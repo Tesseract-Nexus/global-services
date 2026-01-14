@@ -1,4 +1,4 @@
-module notification-service
+module tenant-service
 
 go 1.25
 
