@@ -11,9 +11,10 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/Tesseract-Nexus/go-shared/auth"
-	"tenant-service/internal/clients"
-	"tenant-service/internal/models"
-	"tenant-service/internal/repository"
+	"github.com/Tesseract-Nexus/go-shared/security"
+	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/clients"
+	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/models"
+	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/repository"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -22,12 +23,14 @@ import (
 // This enables multi-tenant credential isolation where the same email
 // can have different passwords for different tenants
 type TenantAuthService struct {
-	credentialRepo *repository.CredentialRepository
-	membershipRepo *repository.MembershipRepository
-	keycloakClient *auth.KeycloakAdminClient
-	keycloakConfig *KeycloakAuthConfig
-	db             *gorm.DB
-	staffClient    StaffClientInterface // For staff member credential validation
+	credentialRepo     *repository.CredentialRepository
+	membershipRepo     *repository.MembershipRepository
+	keycloakClient     *auth.KeycloakAdminClient
+	keycloakConfig     *KeycloakAuthConfig
+	db                 *gorm.DB
+	staffClient        StaffClientInterface          // For staff member credential validation
+	notificationClient *clients.NotificationClient   // For sending emails
+	verificationClient *clients.VerificationClient   // For email verification
 }
 
 // StaffClientInterface defines the interface for staff-service client
@@ -58,14 +61,32 @@ func (s *TenantAuthService) SetStaffClient(client StaffClientInterface) {
 	s.staffClient = client
 }
 
+// SetNotificationClient sets the notification client for sending emails
+func (s *TenantAuthService) SetNotificationClient(client *clients.NotificationClient) {
+	s.notificationClient = client
+}
+
+// SetVerificationClient sets the verification client for email verification
+func (s *TenantAuthService) SetVerificationClient(client *clients.VerificationClient) {
+	s.verificationClient = client
+}
+
+// AuthContext defines the authentication context
+// This prevents staff members from logging into the storefront
+const (
+	AuthContextCustomer = "customer" // For storefront/customer login - staff fallback NOT allowed
+	AuthContextStaff    = "staff"    // For admin portal - staff fallback allowed
+)
+
 // ValidateCredentialsRequest represents a request to validate tenant-specific credentials
 type ValidateCredentialsRequest struct {
-	Email      string    `json:"email" validate:"required,email"`
-	Password   string    `json:"password" validate:"required"`
-	TenantID   uuid.UUID `json:"tenant_id"`   // Either tenant_id or tenant_slug required
-	TenantSlug string    `json:"tenant_slug"` // Either tenant_id or tenant_slug required
-	IPAddress  string    `json:"ip_address,omitempty"`
-	UserAgent  string    `json:"user_agent,omitempty"`
+	Email       string    `json:"email" validate:"required,email"`
+	Password    string    `json:"password" validate:"required"`
+	TenantID    uuid.UUID `json:"tenant_id"`    // Either tenant_id or tenant_slug required
+	TenantSlug  string    `json:"tenant_slug"`  // Either tenant_id or tenant_slug required
+	AuthContext string    `json:"auth_context"` // "customer" or "staff" - controls whether staff fallback is allowed
+	IPAddress   string    `json:"ip_address,omitempty"`
+	UserAgent   string    `json:"user_agent,omitempty"`
 }
 
 // ValidateCredentialsResponse represents the response from credential validation
@@ -121,10 +142,16 @@ func (s *TenantAuthService) ValidateCredentials(ctx context.Context, req *Valida
 	var user models.User
 	if err := s.db.WithContext(ctx).Where("email = ?", req.Email).First(&user).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			// User not in tenant_users - try staff member fallback
-			if s.staffClient != nil && s.keycloakClient != nil && s.keycloakConfig != nil {
-				log.Printf("[TenantAuthService] User not in tenant_users, trying staff fallback for %s", req.Email)
+			// User not in tenant_users - try staff member fallback ONLY if auth_context is "staff"
+			// SECURITY: Customer/storefront logins should NEVER fall back to staff credentials
+			// This prevents store owners from logging into their own storefront using admin credentials
+			if req.AuthContext != AuthContextCustomer && s.staffClient != nil && s.keycloakClient != nil && s.keycloakConfig != nil {
+				log.Printf("[TenantAuthService] User not in tenant_users, trying staff fallback for %s (auth_context=%s)", security.MaskEmail(req.Email), req.AuthContext)
 				return s.validateStaffCredentials(ctx, tenant, req)
+			}
+			// For customer context, don't fall back to staff - this is the security fix
+			if req.AuthContext == AuthContextCustomer {
+				log.Printf("[TenantAuthService] User not found and staff fallback disabled for customer context: %s", security.MaskEmail(req.Email))
 			}
 			// Don't reveal whether user exists
 			s.logFailedAuthEvent(ctx, tenant.ID, nil, req.Email, req.IPAddress, req.UserAgent, "USER_NOT_FOUND")
@@ -192,7 +219,7 @@ func (s *TenantAuthService) ValidateCredentials(ctx context.Context, req *Valida
 
 	if s.keycloakClient != nil && s.keycloakConfig != nil && keycloakUserID != "" {
 		// Validate password via Keycloak direct grant
-		log.Printf("[TenantAuthService] Validating password via Keycloak direct grant, username=%s", req.Email)
+		log.Printf("[TenantAuthService] Validating password via Keycloak direct grant, username=%s", security.MaskEmail(req.Email))
 		tokens, kcErr := s.keycloakClient.GetTokenWithPassword(
 			ctx,
 			s.keycloakConfig.ClientID,
@@ -323,7 +350,7 @@ func (s *TenantAuthService) validateStaffCredentials(ctx context.Context, tenant
 
 	// Check staff has Keycloak user ID
 	if staffInfo.KeycloakUserID == "" {
-		log.Printf("[TenantAuthService] Staff has no Keycloak user ID: %s", req.Email)
+		log.Printf("[TenantAuthService] Staff has no Keycloak user ID: %s", security.MaskEmail(req.Email))
 		return &ValidateCredentialsResponse{
 			Valid:        false,
 			TenantID:     tenant.ID,
@@ -334,7 +361,7 @@ func (s *TenantAuthService) validateStaffCredentials(ctx context.Context, tenant
 	}
 
 	// Validate password via Keycloak direct grant
-	log.Printf("[TenantAuthService] Validating staff password via Keycloak, email=%s", req.Email)
+	log.Printf("[TenantAuthService] Validating staff password via Keycloak, email=%s", security.MaskEmail(req.Email))
 	tokens, kcErr := s.keycloakClient.GetTokenWithPassword(
 		ctx,
 		s.keycloakConfig.ClientID,
@@ -355,7 +382,7 @@ func (s *TenantAuthService) validateStaffCredentials(ctx context.Context, tenant
 		}, nil
 	}
 
-	log.Printf("[TenantAuthService] Staff password validation succeeded for %s", req.Email)
+	log.Printf("[TenantAuthService] Staff password validation succeeded for %s", security.MaskEmail(req.Email))
 
 	// Extract actual Keycloak user ID from access token and sync if different
 	if tokens != nil && tokens.AccessToken != "" {
@@ -721,4 +748,325 @@ func (s *TenantAuthService) logSuccessAuthEvent(ctx context.Context, tenantID uu
 	if err := s.credentialRepo.LogAuthEvent(ctx, auditLog); err != nil {
 		log.Printf("[TenantAuthService] Warning: Failed to log success auth event: %v", err)
 	}
+}
+
+// RegisterCustomerRequest represents a request to register a new customer
+type RegisterCustomerRequest struct {
+	Email      string `json:"email" validate:"required,email"`
+	Password   string `json:"password" validate:"required,min=8"`
+	FirstName  string `json:"first_name" validate:"required"`
+	LastName   string `json:"last_name" validate:"required"`
+	Phone      string `json:"phone,omitempty"`
+	TenantSlug string `json:"tenant_slug" validate:"required"`
+	IPAddress  string `json:"ip_address,omitempty"`
+	UserAgent  string `json:"user_agent,omitempty"`
+}
+
+// RegisterCustomerResponse represents the response from customer registration
+type RegisterCustomerResponse struct {
+	Success        bool       `json:"success"`
+	UserID         *uuid.UUID `json:"user_id,omitempty"`
+	KeycloakUserID string     `json:"keycloak_user_id,omitempty"`
+	TenantID       uuid.UUID  `json:"tenant_id"`
+	TenantSlug     string     `json:"tenant_slug"`
+	Email          string     `json:"email"`
+	FirstName      string     `json:"first_name"`
+	LastName       string     `json:"last_name"`
+	ErrorCode      string     `json:"error_code,omitempty"`
+	ErrorMessage   string     `json:"error_message,omitempty"`
+
+	// Keycloak tokens for immediate login after registration
+	AccessToken  string `json:"access_token,omitempty"`
+	RefreshToken string `json:"refresh_token,omitempty"`
+	IDToken      string `json:"id_token,omitempty"`
+	ExpiresIn    int    `json:"expires_in,omitempty"`
+}
+
+// RegisterCustomer registers a new customer for the storefront
+// This creates the user in Keycloak and returns tokens for immediate login
+func (s *TenantAuthService) RegisterCustomer(ctx context.Context, req *RegisterCustomerRequest) (*RegisterCustomerResponse, error) {
+	// Resolve tenant by slug
+	tenant, err := s.membershipRepo.GetTenantBySlug(ctx, req.TenantSlug)
+	if err != nil {
+		return &RegisterCustomerResponse{
+			Success:      false,
+			ErrorCode:    "TENANT_NOT_FOUND",
+			ErrorMessage: "The specified store was not found",
+		}, nil
+	}
+
+	// Check if user already exists in Keycloak
+	if s.keycloakClient == nil {
+		return nil, fmt.Errorf("authentication service not properly configured")
+	}
+
+	// Check if email is already registered FOR THIS SPECIFIC TENANT
+	// This allows same email to register on different storefronts
+	var existingEmailCount int64
+	err = s.db.WithContext(ctx).
+		Table("tenant_users").
+		Joins("JOIN user_tenant_memberships ON tenant_users.id = user_tenant_memberships.user_id").
+		Where("tenant_users.email = ? AND user_tenant_memberships.tenant_id = ?", req.Email, tenant.ID).
+		Count(&existingEmailCount).Error
+	if err != nil {
+		log.Printf("[TenantAuthService] Error checking existing email for tenant: %v", err)
+	}
+	if existingEmailCount > 0 {
+		return &RegisterCustomerResponse{
+			Success:      false,
+			TenantID:     tenant.ID,
+			TenantSlug:   tenant.Slug,
+			ErrorCode:    "EMAIL_EXISTS",
+			ErrorMessage: "An account with this email already exists for this store",
+		}, nil
+	}
+
+	// Check if phone is already registered FOR THIS SPECIFIC TENANT (if phone provided)
+	if req.Phone != "" {
+		var existingPhoneCount int64
+		err = s.db.WithContext(ctx).
+			Table("tenant_users").
+			Joins("JOIN user_tenant_memberships ON tenant_users.id = user_tenant_memberships.user_id").
+			Where("tenant_users.phone = ? AND user_tenant_memberships.tenant_id = ?", req.Phone, tenant.ID).
+			Count(&existingPhoneCount).Error
+		if err != nil {
+			log.Printf("[TenantAuthService] Error checking existing phone for tenant: %v", err)
+		}
+		if existingPhoneCount > 0 {
+			return &RegisterCustomerResponse{
+				Success:      false,
+				TenantID:     tenant.ID,
+				TenantSlug:   tenant.Slug,
+				ErrorCode:    "PHONE_EXISTS",
+				ErrorMessage: "An account with this phone number already exists for this store",
+			}, nil
+		}
+	}
+
+	// Validate password against tenant's policy
+	policy, _ := s.credentialRepo.GetAuthPolicy(ctx, tenant.ID)
+	if policy != nil {
+		if err := s.validatePasswordPolicy(req.Password, policy); err != nil {
+			return &RegisterCustomerResponse{
+				Success:      false,
+				TenantID:     tenant.ID,
+				TenantSlug:   tenant.Slug,
+				ErrorCode:    "INVALID_PASSWORD",
+				ErrorMessage: err.Error(),
+			}, nil
+		}
+	}
+
+	// Check if user already exists in Keycloak (may have registered on another storefront)
+	var keycloakUserID string
+	var isExistingKeycloakUser bool
+
+	existingKeycloakUser, err := s.keycloakClient.GetUserByEmail(ctx, req.Email)
+	if err != nil {
+		log.Printf("[TenantAuthService] Error checking Keycloak user: %v", err)
+	}
+
+	if existingKeycloakUser != nil && existingKeycloakUser.ID != "" {
+		// User exists in Keycloak - they're registering on a new storefront
+		keycloakUserID = existingKeycloakUser.ID
+		isExistingKeycloakUser = true
+		log.Printf("[TenantAuthService] User already exists in Keycloak: %s (registering on new storefront)", keycloakUserID)
+
+		// Verify the password is correct for the existing account
+		_, err := s.keycloakClient.GetTokenWithPassword(
+			ctx,
+			s.keycloakConfig.ClientID,
+			s.keycloakConfig.ClientSecret,
+			req.Email,
+			req.Password,
+		)
+		if err != nil {
+			log.Printf("[TenantAuthService] Password verification failed for existing user: %v", err)
+			return &RegisterCustomerResponse{
+				Success:      false,
+				TenantID:     tenant.ID,
+				TenantSlug:   tenant.Slug,
+				ErrorCode:    "INVALID_CREDENTIALS",
+				ErrorMessage: "An account with this email exists. Please use the correct password or log in instead.",
+			}, nil
+		}
+	} else {
+		// Create new user in Keycloak
+		keycloakUserID, err = s.keycloakClient.CreateUser(ctx, auth.UserRepresentation{
+			Email:         req.Email,
+			Username:      req.Email,
+			FirstName:     req.FirstName,
+			LastName:      req.LastName,
+			Enabled:       true,
+			EmailVerified: false, // Require email verification
+		})
+		if err != nil {
+			log.Printf("[TenantAuthService] Failed to create Keycloak user: %v", err)
+			return &RegisterCustomerResponse{
+				Success:      false,
+				TenantID:     tenant.ID,
+				TenantSlug:   tenant.Slug,
+				ErrorCode:    "REGISTRATION_FAILED",
+				ErrorMessage: "Failed to create account. Please try again.",
+			}, nil
+		}
+
+		log.Printf("[TenantAuthService] Created Keycloak user: %s", keycloakUserID)
+
+		// Set password in Keycloak for new users only
+		if err := s.keycloakClient.SetUserPassword(ctx, keycloakUserID, req.Password, false); err != nil {
+			log.Printf("[TenantAuthService] Failed to set password: %v", err)
+			// Try to clean up the created user
+			_ = s.keycloakClient.DeleteUser(ctx, keycloakUserID)
+			return &RegisterCustomerResponse{
+				Success:      false,
+				TenantID:     tenant.ID,
+				TenantSlug:   tenant.Slug,
+				ErrorCode:    "REGISTRATION_FAILED",
+				ErrorMessage: "Failed to set password. Please try again.",
+			}, nil
+		}
+	}
+
+	_ = isExistingKeycloakUser // Mark as used
+
+	// Get tokens via password grant for immediate login
+	var tokens *auth.TokenResponse
+	if s.keycloakConfig != nil {
+		tokens, err = s.keycloakClient.GetTokenWithPassword(
+			ctx,
+			s.keycloakConfig.ClientID,
+			s.keycloakConfig.ClientSecret,
+			req.Email,
+			req.Password,
+		)
+		if err != nil {
+			log.Printf("[TenantAuthService] Warning: Failed to get tokens after registration: %v", err)
+			// Don't fail registration - user can log in manually
+		}
+	}
+
+	// Parse Keycloak UUID
+	keycloakUUID, _ := uuid.Parse(keycloakUserID)
+
+	// Create or get user record in tenant_users (for tracking)
+	var user models.User
+	if err := s.db.WithContext(ctx).Where("email = ?", req.Email).First(&user).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			// Create new user record with phone
+			user = models.User{
+				Email:      req.Email,
+				FirstName:  req.FirstName,
+				LastName:   req.LastName,
+				Phone:      req.Phone,
+				KeycloakID: &keycloakUUID,
+			}
+			if err := s.db.WithContext(ctx).Create(&user).Error; err != nil {
+				log.Printf("[TenantAuthService] Warning: Failed to create user record: %v", err)
+				// Don't fail - Keycloak user was created successfully
+			}
+		}
+	} else {
+		// Update existing user with Keycloak ID and phone if not set
+		updates := make(map[string]interface{})
+		if user.KeycloakID == nil {
+			updates["keycloak_id"] = &keycloakUUID
+		}
+		if user.Phone == "" && req.Phone != "" {
+			updates["phone"] = req.Phone
+		}
+		if len(updates) > 0 {
+			s.db.WithContext(ctx).Model(&user).Updates(updates)
+		}
+	}
+
+	// Create membership if user was created
+	if user.ID != uuid.Nil {
+		membership := &models.UserTenantMembership{
+			UserID:   user.ID,
+			TenantID: tenant.ID,
+			Role:     "customer",
+			IsActive: true,
+		}
+		// Use raw SQL for ON CONFLICT DO NOTHING
+		s.db.WithContext(ctx).Exec(
+			"INSERT INTO user_tenant_memberships (user_id, tenant_id, role, is_active) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING",
+			membership.UserID, membership.TenantID, membership.Role, membership.IsActive,
+		)
+	}
+
+	// Log registration event
+	auditLog := &models.TenantAuthAuditLog{
+		TenantID:    tenant.ID,
+		UserID:      &user.ID,
+		EventType:   "account_created",
+		EventStatus: models.AuthEventStatusSuccess,
+		IPAddress:   req.IPAddress,
+		UserAgent:   req.UserAgent,
+		Details:     models.MustNewJSONB(map[string]interface{}{"email": req.Email, "method": "direct_registration"}),
+	}
+	if auditErr := s.credentialRepo.LogAuthEvent(ctx, auditLog); auditErr != nil {
+		log.Printf("[TenantAuthService] Warning: Failed to log registration event: %v", auditErr)
+	}
+
+	// Send verification email if not already an existing Keycloak user
+	// (existing users already verified their email on their first store)
+	if !isExistingKeycloakUser && s.verificationClient != nil {
+		go func() {
+			sendCtx := context.Background()
+			_, err := s.verificationClient.SendCode(sendCtx, &clients.SendVerificationCodeRequest{
+				Recipient: req.Email,
+				Channel:   "email",
+				Purpose:   "customer_email_verification",
+				TenantID:  &tenant.ID,
+				Metadata: map[string]interface{}{
+					"first_name":  req.FirstName,
+					"tenant_slug": tenant.Slug,
+					"store_name":  tenant.Name,
+				},
+			})
+			if err != nil {
+				log.Printf("[TenantAuthService] Warning: Failed to send verification email: %v", err)
+			} else {
+				log.Printf("[TenantAuthService] Verification email sent to %s", security.MaskEmail(req.Email))
+			}
+		}()
+	}
+
+	// Send welcome email
+	if s.notificationClient != nil {
+		go func() {
+			sendCtx := context.Background()
+			storeName := tenant.Name
+			if storeName == "" {
+				storeName = tenant.Slug
+			}
+			if err := s.notificationClient.SendCustomerWelcomeEmail(sendCtx, req.Email, req.FirstName, storeName); err != nil {
+				log.Printf("[TenantAuthService] Warning: Failed to send welcome email: %v", err)
+			} else {
+				log.Printf("[TenantAuthService] Welcome email sent to %s", security.MaskEmail(req.Email))
+			}
+		}()
+	}
+
+	response := &RegisterCustomerResponse{
+		Success:        true,
+		UserID:         &user.ID,
+		KeycloakUserID: keycloakUserID,
+		TenantID:       tenant.ID,
+		TenantSlug:     tenant.Slug,
+		Email:          req.Email,
+		FirstName:      req.FirstName,
+		LastName:       req.LastName,
+	}
+
+	// Attach tokens if available
+	if tokens != nil {
+		response.AccessToken = tokens.AccessToken
+		response.RefreshToken = tokens.RefreshToken
+		response.IDToken = tokens.IDToken
+		response.ExpiresIn = tokens.ExpiresIn
+	}
+
+	return response, nil
 }

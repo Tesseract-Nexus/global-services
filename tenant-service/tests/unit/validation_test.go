@@ -7,8 +7,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"tenant-service/internal/models"
-	_ "tenant-service/internal/services" // Used in commented out test code
+	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/models"
+	_ "github.com/tesseract-hub/domains/common/services/tenant-service/internal/services" // Used in commented out test code
 )
 
 // MockOnboardingRepository is a mock implementation of OnboardingRepository

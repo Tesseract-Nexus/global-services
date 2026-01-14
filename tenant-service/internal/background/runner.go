@@ -6,18 +6,20 @@ import (
 	"sync"
 	"time"
 
-	"tenant-service/internal/config"
-	"tenant-service/internal/services"
+	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/config"
+	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/services"
 )
 
-// Runner manages background jobs for draft persistence
+// Runner manages background jobs for draft persistence and account maintenance
 type Runner struct {
-	draftSvc       *services.DraftService
-	config         config.DraftConfig
-	stopCh         chan struct{}
-	wg             sync.WaitGroup
-	cleanupTicker  *time.Ticker
-	reminderTicker *time.Ticker
+	draftSvc        *services.DraftService
+	deactivationSvc *services.CustomerDeactivationService
+	config          config.DraftConfig
+	stopCh          chan struct{}
+	wg              sync.WaitGroup
+	cleanupTicker   *time.Ticker
+	reminderTicker  *time.Ticker
+	purgeTicker     *time.Ticker // For purging deactivated accounts
 }
 
 // NewRunner creates a new background runner
@@ -27,6 +29,11 @@ func NewRunner(draftSvc *services.DraftService, cfg config.DraftConfig) *Runner 
 		config:   cfg,
 		stopCh:   make(chan struct{}),
 	}
+}
+
+// SetDeactivationService sets the customer deactivation service for purge jobs
+func (r *Runner) SetDeactivationService(svc *services.CustomerDeactivationService) {
+	r.deactivationSvc = svc
 }
 
 // Start begins the background job processing
@@ -51,6 +58,16 @@ func (r *Runner) Start() {
 	r.wg.Add(1)
 	go r.runReminderJob()
 
+	// Start purge job for deactivated accounts (runs daily)
+	if r.deactivationSvc != nil {
+		purgeInterval := 24 * time.Hour
+		r.purgeTicker = time.NewTicker(purgeInterval)
+		log.Printf("Account purge job scheduled every %v", purgeInterval)
+
+		r.wg.Add(1)
+		go r.runPurgeJob()
+	}
+
 	log.Println("Background job runner started successfully")
 }
 
@@ -64,6 +81,9 @@ func (r *Runner) Stop() {
 	}
 	if r.reminderTicker != nil {
 		r.reminderTicker.Stop()
+	}
+	if r.purgeTicker != nil {
+		r.purgeTicker.Stop()
 	}
 
 	// Wait for goroutines to finish with timeout
@@ -162,4 +182,42 @@ func (r *Runner) RunOnce(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// runPurgeJob runs the account purge job periodically (daily)
+func (r *Runner) runPurgeJob() {
+	defer r.wg.Done()
+
+	// Run immediately on start to catch any accounts that expired while service was down
+	r.executePurge()
+
+	for {
+		select {
+		case <-r.stopCh:
+			log.Println("Purge job stopping...")
+			return
+		case <-r.purgeTicker.C:
+			r.executePurge()
+		}
+	}
+}
+
+// executePurge permanently deletes accounts past the 90-day retention period
+func (r *Runner) executePurge() {
+	if r.deactivationSvc == nil {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	defer cancel()
+
+	log.Println("Running account purge job...")
+	purged, err := r.deactivationSvc.PurgeExpiredAccounts(ctx)
+	if err != nil {
+		log.Printf("Error in account purge job: %v", err)
+	} else if purged > 0 {
+		log.Printf("Account purge job completed: %d accounts permanently deleted", purged)
+	} else {
+		log.Println("Account purge job completed: no accounts to purge")
+	}
 }

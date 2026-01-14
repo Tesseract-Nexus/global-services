@@ -1,9 +1,8 @@
-module tenant-service
+module notification-service
 
 go 1.25
 
 require (
-	github.com/Tesseract-Nexus/go-shared v0.0.0-20260114152147-11cd2a14e96d
 	github.com/gin-contrib/cors v1.7.6
 	github.com/gin-gonic/gin v1.11.0
 	github.com/google/uuid v1.6.0
@@ -12,6 +11,7 @@ require (
 	github.com/redis/go-redis/v9 v9.17.2
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.11.1
+	github.com/Tesseract-Nexus/go-shared v0.0.0
 	golang.org/x/crypto v0.41.0
 	gorm.io/driver/postgres v1.5.6
 	gorm.io/gorm v1.25.7
@@ -87,3 +87,4 @@ require (
 	google.golang.org/protobuf v1.36.9 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+

@@ -23,7 +23,7 @@
 import { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { config } from '../config';
-import { tenantServiceClient } from '../tenant-service-client';
+import { tenantServiceClient, maskEmail } from '../tenant-service-client';
 import { sessionStore } from '../session-store';
 import { createLogger } from '../logger';
 import { v4 as uuidv4 } from 'uuid';
@@ -49,6 +49,44 @@ const directLoginSchema = z.object({
 const accountStatusSchema = z.object({
   email: z.string().email('Invalid email format'),
   tenant_slug: z.string().min(1, 'Tenant selection is required'),
+});
+
+const directRegisterSchema = z.object({
+  email: z.string().email('Invalid email format'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  first_name: z.string().min(1, 'First name is required'),
+  last_name: z.string().min(1, 'Last name is required'),
+  phone: z.string().optional(),
+  tenant_slug: z.string().min(1, 'Store is required'),
+});
+
+const checkDeactivatedSchema = z.object({
+  email: z.string().email('Invalid email format'),
+  tenant_slug: z.string().min(1, 'Store is required'),
+});
+
+const reactivateAccountSchema = z.object({
+  email: z.string().email('Invalid email format'),
+  password: z.string().min(1, 'Password is required'),
+  tenant_slug: z.string().min(1, 'Store is required'),
+});
+
+const deactivateAccountSchema = z.object({
+  reason: z.string().optional(),
+});
+
+const requestPasswordResetSchema = z.object({
+  email: z.string().email('Invalid email format'),
+  tenant_slug: z.string().min(1, 'Store is required'),
+});
+
+const validateResetTokenSchema = z.object({
+  token: z.string().min(1, 'Token is required'),
+});
+
+const resetPasswordSchema = z.object({
+  token: z.string().min(1, 'Token is required'),
+  new_password: z.string().min(8, 'Password must be at least 8 characters'),
 });
 
 // ============================================================================
@@ -194,7 +232,7 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
     const rateLimitKey = `login:${clientIP}:${email.toLowerCase()}`;
     const rateLimit = checkRateLimit(rateLimitKey);
     if (!rateLimit.allowed) {
-      logger.warn({ ip: clientIP, email }, 'Rate limit exceeded for login');
+      logger.warn({ ip: clientIP, email: maskEmail(email) }, 'Rate limit exceeded for login');
       return reply.code(429).send({
         success: false,
         error: 'RATE_LIMITED',
@@ -204,14 +242,16 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
     }
 
     // Validate credentials with tenant-service
+    // SECURITY: Pass auth_context: 'customer' to prevent staff from logging into storefront
+    // This ensures store owners/staff cannot use admin credentials on customer-facing storefront
     const result = await tenantServiceClient.validateCredentials(
-      { email, password, tenant_slug, tenant_id },
+      { email, password, tenant_slug, tenant_id, auth_context: 'customer' },
       clientIP,
       userAgent
     );
 
     if (!result.success) {
-      logger.error({ email, tenant_slug }, 'Tenant service validation failed');
+      logger.error({ email: maskEmail(email), tenant_slug }, 'Tenant service validation failed');
       return reply.code(503).send({
         success: false,
         error: 'SERVICE_UNAVAILABLE',
@@ -224,7 +264,7 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
     // Handle invalid credentials
     if (!data.valid) {
       logger.info({
-        email,
+        email: maskEmail(email),
         tenant_slug,
         error_code: data.error_code,
         account_locked: data.account_locked,
@@ -273,7 +313,7 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
 
     // Check if we received tokens from tenant-service
     if (!data.access_token) {
-      logger.error({ email, tenant_slug }, 'No tokens received from tenant-service');
+      logger.error({ email: maskEmail(email), tenant_slug }, 'No tokens received from tenant-service');
       return reply.code(500).send({
         success: false,
         error: 'TOKEN_ERROR',
@@ -459,6 +499,486 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
       success: false,
       error: 'NOT_IMPLEMENTED',
       message: 'MFA code sending is not yet implemented.',
+    });
+  });
+
+  // ==========================================================================
+  // POST /auth/direct/register
+  // Registers a new customer and returns tokens for immediate login
+  // ==========================================================================
+  fastify.post<{
+    Body: z.infer<typeof directRegisterSchema>;
+  }>('/auth/direct/register', async (request, reply) => {
+    const validation = directRegisterSchema.safeParse(request.body);
+    if (!validation.success) {
+      return reply.code(400).send({
+        success: false,
+        error: 'VALIDATION_ERROR',
+        message: validation.error.issues[0]?.message || 'Invalid request',
+      });
+    }
+
+    const { email, password, first_name, last_name, phone, tenant_slug } = validation.data;
+    const clientIP = request.ip;
+    const userAgent = request.headers['user-agent'] || 'unknown';
+
+    // Rate limit by IP
+    const rateLimitKey = `register:${clientIP}`;
+    const rateLimit = checkRateLimit(rateLimitKey);
+    if (!rateLimit.allowed) {
+      logger.warn({ ip: clientIP }, 'Rate limit exceeded for registration');
+      return reply.code(429).send({
+        success: false,
+        error: 'RATE_LIMITED',
+        message: 'Too many registration attempts. Please try again later.',
+        retry_after: Math.ceil(rateLimit.resetIn / 1000),
+      });
+    }
+
+    // Register with tenant-service
+    const result = await tenantServiceClient.registerCustomer(
+      { email, password, first_name, last_name, phone, tenant_slug },
+      clientIP,
+      userAgent
+    );
+
+    if (!result.success) {
+      logger.error({ email: maskEmail(email), tenant_slug }, 'Tenant service registration failed');
+      return reply.code(503).send({
+        success: false,
+        error: 'SERVICE_UNAVAILABLE',
+        message: 'Registration service is temporarily unavailable. Please try again.',
+      });
+    }
+
+    const data = result.data!;
+
+    // Handle registration errors
+    if (data.error_code) {
+      logger.info({
+        email: maskEmail(email),
+        tenant_slug,
+        error_code: data.error_code,
+      }, 'Registration failed');
+
+      // Email already exists
+      if (data.error_code === 'EMAIL_EXISTS') {
+        return reply.code(409).send({
+          success: false,
+          error: 'EMAIL_EXISTS',
+          message: data.message || 'An account with this email already exists.',
+        });
+      }
+
+      // Other errors
+      return reply.code(400).send({
+        success: false,
+        error: data.error_code,
+        message: data.message || 'Registration failed.',
+      });
+    }
+
+    // Check if we received tokens from tenant-service
+    if (!data.access_token) {
+      // Registration successful but no tokens - user needs to log in manually
+      logger.info({ email: maskEmail(email), tenant_slug }, 'Registration successful (no auto-login)');
+      return reply.send({
+        success: true,
+        registered: true,
+        auto_login: false,
+        user: {
+          id: data.user_id,
+          email: data.email,
+          first_name: data.first_name,
+          last_name: data.last_name,
+          tenant_id: data.tenant_id,
+          tenant_slug: data.tenant_slug,
+        },
+        message: 'Account created successfully. Please log in.',
+      });
+    }
+
+    // Create session with tokens for auto-login
+    const sessionExpirySeconds = 86400; // 24 hours
+    const session = await sessionStore.createSession({
+      userId: data.user_id!,
+      tenantId: data.tenant_id,
+      tenantSlug: data.tenant_slug,
+      clientType: 'customer',
+      accessToken: data.access_token,
+      idToken: data.id_token,
+      refreshToken: data.refresh_token,
+      expiresAt: Math.floor(Date.now() / 1000) + sessionExpirySeconds,
+      userInfo: {
+        sub: data.user_id,
+        email: data.email,
+        given_name: data.first_name,
+        family_name: data.last_name,
+        name: data.first_name && data.last_name
+          ? `${data.first_name} ${data.last_name}`
+          : data.email,
+        tenant_id: data.tenant_id,
+        tenant_slug: data.tenant_slug,
+      },
+    });
+
+    // Set session cookie
+    setSessionCookie(reply, session.id, false);
+
+    logger.info({
+      userId: session.userId,
+      sessionId: session.id,
+      tenant_slug,
+    }, 'Direct registration with auto-login successful');
+
+    return reply.send({
+      success: true,
+      registered: true,
+      authenticated: true,
+      user: {
+        id: data.user_id,
+        email: data.email,
+        first_name: data.first_name,
+        last_name: data.last_name,
+        tenant_id: data.tenant_id,
+        tenant_slug: data.tenant_slug,
+      },
+      session: {
+        expires_at: session.expiresAt,
+        csrf_token: session.csrfToken,
+      },
+    });
+  });
+
+  // ==========================================================================
+  // POST /auth/direct/check-deactivated
+  // Checks if an account is deactivated (used during login flow)
+  // ==========================================================================
+  fastify.post<{
+    Body: z.infer<typeof checkDeactivatedSchema>;
+  }>('/auth/direct/check-deactivated', async (request, reply) => {
+    const validation = checkDeactivatedSchema.safeParse(request.body);
+    if (!validation.success) {
+      return reply.code(400).send({
+        success: false,
+        error: 'VALIDATION_ERROR',
+        message: validation.error.issues[0]?.message || 'Invalid request',
+      });
+    }
+
+    const { email, tenant_slug } = validation.data;
+
+    const result = await tenantServiceClient.checkDeactivatedAccount(email, tenant_slug);
+
+    if (!result.success) {
+      return reply.code(503).send({
+        success: false,
+        error: 'SERVICE_UNAVAILABLE',
+        message: 'Unable to check account status. Please try again.',
+      });
+    }
+
+    return reply.send({
+      success: true,
+      is_deactivated: result.is_deactivated,
+      can_reactivate: result.can_reactivate,
+      days_until_purge: result.days_until_purge,
+      deactivated_at: result.deactivated_at,
+      purge_date: result.purge_date,
+    });
+  });
+
+  // ==========================================================================
+  // POST /auth/direct/reactivate-account
+  // Reactivates a deactivated account within the 90-day retention period
+  // ==========================================================================
+  fastify.post<{
+    Body: z.infer<typeof reactivateAccountSchema>;
+  }>('/auth/direct/reactivate-account', async (request, reply) => {
+    const validation = reactivateAccountSchema.safeParse(request.body);
+    if (!validation.success) {
+      return reply.code(400).send({
+        success: false,
+        error: 'VALIDATION_ERROR',
+        message: validation.error.issues[0]?.message || 'Invalid request',
+      });
+    }
+
+    const { email, password, tenant_slug } = validation.data;
+    const clientIP = request.ip;
+
+    // Rate limit by IP + email
+    const rateLimitKey = `reactivate:${clientIP}:${email.toLowerCase()}`;
+    const rateLimit = checkRateLimit(rateLimitKey);
+    if (!rateLimit.allowed) {
+      logger.warn({ ip: clientIP, email: maskEmail(email) }, 'Rate limit exceeded for reactivation');
+      return reply.code(429).send({
+        success: false,
+        error: 'RATE_LIMITED',
+        message: 'Too many attempts. Please try again later.',
+        retry_after: Math.ceil(rateLimit.resetIn / 1000),
+      });
+    }
+
+    const result = await tenantServiceClient.reactivateAccount({
+      email,
+      password,
+      tenant_slug,
+    });
+
+    if (!result.success) {
+      // Handle specific error codes
+      if (result.error_code === 'INVALID_PASSWORD') {
+        return reply.code(401).send({
+          success: false,
+          error: 'INVALID_PASSWORD',
+          message: 'Invalid password. Please try again.',
+        });
+      }
+
+      if (result.error_code === 'CANNOT_REACTIVATE') {
+        return reply.code(410).send({
+          success: false,
+          error: 'CANNOT_REACTIVATE',
+          message: 'Account cannot be reactivated. The retention period has expired.',
+        });
+      }
+
+      if (result.error_code === 'NOT_DEACTIVATED') {
+        return reply.code(400).send({
+          success: false,
+          error: 'NOT_DEACTIVATED',
+          message: 'This account is not deactivated.',
+        });
+      }
+
+      return reply.code(500).send({
+        success: false,
+        error: result.error_code || 'REACTIVATION_FAILED',
+        message: result.error_message || 'Failed to reactivate account. Please try again.',
+      });
+    }
+
+    logger.info({ email: maskEmail(email), tenant_slug }, 'Account reactivated successfully');
+
+    return reply.send({
+      success: true,
+      message: result.message || 'Your account has been reactivated. Welcome back!',
+    });
+  });
+
+  // ==========================================================================
+  // POST /auth/direct/deactivate-account
+  // Deactivates the authenticated user's account (self-service)
+  // Requires valid session
+  // ==========================================================================
+  fastify.post<{
+    Body: z.infer<typeof deactivateAccountSchema>;
+  }>('/auth/direct/deactivate-account', async (request, reply) => {
+    // Get session from cookie
+    const sessionId = request.cookies[config.session.cookieName];
+    if (!sessionId) {
+      return reply.code(401).send({
+        success: false,
+        error: 'UNAUTHORIZED',
+        message: 'You must be logged in to deactivate your account.',
+      });
+    }
+
+    const session = await sessionStore.getSession(sessionId);
+    if (!session) {
+      return reply.code(401).send({
+        success: false,
+        error: 'SESSION_EXPIRED',
+        message: 'Your session has expired. Please log in again.',
+      });
+    }
+
+    const validation = deactivateAccountSchema.safeParse(request.body);
+    if (!validation.success) {
+      return reply.code(400).send({
+        success: false,
+        error: 'VALIDATION_ERROR',
+        message: validation.error.issues[0]?.message || 'Invalid request',
+      });
+    }
+
+    const { reason } = validation.data;
+
+    // Ensure tenant ID is available
+    if (!session.tenantId) {
+      return reply.code(400).send({
+        success: false,
+        error: 'NO_TENANT_CONTEXT',
+        message: 'No store context found. Please log in again.',
+      });
+    }
+
+    // Deactivate the account
+    const result = await tenantServiceClient.deactivateAccount({
+      user_id: session.userId,
+      tenant_id: session.tenantId,
+      reason,
+    });
+
+    if (!result.success) {
+      return reply.code(500).send({
+        success: false,
+        error: result.error_code || 'DEACTIVATION_FAILED',
+        message: result.message || 'Failed to deactivate account. Please try again.',
+      });
+    }
+
+    // Delete the session after successful deactivation
+    await sessionStore.deleteSession(sessionId);
+
+    // Clear the session cookie
+    reply.clearCookie(config.session.cookieName, {
+      path: '/',
+      domain: config.session.cookieDomain,
+    });
+
+    logger.info({
+      userId: session.userId,
+      tenantId: session.tenantId,
+      reason,
+    }, 'Account deactivated and session destroyed');
+
+    return reply.send({
+      success: true,
+      deactivated_at: result.deactivated_at,
+      scheduled_purge_at: result.scheduled_purge_at,
+      days_until_purge: result.days_until_purge,
+      message: result.message || 'Your account has been deactivated. Your data will be retained for 90 days.',
+    });
+  });
+
+  // ==========================================================================
+  // POST /auth/direct/request-password-reset
+  // Requests a password reset email
+  // ==========================================================================
+  fastify.post<{
+    Body: z.infer<typeof requestPasswordResetSchema>;
+  }>('/auth/direct/request-password-reset', async (request, reply) => {
+    const validation = requestPasswordResetSchema.safeParse(request.body);
+    if (!validation.success) {
+      return reply.code(400).send({
+        success: false,
+        error: 'VALIDATION_ERROR',
+        message: validation.error.issues[0]?.message || 'Invalid request',
+      });
+    }
+
+    const { email, tenant_slug } = validation.data;
+    const clientIP = request.ip;
+    const userAgent = request.headers['user-agent'] || 'unknown';
+
+    // Rate limit by IP + email (more strict for password reset)
+    const rateLimitKey = `password-reset:${clientIP}:${email.toLowerCase()}`;
+    const rateLimit = checkRateLimit(rateLimitKey);
+    if (!rateLimit.allowed) {
+      logger.warn({ ip: clientIP, email: maskEmail(email) }, 'Rate limit exceeded for password reset request');
+      // Still return success to not reveal if email exists
+      return reply.send({
+        success: true,
+        message: 'If an account exists with this email, you will receive a password reset link shortly.',
+      });
+    }
+
+    const result = await tenantServiceClient.requestPasswordReset({
+      email,
+      tenant_slug,
+      ip_address: clientIP,
+      user_agent: userAgent,
+    });
+
+    // Always return success to not reveal if email exists
+    logger.info({ email: maskEmail(email), tenant_slug, success: result.success }, 'Password reset requested');
+
+    return reply.send({
+      success: true,
+      message: 'If an account exists with this email, you will receive a password reset link shortly.',
+    });
+  });
+
+  // ==========================================================================
+  // POST /auth/direct/validate-reset-token
+  // Validates a password reset token
+  // ==========================================================================
+  fastify.post<{
+    Body: z.infer<typeof validateResetTokenSchema>;
+  }>('/auth/direct/validate-reset-token', async (request, reply) => {
+    const validation = validateResetTokenSchema.safeParse(request.body);
+    if (!validation.success) {
+      return reply.code(400).send({
+        success: false,
+        error: 'VALIDATION_ERROR',
+        message: validation.error.issues[0]?.message || 'Invalid request',
+      });
+    }
+
+    const { token } = validation.data;
+
+    const result = await tenantServiceClient.validateResetToken(token);
+
+    if (!result.success) {
+      return reply.code(503).send({
+        success: false,
+        error: 'SERVICE_UNAVAILABLE',
+        message: 'Unable to validate token. Please try again.',
+      });
+    }
+
+    return reply.send({
+      success: true,
+      valid: result.valid,
+      email: result.email,
+      expires_at: result.expires_at,
+      message: result.message,
+    });
+  });
+
+  // ==========================================================================
+  // POST /auth/direct/reset-password
+  // Resets the password using a valid token
+  // ==========================================================================
+  fastify.post<{
+    Body: z.infer<typeof resetPasswordSchema>;
+  }>('/auth/direct/reset-password', async (request, reply) => {
+    const validation = resetPasswordSchema.safeParse(request.body);
+    if (!validation.success) {
+      return reply.code(400).send({
+        success: false,
+        error: 'VALIDATION_ERROR',
+        message: validation.error.issues[0]?.message || 'Invalid request',
+      });
+    }
+
+    const { token, new_password } = validation.data;
+    const clientIP = request.ip;
+    const userAgent = request.headers['user-agent'] || 'unknown';
+
+    const result = await tenantServiceClient.resetPassword({
+      token,
+      new_password,
+      ip_address: clientIP,
+      user_agent: userAgent,
+    });
+
+    if (!result.success) {
+      logger.warn({ success: false }, 'Password reset failed');
+      return reply.code(400).send({
+        success: false,
+        error: 'RESET_FAILED',
+        message: result.message || 'Failed to reset password. The link may be invalid or expired.',
+      });
+    }
+
+    logger.info('Password reset successful');
+
+    return reply.send({
+      success: true,
+      message: result.message || 'Your password has been reset successfully. You can now sign in with your new password.',
     });
   });
 }

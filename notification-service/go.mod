@@ -1,4 +1,4 @@
-module notification-service
+module github.com/tesseract-nexus/tesseract-hub/services/notification-service
 
 go 1.25.5
 

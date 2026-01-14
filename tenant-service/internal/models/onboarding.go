@@ -976,3 +976,132 @@ func (d *DeletedTenant) BeforeCreate(tx *gorm.DB) error {
 	}
 	return nil
 }
+
+// Customer account deactivation constants
+const (
+	// DataRetentionDays is the number of days to retain deactivated account data before permanent deletion
+	DataRetentionDays = 90
+
+	// Deactivation reason constants
+	DeactivationReasonSelfService = "self_service"
+	DeactivationReasonAdminAction = "admin_action"
+	DeactivationReasonInactivity  = "inactivity"
+)
+
+// DeactivatedMembership archives customer membership data when they self-deactivate from a storefront.
+// This enables 90-day data retention before permanent deletion and supports reactivation within that window.
+// Following the same pattern as DeletedTenant for audit/archive purposes.
+type DeactivatedMembership struct {
+	ID                   uuid.UUID `json:"id" gorm:"type:uuid;primary_key;default:uuid_generate_v4()"`
+	OriginalMembershipID uuid.UUID `json:"original_membership_id" gorm:"type:uuid;not null;index"`
+	UserID               uuid.UUID `json:"user_id" gorm:"type:uuid;not null;index"`
+	TenantID             uuid.UUID `json:"tenant_id" gorm:"type:uuid;not null;index"`
+	Email                string    `json:"email" gorm:"size:255;not null;index"`
+	FirstName            string    `json:"first_name" gorm:"size:100"`
+	LastName             string    `json:"last_name" gorm:"size:100"`
+
+	// Archived membership data (JSON snapshot for audit)
+	MembershipData JSONB `json:"membership_data" gorm:"type:jsonb;default:'{}'"`
+
+	// Deactivation metadata
+	DeactivationReason string    `json:"deactivation_reason" gorm:"type:text"`
+	DeactivatedAt      time.Time `json:"deactivated_at" gorm:"not null;index"`
+	ScheduledPurgeAt   time.Time `json:"scheduled_purge_at" gorm:"not null;index"` // DeactivatedAt + 90 days
+
+	// Reactivation tracking
+	ReactivatedAt     *time.Time `json:"reactivated_at"`
+	ReactivationCount int        `json:"reactivation_count" gorm:"default:0"`
+
+	// Purge tracking
+	IsPurged bool       `json:"is_purged" gorm:"default:false;index"`
+	PurgedAt *time.Time `json:"purged_at"`
+
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// TableName specifies the table name for DeactivatedMembership
+func (DeactivatedMembership) TableName() string {
+	return "deactivated_memberships"
+}
+
+func (d *DeactivatedMembership) BeforeCreate(tx *gorm.DB) error {
+	if d.ID == uuid.Nil {
+		d.ID = uuid.New()
+	}
+	if d.DeactivatedAt.IsZero() {
+		d.DeactivatedAt = time.Now()
+	}
+	if d.ScheduledPurgeAt.IsZero() {
+		d.ScheduledPurgeAt = d.DeactivatedAt.AddDate(0, 0, DataRetentionDays)
+	}
+	return nil
+}
+
+// DaysUntilPurge returns the number of days remaining until the account is permanently deleted
+func (d *DeactivatedMembership) DaysUntilPurge() int {
+	if d.IsPurged {
+		return 0
+	}
+	remaining := time.Until(d.ScheduledPurgeAt).Hours() / 24
+	if remaining < 0 {
+		return 0
+	}
+	return int(remaining)
+}
+
+// CanReactivate returns true if the account can still be reactivated
+func (d *DeactivatedMembership) CanReactivate() bool {
+	return !d.IsPurged && d.ReactivatedAt == nil && time.Now().Before(d.ScheduledPurgeAt)
+}
+
+// ============================================================================
+// PASSWORD RESET TOKEN MODEL
+// ============================================================================
+// Secure password reset tokens for self-service password recovery.
+// Tokens are single-use, time-limited, and tenant-aware.
+
+// DefaultPasswordResetTokenExpiry is the default token expiry (1 hour)
+const DefaultPasswordResetTokenExpiry = 1 * time.Hour
+
+// PasswordResetToken stores secure tokens for password reset requests
+type PasswordResetToken struct {
+	ID        uuid.UUID `json:"id" gorm:"type:uuid;primary_key;default:uuid_generate_v4()"`
+	Token     string    `json:"-" gorm:"type:varchar(255);not null;uniqueIndex"` // Hashed token
+	UserID    uuid.UUID `json:"user_id" gorm:"type:uuid;not null;index"`
+	TenantID  uuid.UUID `json:"tenant_id" gorm:"type:uuid;not null;index"`
+	Email     string    `json:"email" gorm:"size:255;not null;index"`
+
+	// Token lifecycle
+	ExpiresAt   time.Time  `json:"expires_at" gorm:"not null;index"`
+	UsedAt      *time.Time `json:"used_at"`
+	IsUsed      bool       `json:"is_used" gorm:"default:false;index"`
+
+	// Security tracking
+	RequestedIP    string `json:"requested_ip" gorm:"size:45"`
+	RequestedAgent string `json:"requested_agent"`
+	UsedIP         string `json:"used_ip" gorm:"size:45"`
+	UsedAgent      string `json:"used_agent"`
+
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// TableName specifies the table name for PasswordResetToken
+func (PasswordResetToken) TableName() string {
+	return "password_reset_tokens"
+}
+
+func (p *PasswordResetToken) BeforeCreate(tx *gorm.DB) error {
+	if p.ID == uuid.Nil {
+		p.ID = uuid.New()
+	}
+	if p.ExpiresAt.IsZero() {
+		p.ExpiresAt = time.Now().Add(DefaultPasswordResetTokenExpiry)
+	}
+	return nil
+}
+
+// IsValid returns true if the token is still valid (not used and not expired)
+func (p *PasswordResetToken) IsValid() bool {
+	return !p.IsUsed && time.Now().Before(p.ExpiresAt)
+}

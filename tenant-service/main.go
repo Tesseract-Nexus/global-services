@@ -14,16 +14,16 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"tenant-service/internal/background"
-	"tenant-service/internal/clients"
-	"tenant-service/internal/config"
-	"tenant-service/internal/handlers"
-	"tenant-service/internal/middleware"
-	"tenant-service/internal/models"
-	natsClient "tenant-service/internal/nats"
-	"tenant-service/internal/redis"
-	"tenant-service/internal/repository"
-	"tenant-service/internal/services"
+	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/background"
+	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/clients"
+	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/config"
+	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/handlers"
+	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/middleware"
+	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/models"
+	natsClient "github.com/tesseract-hub/domains/common/services/tenant-service/internal/nats"
+	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/redis"
+	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/repository"
+	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/services"
 	"github.com/Tesseract-Nexus/go-shared/auth"
 	"github.com/Tesseract-Nexus/go-shared/metrics"
 	sharedMiddleware "github.com/Tesseract-Nexus/go-shared/middleware"
@@ -96,7 +96,8 @@ func main() {
 
 	// Initialize clients
 	verificationServiceURL := getEnv("VERIFICATION_SERVICE_URL", "http://localhost:8088")
-	verificationServiceAPIKey := getEnv("VERIFICATION_SERVICE_API_KEY", "tesseract_verification_dev_key_2025")
+	// Load verification API key from GCP Secret Manager (production) or env var (dev)
+	verificationServiceAPIKey := secrets.GetSecretOrEnv("VERIFICATION_API_KEY_SECRET_NAME", "VERIFICATION_SERVICE_API_KEY", "tesseract_verification_dev_key_2025")
 
 	verificationClient := clients.NewVerificationClient(
 		verificationServiceURL,
@@ -199,6 +200,42 @@ func main() {
 	tenantAuthSvc.SetStaffClient(staffClient)
 	log.Println("Staff client wired to TenantAuthService for staff credential validation")
 
+	// Wire notification client to auth service for sending welcome/verification emails
+	tenantAuthSvc.SetNotificationClient(notificationClient)
+	log.Println("Notification client wired to TenantAuthService for customer registration emails")
+
+	// Wire verification client to auth service for customer email verification
+	tenantAuthSvc.SetVerificationClient(verificationClient)
+	log.Println("Verification client wired to TenantAuthService for customer email verification")
+
+	// Initialize customer deactivation service for self-service account deactivation
+	var customerDeactivationSvc *services.CustomerDeactivationService
+	if keycloakClient != nil {
+		customerDeactivationSvc = services.NewCustomerDeactivationService(
+			db,
+			membershipRepo,
+			notificationClient,
+			keycloakClient,
+			&services.KeycloakAuthConfig{
+				ClientID:     getEnv("KEYCLOAK_CLIENT_ID", "marketplace-dashboard"),
+				ClientSecret: secrets.GetSecretOrEnv("KEYCLOAK_CLIENT_SECRET_NAME", "KEYCLOAK_CLIENT_SECRET", keycloakAdminSecret),
+			},
+		)
+		log.Println("CustomerDeactivationService initialized for self-service account deactivation")
+	} else {
+		customerDeactivationSvc = services.NewCustomerDeactivationService(db, membershipRepo, notificationClient, nil, nil)
+		log.Println("CustomerDeactivationService initialized (without Keycloak password verification)")
+	}
+
+	// Initialize password reset service for self-service password recovery
+	var passwordResetSvc *services.PasswordResetService
+	if keycloakClient != nil {
+		passwordResetSvc = services.NewPasswordResetService(db, keycloakClient, notificationClient)
+		log.Println("PasswordResetService initialized for self-service password recovery")
+	} else {
+		log.Println("Warning: PasswordResetService not initialized (Keycloak client not available)")
+	}
+
 	// Initialize handlers
 	healthHandler := handlers.NewHealthHandlerWithNATS(db, nc)
 	onboardingHandler := handlers.NewOnboardingHandler(onboardingSvc, templateSvc)
@@ -207,6 +244,14 @@ func main() {
 	membershipHandler := handlers.NewMembershipHandlerWithStaff(membershipSvc, staffClient, tenantSvc)
 	tenantHandler := handlers.NewTenantHandler(tenantSvc, offboardingSvc)
 	authHandler := handlers.NewAuthHandler(tenantAuthSvc, staffClient)
+	authHandler.SetDeactivationService(customerDeactivationSvc)
+	log.Println("CustomerDeactivationService wired to AuthHandler for account deactivation endpoints")
+
+	// Wire password reset service to auth handler
+	if passwordResetSvc != nil {
+		authHandler.SetPasswordResetService(passwordResetSvc)
+		log.Println("PasswordResetService wired to AuthHandler for password reset endpoints")
+	}
 
 	// Initialize draft handler (optional)
 	var draftHandler *handlers.DraftHandler
@@ -220,6 +265,11 @@ func main() {
 	var bgRunner *background.Runner
 	if draftSvc != nil {
 		bgRunner = background.NewRunner(draftSvc, cfg.Draft)
+		// Wire deactivation service for account purge background job
+		if customerDeactivationSvc != nil {
+			bgRunner.SetDeactivationService(customerDeactivationSvc)
+			log.Println("CustomerDeactivationService wired to background runner for account purge job")
+		}
 		bgRunner.Start()
 	}
 
@@ -457,14 +507,23 @@ func setupRouter(
 		authRoutes := v1.Group("/auth")
 		{
 			// Public endpoints (no auth required)
-			authRoutes.POST("/validate", authHandler.ValidateCredentials)       // Validate tenant-specific credentials
-			authRoutes.POST("/tenants", authHandler.GetUserTenantsForAuth)      // Get user's tenants for login selection
-			authRoutes.POST("/account-status", authHandler.CheckAccountStatus)  // Check if account is locked
+			authRoutes.POST("/validate", authHandler.ValidateCredentials)          // Validate tenant-specific credentials
+			authRoutes.POST("/tenants", authHandler.GetUserTenantsForAuth)         // Get user's tenants for login selection
+			authRoutes.POST("/account-status", authHandler.CheckAccountStatus)     // Check if account is locked
+			authRoutes.POST("/register", authHandler.RegisterCustomer)             // Direct customer registration (storefront)
+			authRoutes.POST("/check-deactivated", authHandler.CheckDeactivatedAccount) // Check if account is deactivated
+			authRoutes.POST("/reactivate-account", authHandler.ReactivateAccount)  // Reactivate within 90-day window
+
+			// Password reset endpoints (public - no auth required)
+			authRoutes.POST("/request-password-reset", authHandler.RequestPasswordReset) // Request password reset email
+			authRoutes.POST("/validate-reset-token", authHandler.ValidateResetToken)     // Validate reset token
+			authRoutes.POST("/reset-password", authHandler.ResetPassword)                // Reset password with token
 
 			// Protected endpoints (require auth)
-			authRoutes.POST("/change-password", authHandler.ChangePassword)     // Change password for a tenant
-			authRoutes.POST("/set-password", authHandler.SetPassword)           // Set password (password reset)
-			authRoutes.POST("/unlock-account", authHandler.UnlockAccount)       // Admin: unlock locked account
+			authRoutes.POST("/change-password", authHandler.ChangePassword)        // Change password for a tenant
+			authRoutes.POST("/set-password", authHandler.SetPassword)              // Set password (password reset)
+			authRoutes.POST("/unlock-account", authHandler.UnlockAccount)          // Admin: unlock locked account
+			authRoutes.POST("/deactivate-account", authHandler.DeactivateAccount)  // Customer self-service deactivation
 		}
 
 		// Internal service-to-service endpoints (requires X-Internal-Service header)
@@ -536,6 +595,10 @@ func autoMigrate(db *gorm.DB) error {
 		&models.TenantCredential{},   // Per-tenant passwords for enterprise credential isolation
 		&models.TenantAuthPolicy{},   // Per-tenant authentication policies
 		&models.TenantAuthAuditLog{}, // Authentication audit trail per tenant
+		// Customer account deactivation
+		&models.DeactivatedMembership{}, // Archive of deactivated customer accounts
+		// Password reset tokens
+		&models.PasswordResetToken{}, // Secure tokens for password reset flow
 	}
 
 	for _, model := range modelsToMigrate {

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"tenant-service/internal/models"
+	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/models"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )

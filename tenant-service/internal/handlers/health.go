@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	natsClient "tenant-service/internal/nats"
+	natsClient "github.com/tesseract-hub/domains/common/services/tenant-service/internal/nats"
 	"gorm.io/gorm"
 )
 

@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"tenant-service/internal/services"
+	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/services"
 )
 
 // VerificationHandler handles verification HTTP requests

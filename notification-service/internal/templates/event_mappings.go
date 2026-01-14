@@ -56,7 +56,9 @@ var eventToTemplateMap = map[string]string{
 	"coupon.expired": "coupon_expired",
 
 	// Auth events
-	"auth.password_reset": "password_reset",
+	"auth.password_reset":   "password_reset",
+	"auth.login_success":    "login_notification",
+	"auth.verification_code": "customer_verification",
 
 	// Tenant events
 	"tenant.created":                "tenant_welcome_pack",

@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"tenant-service/internal/models"
-	"tenant-service/internal/repository"
+	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/models"
+	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/repository"
 )
 
 // MembershipService handles user-tenant membership business logic

@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"tenant-service/internal/config"
-	"tenant-service/internal/models"
-	"tenant-service/internal/redis"
+	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/config"
+	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/models"
+	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/redis"
 	"gorm.io/gorm"
 )
 

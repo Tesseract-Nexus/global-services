@@ -237,3 +237,54 @@ func (r *Renderer) RenderVerificationLink(data *EmailData) (string, string, erro
 
 	return data.Subject, body, nil
 }
+
+// RenderCustomerVerification renders the customer email verification template.
+// Returns subject, body, and error.
+func (r *Renderer) RenderCustomerVerification(data *EmailData) (string, string, error) {
+	if r == nil {
+		return "", "", ErrNilRenderer
+	}
+	if data == nil {
+		return "", "", errors.New("email data is nil")
+	}
+
+	if data.BusinessName != "" {
+		data.Subject = fmt.Sprintf("Verify your email - %s", data.BusinessName)
+		data.Preheader = fmt.Sprintf("Please verify your email to complete your %s account setup.", data.BusinessName)
+	} else {
+		data.Subject = "Please verify your email address"
+		data.Preheader = "Verify your email to unlock all account features."
+	}
+
+	body, err := r.Render("customer_verification", data)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to render customer_verification: %w", err)
+	}
+
+	return data.Subject, body, nil
+}
+
+// RenderLoginNotification renders the login notification email.
+// Returns subject, body, and error.
+func (r *Renderer) RenderLoginNotification(data *EmailData) (string, string, error) {
+	if r == nil {
+		return "", "", ErrNilRenderer
+	}
+	if data == nil {
+		return "", "", errors.New("email data is nil")
+	}
+
+	if data.BusinessName != "" {
+		data.Subject = fmt.Sprintf("New sign-in to your %s account", data.BusinessName)
+	} else {
+		data.Subject = "New sign-in to your account"
+	}
+	data.Preheader = "We noticed a new sign-in to your account. Was this you?"
+
+	body, err := r.Render("login_notification", data)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to render login_notification: %w", err)
+	}
+
+	return data.Subject, body, nil
+}

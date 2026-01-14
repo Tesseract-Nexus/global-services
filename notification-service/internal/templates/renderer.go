@@ -168,9 +168,18 @@ type EmailData struct {
 	// Auth/Security fields
 	ResetCode          string
 	ResetURL           string
+	ResetPasswordURL   string
 	VerificationLink   string
 	VerificationToken  string
 	VerificationExpiry string
+
+	// Login notification fields
+	LoginTime     string
+	LoginLocation string
+	IPAddress     string
+	DeviceInfo    string
+	UserAgent     string
+	LoginMethod   string
 
 	// Tenant onboarding fields
 	SessionID      string
@@ -255,6 +264,10 @@ func NewRenderer() (*Renderer, error) {
 		"coupon_expired",
 		// Auth templates
 		"password_reset",
+		// Customer verification
+		"customer_verification",
+		// Login notification
+		"login_notification",
 		// Tenant onboarding templates
 		"tenant_welcome_pack",
 		"verification_link",

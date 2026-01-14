@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { config } from '../config';
 import { oidcClient } from '../oidc-client';
 import { sessionStore, SessionData, WsTicketData, SessionTransferData } from '../session-store';
+import { natsClient } from '../nats-client';
 import { v4 as uuidv4 } from 'uuid';
 import { createLogger } from '../logger';
 
@@ -11,7 +12,8 @@ const logger = createLogger('auth-routes');
 // Request schemas
 const loginQuerySchema = z.object({
   returnTo: z.string().optional(),
-  prompt: z.enum(['none', 'login', 'consent', 'select_account']).optional(),
+  // Standard OIDC prompt values + 'create' for Keycloak registration (converted to kc_action=register)
+  prompt: z.enum(['none', 'login', 'consent', 'select_account', 'create']).optional(),
   loginHint: z.string().optional(),
   login_hint: z.string().optional(), // Alternative format for login hint
   kc_idp_hint: z.string().optional(), // Keycloak IDP hint - skips login page and goes directly to the IDP (e.g., 'google')
@@ -19,6 +21,9 @@ const loginQuerySchema = z.object({
   // Tenant context - for multi-tenant storefront authentication
   tenant_id: z.string().optional(), // Tenant UUID
   tenant_slug: z.string().optional(), // Tenant slug (e.g., 'demo-store')
+  // Registration info passed from storefront
+  first_name: z.string().optional(),
+  last_name: z.string().optional(),
 });
 
 const callbackQuerySchema = z.object({
@@ -114,20 +119,29 @@ export async function authRoutes(fastify: FastifyInstance) {
     // Support both loginHint and login_hint formats (storefront uses login_hint)
     const loginHint = query.loginHint || query.login_hint;
 
+    // Convert prompt=create to kc_action=register for Keycloak registration
+    // 'create' is not a standard OIDC prompt value, but we support it for convenience
+    let kcAction = query.kc_action;
+    let prompt = query.prompt;
+    if (prompt === 'create') {
+      kcAction = 'register';
+      prompt = undefined; // Don't pass 'create' as prompt to Keycloak
+    }
+
     const authUrl = await oidcClient.getAuthorizationUrl(clientType, {
       redirectUri,
       scope: 'openid profile email offline_access',
       state,
       nonce,
       codeVerifier,
-      prompt: query.prompt,
+      prompt,
       loginHint,
       kcIdpHint: query.kc_idp_hint, // Pass IDP hint to skip Keycloak login page
-      kcAction: query.kc_action, // Pass action for registration or password reset
+      kcAction, // Pass action for registration or password reset
     });
 
     logger.info(
-      { clientType, state, kcIdpHint: query.kc_idp_hint, kcAction: query.kc_action, tenantSlug },
+      { clientType, state, kcIdpHint: query.kc_idp_hint, kcAction, tenantSlug },
       'Initiating auth flow'
     );
 
@@ -205,6 +219,28 @@ export async function authRoutes(fastify: FastifyInstance) {
       setSessionCookie(reply, session.id);
 
       logger.info({ userId: session.userId, sessionId: session.id }, 'Authentication successful');
+
+      // Publish login success event for notifications (non-blocking)
+      // Only publish for customer logins (storefront) with tenant context
+      if (tenantId && authState.clientType === 'customer') {
+        const ipAddress = (request.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim()
+          || request.ip
+          || 'unknown';
+        const userAgent = request.headers['user-agent'] || 'unknown';
+        const email = (userInfo.email as string) || '';
+
+        // Publish in background - don't block the redirect
+        natsClient.publishLoginSuccess(
+          tenantId,
+          session.userId,
+          email,
+          ipAddress,
+          userAgent,
+          'oidc'
+        ).catch((err) => {
+          logger.warn({ error: err }, 'Failed to publish login event (non-critical)');
+        });
+      }
 
       // Redirect to return URL or default
       const returnTo = authState.returnTo || '/';

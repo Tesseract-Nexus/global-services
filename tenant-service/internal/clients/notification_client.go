@@ -227,6 +227,96 @@ func (c *NotificationClient) SendAccountCreatedEmail(ctx context.Context, email,
 	return nil
 }
 
+// SendCustomerWelcomeEmail sends a welcome email to a new customer who registered on a storefront
+func (c *NotificationClient) SendCustomerWelcomeEmail(ctx context.Context, email, firstName, storeName string) error {
+	htmlBody := renderCustomerWelcomeEmailTemplate(firstName, storeName)
+
+	req := &NotificationSendRequest{
+		Channel:        "EMAIL",
+		RecipientEmail: email,
+		Subject:        fmt.Sprintf("Welcome to %s!", storeName),
+		Body:           fmt.Sprintf("Welcome %s! Your account at %s has been created.", firstName, storeName),
+		BodyHTML:       htmlBody,
+	}
+
+	var response struct {
+		Success bool   `json:"success"`
+		Error   string `json:"error,omitempty"`
+	}
+
+	return c.makeRequest(ctx, "POST", "/api/v1/notifications/send", req, &response)
+}
+
+// renderCustomerWelcomeEmailTemplate generates a welcome email for storefront customers
+func renderCustomerWelcomeEmailTemplate(firstName, storeName string) string {
+	return fmt.Sprintf(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to %s!</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7fa;">
+    <table role="presentation" style="width: 100%%; border-collapse: collapse;">
+        <tr>
+            <td align="center" style="padding: 40px 0;">
+                <table role="presentation" style="width: 600px; max-width: 100%%; border-collapse: collapse; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);">
+                    <!-- Header with gradient -->
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #6366f1 0%%, #8b5cf6 50%%, #a855f7 100%%); padding: 40px 40px 30px; border-radius: 16px 16px 0 0; text-align: center;">
+                            <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 600;">
+                                🎉 Welcome to %s!
+                            </h1>
+                        </td>
+                    </tr>
+
+                    <!-- Main content -->
+                    <tr>
+                        <td style="padding: 40px;">
+                            <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
+                                Hi %s! 👋
+                            </p>
+                            <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
+                                Thank you for creating an account with <strong>%s</strong>. We're excited to have you as part of our community!
+                            </p>
+                            <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
+                                You can now:
+                            </p>
+                            <ul style="color: #374151; font-size: 16px; line-height: 1.8; margin: 0 0 24px; padding-left: 24px;">
+                                <li>Browse our products and collections</li>
+                                <li>Save items to your wishlist</li>
+                                <li>Track your orders</li>
+                                <li>Manage your account settings</li>
+                            </ul>
+
+                            <!-- Check email notice -->
+                            <div style="border-left: 4px solid #6366f1; background-color: #f0f0ff; padding: 16px; border-radius: 0 8px 8px 0; margin-top: 24px;">
+                                <p style="color: #4338ca; font-size: 14px; margin: 0;">
+                                    📧 Please check your inbox for an email verification code to complete your account setup.
+                                </p>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f9fafb; padding: 24px 40px; border-radius: 0 0 16px 16px; text-align: center;">
+                            <p style="color: #9ca3af; font-size: 13px; margin: 0 0 8px;">
+                                This email was sent because you created an account at %s
+                            </p>
+                            <p style="color: #9ca3af; font-size: 13px; margin: 0;">
+                                © 2026 Powered by Tesseract Hub
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>`, storeName, storeName, firstName, storeName, storeName)
+}
+
 // WelcomePackData contains all data for sending a welcome pack email
 type WelcomePackData struct {
 	Email         string
@@ -405,4 +495,235 @@ func (c *NotificationClient) makeRequest(ctx context.Context, method, path strin
 	}
 
 	return nil
+}
+
+// GoodbyeEmailData contains data for the goodbye/deactivation email
+type GoodbyeEmailData struct {
+	Email            string
+	FirstName        string
+	StoreName        string
+	DeactivatedAt    time.Time
+	ScheduledPurgeAt time.Time
+	ReactivationURL  string
+}
+
+// SendGoodbyeEmail sends a goodbye email when a customer deactivates their account
+func (c *NotificationClient) SendGoodbyeEmail(ctx context.Context, data *GoodbyeEmailData) error {
+	htmlBody := renderGoodbyeEmailTemplate(data)
+
+	req := &NotificationSendRequest{
+		Channel:        "EMAIL",
+		RecipientEmail: data.Email,
+		Subject:        fmt.Sprintf("We're sorry to see you go from %s", data.StoreName),
+		Body:           fmt.Sprintf("Your account at %s has been deactivated. You have 90 days to reactivate.", data.StoreName),
+		BodyHTML:       htmlBody,
+	}
+
+	var response struct {
+		Success bool   `json:"success"`
+		Error   string `json:"error,omitempty"`
+	}
+
+	return c.makeRequest(ctx, "POST", "/api/v1/notifications/send", req, &response)
+}
+
+// PasswordResetEmailData contains data for password reset emails
+type PasswordResetEmailData struct {
+	Email        string
+	FirstName    string
+	StoreName    string
+	ResetLink    string
+	ExpiresIn    string // e.g., "1 hour"
+}
+
+// SendPasswordResetEmail sends a password reset email with a secure link
+func (c *NotificationClient) SendPasswordResetEmail(ctx context.Context, data *PasswordResetEmailData) error {
+	htmlBody := renderPasswordResetEmailTemplate(data)
+
+	req := &NotificationSendRequest{
+		Channel:        "EMAIL",
+		RecipientEmail: data.Email,
+		Subject:        fmt.Sprintf("Reset your password for %s", data.StoreName),
+		Body:           fmt.Sprintf("Click this link to reset your password: %s. This link expires in %s.", data.ResetLink, data.ExpiresIn),
+		BodyHTML:       htmlBody,
+		Priority:       "high",
+	}
+
+	var response struct {
+		Success bool   `json:"success"`
+		Error   string `json:"error,omitempty"`
+	}
+
+	return c.makeRequest(ctx, "POST", "/api/v1/notifications/send", req, &response)
+}
+
+// renderPasswordResetEmailTemplate generates a password reset email
+func renderPasswordResetEmailTemplate(data *PasswordResetEmailData) string {
+	return fmt.Sprintf(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reset Your Password</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7fa;">
+    <table role="presentation" style="width: 100%%; border-collapse: collapse;">
+        <tr>
+            <td align="center" style="padding: 40px 0;">
+                <table role="presentation" style="width: 600px; max-width: 100%%; border-collapse: collapse; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);">
+                    <!-- Header -->
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #6366f1 0%%, #8b5cf6 50%%, #a855f7 100%%); padding: 40px 40px 30px; border-radius: 16px 16px 0 0; text-align: center;">
+                            <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 600;">
+                                🔐 Reset Your Password
+                            </h1>
+                        </td>
+                    </tr>
+
+                    <!-- Main content -->
+                    <tr>
+                        <td style="padding: 40px;">
+                            <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
+                                Hi %s,
+                            </p>
+                            <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
+                                We received a request to reset your password for your <strong>%s</strong> account. Click the button below to create a new password.
+                            </p>
+
+                            <!-- CTA Button -->
+                            <table role="presentation" style="width: 100%%; border-collapse: collapse;">
+                                <tr>
+                                    <td align="center" style="padding: 16px 0 32px;">
+                                        <a href="%s" style="display: inline-block; background: linear-gradient(135deg, #6366f1 0%%, #8b5cf6 100%%); color: #ffffff; text-decoration: none; padding: 16px 48px; border-radius: 12px; font-size: 16px; font-weight: 600; box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);">
+                                            Reset Password
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Alternative link -->
+                            <div style="background-color: #f9fafb; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+                                <p style="color: #6b7280; font-size: 14px; margin: 0 0 8px;">
+                                    Or copy this link into your browser:
+                                </p>
+                                <p style="color: #6366f1; font-size: 13px; margin: 0; word-break: break-all;">
+                                    %s
+                                </p>
+                            </div>
+
+                            <!-- Security notice -->
+                            <div style="border-left: 4px solid #f59e0b; background-color: #fffbeb; padding: 16px; border-radius: 0 8px 8px 0;">
+                                <p style="color: #92400e; font-size: 14px; margin: 0;">
+                                    ⏰ This link expires in <strong>%s</strong>. If you didn't request this password reset, you can safely ignore this email.
+                                </p>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f9fafb; padding: 24px 40px; border-radius: 0 0 16px 16px; text-align: center;">
+                            <p style="color: #9ca3af; font-size: 13px; margin: 0 0 8px;">
+                                This email was sent to %s
+                            </p>
+                            <p style="color: #9ca3af; font-size: 13px; margin: 0;">
+                                © 2026 Powered by Tesseract Hub
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>`, data.FirstName, data.StoreName, data.ResetLink, data.ResetLink, data.ExpiresIn, data.Email)
+}
+
+// renderGoodbyeEmailTemplate generates a goodbye email for deactivated accounts
+func renderGoodbyeEmailTemplate(data *GoodbyeEmailData) string {
+	purgeDate := data.ScheduledPurgeAt.Format("January 2, 2006")
+
+	return fmt.Sprintf(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>We're sorry to see you go</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7fa;">
+    <table role="presentation" style="width: 100%%; border-collapse: collapse;">
+        <tr>
+            <td align="center" style="padding: 40px 0;">
+                <table role="presentation" style="width: 600px; max-width: 100%%; border-collapse: collapse; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);">
+                    <!-- Header -->
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #64748b 0%%, #475569 100%%); padding: 40px 40px 30px; border-radius: 16px 16px 0 0; text-align: center;">
+                            <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 600;">
+                                We're sorry to see you go
+                            </h1>
+                        </td>
+                    </tr>
+
+                    <!-- Main content -->
+                    <tr>
+                        <td style="padding: 40px;">
+                            <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
+                                Hi %s,
+                            </p>
+                            <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
+                                Your account at <strong>%s</strong> has been deactivated as requested.
+                            </p>
+
+                            <!-- Info box -->
+                            <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; border-radius: 0 8px 8px 0; margin-bottom: 24px;">
+                                <h3 style="color: #92400e; margin: 0 0 12px; font-size: 16px;">What happens next?</h3>
+                                <ul style="color: #92400e; font-size: 14px; margin: 0; padding-left: 20px; line-height: 1.8;">
+                                    <li>Your data will be safely retained for <strong>90 days</strong></li>
+                                    <li>You can reactivate your account anytime before <strong>%s</strong></li>
+                                    <li>After 90 days, your data will be permanently deleted</li>
+                                </ul>
+                            </div>
+
+                            <!-- Changed your mind section -->
+                            <div style="background-color: #f0fdf4; border-left: 4px solid #22c55e; padding: 20px; border-radius: 0 8px 8px 0; margin-bottom: 24px;">
+                                <h3 style="color: #166534; margin: 0 0 12px; font-size: 16px;">Changed your mind?</h3>
+                                <p style="color: #166534; font-size: 14px; margin: 0;">
+                                    Simply log back in to reactivate your account. All your data will be restored instantly.
+                                </p>
+                            </div>
+
+                            <!-- CTA Button -->
+                            <table role="presentation" style="width: 100%%; border-collapse: collapse;">
+                                <tr>
+                                    <td align="center" style="padding: 16px 0;">
+                                        <a href="%s" style="display: inline-block; background: linear-gradient(135deg, #22c55e 0%%, #16a34a 100%%); color: #ffffff; text-decoration: none; padding: 16px 48px; border-radius: 12px; font-size: 16px; font-weight: 600; box-shadow: 0 4px 14px rgba(34, 197, 94, 0.4);">
+                                            Reactivate My Account
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="color: #6b7280; font-size: 14px; line-height: 1.6; margin: 24px 0 0; text-align: center;">
+                                We'd love to have you back! If you have any feedback on how we can improve, please let us know.
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f9fafb; padding: 24px 40px; border-radius: 0 0 16px 16px; text-align: center;">
+                            <p style="color: #9ca3af; font-size: 13px; margin: 0 0 8px;">
+                                This email was sent because you deactivated your account at %s
+                            </p>
+                            <p style="color: #9ca3af; font-size: 13px; margin: 0;">
+                                © 2026 Powered by Tesseract Hub
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>`, data.FirstName, data.StoreName, purgeDate, data.ReactivationURL, data.StoreName)
 }

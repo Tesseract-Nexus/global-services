@@ -6,8 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"tenant-service/internal/models"
-	"tenant-service/internal/services"
+	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/models"
+	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/services"
 )
 
 // TemplateHandler handles template HTTP requests

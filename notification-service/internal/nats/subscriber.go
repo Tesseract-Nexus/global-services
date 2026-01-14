@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -627,6 +628,13 @@ func (s *Subscriber) handleAuthEvent(msg *nats.Msg) {
 
 	ctx := context.Background()
 
+	// Get tenant info for URLs
+	tenantInfo, _ := s.tenantClient.GetTenantInfo(event.TenantID)
+	businessName := tenantInfo.BusinessName
+	if businessName == "" {
+		businessName = tenantInfo.Name
+	}
+
 	// Security notifications are always sent (no preference check for password reset)
 	switch event.EventType {
 	case events.PasswordReset:
@@ -658,6 +666,42 @@ func (s *Subscriber) handleAuthEvent(msg *nats.Msg) {
 		if event.Phone != "" {
 			log.Printf("[SMS] Sending verification-code-sms to %s", event.Phone)
 			s.sendTemplatedSMS(ctx, event.TenantID, "verification-code-sms", event.Phone, variables)
+		}
+
+	case events.LoginSuccess:
+		// Send login notification for security awareness
+		// Parse user agent to get device info
+		deviceInfo := formatUserAgent(event.UserAgent, event.DeviceType)
+
+		// Format login time
+		loginTime := event.Timestamp.Format("January 2, 2006 at 3:04 PM MST")
+
+		// Build reset password URL
+		resetPasswordURL := fmt.Sprintf("%s/forgot-password", tenantInfo.StorefrontURL)
+
+		// Get location info - use Location field or default
+		loginLocation := event.Location
+		if loginLocation == "" {
+			loginLocation = "Unknown location"
+		}
+
+		variables := map[string]interface{}{
+			"customerName":     "", // Will be populated by template if available
+			"customerEmail":    event.Email,
+			"email":            event.Email,
+			"loginTime":        loginTime,
+			"loginLocation":    loginLocation,
+			"ipAddress":        event.IPAddress,
+			"deviceInfo":       deviceInfo,
+			"userAgent":        event.UserAgent,
+			"loginMethod":      event.LoginMethod,
+			"businessName":     businessName,
+			"resetPasswordURL": resetPasswordURL,
+		}
+
+		if event.Email != "" {
+			log.Printf("[EMAIL] Sending login-notification to %s (IP: %s)", event.Email, event.IPAddress)
+			s.sendTemplatedEmail(ctx, event.TenantID, "login-notification", event.Email, variables)
 		}
 	}
 
@@ -2027,5 +2071,60 @@ func (s *Subscriber) buildEmailData(variables map[string]interface{}) *templates
 		}
 	}
 
+	// Login notification fields
+	data.LoginTime = getString("loginTime")
+	data.LoginLocation = getString("loginLocation")
+	data.IPAddress = getString("ipAddress")
+	data.DeviceInfo = getString("deviceInfo")
+	data.UserAgent = getString("userAgent")
+	data.LoginMethod = getString("loginMethod")
+	data.ResetPasswordURL = getString("resetPasswordURL")
+
 	return data
+}
+
+// formatUserAgent parses user agent string and returns a human-readable device info
+func formatUserAgent(userAgent string, deviceType string) string {
+	if userAgent == "" {
+		if deviceType != "" {
+			return deviceType
+		}
+		return "Unknown device"
+	}
+
+	// Simple parsing for common browsers/devices
+	device := "Unknown device"
+
+	// Check for mobile devices first
+	if strings.Contains(userAgent, "iPhone") {
+		device = "iPhone"
+	} else if strings.Contains(userAgent, "iPad") {
+		device = "iPad"
+	} else if strings.Contains(userAgent, "Android") {
+		device = "Android device"
+	} else if strings.Contains(userAgent, "Windows") {
+		device = "Windows PC"
+	} else if strings.Contains(userAgent, "Macintosh") || strings.Contains(userAgent, "Mac OS") {
+		device = "Mac"
+	} else if strings.Contains(userAgent, "Linux") {
+		device = "Linux PC"
+	}
+
+	// Add browser info
+	browser := ""
+	if strings.Contains(userAgent, "Chrome") && !strings.Contains(userAgent, "Edg") {
+		browser = "Chrome"
+	} else if strings.Contains(userAgent, "Safari") && !strings.Contains(userAgent, "Chrome") {
+		browser = "Safari"
+	} else if strings.Contains(userAgent, "Firefox") {
+		browser = "Firefox"
+	} else if strings.Contains(userAgent, "Edg") {
+		browser = "Edge"
+	}
+
+	if browser != "" {
+		return fmt.Sprintf("%s using %s", device, browser)
+	}
+
+	return device
 }
