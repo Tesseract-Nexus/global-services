@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/models"
-	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/repository"
+	"tenant-service/internal/models"
+	"tenant-service/internal/repository"
 )
 
 // TemplateService handles onboarding template business logic

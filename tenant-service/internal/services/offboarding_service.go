@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/models"
-	natsClient "github.com/tesseract-hub/domains/common/services/tenant-service/internal/nats"
+	"tenant-service/internal/models"
+	natsClient "tenant-service/internal/nats"
 	"github.com/Tesseract-Nexus/go-shared/auth"
 	"gorm.io/gorm"
 )

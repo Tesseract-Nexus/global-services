@@ -10,12 +10,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/clients"
-	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/config"
-	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/models"
-	tsnats "github.com/tesseract-hub/domains/common/services/tenant-service/internal/nats"
-	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/redis"
-	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/repository"
+	"tenant-service/internal/clients"
+	"tenant-service/internal/config"
+	"tenant-service/internal/models"
+	tsnats "tenant-service/internal/nats"
+	"tenant-service/internal/redis"
+	"tenant-service/internal/repository"
 	"github.com/Tesseract-Nexus/go-shared/security"
 )
 

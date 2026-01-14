@@ -6,8 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/clients"
-	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/services"
+	"tenant-service/internal/clients"
+	"tenant-service/internal/services"
 	"github.com/Tesseract-Nexus/go-shared/security"
 )
 

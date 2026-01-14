@@ -12,9 +12,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/Tesseract-Nexus/go-shared/auth"
 	"github.com/Tesseract-Nexus/go-shared/security"
-	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/clients"
-	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/models"
-	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/repository"
+	"tenant-service/internal/clients"
+	"tenant-service/internal/models"
+	"tenant-service/internal/repository"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
