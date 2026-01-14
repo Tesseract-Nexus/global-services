@@ -1,6 +1,6 @@
 # =============================================================================
 # Notification Service - Dockerfile
-# Multi-stage build for Go microservice
+# Multi-stage build for Go microservice (standalone)
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -17,18 +17,14 @@ RUN addgroup -g 1000 -S appgroup && adduser -D -u 1000 -S appuser -G appgroup
 # Set working directory
 WORKDIR /build
 
-# Copy go-shared package (used for middleware, auth, etc.)
-# Cache bust: 2026-01-14
-COPY packages/go-shared/ ./packages/go-shared/
-
-# Copy service source
-COPY services/notification-service/ ./services/notification-service/
-
-# Set working directory to service
-WORKDIR /build/services/notification-service
+# Copy go.mod and go.sum first for better layer caching
+COPY go.mod go.sum ./
 
 # Download dependencies
 RUN go mod download
+
+# Copy source code
+COPY . .
 
 # Build the application with optimization flags
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
@@ -50,10 +46,10 @@ RUN addgroup -g 1000 -S appgroup && adduser -D -u 1000 -S appuser -G appgroup
 WORKDIR /app
 
 # Copy the binary from builder
-COPY --from=builder /build/services/notification-service/notification-service .
+COPY --from=builder /build/notification-service .
 
 # Copy migrations if they exist
-COPY --from=builder /build/services/notification-service/migrations ./migrations/
+COPY --from=builder /build/migrations ./migrations/
 
 # Change ownership to non-root user
 RUN chown -R appuser:appgroup /app
@@ -71,7 +67,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 # Labels
 LABEL org.label-schema.name="notification-service" \
       org.label-schema.description="Tesseract Hub Notification Service" \
-      org.label-schema.vcs-url="https://github.com/tesseract-hub/tesseract-hub"
+      org.label-schema.vcs-url="https://github.com/Tesseract-Nexus/global-services"
 
 # Run the service
 CMD ["./notification-service"]
