@@ -9,7 +9,7 @@ require (
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.1
 	github.com/swaggo/swag v1.16.6
-	github.com/Tesseract-Nexus/go-shared v0.0.0-20260114145812-9ee4116ec0c6
+	github.com/Tesseract-Nexus/go-shared v0.0.0-20260114144102-9ee4116ec0c6
 	github.com/typesense/typesense-go/v2 v2.0.0
 	go.opentelemetry.io/otel v1.21.0
 )

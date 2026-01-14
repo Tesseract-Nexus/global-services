@@ -12,7 +12,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.0
-	github.com/Tesseract-Nexus/go-shared v0.0.0-20260114145812-9ee4116ec0c6
+	github.com/Tesseract-Nexus/go-shared v0.0.0-20260114144102-9ee4116ec0c6
 	gorm.io/datatypes v1.2.6
 	gorm.io/driver/postgres v1.5.6
 	gorm.io/gorm v1.30.0

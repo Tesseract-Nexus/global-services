@@ -16,7 +16,7 @@ require (
 	github.com/redis/go-redis/v9 v9.17.2
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.19.0
-	github.com/Tesseract-Nexus/go-shared v0.0.0-20260114145812-9ee4116ec0c6-00010101000000-000000000000
+	github.com/Tesseract-Nexus/go-shared v0.0.0-20260114144102-9ee4116ec0c6-00010101000000-000000000000
 	google.golang.org/api v0.171.0
 	gorm.io/driver/postgres v1.5.9
 	gorm.io/gorm v1.25.12

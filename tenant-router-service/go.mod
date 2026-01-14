@@ -7,7 +7,7 @@ require (
 	github.com/gin-gonic/gin v1.10.0
 	github.com/google/uuid v1.6.0
 	github.com/nats-io/nats.go v1.31.0
-	github.com/Tesseract-Nexus/go-shared v0.0.0-20260114145812-9ee4116ec0c6
+	github.com/Tesseract-Nexus/go-shared v0.0.0-20260114144102-9ee4116ec0c6
 	golang.org/x/time v0.3.0
 	gorm.io/driver/postgres v1.5.6
 	gorm.io/gorm v1.25.7

@@ -15,7 +15,7 @@ require (
 	github.com/nats-io/nats.go v1.31.0
 	github.com/sendgrid/sendgrid-go v3.14.0+incompatible
 	github.com/sirupsen/logrus v1.9.3
-	github.com/Tesseract-Nexus/go-shared v0.0.0-20260114145812-9ee4116ec0c6
+	github.com/Tesseract-Nexus/go-shared v0.0.0-20260114144102-9ee4116ec0c6
 	google.golang.org/api v0.170.0
 	gorm.io/datatypes v1.2.0
 	gorm.io/driver/postgres v1.5.6
