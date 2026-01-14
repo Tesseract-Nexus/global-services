@@ -1,0 +1,94 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: tesseract-settings-postgres
+    environment:
+      POSTGRES_DB: settings_db
+      POSTGRES_USER: settings_user
+      POSTGRES_PASSWORD: settings_password_dev
+      POSTGRES_HOST_AUTH_METHOD: md5
+    ports:
+      - "5442:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d/
+    networks:
+      - settings-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U settings_user -d settings_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  settings-service:
+    build:
+      context: ../../../../
+      dockerfile: domains/ecommerce/services/settings-service/Dockerfile
+    container_name: tesseract-settings-api
+    ports:
+      - "8085:8085"
+    environment:
+      # Database
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: settings_user
+      DB_PASSWORD: settings_password_dev
+      DB_NAME: settings_db
+      DB_SSL_MODE: disable
+      # Server
+      PORT: 8085
+      HOST: 0.0.0.0
+      ENVIRONMENT: development
+      # Security
+      JWT_SECRET: settings-service-jwt-secret-dev
+      CORS_ALLOWED_ORIGINS: "*"
+      # Service Discovery
+      SERVICE_NAME: settings-service
+      SERVICE_VERSION: 2.0.0
+      # Observability
+      LOG_LEVEL: debug
+      METRICS_ENABLED: "true"
+      TRACING_ENABLED: "false"
+      # Application
+      GIN_MODE: debug
+      DEBUG: "true"
+      VERSION: 2.0.0
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - settings-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "/app/settings-service", "health"]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+
+  migrate:
+    image: migrate/migrate:latest
+    container_name: tesseract-settings-migrate
+    volumes:
+      - ./migrations:/migrations
+    command: [
+      "-path", "/migrations",
+      "-database", "postgres://settings_user:settings_password_dev@postgres:5432/settings_db?sslmode=disable",
+      "up"
+    ]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - settings-network
+
+networks:
+  settings-network:
+    external: true
+    name: tesseract-network
+
+volumes:
+  postgres_data:
+    name: tesseract_settings_postgres_data

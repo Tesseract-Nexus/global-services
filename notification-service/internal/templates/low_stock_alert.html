@@ -1,0 +1,167 @@
+{{define "header"}}
+<!-- Logo -->
+<tr>
+    <td style="text-align: center; padding-bottom: 24px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+            <tr>
+                <td style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
+                    <span style="color: #ffffff; font-size: 24px; font-weight: 700;">{{if .BusinessInitial}}{{.BusinessInitial}}{{else}}T{{end}}</span>
+                </td>
+            </tr>
+        </table>
+        {{if .BusinessName}}
+        <p style="margin: 12px 0 0 0; font-size: 18px; font-weight: 600; color: #18181b; letter-spacing: -0.3px;">{{.BusinessName}}</p>
+        {{end}}
+    </td>
+</tr>
+{{end}}
+
+{{define "content"}}
+<!-- Main Card -->
+<tr>
+    <td>
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1); overflow: hidden;">
+
+            <!-- Alert Header -->
+            <tr>
+                <td style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding: 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="width: 64px; height: 64px; background-color: rgba(255,255,255,0.2); border-radius: 50%; text-align: center; vertical-align: middle;">
+                                <span style="font-size: 32px;">&#128230;</span>
+                            </td>
+                        </tr>
+                    </table>
+                    <h1 style="margin: 16px 0 0 0; font-size: 24px; font-weight: 700; color: #ffffff; line-height: 1.3;">
+                        Low Stock Alert
+                    </h1>
+                    <p style="margin: 8px 0 0 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                        Some products need restocking
+                    </p>
+                </td>
+            </tr>
+
+            <!-- Alert Summary -->
+            <tr>
+                <td style="padding: 32px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 12px; border: 1px solid #fcd34d;">
+                        <tr>
+                            <td style="padding: 20px; text-align: center;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 33%; text-align: center; border-right: 1px solid rgba(0,0,0,0.1);">
+                                            <p style="margin: 0; font-size: 28px; font-weight: 700; color: #92400e;">{{.TotalLowStockItems}}</p>
+                                            <p style="margin: 4px 0 0 0; font-size: 11px; color: #a16207; text-transform: uppercase; letter-spacing: 0.5px;">Low Stock</p>
+                                        </td>
+                                        <td style="width: 33%; text-align: center; border-right: 1px solid rgba(0,0,0,0.1);">
+                                            <p style="margin: 0; font-size: 28px; font-weight: 700; color: #dc2626;">{{.TotalOutOfStockItems}}</p>
+                                            <p style="margin: 4px 0 0 0; font-size: 11px; color: #a16207; text-transform: uppercase; letter-spacing: 0.5px;">Out of Stock</p>
+                                        </td>
+                                        <td style="width: 33%; text-align: center;">
+                                            <p style="margin: 0; font-size: 28px; font-weight: 700; color: #78350f;">{{.TotalAffectedProducts}}</p>
+                                            <p style="margin: 4px 0 0 0; font-size: 11px; color: #a16207; text-transform: uppercase; letter-spacing: 0.5px;">Products</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- Product List -->
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <p style="margin: 0 0 16px 0; font-size: 14px; font-weight: 600; color: #18181b;">
+                        Products Requiring Attention
+                    </p>
+                    {{range .Products}}
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 12px; background-color: #f8fafc; border-radius: 10px;">
+                        <tr>
+                            <td style="padding: 16px;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 56px; vertical-align: top;">
+                                            {{if .ImageURL}}
+                                            <img src="{{.ImageURL}}" alt="{{.Name}}" width="48" height="48" style="border-radius: 8px; object-fit: cover;">
+                                            {{else}}
+                                            <div style="width: 48px; height: 48px; background-color: #e2e8f0; border-radius: 8px;"></div>
+                                            {{end}}
+                                        </td>
+                                        <td style="vertical-align: top; padding-left: 12px;">
+                                            <p style="margin: 0 0 4px 0; font-size: 14px; font-weight: 600; color: #18181b;">{{.Name}}</p>
+                                            <p style="margin: 0; font-size: 12px; color: #71717a;">SKU: {{.SKU}}</p>
+                                        </td>
+                                        <td style="vertical-align: top; text-align: right; width: 100px;">
+                                            {{if eq .StockLevel 0}}
+                                            <span style="display: inline-block; padding: 4px 10px; background-color: #fef2f2; color: #dc2626; font-size: 11px; font-weight: 600; border-radius: 12px;">OUT OF STOCK</span>
+                                            {{else}}
+                                            <span style="display: inline-block; padding: 4px 10px; background-color: #fef3c7; color: #92400e; font-size: 11px; font-weight: 600; border-radius: 12px;">{{.StockLevel}} LEFT</span>
+                                            {{end}}
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                    {{end}}
+                </td>
+            </tr>
+
+            <!-- Action Required -->
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #eff6ff; border-radius: 10px; border: 1px solid #bfdbfe;">
+                        <tr>
+                            <td style="padding: 16px 20px;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 28px; vertical-align: top;">
+                                            <span style="font-size: 18px;">&#128161;</span>
+                                        </td>
+                                        <td style="vertical-align: top;">
+                                            <p style="margin: 0 0 4px 0; font-size: 13px; font-weight: 600; color: #1e40af;">Recommended Action</p>
+                                            <p style="margin: 0; font-size: 12px; color: #3b82f6; line-height: 1.5;">
+                                                Review your inventory levels and reorder products that are running low to prevent stockouts and lost sales.
+                                            </p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- CTA Button -->
+            <tr>
+                <td style="padding: 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 10px; box-shadow: 0 4px 14px rgba(245,158,11,0.3);">
+                                <a href="{{.InventoryURL}}" style="display: inline-block; padding: 14px 32px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
+                                    Manage Inventory &#8594;
+                                </a>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </td>
+</tr>
+{{end}}
+
+{{define "footer"}}
+<!-- Footer -->
+<tr>
+    <td style="padding: 32px 20px; text-align: center;">
+        <p style="margin: 0 0 8px 0; font-size: 12px; color: #a1a1aa;">
+            This is an automated inventory alert from your store.
+        </p>
+        <p style="margin: 0; font-size: 12px; color: #a1a1aa;">
+            &copy; {{.Year}} {{.BusinessName}}. All rights reserved.
+        </p>
+    </td>
+</tr>
+{{end}}

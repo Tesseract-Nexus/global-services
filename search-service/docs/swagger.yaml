@@ -1,0 +1,1334 @@
+basePath: /api/v1
+definitions:
+  internal_handlers.BatchIndexRequest:
+    properties:
+      action:
+        description: create, upsert, update
+        type: string
+      documents:
+        items:
+          additionalProperties: true
+          type: object
+        type: array
+    required:
+    - documents
+    type: object
+  internal_handlers.DeleteByQueryRequest:
+    properties:
+      filter_by:
+        type: string
+    required:
+    - filter_by
+    type: object
+  internal_handlers.ErrorInfo:
+    description: Error information
+    properties:
+      code:
+        example: INVALID_REQUEST
+        type: string
+      message:
+        example: Query parameter is required
+        type: string
+    type: object
+  internal_handlers.IndexDocumentRequest:
+    properties:
+      document:
+        additionalProperties: true
+        type: object
+    required:
+    - document
+    type: object
+  internal_handlers.MultiSearchRequest:
+    description: Multi-search request for parallel searches across collections
+    properties:
+      searches:
+        items:
+          $ref: '#/definitions/internal_handlers.SearchRequestWithCollection'
+        type: array
+    required:
+    - searches
+    type: object
+  internal_handlers.SearchRequest:
+    description: Search request parameters
+    properties:
+      facet_by:
+        example:
+        - category
+        - brand
+        items:
+          type: string
+        type: array
+      filter_by:
+        example: price:>100 && in_stock:true
+        type: string
+      page:
+        example: 1
+        type: integer
+      per_page:
+        example: 20
+        type: integer
+      query:
+        example: wireless headphones
+        type: string
+      query_by:
+        example:
+        - name
+        - description
+        items:
+          type: string
+        type: array
+      sort_by:
+        example: price:asc
+        type: string
+    required:
+    - query
+    type: object
+  internal_handlers.SearchRequestWithCollection:
+    description: Search request for a specific collection
+    properties:
+      collection:
+        example: products
+        type: string
+      facet_by:
+        example:
+        - brand
+        items:
+          type: string
+        type: array
+      filter_by:
+        example: price:>500
+        type: string
+      page:
+        example: 1
+        type: integer
+      per_page:
+        example: 10
+        type: integer
+      query:
+        example: laptop
+        type: string
+      query_by:
+        example:
+        - name
+        - description
+        items:
+          type: string
+        type: array
+      sort_by:
+        example: price:desc
+        type: string
+    required:
+    - collection
+    - query
+    type: object
+  internal_handlers.SearchResponse:
+    description: Standard API response wrapper
+    properties:
+      data: {}
+      error:
+        $ref: '#/definitions/internal_handlers.ErrorInfo'
+      success:
+        example: true
+        type: boolean
+    type: object
+  internal_handlers.SuggestResponse:
+    description: Autocomplete/suggestion response
+    properties:
+      data:
+        properties:
+          found:
+            example: 5
+            type: integer
+          suggestions:
+            items:
+              additionalProperties: true
+              type: object
+            type: array
+        type: object
+      success:
+        example: true
+        type: boolean
+    type: object
+  internal_handlers.SyncAllRequest:
+    properties:
+      collections:
+        description: 'Optional: specific collections to sync'
+        items:
+          type: string
+        type: array
+    type: object
+host: localhost:8095
+info:
+  contact:
+    email: support@tesseract.com
+    name: Search API Support
+  description: Type "Bearer" followed by a space and JWT token.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: http://swagger.io/terms/
+  title: Search Service API
+  version: 1.0.0
+paths:
+  /admin/cache/clear:
+    post:
+      description: Clear all cached search results
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Cache cleared
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Clear search cache
+      tags:
+      - Admin
+  /admin/cache/stats:
+    get:
+      description: Get search cache statistics
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Cache statistics
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get cache statistics
+      tags:
+      - Admin
+  /admin/collections:
+    get:
+      description: Get all Typesense collections with their schemas and document counts
+      parameters:
+      - description: Tenant/Vendor ID
+        in: header
+        name: X-Vendor-ID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of collections
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Error listing collections
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List collections
+      tags:
+      - Admin
+  /admin/collections/{name}:
+    delete:
+      description: Permanently delete a collection and all its documents
+      parameters:
+      - description: Tenant/Vendor ID
+        in: header
+        name: X-Vendor-ID
+        required: true
+        type: string
+      - description: Collection name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Collection deleted successfully
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Collection name required
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Deletion error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete a collection
+      tags:
+      - Admin
+    post:
+      description: Create a predefined collection schema (products, customers, orders,
+        categories)
+      parameters:
+      - description: Tenant/Vendor ID
+        in: header
+        name: X-Vendor-ID
+        required: true
+        type: string
+      - description: Collection name (products, customers, orders, categories)
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Collection already exists
+          schema:
+            additionalProperties: true
+            type: object
+        "201":
+          description: Collection created successfully
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid collection name
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Creation error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create a collection
+      tags:
+      - Admin
+  /admin/collections/{name}/reindex:
+    post:
+      description: Trigger a full reindex of a collection from the source service
+      parameters:
+      - description: Tenant/Vendor ID
+        in: header
+        name: X-Vendor-ID
+        required: true
+        type: string
+      - description: Collection name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Reindex initiated
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Collection name required
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Reindex a collection
+      tags:
+      - Admin
+  /admin/collections/{name}/stats:
+    get:
+      description: Get detailed statistics for a specific collection including document
+        count and schema
+      parameters:
+      - description: Tenant/Vendor ID
+        in: header
+        name: X-Vendor-ID
+        required: true
+        type: string
+      - description: Collection name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Collection statistics
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Collection name required
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Error retrieving collection
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get collection statistics
+      tags:
+      - Admin
+  /health:
+    get:
+      description: Check if the service is running
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Service is healthy
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Health check
+      tags:
+      - Health
+  /index/documents/{collection}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete all documents matching a filter (tenant-scoped)
+      parameters:
+      - description: Tenant/Vendor ID
+        in: header
+        name: X-Vendor-ID
+        required: true
+        type: string
+      - description: Collection name
+        in: path
+        name: collection
+        required: true
+        type: string
+      - description: Filter expression
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.DeleteByQueryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Documents deleted
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Delete error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete documents by query
+      tags:
+      - Index
+    post:
+      consumes:
+      - application/json
+      description: Index a single document to a collection
+      parameters:
+      - description: Collection name
+        in: path
+        name: collection
+        required: true
+        type: string
+      - description: Document to index
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.IndexDocumentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Index a document
+      tags:
+      - index
+  /index/documents/{collection}/{id}:
+    delete:
+      description: Delete a document from a collection by ID
+      parameters:
+      - description: Tenant/Vendor ID
+        in: header
+        name: X-Vendor-ID
+        required: true
+        type: string
+      - description: Collection name
+        in: path
+        name: collection
+        required: true
+        type: string
+      - description: Document ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Document deleted
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Delete error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete a document
+      tags:
+      - Index
+    put:
+      consumes:
+      - application/json
+      description: Update an existing document in a collection
+      parameters:
+      - description: Tenant/Vendor ID
+        in: header
+        name: X-Vendor-ID
+        required: true
+        type: string
+      - description: Collection name
+        in: path
+        name: collection
+        required: true
+        type: string
+      - description: Document ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated document
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.IndexDocumentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Document updated
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Update error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update a document
+      tags:
+      - Index
+  /index/documents/{collection}/batch:
+    post:
+      consumes:
+      - application/json
+      description: Index multiple documents to a collection with automatic tenant_id
+        assignment
+      parameters:
+      - description: Tenant/Vendor ID
+        in: header
+        name: X-Vendor-ID
+        required: true
+        type: string
+      - description: Collection name
+        in: path
+        name: collection
+        required: true
+        type: string
+      - description: Documents to index
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.BatchIndexRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Documents indexed successfully
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Batch indexing error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Batch index documents
+      tags:
+      - Index
+  /index/sync/all:
+    post:
+      consumes:
+      - application/json
+      description: Trigger full sync of all collections from backend services
+      parameters:
+      - description: Tenant/Vendor ID
+        in: header
+        name: X-Vendor-ID
+        required: true
+        type: string
+      - description: 'Optional: specific collections to sync'
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/internal_handlers.SyncAllRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Sync completed
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Sync error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Sync all collections
+      tags:
+      - Sync
+  /index/sync/categories:
+    post:
+      description: Trigger full sync of categories from products-service to search
+        index
+      parameters:
+      - description: Tenant/Vendor ID
+        in: header
+        name: X-Vendor-ID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Sync completed
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Sync error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Sync categories
+      tags:
+      - Sync
+  /index/sync/customers:
+    post:
+      description: Trigger full sync of customers from customers-service to search
+        index
+      parameters:
+      - description: Tenant/Vendor ID
+        in: header
+        name: X-Vendor-ID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Sync completed
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Sync error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Sync customers
+      tags:
+      - Sync
+  /index/sync/orders:
+    post:
+      description: Trigger full sync of orders from orders-service to search index
+      parameters:
+      - description: Tenant/Vendor ID
+        in: header
+        name: X-Vendor-ID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Sync completed
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Sync error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Sync orders
+      tags:
+      - Sync
+  /index/sync/products:
+    post:
+      description: Trigger full sync of products from products-service to search index
+      parameters:
+      - description: Tenant/Vendor ID
+        in: header
+        name: X-Vendor-ID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Sync completed
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Sync error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Sync products
+      tags:
+      - Sync
+  /ready:
+    get:
+      description: Check if the service is ready to accept requests (Typesense connection
+        verified)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Service is ready
+          schema:
+            additionalProperties: true
+            type: object
+        "503":
+          description: Service is not ready
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Readiness check
+      tags:
+      - Health
+  /search:
+    get:
+      description: Search across all collections using query parameters
+      parameters:
+      - description: Tenant/Vendor ID
+        in: header
+        name: X-Vendor-ID
+        required: true
+        type: string
+      - description: Search query
+        example: '"wireless"'
+        in: query
+        name: q
+        required: true
+        type: string
+      - description: Filter expression
+        example: '"price:>100"'
+        in: query
+        name: filter_by
+        type: string
+      - description: Sort expression
+        example: '"price:asc"'
+        in: query
+        name: sort_by
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Search results
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+      security:
+      - BearerAuth: []
+      summary: Global search via GET
+      tags:
+      - Search
+    post:
+      consumes:
+      - application/json
+      description: Search across products, customers, orders, and categories simultaneously
+        with tenant isolation
+      parameters:
+      - description: Tenant/Vendor ID
+        in: header
+        name: X-Vendor-ID
+        required: true
+        type: string
+      - description: Search request parameters
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.SearchRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Search results from all collections
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+        "400":
+          description: Invalid request or missing tenant
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+      security:
+      - BearerAuth: []
+      summary: Global search across all collections
+      tags:
+      - Search
+  /search/categories:
+    get:
+      description: Search categories using query parameters
+      parameters:
+      - description: Tenant/Vendor ID
+        in: header
+        name: X-Vendor-ID
+        required: true
+        type: string
+      - description: Search query
+        example: '"electronics"'
+        in: query
+        name: q
+        required: true
+        type: string
+      - description: Filter expression
+        in: query
+        name: filter_by
+        type: string
+      - description: Sort expression
+        in: query
+        name: sort_by
+        type: string
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Results per page
+        in: query
+        name: per_page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Category search results
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+      security:
+      - BearerAuth: []
+      summary: Search categories via GET
+      tags:
+      - Search
+    post:
+      consumes:
+      - application/json
+      description: Search categories by name, slug, or description
+      parameters:
+      - description: Tenant/Vendor ID
+        in: header
+        name: X-Vendor-ID
+        required: true
+        type: string
+      - description: Search request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.SearchRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Category search results
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+        "500":
+          description: Search error
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+      security:
+      - BearerAuth: []
+      summary: Search categories
+      tags:
+      - Search
+  /search/customers:
+    get:
+      description: Search customers using query parameters
+      parameters:
+      - description: Tenant/Vendor ID
+        in: header
+        name: X-Vendor-ID
+        required: true
+        type: string
+      - description: Search query
+        example: '"john@example.com"'
+        in: query
+        name: q
+        required: true
+        type: string
+      - description: Filter expression
+        in: query
+        name: filter_by
+        type: string
+      - description: Sort expression
+        in: query
+        name: sort_by
+        type: string
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Results per page
+        in: query
+        name: per_page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Customer search results
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+      security:
+      - BearerAuth: []
+      summary: Search customers via GET
+      tags:
+      - Search
+    post:
+      consumes:
+      - application/json
+      description: Search customers by name, email, phone, or company
+      parameters:
+      - description: Tenant/Vendor ID
+        in: header
+        name: X-Vendor-ID
+        required: true
+        type: string
+      - description: Search request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.SearchRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Customer search results
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+        "500":
+          description: Search error
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+      security:
+      - BearerAuth: []
+      summary: Search customers
+      tags:
+      - Search
+  /search/multi:
+    post:
+      consumes:
+      - application/json
+      description: Execute multiple search queries in parallel across different collections
+      parameters:
+      - description: Tenant/Vendor ID
+        in: header
+        name: X-Vendor-ID
+        required: true
+        type: string
+      - description: Multi-search request with array of searches
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.MultiSearchRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Multi-search results
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+        "500":
+          description: Search error
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+      security:
+      - BearerAuth: []
+      summary: Multi-search across collections
+      tags:
+      - Search
+  /search/orders:
+    get:
+      description: Search orders using query parameters
+      parameters:
+      - description: Tenant/Vendor ID
+        in: header
+        name: X-Vendor-ID
+        required: true
+        type: string
+      - description: Search query
+        example: '"ORD-12345"'
+        in: query
+        name: q
+        required: true
+        type: string
+      - description: Filter expression
+        example: '"status:=completed"'
+        in: query
+        name: filter_by
+        type: string
+      - description: Sort expression
+        example: '"created_at:desc"'
+        in: query
+        name: sort_by
+        type: string
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Results per page
+        in: query
+        name: per_page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Order search results
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+      security:
+      - BearerAuth: []
+      summary: Search orders via GET
+      tags:
+      - Search
+    post:
+      consumes:
+      - application/json
+      description: Search orders by order number, customer name, email, or items
+      parameters:
+      - description: Tenant/Vendor ID
+        in: header
+        name: X-Vendor-ID
+        required: true
+        type: string
+      - description: Search request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.SearchRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Order search results
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+        "500":
+          description: Search error
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+      security:
+      - BearerAuth: []
+      summary: Search orders
+      tags:
+      - Search
+  /search/products:
+    get:
+      description: Search products using query parameters
+      parameters:
+      - description: Tenant/Vendor ID
+        in: header
+        name: X-Vendor-ID
+        required: true
+        type: string
+      - description: Search query
+        example: '"laptop"'
+        in: query
+        name: q
+        required: true
+        type: string
+      - description: Filter expression
+        example: '"brand:=Apple"'
+        in: query
+        name: filter_by
+        type: string
+      - description: Sort expression
+        example: '"price:asc"'
+        in: query
+        name: sort_by
+        type: string
+      - description: Facet fields
+        example: '"brand,category"'
+        in: query
+        name: facet_by
+        type: string
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Results per page
+        in: query
+        name: per_page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Product search results
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+      security:
+      - BearerAuth: []
+      summary: Search products via GET
+      tags:
+      - Search
+    post:
+      consumes:
+      - application/json
+      description: Search products with full-text search, filtering, and faceting
+      parameters:
+      - description: Tenant/Vendor ID
+        in: header
+        name: X-Vendor-ID
+        required: true
+        type: string
+      - description: Search request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.SearchRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Product search results
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+        "500":
+          description: Search error
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+      security:
+      - BearerAuth: []
+      summary: Search products
+      tags:
+      - Search
+  /search/suggest:
+    get:
+      description: Get autocomplete suggestions for a search query with prefix matching
+      parameters:
+      - description: Tenant/Vendor ID
+        in: header
+        name: X-Vendor-ID
+        required: true
+        type: string
+      - description: Search prefix query
+        example: '"wire"'
+        in: query
+        name: q
+        required: true
+        type: string
+      - default: products
+        description: Collection to search
+        enum:
+        - products
+        - customers
+        - orders
+        - categories
+        in: query
+        name: collection
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Autocomplete suggestions
+          schema:
+            $ref: '#/definitions/internal_handlers.SuggestResponse'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+        "500":
+          description: Suggestion error
+          schema:
+            $ref: '#/definitions/internal_handlers.SearchResponse'
+      security:
+      - BearerAuth: []
+      summary: Autocomplete suggestions
+      tags:
+      - Search
+swagger: "2.0"

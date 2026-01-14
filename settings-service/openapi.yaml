@@ -1,0 +1,198 @@
+openapi: 3.0.3
+info:
+  title: Settings Service API
+  description: Tenant settings, themes, and configuration management
+  version: 1.0.0
+servers:
+  - url: http://localhost:8092
+    description: Local development
+tags:
+  - name: Settings
+  - name: Themes
+  - name: Storefront
+
+paths:
+  /api/v1/settings:
+    get:
+      tags: [Settings]
+      summary: Get settings
+      operationId: getSettings
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Settings data
+    put:
+      tags: [Settings]
+      summary: Update settings
+      operationId: updateSettings
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Settings updated
+
+  /api/v1/settings/context:
+    get:
+      tags: [Settings]
+      summary: Get settings by context
+      operationId: getSettingsByContext
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: applicationId
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Context settings
+
+  /api/v1/settings/branding:
+    get:
+      tags: [Settings]
+      summary: Get branding settings
+      operationId: getBrandingSettings
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Branding settings
+    put:
+      tags: [Settings]
+      summary: Update branding
+      operationId: updateBrandingSettings
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Branding updated
+
+  /api/v1/settings/localization:
+    get:
+      tags: [Settings]
+      summary: Get localization settings
+      operationId: getLocalizationSettings
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Localization settings
+    put:
+      tags: [Settings]
+      summary: Update localization
+      operationId: updateLocalizationSettings
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Localization updated
+
+  /api/v1/themes:
+    get:
+      tags: [Themes]
+      summary: Get theme
+      operationId: getTheme
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Theme data
+    put:
+      tags: [Themes]
+      summary: Update theme
+      operationId: updateTheme
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Theme updated
+
+  /api/v1/themes/presets:
+    get:
+      tags: [Themes]
+      summary: List theme presets
+      operationId: listThemePresets
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Theme presets
+
+  /api/v1/themes/presets/{id}/apply:
+    post:
+      tags: [Themes]
+      summary: Apply preset
+      operationId: applyThemePreset
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Preset applied
+
+  /api/v1/storefront-theme:
+    get:
+      tags: [Storefront]
+      summary: Get storefront theme
+      operationId: getStorefrontTheme
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Storefront theme
+    put:
+      tags: [Storefront]
+      summary: Update storefront theme
+      operationId: updateStorefrontTheme
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Theme updated
+
+  /api/v1/storefront-settings:
+    get:
+      tags: [Storefront]
+      summary: Get storefront settings
+      operationId: getStorefrontSettings
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Storefront settings
+    put:
+      tags: [Storefront]
+      summary: Update storefront settings
+      operationId: updateStorefrontSettings
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Settings updated
+
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: Healthy
+
+  /ready:
+    get:
+      summary: Readiness check
+      responses:
+        '200':
+          description: Ready
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

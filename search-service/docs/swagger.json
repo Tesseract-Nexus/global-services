@@ -1,0 +1,1999 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "Type \"Bearer\" followed by a space and JWT token.",
+        "title": "Search Service API",
+        "termsOfService": "http://swagger.io/terms/",
+        "contact": {
+            "name": "Search API Support",
+            "email": "support@tesseract.com"
+        },
+        "license": {
+            "name": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+        },
+        "version": "1.0.0"
+    },
+    "host": "localhost:8095",
+    "basePath": "/api/v1",
+    "paths": {
+        "/admin/cache/clear": {
+            "post": {
+                "description": "Clear all cached search results",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Clear search cache",
+                "responses": {
+                    "200": {
+                        "description": "Cache cleared",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/cache/stats": {
+            "get": {
+                "description": "Get search cache statistics",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Get cache statistics",
+                "responses": {
+                    "200": {
+                        "description": "Cache statistics",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/collections": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get all Typesense collections with their schemas and document counts",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "List collections",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant/Vendor ID",
+                        "name": "X-Vendor-ID",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of collections",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Error listing collections",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/collections/{name}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a predefined collection schema (products, customers, orders, categories)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Create a collection",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant/Vendor ID",
+                        "name": "X-Vendor-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Collection name (products, customers, orders, categories)",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Collection already exists",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "201": {
+                        "description": "Collection created successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid collection name",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Creation error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Permanently delete a collection and all its documents",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Delete a collection",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant/Vendor ID",
+                        "name": "X-Vendor-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Collection name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Collection deleted successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Collection name required",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Deletion error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/collections/{name}/reindex": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Trigger a full reindex of a collection from the source service",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Reindex a collection",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant/Vendor ID",
+                        "name": "X-Vendor-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Collection name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Reindex initiated",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Collection name required",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/collections/{name}/stats": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get detailed statistics for a specific collection including document count and schema",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Get collection statistics",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant/Vendor ID",
+                        "name": "X-Vendor-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Collection name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Collection statistics",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Collection name required",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Error retrieving collection",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "description": "Check if the service is running",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Health"
+                ],
+                "summary": "Health check",
+                "responses": {
+                    "200": {
+                        "description": "Service is healthy",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/index/documents/{collection}": {
+            "post": {
+                "description": "Index a single document to a collection",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "index"
+                ],
+                "summary": "Index a document",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Collection name",
+                        "name": "collection",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Document to index",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.IndexDocumentRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Delete all documents matching a filter (tenant-scoped)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Index"
+                ],
+                "summary": "Delete documents by query",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant/Vendor ID",
+                        "name": "X-Vendor-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Collection name",
+                        "name": "collection",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Filter expression",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.DeleteByQueryRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Documents deleted",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Delete error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/index/documents/{collection}/batch": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Index multiple documents to a collection with automatic tenant_id assignment",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Index"
+                ],
+                "summary": "Batch index documents",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant/Vendor ID",
+                        "name": "X-Vendor-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Collection name",
+                        "name": "collection",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Documents to index",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.BatchIndexRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Documents indexed successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Batch indexing error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/index/documents/{collection}/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update an existing document in a collection",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Index"
+                ],
+                "summary": "Update a document",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant/Vendor ID",
+                        "name": "X-Vendor-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Collection name",
+                        "name": "collection",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Document ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Updated document",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.IndexDocumentRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Document updated",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Update error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Delete a document from a collection by ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Index"
+                ],
+                "summary": "Delete a document",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant/Vendor ID",
+                        "name": "X-Vendor-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Collection name",
+                        "name": "collection",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Document ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Document deleted",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Delete error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/index/sync/all": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Trigger full sync of all collections from backend services",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Sync"
+                ],
+                "summary": "Sync all collections",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant/Vendor ID",
+                        "name": "X-Vendor-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Optional: specific collections to sync",
+                        "name": "request",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SyncAllRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Sync completed",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Sync error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/index/sync/categories": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Trigger full sync of categories from products-service to search index",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Sync"
+                ],
+                "summary": "Sync categories",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant/Vendor ID",
+                        "name": "X-Vendor-ID",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Sync completed",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Sync error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/index/sync/customers": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Trigger full sync of customers from customers-service to search index",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Sync"
+                ],
+                "summary": "Sync customers",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant/Vendor ID",
+                        "name": "X-Vendor-ID",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Sync completed",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Sync error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/index/sync/orders": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Trigger full sync of orders from orders-service to search index",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Sync"
+                ],
+                "summary": "Sync orders",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant/Vendor ID",
+                        "name": "X-Vendor-ID",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Sync completed",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Sync error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/index/sync/products": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Trigger full sync of products from products-service to search index",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Sync"
+                ],
+                "summary": "Sync products",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant/Vendor ID",
+                        "name": "X-Vendor-ID",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Sync completed",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Sync error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/ready": {
+            "get": {
+                "description": "Check if the service is ready to accept requests (Typesense connection verified)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Health"
+                ],
+                "summary": "Readiness check",
+                "responses": {
+                    "200": {
+                        "description": "Service is ready",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "503": {
+                        "description": "Service is not ready",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/search": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Search across all collections using query parameters",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Search"
+                ],
+                "summary": "Global search via GET",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant/Vendor ID",
+                        "name": "X-Vendor-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "\"wireless\"",
+                        "description": "Search query",
+                        "name": "q",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "\"price:\u003e100\"",
+                        "description": "Filter expression",
+                        "name": "filter_by",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "\"price:asc\"",
+                        "description": "Sort expression",
+                        "name": "sort_by",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Search results",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Search across products, customers, orders, and categories simultaneously with tenant isolation",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Search"
+                ],
+                "summary": "Global search across all collections",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant/Vendor ID",
+                        "name": "X-Vendor-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Search request parameters",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Search results from all collections",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request or missing tenant",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/search/categories": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Search categories using query parameters",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Search"
+                ],
+                "summary": "Search categories via GET",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant/Vendor ID",
+                        "name": "X-Vendor-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "\"electronics\"",
+                        "description": "Search query",
+                        "name": "q",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter expression",
+                        "name": "filter_by",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sort expression",
+                        "name": "sort_by",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Results per page",
+                        "name": "per_page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Category search results",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Search categories by name, slug, or description",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Search"
+                ],
+                "summary": "Search categories",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant/Vendor ID",
+                        "name": "X-Vendor-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Search request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Category search results",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Search error",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/search/customers": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Search customers using query parameters",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Search"
+                ],
+                "summary": "Search customers via GET",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant/Vendor ID",
+                        "name": "X-Vendor-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "\"john@example.com\"",
+                        "description": "Search query",
+                        "name": "q",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter expression",
+                        "name": "filter_by",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sort expression",
+                        "name": "sort_by",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Results per page",
+                        "name": "per_page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Customer search results",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Search customers by name, email, phone, or company",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Search"
+                ],
+                "summary": "Search customers",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant/Vendor ID",
+                        "name": "X-Vendor-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Search request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Customer search results",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Search error",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/search/multi": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Execute multiple search queries in parallel across different collections",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Search"
+                ],
+                "summary": "Multi-search across collections",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant/Vendor ID",
+                        "name": "X-Vendor-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Multi-search request with array of searches",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.MultiSearchRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Multi-search results",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Search error",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/search/orders": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Search orders using query parameters",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Search"
+                ],
+                "summary": "Search orders via GET",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant/Vendor ID",
+                        "name": "X-Vendor-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "\"ORD-12345\"",
+                        "description": "Search query",
+                        "name": "q",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "\"status:=completed\"",
+                        "description": "Filter expression",
+                        "name": "filter_by",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "\"created_at:desc\"",
+                        "description": "Sort expression",
+                        "name": "sort_by",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Results per page",
+                        "name": "per_page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Order search results",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Search orders by order number, customer name, email, or items",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Search"
+                ],
+                "summary": "Search orders",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant/Vendor ID",
+                        "name": "X-Vendor-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Search request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Order search results",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Search error",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/search/products": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Search products using query parameters",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Search"
+                ],
+                "summary": "Search products via GET",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant/Vendor ID",
+                        "name": "X-Vendor-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "\"laptop\"",
+                        "description": "Search query",
+                        "name": "q",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "\"brand:=Apple\"",
+                        "description": "Filter expression",
+                        "name": "filter_by",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "\"price:asc\"",
+                        "description": "Sort expression",
+                        "name": "sort_by",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "\"brand,category\"",
+                        "description": "Facet fields",
+                        "name": "facet_by",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Results per page",
+                        "name": "per_page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Product search results",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Search products with full-text search, filtering, and faceting",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Search"
+                ],
+                "summary": "Search products",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant/Vendor ID",
+                        "name": "X-Vendor-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Search request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Product search results",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Search error",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/search/suggest": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get autocomplete suggestions for a search query with prefix matching",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Search"
+                ],
+                "summary": "Autocomplete suggestions",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant/Vendor ID",
+                        "name": "X-Vendor-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "\"wire\"",
+                        "description": "Search prefix query",
+                        "name": "q",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            "products",
+                            "customers",
+                            "orders",
+                            "categories"
+                        ],
+                        "type": "string",
+                        "default": "products",
+                        "description": "Collection to search",
+                        "name": "collection",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Autocomplete suggestions",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SuggestResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Suggestion error",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SearchResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "internal_handlers.BatchIndexRequest": {
+            "type": "object",
+            "required": [
+                "documents"
+            ],
+            "properties": {
+                "action": {
+                    "description": "create, upsert, update",
+                    "type": "string"
+                },
+                "documents": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": true
+                    }
+                }
+            }
+        },
+        "internal_handlers.DeleteByQueryRequest": {
+            "type": "object",
+            "required": [
+                "filter_by"
+            ],
+            "properties": {
+                "filter_by": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_handlers.ErrorInfo": {
+            "description": "Error information",
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "example": "INVALID_REQUEST"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Query parameter is required"
+                }
+            }
+        },
+        "internal_handlers.IndexDocumentRequest": {
+            "type": "object",
+            "required": [
+                "document"
+            ],
+            "properties": {
+                "document": {
+                    "type": "object",
+                    "additionalProperties": true
+                }
+            }
+        },
+        "internal_handlers.MultiSearchRequest": {
+            "description": "Multi-search request for parallel searches across collections",
+            "type": "object",
+            "required": [
+                "searches"
+            ],
+            "properties": {
+                "searches": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_handlers.SearchRequestWithCollection"
+                    }
+                }
+            }
+        },
+        "internal_handlers.SearchRequest": {
+            "description": "Search request parameters",
+            "type": "object",
+            "required": [
+                "query"
+            ],
+            "properties": {
+                "facet_by": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "category",
+                        "brand"
+                    ]
+                },
+                "filter_by": {
+                    "type": "string",
+                    "example": "price:\u003e100 \u0026\u0026 in_stock:true"
+                },
+                "page": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "per_page": {
+                    "type": "integer",
+                    "example": 20
+                },
+                "query": {
+                    "type": "string",
+                    "example": "wireless headphones"
+                },
+                "query_by": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "name",
+                        "description"
+                    ]
+                },
+                "sort_by": {
+                    "type": "string",
+                    "example": "price:asc"
+                }
+            }
+        },
+        "internal_handlers.SearchRequestWithCollection": {
+            "description": "Search request for a specific collection",
+            "type": "object",
+            "required": [
+                "collection",
+                "query"
+            ],
+            "properties": {
+                "collection": {
+                    "type": "string",
+                    "example": "products"
+                },
+                "facet_by": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "brand"
+                    ]
+                },
+                "filter_by": {
+                    "type": "string",
+                    "example": "price:\u003e500"
+                },
+                "page": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "per_page": {
+                    "type": "integer",
+                    "example": 10
+                },
+                "query": {
+                    "type": "string",
+                    "example": "laptop"
+                },
+                "query_by": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "name",
+                        "description"
+                    ]
+                },
+                "sort_by": {
+                    "type": "string",
+                    "example": "price:desc"
+                }
+            }
+        },
+        "internal_handlers.SearchResponse": {
+            "description": "Standard API response wrapper",
+            "type": "object",
+            "properties": {
+                "data": {},
+                "error": {
+                    "$ref": "#/definitions/internal_handlers.ErrorInfo"
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
+        "internal_handlers.SuggestResponse": {
+            "description": "Autocomplete/suggestion response",
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "found": {
+                            "type": "integer",
+                            "example": 5
+                        },
+                        "suggestions": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                            }
+                        }
+                    }
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
+        "internal_handlers.SyncAllRequest": {
+            "type": "object",
+            "properties": {
+                "collections": {
+                    "description": "Optional: specific collections to sync",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        }
+    }
+}

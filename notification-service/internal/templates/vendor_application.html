@@ -1,0 +1,133 @@
+{{define "header"}}
+<!-- Logo -->
+<tr>
+    <td style="text-align: center; padding-bottom: 24px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+            <tr>
+                <td style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
+                    <span style="color: #ffffff; font-size: 24px; font-weight: 700;">{{if .BusinessInitial}}{{.BusinessInitial}}{{else}}T{{end}}</span>
+                </td>
+            </tr>
+        </table>
+        {{if .BusinessName}}
+        <p style="margin: 12px 0 0 0; font-size: 18px; font-weight: 600; color: #18181b; letter-spacing: -0.3px;">{{.BusinessName}}</p>
+        {{end}}
+    </td>
+</tr>
+{{end}}
+
+{{define "content"}}
+<!-- Main Card -->
+<tr>
+    <td>
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1); overflow: hidden;">
+
+            <!-- Header Banner -->
+            <tr>
+                <td style="background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); padding: 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="width: 64px; height: 64px; background-color: rgba(255,255,255,0.2); border-radius: 50%; text-align: center; vertical-align: middle;">
+                                <span style="font-size: 32px;">&#128188;</span>
+                            </td>
+                        </tr>
+                    </table>
+                    <h1 style="margin: 16px 0 0 0; font-size: 24px; font-weight: 700; color: #ffffff; line-height: 1.3;">
+                        New Vendor Application
+                    </h1>
+                    <p style="margin: 8px 0 0 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                        A new vendor has applied to join your marketplace
+                    </p>
+                </td>
+            </tr>
+
+            <!-- Vendor Details -->
+            <tr>
+                <td style="padding: 32px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #fff7ed; border-radius: 12px; border: 1px solid #fed7aa;">
+                        <tr>
+                            <td style="padding: 20px;">
+                                <p style="margin: 0 0 4px 0; font-size: 11px; font-weight: 600; color: #9a3412; text-transform: uppercase; letter-spacing: 0.5px;">Applicant Details</p>
+                                <p style="margin: 12px 0 0 0; font-size: 18px; font-weight: 700; color: #18181b;">{{.VendorName}}</p>
+                                {{if .VendorBusinessName}}
+                                <p style="margin: 4px 0 0 0; font-size: 14px; color: #3f3f46;">{{.VendorBusinessName}}</p>
+                                {{end}}
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- Info Grid -->
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                        <tr>
+                            <td style="width: 50%; vertical-align: top; padding-right: 12px;">
+                                <p style="margin: 0 0 8px 0; font-size: 11px; font-weight: 600; color: #71717a; text-transform: uppercase; letter-spacing: 0.5px;">Contact Email</p>
+                                <p style="margin: 0; font-size: 14px; color: #3f3f46;">{{.VendorEmail}}</p>
+                            </td>
+                            <td style="width: 50%; vertical-align: top; padding-left: 12px;">
+                                <p style="margin: 0 0 8px 0; font-size: 11px; font-weight: 600; color: #71717a; text-transform: uppercase; letter-spacing: 0.5px;">Status</p>
+                                <span style="display: inline-block; padding: 4px 12px; font-size: 12px; font-weight: 600; color: #c2410c; background-color: #ffedd5; border-radius: 20px;">Pending Review</span>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- Action Required Notice -->
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #fefce8; border-radius: 12px; border: 1px solid #fef08a;">
+                        <tr>
+                            <td style="padding: 16px 20px;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 24px; vertical-align: top;">
+                                            <span style="font-size: 16px;">&#9888;</span>
+                                        </td>
+                                        <td style="padding-left: 12px;">
+                                            <p style="margin: 0; font-size: 14px; font-weight: 600; color: #854d0e;">Action Required</p>
+                                            <p style="margin: 4px 0 0 0; font-size: 13px; color: #a16207;">Please review this application and approve or reject the vendor.</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- CTA Button -->
+            <tr>
+                <td style="padding: 24px 40px 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); border-radius: 10px;">
+                                <a href="{{.VendorURL}}" style="display: inline-block; padding: 14px 32px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
+                                    Review Application &#8594;
+                                </a>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </td>
+</tr>
+{{end}}
+
+{{define "footer"}}
+<!-- Footer -->
+<tr>
+    <td style="padding: 32px 20px; text-align: center;">
+        <p style="margin: 0 0 8px 0; font-size: 13px; color: #71717a;">
+            This is an automated admin notification from <a href="mailto:{{.SupportEmail}}" style="color: #6366f1; text-decoration: none; font-weight: 500;">{{.BusinessName}}</a>
+        </p>
+        <p style="margin: 0; font-size: 12px; color: #a1a1aa;">
+            &copy; {{.Year}} {{.BusinessName}}. All rights reserved.
+        </p>
+    </td>
+</tr>
+{{end}}

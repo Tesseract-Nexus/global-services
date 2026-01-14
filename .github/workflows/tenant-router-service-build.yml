@@ -1,0 +1,167 @@
+name: tenant-router-service - CI Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - 'feat/**'
+      - 'feature/**'
+      - 'bugfix/**'
+      - 'hotfix/**'
+    paths:
+      - 'tenant-router-service/**'
+      - '.github/workflows/tenant-router-service-build.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'tenant-router-service/**'
+
+permissions:
+  contents: read
+  packages: write
+  security-events: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/tenant-router-service
+  GO_VERSION: '1.25'
+
+jobs:
+  test:
+    name: Test tenant-router-service
+    runs-on:
+  workflow_dispatch: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version:
+  workflow_dispatch: ${{ env.GO_VERSION }}
+          cache-dependency-path: tenant-router-service/go.sum
+
+      - name: Download dependencies
+        working-directory: tenant-router-service
+        run: go mod download
+
+      - name: Run go vet
+        working-directory: tenant-router-service
+        run: go vet ./...
+
+      - name: Run staticcheck
+        uses: dominikh/staticcheck-action@v1
+        with:
+          version:
+  workflow_dispatch: "latest"
+          working-directory: tenant-router-service
+
+      - name: Run tests
+        working-directory: tenant-router-service
+        run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+
+      - name: Upload coverage to Codecov
+        if: github.event_name != 'pull_request'
+        uses: codecov/codecov-action@v4
+        with:
+          file: tenant-router-service/coverage.out
+          flags: tenant-router-service
+          fail_ci_if_error: false
+        continue-on-error: true
+
+      - name: Build binary
+        working-directory: tenant-router-service
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o bin/tenant-router-service ./cmd
+          echo "Binary built successfully"
+
+  build:
+    name: Build and Push tenant-router-service
+    runs-on:
+  workflow_dispatch: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.title=tenant-router-service
+            org.opencontainers.image.description=Tenant Router Service - Manages Istio VirtualService hosts for multi-tenant routing
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: tenant-router-service/Dockerfile
+          platforms: linux/amd64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=tenant-router-service
+          cache-to: type=gha,mode=max,scope=tenant-router-service
+
+      - name: Run Trivy vulnerability scanner
+        if: github.event_name != 'pull_request'
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ fromJSON(steps.meta.outputs.json).tags[0] }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+        continue-on-error: true
+
+      - name: Upload Trivy results to GitHub Security tab
+        if: github.event_name != 'pull_request'
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+        continue-on-error: true
+
+      - name: Build Summary
+        if: always()
+        run: |
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Application:
+  workflow_dispatch:** tenant-router-service" >> $GITHUB_STEP_SUMMARY
+          echo "**Architecture:** AMD64" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [[ "${{ github.event_name }}" != "pull_request" ]]; then
+            echo "✅ **Docker Image:** Pushed to ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Tags:**" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "🔨 **Docker Image:** Built successfully (not pushed)" >> $GITHUB_STEP_SUMMARY
+          fi

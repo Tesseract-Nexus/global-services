@@ -1,0 +1,119 @@
+package config
+
+import (
+	"os"
+	"strconv"
+
+	"github.com/tesseract-hub/go-shared/secrets"
+)
+
+// Config holds the application configuration
+type Config struct {
+	Server     ServerConfig
+	Database   DatabaseConfig
+	NATS       NATSConfig
+	Kubernetes K8sConfig
+	Domain     DomainConfig
+}
+
+// DatabaseConfig holds PostgreSQL database configuration
+type DatabaseConfig struct {
+	Host     string
+	Port     string
+	User     string
+	Password string
+	Name     string
+	SSLMode  string
+}
+
+// ServerConfig holds server configuration
+type ServerConfig struct {
+	Port string
+	Mode string // "debug" or "release"
+}
+
+// NATSConfig holds NATS configuration
+type NATSConfig struct {
+	URL string
+}
+
+// K8sConfig holds Kubernetes configuration
+type K8sConfig struct {
+	Namespace          string
+	IstioNamespace     string
+	GatewayName        string
+	AdminVSName        string
+	StorefrontVSName   string
+	APIVSName          string // Template VirtualService for mobile/external API access
+	ClusterIssuer      string
+	SkipGatewayPatch   bool   // Skip gateway patching when using wildcard certificate
+	WildcardCertName   string // Name of the wildcard certificate (e.g., "storefront-wildcard-tls")
+}
+
+// DomainConfig holds domain configuration
+type DomainConfig struct {
+	BaseDomain string
+}
+
+// LoadConfig loads configuration from environment variables
+func LoadConfig() *Config {
+	return &Config{
+		Server: ServerConfig{
+			Port: getEnv("SERVER_PORT", "8089"),
+			Mode: getEnv("GIN_MODE", "debug"),
+		},
+		Database: DatabaseConfig{
+			Host:     getEnv("DB_HOST", "postgresql.database.svc.cluster.local"),
+			Port:     getEnv("DB_PORT", "5432"),
+			User:     getEnv("DB_USER", "postgres"),
+			Password: secrets.GetDBPassword(),
+			Name:     getEnv("DB_NAME", "tesseract_hub"),
+			SSLMode:  getEnv("DB_SSLMODE", "disable"),
+		},
+		NATS: NATSConfig{
+			URL: getEnv("NATS_URL", "nats://nats.devtest.svc.cluster.local:4222"),
+		},
+		Kubernetes: K8sConfig{
+			Namespace:        getEnv("K8S_NAMESPACE", "devtest"),
+			IstioNamespace:   getEnv("ISTIO_NAMESPACE", "istio-system"),
+			GatewayName:      getEnv("GATEWAY_NAME", "main-gateway"),
+			AdminVSName:      getEnv("ADMIN_VS_NAME", "admin-vs"),
+			StorefrontVSName: getEnv("STOREFRONT_VS_NAME", "storefront-vs"),
+			APIVSName:        getEnv("API_VS_NAME", "api-vs"),
+			ClusterIssuer:    getEnv("CLUSTER_ISSUER", "letsencrypt-prod"),
+			SkipGatewayPatch: getEnvBool("SKIP_GATEWAY_PATCH", true), // Default true: use wildcard cert
+			WildcardCertName: getEnv("WILDCARD_CERT_NAME", "storefront-wildcard-tls"),
+		},
+		Domain: DomainConfig{
+			BaseDomain: getEnv("BASE_DOMAIN", "tesserix.app"),
+		},
+	}
+}
+
+// getEnv gets an environment variable with a default value
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
+// getEnvInt gets an environment variable as int with a default value
+func getEnvInt(key string, defaultValue int) int {
+	if value := os.Getenv(key); value != "" {
+		if intValue, err := strconv.Atoi(value); err == nil {
+			return intValue
+		}
+	}
+	return defaultValue
+}
+
+// getEnvBool gets an environment variable as bool with a default value
+func getEnvBool(key string, defaultValue bool) bool {
+	if value := os.Getenv(key); value != "" {
+		if boolValue, err := strconv.ParseBool(value); err == nil {
+			return boolValue
+		}
+	}
+	return defaultValue
+}

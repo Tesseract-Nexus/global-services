@@ -1,0 +1,174 @@
+openapi: 3.0.3
+info:
+  title: Tenant Router Service API
+  description: Dynamic tenant routing infrastructure for Kubernetes with SSL and Istio
+  version: 1.0.0
+servers:
+  - url: http://localhost:8089
+    description: Local development
+tags:
+  - name: Hosts
+  - name: Health
+
+paths:
+  /api/v1/hosts:
+    get:
+      tags: [Hosts]
+      summary: List tenant hosts
+      operationId: listTenantHosts
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Tenant hosts list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TenantHost'
+                  count:
+                    type: integer
+
+  /api/v1/hosts/{slug}:
+    get:
+      tags: [Hosts]
+      summary: Get tenant host
+      operationId: getTenantHost
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Tenant host details
+        '404':
+          description: Tenant not found
+    post:
+      tags: [Hosts]
+      summary: Add tenant host
+      operationId: addTenantHost
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                slug:
+                  type: string
+                tenant_id:
+                  type: string
+      responses:
+        '200':
+          description: Tenant host provisioned
+        '206':
+          description: Partial success with errors
+    delete:
+      tags: [Hosts]
+      summary: Remove tenant host
+      operationId: removeTenantHost
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Tenant host removed
+
+  /api/v1/hosts/{slug}/sync:
+    post:
+      tags: [Hosts]
+      summary: Force sync tenant config
+      operationId: syncTenantHost
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Tenant config synced
+
+  /health:
+    get:
+      tags: [Health]
+      summary: Liveness probe
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  service:
+                    type: string
+
+  /ready:
+    get:
+      tags: [Health]
+      summary: Readiness probe
+      operationId: readinessCheck
+      responses:
+        '200':
+          description: Service is ready
+        '503':
+          description: Service not ready
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    TenantHost:
+      type: object
+      properties:
+        tenant_id:
+          type: string
+        slug:
+          type: string
+        admin_host:
+          type: string
+        storefront_host:
+          type: string
+        cert_name:
+          type: string
+        status:
+          type: string
+          enum: [pending, provisioned, failed]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time

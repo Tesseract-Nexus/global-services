@@ -1,0 +1,461 @@
+basePath: /api/v1
+definitions:
+  handlers.BatchEvaluateRequest:
+    properties:
+      attributes:
+        additionalProperties: true
+        type: object
+      client_key:
+        type: string
+      feature_keys:
+        items:
+          type: string
+        type: array
+    required:
+    - client_key
+    - feature_keys
+    type: object
+  handlers.EvaluateFeatureRequest:
+    properties:
+      attributes:
+        additionalProperties: true
+        type: object
+      client_key:
+        type: string
+      feature_key:
+        type: string
+    required:
+    - client_key
+    - feature_key
+    type: object
+  handlers.OverrideRequest:
+    properties:
+      feature_key:
+        type: string
+      value: {}
+    required:
+    - feature_key
+    - value
+    type: object
+  handlers.TrackExperimentRequest:
+    properties:
+      attributes:
+        additionalProperties: true
+        type: object
+      user_id:
+        type: string
+      variation_id:
+        type: string
+    required:
+    - variation_id
+    type: object
+host: localhost:8096
+info:
+  contact:
+    email: support@tesseract.com
+    name: Feature Flags API Support
+  description: Multi-tenant feature flags service powered by Growthbook
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: http://swagger.io/terms/
+  title: Feature Flags Service API
+  version: 1.0.0
+paths:
+  /experiments:
+    get:
+      description: Get all experiments for the tenant
+      parameters:
+      - description: Tenant/Vendor ID
+        in: header
+        name: X-Vendor-ID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of experiments
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List experiments
+      tags:
+      - Experiments
+  /experiments/{id}:
+    get:
+      description: Get a specific experiment by ID
+      parameters:
+      - description: Tenant/Vendor ID
+        in: header
+        name: X-Vendor-ID
+        required: true
+        type: string
+      - description: Experiment ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Experiment details
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Experiment not found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get experiment
+      tags:
+      - Experiments
+  /experiments/{id}/track:
+    post:
+      consumes:
+      - application/json
+      description: Track an experiment view or conversion event
+      parameters:
+      - description: Tenant/Vendor ID
+        in: header
+        name: X-Vendor-ID
+        required: true
+        type: string
+      - description: Experiment ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Tracking request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.TrackExperimentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Tracking recorded
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Track experiment
+      tags:
+      - Experiments
+  /features:
+    get:
+      description: Get all feature flags for the authenticated tenant
+      parameters:
+      - description: Tenant/Vendor ID
+        in: header
+        name: X-Vendor-ID
+        required: true
+        type: string
+      - description: Growthbook SDK client key
+        in: query
+        name: client_key
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of features
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Missing required parameters
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Error fetching features
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List all features
+      tags:
+      - Features
+  /features/{clientKey}:
+    get:
+      description: Proxy features request to Growthbook for SDK clients
+      parameters:
+      - description: Growthbook SDK client key
+        in: path
+        name: clientKey
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Feature flags configuration
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Client key required
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Error fetching features
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get features for SDK client
+      tags:
+      - SDK
+  /features/evaluate:
+    post:
+      consumes:
+      - application/json
+      description: Evaluate a specific feature flag with user attributes for targeting
+      parameters:
+      - description: Tenant/Vendor ID
+        in: header
+        name: X-Vendor-ID
+        required: true
+        type: string
+      - description: Feature evaluation request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.EvaluateFeatureRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Feature evaluation result
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Evaluation error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Evaluate a feature flag
+      tags:
+      - Features
+  /features/evaluate/{key}:
+    get:
+      description: Evaluate a specific feature flag by its key using query parameters
+      parameters:
+      - description: Tenant/Vendor ID
+        in: header
+        name: X-Vendor-ID
+        required: true
+        type: string
+      - description: Feature key
+        in: path
+        name: key
+        required: true
+        type: string
+      - description: Growthbook SDK client key
+        in: query
+        name: client_key
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Feature evaluation result
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Missing required parameters
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Evaluation error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Evaluate a feature by key
+      tags:
+      - Features
+  /features/evaluate/batch:
+    post:
+      consumes:
+      - application/json
+      description: Evaluate multiple feature flags in a single request
+      parameters:
+      - description: Tenant/Vendor ID
+        in: header
+        name: X-Vendor-ID
+        required: true
+        type: string
+      - description: Batch evaluation request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.BatchEvaluateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Batch evaluation results
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Batch evaluate features
+      tags:
+      - Features
+  /features/override:
+    post:
+      consumes:
+      - application/json
+      description: Set a local feature override for testing purposes
+      parameters:
+      - description: Tenant/Vendor ID
+        in: header
+        name: X-Vendor-ID
+        required: true
+        type: string
+      - description: Override request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.OverrideRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Override set
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Set feature override
+      tags:
+      - Features
+  /features/override/{key}:
+    delete:
+      description: Clear a local feature override
+      parameters:
+      - description: Tenant/Vendor ID
+        in: header
+        name: X-Vendor-ID
+        required: true
+        type: string
+      - description: Feature key to clear
+        in: path
+        name: key
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Override cleared
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Clear feature override
+      tags:
+      - Features
+  /health:
+    get:
+      description: Check if the service is running
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Service is healthy
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Health check
+      tags:
+      - Health
+  /ready:
+    get:
+      description: Check if the service is ready to accept requests (Growthbook connection
+        verified)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Service is ready
+          schema:
+            additionalProperties: true
+            type: object
+        "503":
+          description: Service is not ready
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Readiness check
+      tags:
+      - Health
+  /sdk/config:
+    get:
+      description: Get Growthbook SDK configuration for the tenant
+      parameters:
+      - description: Tenant/Vendor ID
+        in: header
+        name: X-Vendor-ID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: SDK configuration
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get SDK configuration
+      tags:
+      - SDK
+swagger: "2.0"

@@ -1,0 +1,123 @@
+{{define "header"}}
+<!-- Logo -->
+<tr>
+    <td style="text-align: center; padding-bottom: 24px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+            <tr>
+                <td style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
+                    <span style="color: #ffffff; font-size: 24px; font-weight: 700;">{{if .BusinessInitial}}{{.BusinessInitial}}{{else}}T{{end}}</span>
+                </td>
+            </tr>
+        </table>
+        {{if .BusinessName}}
+        <p style="margin: 12px 0 0 0; font-size: 18px; font-weight: 600; color: #18181b; letter-spacing: -0.3px;">{{.BusinessName}}</p>
+        {{end}}
+    </td>
+</tr>
+{{end}}
+
+{{define "content"}}
+<!-- Main Card -->
+<tr>
+    <td>
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1); overflow: hidden;">
+
+            <!-- Success Header -->
+            <tr>
+                <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="width: 64px; height: 64px; background-color: rgba(255,255,255,0.2); border-radius: 50%; text-align: center; vertical-align: middle;">
+                                <span style="font-size: 32px;">&#127881;</span>
+                            </td>
+                        </tr>
+                    </table>
+                    <h1 style="margin: 16px 0 0 0; font-size: 24px; font-weight: 700; color: #ffffff; line-height: 1.3;">
+                        Coupon Applied!
+                    </h1>
+                    <p style="margin: 8px 0 0 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                        You saved on your order
+                    </p>
+                </td>
+            </tr>
+
+            <!-- Coupon Details -->
+            <tr>
+                <td style="padding: 32px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f0fdf4; border-radius: 12px; border: 2px dashed #86efac;">
+                        <tr>
+                            <td style="padding: 24px; text-align: center;">
+                                <p style="margin: 0 0 8px 0; font-size: 11px; font-weight: 600; color: #166534; text-transform: uppercase; letter-spacing: 1px;">Coupon Code</p>
+                                <p style="margin: 0; font-size: 28px; font-weight: 800; color: #15803d; letter-spacing: 2px;">{{.CouponCode}}</p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- Savings Summary -->
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f8fafc; border-radius: 12px;">
+                        <tr>
+                            <td style="padding: 20px;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 50%;">
+                                            <p style="margin: 0 0 4px 0; font-size: 11px; font-weight: 600; color: #71717a; text-transform: uppercase; letter-spacing: 0.5px;">Order Total</p>
+                                            <p style="margin: 0; font-size: 16px; color: #3f3f46;">{{.Currency}}{{.OrderValue}}</p>
+                                        </td>
+                                        <td style="width: 50%; text-align: right;">
+                                            <p style="margin: 0 0 4px 0; font-size: 11px; font-weight: 600; color: #166534; text-transform: uppercase; letter-spacing: 0.5px;">You Saved</p>
+                                            <p style="margin: 0; font-size: 20px; font-weight: 700; color: #15803d;">{{.Currency}}{{.DiscountAmount}}</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- Order Info -->
+            {{if .OrderNumber}}
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                        <tr>
+                            <td>
+                                <p style="margin: 0 0 4px 0; font-size: 11px; font-weight: 600; color: #71717a; text-transform: uppercase; letter-spacing: 0.5px;">Applied to Order</p>
+                                <p style="margin: 0; font-size: 16px; font-weight: 600; color: #18181b;">#{{.OrderNumber}}</p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+            {{end}}
+
+            <!-- Confirmation Message -->
+            <tr>
+                <td style="padding: 24px 40px 32px 40px;" class="mobile-padding">
+                    <p style="margin: 0; font-size: 14px; color: #71717a; line-height: 1.6;">
+                        The discount has been applied to your order. Thank you for shopping with us!
+                    </p>
+                </td>
+            </tr>
+        </table>
+    </td>
+</tr>
+{{end}}
+
+{{define "footer"}}
+<!-- Footer -->
+<tr>
+    <td style="padding: 32px 20px; text-align: center;">
+        <p style="margin: 0 0 8px 0; font-size: 13px; color: #71717a;">
+            Questions? Contact us at <a href="mailto:{{.SupportEmail}}" style="color: #6366f1; text-decoration: none; font-weight: 500;">{{.SupportEmail}}</a>
+        </p>
+        <p style="margin: 0; font-size: 12px; color: #a1a1aa;">
+            &copy; {{.Year}} {{.BusinessName}}. All rights reserved.
+        </p>
+    </td>
+</tr>
+{{end}}

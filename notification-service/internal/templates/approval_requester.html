@@ -1,0 +1,358 @@
+{{define "header"}}
+<!-- Logo -->
+<tr>
+    <td style="text-align: center; padding-bottom: 24px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+            <tr>
+                {{if eq .ApprovalStatus "APPROVED"}}
+                <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
+                {{else if eq .ApprovalStatus "REJECTED"}}
+                <td style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
+                {{else if eq .ApprovalStatus "CANCELLED"}}
+                <td style="background: linear-gradient(135deg, #71717a 0%, #52525b 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
+                {{else if eq .ApprovalStatus "EXPIRED"}}
+                <td style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
+                {{else}}
+                <td style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
+                {{end}}
+                    <span style="color: #ffffff; font-size: 24px; font-weight: 700;">{{if .BusinessInitial}}{{.BusinessInitial}}{{else}}A{{end}}</span>
+                </td>
+            </tr>
+        </table>
+        {{if .BusinessName}}
+        <p style="margin: 12px 0 0 0; font-size: 18px; font-weight: 600; color: #18181b; letter-spacing: -0.3px;">{{.BusinessName}}</p>
+        {{end}}
+    </td>
+</tr>
+{{end}}
+
+{{define "content"}}
+<!-- Main Card -->
+<tr>
+    <td>
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1); overflow: hidden;">
+
+            <!-- Dynamic Header based on Approval Status -->
+            <tr>
+                {{if eq .ApprovalStatus "APPROVED"}}
+                <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="width: 64px; height: 64px; background-color: rgba(255,255,255,0.2); border-radius: 50%; text-align: center; vertical-align: middle;">
+                                <span style="font-size: 32px;">&#10003;</span>
+                            </td>
+                        </tr>
+                    </table>
+                    <h1 style="margin: 16px 0 0 0; font-size: 24px; font-weight: 700; color: #ffffff; line-height: 1.3;">
+                        Request Approved!
+                    </h1>
+                    <p style="margin: 8px 0 0 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                        Your request has been approved
+                    </p>
+                </td>
+                {{else if eq .ApprovalStatus "REJECTED"}}
+                <td style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); padding: 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="width: 64px; height: 64px; background-color: rgba(255,255,255,0.2); border-radius: 50%; text-align: center; vertical-align: middle;">
+                                <span style="font-size: 32px;">&#10006;</span>
+                            </td>
+                        </tr>
+                    </table>
+                    <h1 style="margin: 16px 0 0 0; font-size: 24px; font-weight: 700; color: #ffffff; line-height: 1.3;">
+                        Request Rejected
+                    </h1>
+                    <p style="margin: 8px 0 0 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                        Your request was not approved
+                    </p>
+                </td>
+                {{else if eq .ApprovalStatus "CANCELLED"}}
+                <td style="background: linear-gradient(135deg, #71717a 0%, #52525b 100%); padding: 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="width: 64px; height: 64px; background-color: rgba(255,255,255,0.2); border-radius: 50%; text-align: center; vertical-align: middle;">
+                                <span style="font-size: 32px;">&#128465;</span>
+                            </td>
+                        </tr>
+                    </table>
+                    <h1 style="margin: 16px 0 0 0; font-size: 24px; font-weight: 700; color: #ffffff; line-height: 1.3;">
+                        Request Cancelled
+                    </h1>
+                    <p style="margin: 8px 0 0 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                        Your approval request has been cancelled
+                    </p>
+                </td>
+                {{else if eq .ApprovalStatus "EXPIRED"}}
+                <td style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding: 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="width: 64px; height: 64px; background-color: rgba(255,255,255,0.2); border-radius: 50%; text-align: center; vertical-align: middle;">
+                                <span style="font-size: 32px;">&#9200;</span>
+                            </td>
+                        </tr>
+                    </table>
+                    <h1 style="margin: 16px 0 0 0; font-size: 24px; font-weight: 700; color: #ffffff; line-height: 1.3;">
+                        Request Expired
+                    </h1>
+                    <p style="margin: 8px 0 0 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                        Your request has expired without a decision
+                    </p>
+                </td>
+                {{else}}
+                <td style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); padding: 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="width: 64px; height: 64px; background-color: rgba(255,255,255,0.2); border-radius: 50%; text-align: center; vertical-align: middle;">
+                                <span style="font-size: 32px;">&#128203;</span>
+                            </td>
+                        </tr>
+                    </table>
+                    <h1 style="margin: 16px 0 0 0; font-size: 24px; font-weight: 700; color: #ffffff; line-height: 1.3;">
+                        Approval Update
+                    </h1>
+                    <p style="margin: 8px 0 0 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                        Status update on your request
+                    </p>
+                </td>
+                {{end}}
+            </tr>
+
+            <!-- Greeting -->
+            <tr>
+                <td style="padding: 32px 40px 0 40px;" class="mobile-padding">
+                    <p style="margin: 0; font-size: 15px; color: #3f3f46; line-height: 1.6;">
+                        Hi {{.RequesterName}},
+                    </p>
+                    <p style="margin: 16px 0 0 0; font-size: 15px; color: #3f3f46; line-height: 1.6;">
+                        {{if eq .ApprovalStatus "APPROVED"}}
+                        Great news! Your approval request for <strong>{{.ActionTypeDisplay}}</strong> has been <strong style="color: #059669;">approved</strong> by {{.ApproverName}}.
+                        {{else if eq .ApprovalStatus "REJECTED"}}
+                        Your approval request for <strong>{{.ActionTypeDisplay}}</strong> has been <strong style="color: #dc2626;">rejected</strong> by {{.ApproverName}}.
+                        {{else if eq .ApprovalStatus "CANCELLED"}}
+                        Your approval request for <strong>{{.ActionTypeDisplay}}</strong> has been <strong>cancelled</strong>.
+                        {{else if eq .ApprovalStatus "EXPIRED"}}
+                        Your approval request for <strong>{{.ActionTypeDisplay}}</strong> has <strong style="color: #d97706;">expired</strong> without receiving a decision within the required timeframe.
+                        {{else}}
+                        Here's an update on your approval request for <strong>{{.ActionTypeDisplay}}</strong>.
+                        {{end}}
+                    </p>
+                </td>
+            </tr>
+
+            <!-- Status Badge -->
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: {{if eq .ApprovalStatus "APPROVED"}}#f0fdf4{{else if eq .ApprovalStatus "REJECTED"}}#fef2f2{{else if eq .ApprovalStatus "EXPIRED"}}#fffbeb{{else}}#f4f4f5{{end}}; border-radius: 12px; border: 1px solid {{if eq .ApprovalStatus "APPROVED"}}#bbf7d0{{else if eq .ApprovalStatus "REJECTED"}}#fecaca{{else if eq .ApprovalStatus "EXPIRED"}}#fde68a{{else}}#e4e4e7{{end}};">
+                        <tr>
+                            <td style="padding: 20px; text-align: center;">
+                                <span style="display: inline-block; padding: 8px 24px; font-size: 14px; font-weight: 700; color: {{if eq .ApprovalStatus "APPROVED"}}#15803d{{else if eq .ApprovalStatus "REJECTED"}}#b91c1c{{else if eq .ApprovalStatus "EXPIRED"}}#b45309{{else}}#3f3f46{{end}}; background-color: {{if eq .ApprovalStatus "APPROVED"}}#dcfce7{{else if eq .ApprovalStatus "REJECTED"}}#fee2e2{{else if eq .ApprovalStatus "EXPIRED"}}#fef3c7{{else}}#e4e4e7{{end}}; border-radius: 24px;">
+                                    {{if eq .ApprovalStatus "APPROVED"}}&#10004; Approved{{else if eq .ApprovalStatus "REJECTED"}}&#10006; Rejected{{else if eq .ApprovalStatus "CANCELLED"}}Cancelled{{else if eq .ApprovalStatus "EXPIRED"}}&#9200; Expired{{else}}{{.ApprovalStatus}}{{end}}
+                                </span>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- Request Details -->
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
+                        <tr>
+                            <td style="padding: 20px;">
+                                <p style="margin: 0 0 16px 0; font-size: 14px; font-weight: 600; color: #18181b;">Request Details</p>
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">
+                                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                                <tr>
+                                                    <td style="width: 120px; font-size: 13px; color: #71717a;">Action Type</td>
+                                                    <td style="font-size: 14px; font-weight: 500; color: #18181b;">{{.ActionTypeDisplay}}</td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                    </tr>
+                                    {{if .ResourceType}}
+                                    <tr>
+                                        <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">
+                                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                                <tr>
+                                                    <td style="width: 120px; font-size: 13px; color: #71717a;">Resource</td>
+                                                    <td style="font-size: 14px; font-weight: 500; color: #18181b;">{{.ResourceType}} {{if .ResourceID}}({{.ResourceID}}){{end}}</td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                    </tr>
+                                    {{end}}
+                                    {{if or (eq .ApprovalStatus "APPROVED") (eq .ApprovalStatus "REJECTED")}}
+                                    <tr>
+                                        <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">
+                                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                                <tr>
+                                                    <td style="width: 120px; font-size: 13px; color: #71717a;">Decided By</td>
+                                                    <td style="font-size: 14px; font-weight: 500; color: #18181b;">{{.ApproverName}}{{if .ApproverRole}} ({{.ApproverRole}}){{end}}</td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                    </tr>
+                                    {{end}}
+                                    <tr>
+                                        <td style="padding: 8px 0;">
+                                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                                <tr>
+                                                    <td style="width: 120px; font-size: 13px; color: #71717a;">{{if eq .ApprovalStatus "EXPIRED"}}Expired At{{else}}Decided At{{end}}</td>
+                                                    <td style="font-size: 14px; font-weight: 500; color: #18181b;">{{if .ApprovalDecidedAt}}{{.ApprovalDecidedAt}}{{else}}{{.ApprovalExpiresAt}}{{end}}</td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- Comment/Reason (if provided) -->
+            {{if .ApprovalComment}}
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: {{if eq .ApprovalStatus "APPROVED"}}#f0fdf4{{else if eq .ApprovalStatus "REJECTED"}}#fef2f2{{else}}#f0f9ff{{end}}; border-radius: 12px; border: 1px solid {{if eq .ApprovalStatus "APPROVED"}}#bbf7d0{{else if eq .ApprovalStatus "REJECTED"}}#fecaca{{else}}#bae6fd{{end}};">
+                        <tr>
+                            <td style="padding: 20px;">
+                                <p style="margin: 0 0 8px 0; font-size: 11px; font-weight: 600; color: {{if eq .ApprovalStatus "APPROVED"}}#15803d{{else if eq .ApprovalStatus "REJECTED"}}#991b1b{{else}}#0369a1{{end}}; text-transform: uppercase; letter-spacing: 0.5px;">{{if eq .ApprovalStatus "REJECTED"}}Reason for Rejection{{else}}Comment from Approver{{end}}</p>
+                                <p style="margin: 0; font-size: 14px; color: {{if eq .ApprovalStatus "APPROVED"}}#166534{{else if eq .ApprovalStatus "REJECTED"}}#7f1d1d{{else}}#0c4a6e{{end}}; line-height: 1.5;">{{.ApprovalComment}}</p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+            {{end}}
+
+            <!-- Next Steps -->
+            {{if eq .ApprovalStatus "APPROVED"}}
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f0f9ff; border-radius: 12px; border: 1px solid #bae6fd;">
+                        <tr>
+                            <td style="padding: 20px;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 24px; vertical-align: top;">
+                                            <span style="font-size: 16px;">&#128161;</span>
+                                        </td>
+                                        <td style="padding-left: 12px;">
+                                            <p style="margin: 0; font-size: 14px; font-weight: 600; color: #0369a1;">What happens next?</p>
+                                            <p style="margin: 8px 0 0 0; font-size: 13px; color: #0c4a6e; line-height: 1.5;">
+                                                Your approved action will be processed automatically. You may see the changes reflected in your account shortly.
+                                            </p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+            {{else if eq .ApprovalStatus "REJECTED"}}
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <p style="margin: 0 0 16px 0; font-size: 14px; font-weight: 600; color: #18181b;">What you can do:</p>
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                        <tr>
+                            <td style="padding: 8px 0;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 24px; vertical-align: top;">
+                                            <span style="color: #6366f1; font-weight: 700;">&#8226;</span>
+                                        </td>
+                                        <td style="padding-left: 8px;">
+                                            <p style="margin: 0; font-size: 14px; color: #3f3f46;">Review the feedback provided and address any issues.</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 24px; vertical-align: top;">
+                                            <span style="color: #6366f1; font-weight: 700;">&#8226;</span>
+                                        </td>
+                                        <td style="padding-left: 8px;">
+                                            <p style="margin: 0; font-size: 14px; color: #3f3f46;">Submit a new request with additional details or clarification.</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 24px; vertical-align: top;">
+                                            <span style="color: #6366f1; font-weight: 700;">&#8226;</span>
+                                        </td>
+                                        <td style="padding-left: 8px;">
+                                            <p style="margin: 0; font-size: 14px; color: #3f3f46;">Contact your manager for further discussion if needed.</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+            {{else if eq .ApprovalStatus "EXPIRED"}}
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #fffbeb; border-radius: 12px; border: 1px solid #fde68a;">
+                        <tr>
+                            <td style="padding: 20px;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 24px; vertical-align: top;">
+                                            <span style="font-size: 16px;">&#128161;</span>
+                                        </td>
+                                        <td style="padding-left: 12px;">
+                                            <p style="margin: 0; font-size: 14px; font-weight: 600; color: #92400e;">Need to try again?</p>
+                                            <p style="margin: 8px 0 0 0; font-size: 13px; color: #78350f; line-height: 1.5;">
+                                                You can submit a new approval request if this action is still needed. Consider reaching out to the approvers beforehand to ensure timely review.
+                                            </p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+            {{end}}
+
+            <!-- Closing -->
+            <tr>
+                <td style="padding: 24px 40px 32px 40px;" class="mobile-padding">
+                    <p style="margin: 0; font-size: 14px; color: #71717a; line-height: 1.6;">
+                        If you have any questions, please contact us at <a href="mailto:{{.SupportEmail}}" style="color: {{if eq .ApprovalStatus "APPROVED"}}#10b981{{else if eq .ApprovalStatus "REJECTED"}}#ef4444{{else}}#3b82f6{{end}}; text-decoration: none; font-weight: 500;">{{.SupportEmail}}</a>.
+                    </p>
+                </td>
+            </tr>
+        </table>
+    </td>
+</tr>
+{{end}}
+
+{{define "footer"}}
+<!-- Footer -->
+<tr>
+    <td style="padding: 32px 20px; text-align: center;">
+        <p style="margin: 0 0 8px 0; font-size: 13px; color: #71717a;">
+            Questions? Contact us at <a href="mailto:{{.SupportEmail}}" style="color: {{if eq .ApprovalStatus "APPROVED"}}#10b981{{else if eq .ApprovalStatus "REJECTED"}}#ef4444{{else}}#3b82f6{{end}}; text-decoration: none; font-weight: 500;">{{.SupportEmail}}</a>
+        </p>
+        <p style="margin: 0; font-size: 12px; color: #a1a1aa;">
+            &copy; {{.Year}} {{.BusinessName}}. All rights reserved.
+        </p>
+    </td>
+</tr>
+{{end}}

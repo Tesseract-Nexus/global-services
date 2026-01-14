@@ -1,0 +1,698 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "Multi-tenant feature flags service powered by Growthbook",
+        "title": "Feature Flags Service API",
+        "termsOfService": "http://swagger.io/terms/",
+        "contact": {
+            "name": "Feature Flags API Support",
+            "email": "support@tesseract.com"
+        },
+        "license": {
+            "name": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+        },
+        "version": "1.0.0"
+    },
+    "host": "localhost:8096",
+    "basePath": "/api/v1",
+    "paths": {
+        "/experiments": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get all experiments for the tenant",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Experiments"
+                ],
+                "summary": "List experiments",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant/Vendor ID",
+                        "name": "X-Vendor-ID",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of experiments",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/experiments/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get a specific experiment by ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Experiments"
+                ],
+                "summary": "Get experiment",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant/Vendor ID",
+                        "name": "X-Vendor-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Experiment ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Experiment details",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "404": {
+                        "description": "Experiment not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/experiments/{id}/track": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Track an experiment view or conversion event",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Experiments"
+                ],
+                "summary": "Track experiment",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant/Vendor ID",
+                        "name": "X-Vendor-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Experiment ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Tracking request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.TrackExperimentRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Tracking recorded",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/features": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get all feature flags for the authenticated tenant",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Features"
+                ],
+                "summary": "List all features",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant/Vendor ID",
+                        "name": "X-Vendor-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Growthbook SDK client key",
+                        "name": "client_key",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of features",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Missing required parameters",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Error fetching features",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/features/evaluate": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Evaluate a specific feature flag with user attributes for targeting",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Features"
+                ],
+                "summary": "Evaluate a feature flag",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant/Vendor ID",
+                        "name": "X-Vendor-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Feature evaluation request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.EvaluateFeatureRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Feature evaluation result",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Evaluation error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/features/evaluate/batch": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Evaluate multiple feature flags in a single request",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Features"
+                ],
+                "summary": "Batch evaluate features",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant/Vendor ID",
+                        "name": "X-Vendor-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Batch evaluation request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.BatchEvaluateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Batch evaluation results",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/features/evaluate/{key}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Evaluate a specific feature flag by its key using query parameters",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Features"
+                ],
+                "summary": "Evaluate a feature by key",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant/Vendor ID",
+                        "name": "X-Vendor-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Feature key",
+                        "name": "key",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Growthbook SDK client key",
+                        "name": "client_key",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Feature evaluation result",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Missing required parameters",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Evaluation error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/features/override": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Set a local feature override for testing purposes",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Features"
+                ],
+                "summary": "Set feature override",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant/Vendor ID",
+                        "name": "X-Vendor-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Override request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.OverrideRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Override set",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/features/override/{key}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Clear a local feature override",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Features"
+                ],
+                "summary": "Clear feature override",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant/Vendor ID",
+                        "name": "X-Vendor-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Feature key to clear",
+                        "name": "key",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Override cleared",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/features/{clientKey}": {
+            "get": {
+                "description": "Proxy features request to Growthbook for SDK clients",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "SDK"
+                ],
+                "summary": "Get features for SDK client",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Growthbook SDK client key",
+                        "name": "clientKey",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Feature flags configuration",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Client key required",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Error fetching features",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "description": "Check if the service is running",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Health"
+                ],
+                "summary": "Health check",
+                "responses": {
+                    "200": {
+                        "description": "Service is healthy",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/ready": {
+            "get": {
+                "description": "Check if the service is ready to accept requests (Growthbook connection verified)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Health"
+                ],
+                "summary": "Readiness check",
+                "responses": {
+                    "200": {
+                        "description": "Service is ready",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "503": {
+                        "description": "Service is not ready",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/sdk/config": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get Growthbook SDK configuration for the tenant",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "SDK"
+                ],
+                "summary": "Get SDK configuration",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant/Vendor ID",
+                        "name": "X-Vendor-ID",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "SDK configuration",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "handlers.BatchEvaluateRequest": {
+            "type": "object",
+            "required": [
+                "client_key",
+                "feature_keys"
+            ],
+            "properties": {
+                "attributes": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "client_key": {
+                    "type": "string"
+                },
+                "feature_keys": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "handlers.EvaluateFeatureRequest": {
+            "type": "object",
+            "required": [
+                "client_key",
+                "feature_key"
+            ],
+            "properties": {
+                "attributes": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "client_key": {
+                    "type": "string"
+                },
+                "feature_key": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.OverrideRequest": {
+            "type": "object",
+            "required": [
+                "feature_key",
+                "value"
+            ],
+            "properties": {
+                "feature_key": {
+                    "type": "string"
+                },
+                "value": {}
+            }
+        },
+        "handlers.TrackExperimentRequest": {
+            "type": "object",
+            "required": [
+                "variation_id"
+            ],
+            "properties": {
+                "attributes": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "user_id": {
+                    "type": "string"
+                },
+                "variation_id": {
+                    "type": "string"
+                }
+            }
+        }
+    }
+}

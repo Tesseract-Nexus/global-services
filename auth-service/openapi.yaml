@@ -1,0 +1,492 @@
+openapi: 3.0.3
+info:
+  title: Auth Service API
+  description: Authentication and Role-Based Access Control (RBAC) service
+  version: 1.0.0
+servers:
+  - url: http://localhost:3080
+    description: Local development
+tags:
+  - name: Authentication
+  - name: Profile
+  - name: Permissions
+  - name: Admin Users
+  - name: Admin Roles
+
+paths:
+  /api/v1/auth/login:
+    post:
+      tags: [Authentication]
+      summary: User login
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+
+  /api/v1/auth/register:
+    post:
+      tags: [Authentication]
+      summary: Register new user
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User registered
+
+  /api/v1/auth/verify-email:
+    post:
+      tags: [Authentication]
+      summary: Verify email address
+      operationId: verifyEmail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+      responses:
+        '200':
+          description: Email verified
+
+  /api/v1/auth/refresh:
+    post:
+      tags: [Authentication]
+      summary: Refresh access token
+      operationId: refreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        '200':
+          description: Token refreshed
+
+  /api/v1/auth/logout:
+    post:
+      tags: [Authentication]
+      summary: User logout
+      operationId: logout
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logged out
+
+  /api/v1/auth/validate:
+    post:
+      tags: [Authentication]
+      summary: Validate token
+      operationId: validateToken
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Token valid
+
+  /api/v1/profile:
+    get:
+      tags: [Profile]
+      summary: Get current user profile
+      operationId: getProfile
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User profile
+
+  /api/v1/permissions/{permission}:
+    get:
+      tags: [Permissions]
+      summary: Check single permission
+      operationId: checkPermission
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: permission
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Permission check result
+
+  /api/v1/permissions/check:
+    post:
+      tags: [Permissions]
+      summary: Check multiple permissions
+      operationId: checkPermissions
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                permissions:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Permissions check result
+
+  /api/v1/roles/available:
+    get:
+      tags: [Permissions]
+      summary: Get available roles
+      operationId: getAvailableRoles
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Available roles list
+
+  /api/v1/permissions/available:
+    get:
+      tags: [Permissions]
+      summary: Get available permissions
+      operationId: getAvailablePermissions
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Available permissions list
+
+  /api/v1/admin/users:
+    get:
+      tags: [Admin Users]
+      summary: List users
+      operationId: listUsers
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Users list
+
+  /api/v1/admin/users/{user_id}:
+    get:
+      tags: [Admin Users]
+      summary: Get user details
+      operationId: getUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: User details
+
+  /api/v1/admin/users/{user_id}/roles:
+    get:
+      tags: [Admin Users]
+      summary: Get user roles
+      operationId: getUserRoles
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: User roles
+    post:
+      tags: [Admin Users]
+      summary: Assign role to user
+      operationId: assignRole
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                role:
+                  type: string
+      responses:
+        '200':
+          description: Role assigned
+    delete:
+      tags: [Admin Users]
+      summary: Remove role from user
+      operationId: removeRole
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Role removed
+
+  /api/v1/admin/roles:
+    get:
+      tags: [Admin Roles]
+      summary: List all roles
+      operationId: listRoles
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Roles list
+    post:
+      tags: [Admin Roles]
+      summary: Create new role
+      operationId: createRole
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleInput'
+      responses:
+        '201':
+          description: Role created
+
+  /api/v1/admin/roles/{role_id}:
+    get:
+      tags: [Admin Roles]
+      summary: Get role details
+      operationId: getRole
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: role_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Role details
+    put:
+      tags: [Admin Roles]
+      summary: Update role
+      operationId: updateRole
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: role_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleInput'
+      responses:
+        '200':
+          description: Role updated
+    delete:
+      tags: [Admin Roles]
+      summary: Delete role
+      operationId: deleteRole
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: role_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Role deleted
+
+  /api/v1/admin/roles/{role_id}/permissions:
+    get:
+      tags: [Admin Roles]
+      summary: Get role permissions
+      operationId: getRolePermissions
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: role_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Role permissions
+    post:
+      tags: [Admin Roles]
+      summary: Assign permission to role
+      operationId: assignPermissionToRole
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: role_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Permission assigned
+    delete:
+      tags: [Admin Roles]
+      summary: Remove permission from role
+      operationId: removePermissionFromRole
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: role_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Permission removed
+
+  /health:
+    get:
+      summary: Health check
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service healthy
+
+  /ready:
+    get:
+      summary: Readiness check
+      operationId: readinessCheck
+      responses:
+        '200':
+          description: Service ready
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        tenant_id:
+          type: string
+          format: uuid
+
+    LoginResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        expires_in:
+          type: integer
+        user:
+          $ref: '#/components/schemas/User'
+
+    RegisterRequest:
+      type: object
+      required: [email, password, first_name, last_name]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        first_name:
+          type: string
+        last_name:
+          type: string
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        first_name:
+          type: string
+        last_name:
+          type: string
+        role:
+          type: string
+
+    RoleInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string

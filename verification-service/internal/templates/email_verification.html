@@ -1,0 +1,126 @@
+{{define "header"}}
+<!-- Logo -->
+<tr>
+    <td style="text-align: center; padding-bottom: 24px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+            <tr>
+                <td style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
+                    <span style="color: #ffffff; font-size: 24px; font-weight: 700;">T</span>
+                </td>
+            </tr>
+        </table>
+        <p style="margin: 12px 0 0 0; font-size: 18px; font-weight: 600; color: #18181b; letter-spacing: -0.3px;">Tesseract Hub</p>
+    </td>
+</tr>
+{{end}}
+
+{{define "content"}}
+<!-- Main Card -->
+<tr>
+    <td>
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1);">
+            <!-- Icon Header -->
+            <tr>
+                <td style="padding: 40px 40px 0 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="width: 72px; height: 72px; background: linear-gradient(135deg, #ede9fe 0%, #e0e7ff 100%); border-radius: 50%; text-align: center; vertical-align: middle;">
+                                <span style="font-size: 32px;">&#9993;</span>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- Title -->
+            <tr>
+                <td style="padding: 24px 40px 0 40px; text-align: center;" class="mobile-padding">
+                    <h1 style="margin: 0; font-size: 24px; font-weight: 700; color: #18181b; line-height: 1.3;">
+                        Verify your email
+                    </h1>
+                </td>
+            </tr>
+
+            <!-- Description -->
+            <tr>
+                <td style="padding: 16px 40px 0 40px; text-align: center;" class="mobile-padding">
+                    <p style="margin: 0; font-size: 16px; color: #52525b; line-height: 1.6;">
+                        Enter this code to complete your verification{{if .BusinessName}} for <strong style="color: #18181b;">{{.BusinessName}}</strong>{{end}}:
+                    </p>
+                </td>
+            </tr>
+
+            <!-- Verification Code -->
+            <tr>
+                <td style="padding: 32px 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border-radius: 12px; border: 1px solid #e2e8f0;">
+                        <tr>
+                            <td style="padding: 24px; text-align: center;">
+                                <span style="font-family: 'SF Mono', 'Roboto Mono', 'Courier New', monospace; font-size: 36px; font-weight: 700; color: #6366f1; letter-spacing: 12px;">{{.Code}}</span>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- Expiry Notice -->
+            <tr>
+                <td style="padding: 0 40px 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="background-color: #fef3c7; padding: 8px 16px; border-radius: 20px;">
+                                <span style="font-size: 12px; color: #92400e; font-weight: 500;">
+                                    &#9201; Expires in {{.ExpiryMinutes}} minutes
+                                </span>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- Divider -->
+            <tr>
+                <td style="padding: 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                        <tr>
+                            <td style="height: 1px; background-color: #e2e8f0;"></td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- Security Notice -->
+            <tr>
+                <td style="padding: 24px 40px 40px 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                        <tr>
+                            <td style="width: 24px; vertical-align: top; padding-right: 12px;">
+                                <span style="font-size: 16px;">&#128274;</span>
+                            </td>
+                            <td style="vertical-align: top;">
+                                <p style="margin: 0; font-size: 13px; color: #71717a; line-height: 1.5;">
+                                    If you didn't request this code, you can safely ignore this email. Someone may have entered your email by mistake.
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </td>
+</tr>
+{{end}}
+
+{{define "footer"}}
+<!-- Footer -->
+<tr>
+    <td style="padding: 32px 20px; text-align: center;">
+        <p style="margin: 0 0 8px 0; font-size: 13px; color: #a1a1aa;">
+            This email was sent to <span style="color: #71717a;">{{.Email}}</span>
+        </p>
+        <p style="margin: 0; font-size: 12px; color: #d4d4d8;">
+            &copy; {{.Year}} Tesseract Hub. All rights reserved.
+        </p>
+    </td>
+</tr>
+{{end}}

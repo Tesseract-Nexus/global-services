@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  tesseract-tenant-postgres:
+    image: postgres:15-alpine
+    container_name: tesseract-tenant-postgres
+    environment:
+      POSTGRES_DB: tenant_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5438:5432"
+    volumes:
+      - tesseract_tenant_postgres_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+    networks:
+      - tesseract-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d tenant_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Tenant Service API
+  tesseract-tenant-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tesseract-tenant-api
+    environment:
+      # Server Configuration
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: 8086
+      
+      # Database Configuration
+      DB_HOST: tesseract-tenant-postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: tenant_db
+      DB_SSL_MODE: disable
+      
+      # Application Configuration
+      APP_ENV: development
+      LOG_LEVEL: info
+      JWT_SECRET: tenant-service-secret-key-change-in-production
+      
+      # Email Configuration (configure with your SMTP provider)
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: 587
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      FROM_EMAIL: noreply@tesseract-hub.com
+      FROM_NAME: Tesseract Hub Tenant Service
+      
+      # SMS Configuration (configure with Twilio)
+      SMS_PROVIDER: twilio
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER:-}
+      
+      # Payment Configuration
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
+      PAYPAL_CLIENT_ID: ${PAYPAL_CLIENT_ID:-}
+      PAYPAL_CLIENT_SECRET: ${PAYPAL_CLIENT_SECRET:-}
+      
+      # Integration Services
+      SETTINGS_SERVICE_URL: http://tesseract-settings-api:8104
+      AUTH_SERVICE_URL: http://tesseract-auth-api:8080
+      NOTIFICATION_SERVICE_URL: http://tesseract-notification-api:8087
+    ports:
+      - "8086:8086"
+    depends_on:
+      tesseract-tenant-postgres:
+        condition: service_healthy
+    networks:
+      - tesseract-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+volumes:
+  tesseract_tenant_postgres_data:
+    name: tesseract_tenant_postgres_data
+
+networks:
+  tesseract-network:
+    name: tesseract-network
+    external: true

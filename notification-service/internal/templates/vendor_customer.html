@@ -1,0 +1,565 @@
+{{define "header"}}
+<!-- Logo -->
+<tr>
+    <td style="text-align: center; padding-bottom: 24px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+            <tr>
+                {{if eq .VendorStatus "APPROVED"}}
+                <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
+                {{else if eq .VendorStatus "REJECTED"}}
+                <td style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
+                {{else if eq .VendorStatus "SUSPENDED"}}
+                <td style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
+                {{else}}
+                <td style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
+                {{end}}
+                    <span style="color: #ffffff; font-size: 24px; font-weight: 700;">{{if .BusinessInitial}}{{.BusinessInitial}}{{else}}T{{end}}</span>
+                </td>
+            </tr>
+        </table>
+        {{if .BusinessName}}
+        <p style="margin: 12px 0 0 0; font-size: 18px; font-weight: 600; color: #18181b; letter-spacing: -0.3px;">{{.BusinessName}}</p>
+        {{end}}
+    </td>
+</tr>
+{{end}}
+
+{{define "content"}}
+<!-- Main Card -->
+<tr>
+    <td>
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1); overflow: hidden;">
+
+            <!-- Dynamic Header based on VendorStatus -->
+            <tr>
+                {{if eq .VendorStatus "APPLIED"}}
+                <td style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); padding: 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="width: 64px; height: 64px; background-color: rgba(255,255,255,0.2); border-radius: 50%; text-align: center; vertical-align: middle;">
+                                <span style="font-size: 32px;">&#127881;</span>
+                            </td>
+                        </tr>
+                    </table>
+                    <h1 style="margin: 16px 0 0 0; font-size: 24px; font-weight: 700; color: #ffffff; line-height: 1.3;">
+                        Welcome, {{.VendorName}}!
+                    </h1>
+                    <p style="margin: 8px 0 0 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                        Your vendor application has been received
+                    </p>
+                </td>
+                {{else if eq .VendorStatus "APPROVED"}}
+                <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="width: 64px; height: 64px; background-color: rgba(255,255,255,0.2); border-radius: 50%; text-align: center; vertical-align: middle;">
+                                <span style="font-size: 32px;">&#10003;</span>
+                            </td>
+                        </tr>
+                    </table>
+                    <h1 style="margin: 16px 0 0 0; font-size: 24px; font-weight: 700; color: #ffffff; line-height: 1.3;">
+                        You're Approved!
+                    </h1>
+                    <p style="margin: 8px 0 0 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                        Congratulations, {{.VendorName}}!
+                    </p>
+                </td>
+                {{else if eq .VendorStatus "REJECTED"}}
+                <td style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); padding: 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="width: 64px; height: 64px; background-color: rgba(255,255,255,0.2); border-radius: 50%; text-align: center; vertical-align: middle;">
+                                <span style="font-size: 32px;">&#10006;</span>
+                            </td>
+                        </tr>
+                    </table>
+                    <h1 style="margin: 16px 0 0 0; font-size: 24px; font-weight: 700; color: #ffffff; line-height: 1.3;">
+                        Application Update
+                    </h1>
+                    <p style="margin: 8px 0 0 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                        Regarding your vendor application
+                    </p>
+                </td>
+                {{else if eq .VendorStatus "SUSPENDED"}}
+                <td style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding: 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="width: 64px; height: 64px; background-color: rgba(255,255,255,0.2); border-radius: 50%; text-align: center; vertical-align: middle;">
+                                <span style="font-size: 32px;">&#9888;</span>
+                            </td>
+                        </tr>
+                    </table>
+                    <h1 style="margin: 16px 0 0 0; font-size: 24px; font-weight: 700; color: #ffffff; line-height: 1.3;">
+                        Account Suspended
+                    </h1>
+                    <p style="margin: 8px 0 0 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                        Your vendor account has been temporarily suspended
+                    </p>
+                </td>
+                {{else}}
+                <td style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); padding: 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="width: 64px; height: 64px; background-color: rgba(255,255,255,0.2); border-radius: 50%; text-align: center; vertical-align: middle;">
+                                <span style="font-size: 32px;">&#128188;</span>
+                            </td>
+                        </tr>
+                    </table>
+                    <h1 style="margin: 16px 0 0 0; font-size: 24px; font-weight: 700; color: #ffffff; line-height: 1.3;">
+                        Vendor Update
+                    </h1>
+                    <p style="margin: 8px 0 0 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                        Here's an update on your vendor account
+                    </p>
+                </td>
+                {{end}}
+            </tr>
+
+            {{if eq .VendorStatus "APPLIED"}}
+            <!-- Welcome Message for Applied -->
+            <tr>
+                <td style="padding: 32px 40px 0 40px;" class="mobile-padding">
+                    <p style="margin: 0; font-size: 15px; color: #3f3f46; line-height: 1.6;">
+                        Thank you for applying to become a vendor on <strong>{{.BusinessName}}</strong>! We're excited about the possibility of having you join our marketplace.
+                    </p>
+                </td>
+            </tr>
+
+            <!-- Application Status -->
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f0f9ff; border-radius: 12px; border: 1px solid #bae6fd;">
+                        <tr>
+                            <td style="padding: 20px;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 40px; vertical-align: top;">
+                                            <span style="font-size: 24px;">&#128203;</span>
+                                        </td>
+                                        <td style="padding-left: 12px;">
+                                            <p style="margin: 0; font-size: 14px; font-weight: 600; color: #0369a1;">Application Status</p>
+                                            <p style="margin: 8px 0 0 0; font-size: 13px; color: #0c4a6e; line-height: 1.5;">
+                                                Your application is currently <strong>under review</strong>. Our team will carefully evaluate your submission and get back to you within 2-3 business days.
+                                            </p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- What Happens Next -->
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <p style="margin: 0 0 16px 0; font-size: 14px; font-weight: 600; color: #18181b;">What happens next?</p>
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                        <tr>
+                            <td style="padding: 12px 0; border-bottom: 1px solid #f4f4f5;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 32px; height: 32px; background-color: #f0fdf4; border-radius: 50%; text-align: center; vertical-align: middle;">
+                                            <span style="color: #16a34a; font-weight: 700;">1</span>
+                                        </td>
+                                        <td style="padding-left: 12px;">
+                                            <p style="margin: 0; font-size: 14px; font-weight: 500; color: #18181b;">Application Review</p>
+                                            <p style="margin: 4px 0 0 0; font-size: 13px; color: #71717a;">We'll review your business details and product catalog.</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px 0; border-bottom: 1px solid #f4f4f5;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 32px; height: 32px; background-color: #f0fdf4; border-radius: 50%; text-align: center; vertical-align: middle;">
+                                            <span style="color: #16a34a; font-weight: 700;">2</span>
+                                        </td>
+                                        <td style="padding-left: 12px;">
+                                            <p style="margin: 0; font-size: 14px; font-weight: 500; color: #18181b;">Decision Notification</p>
+                                            <p style="margin: 4px 0 0 0; font-size: 13px; color: #71717a;">You'll receive an email with our decision.</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px 0;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 32px; height: 32px; background-color: #f0fdf4; border-radius: 50%; text-align: center; vertical-align: middle;">
+                                            <span style="color: #16a34a; font-weight: 700;">3</span>
+                                        </td>
+                                        <td style="padding-left: 12px;">
+                                            <p style="margin: 0; font-size: 14px; font-weight: 500; color: #18181b;">Start Selling</p>
+                                            <p style="margin: 4px 0 0 0; font-size: 13px; color: #71717a;">Once approved, you can set up your store and start listing products!</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- Closing for Applied -->
+            <tr>
+                <td style="padding: 24px 40px 32px 40px;" class="mobile-padding">
+                    <p style="margin: 0; font-size: 14px; color: #71717a; line-height: 1.6;">
+                        If you have any questions about the application process, feel free to reach out to us at <a href="mailto:{{.SupportEmail}}" style="color: #6366f1; text-decoration: none; font-weight: 500;">{{.SupportEmail}}</a>.
+                    </p>
+                </td>
+            </tr>
+            {{end}}
+
+            {{if eq .VendorStatus "APPROVED"}}
+            <!-- Welcome Message for Approved -->
+            <tr>
+                <td style="padding: 32px 40px 0 40px;" class="mobile-padding">
+                    <p style="margin: 0; font-size: 15px; color: #3f3f46; line-height: 1.6;">
+                        Great news! Your vendor application has been <strong style="color: #059669;">approved</strong>. You're now officially part of the <strong>{{.BusinessName}}</strong> marketplace!
+                    </p>
+                </td>
+            </tr>
+
+            <!-- Status Badge -->
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f0fdf4; border-radius: 12px; border: 1px solid #bbf7d0;">
+                        <tr>
+                            <td style="padding: 20px; text-align: center;">
+                                <span style="display: inline-block; padding: 8px 24px; font-size: 14px; font-weight: 700; color: #15803d; background-color: #dcfce7; border-radius: 24px;">
+                                    &#10004; Vendor Account Active
+                                </span>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- Getting Started -->
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <p style="margin: 0 0 16px 0; font-size: 14px; font-weight: 600; color: #18181b;">Get started with your store:</p>
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                        <tr>
+                            <td style="padding: 12px 0; border-bottom: 1px solid #f4f4f5;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 40px; vertical-align: top;">
+                                            <span style="font-size: 24px;">&#128230;</span>
+                                        </td>
+                                        <td style="padding-left: 12px;">
+                                            <p style="margin: 0; font-size: 14px; font-weight: 500; color: #18181b;">Add Your Products</p>
+                                            <p style="margin: 4px 0 0 0; font-size: 13px; color: #71717a;">List your products with photos, descriptions, and pricing.</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px 0; border-bottom: 1px solid #f4f4f5;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 40px; vertical-align: top;">
+                                            <span style="font-size: 24px;">&#128179;</span>
+                                        </td>
+                                        <td style="padding-left: 12px;">
+                                            <p style="margin: 0; font-size: 14px; font-weight: 500; color: #18181b;">Set Up Payments</p>
+                                            <p style="margin: 4px 0 0 0; font-size: 13px; color: #71717a;">Connect your bank account to receive payouts.</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px 0;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 40px; vertical-align: top;">
+                                            <span style="font-size: 24px;">&#128640;</span>
+                                        </td>
+                                        <td style="padding-left: 12px;">
+                                            <p style="margin: 0; font-size: 14px; font-weight: 500; color: #18181b;">Start Selling</p>
+                                            <p style="margin: 4px 0 0 0; font-size: 13px; color: #71717a;">Your products will be visible to customers immediately.</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- CTA Button for Approved -->
+            <tr>
+                <td style="padding: 24px 40px 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 10px;">
+                                <a href="{{.VendorURL}}" style="display: inline-block; padding: 14px 32px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
+                                    Go to Vendor Dashboard &#8594;
+                                </a>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+            {{end}}
+
+            {{if eq .VendorStatus "REJECTED"}}
+            <!-- Message for Rejected -->
+            <tr>
+                <td style="padding: 32px 40px 0 40px;" class="mobile-padding">
+                    <p style="margin: 0; font-size: 15px; color: #3f3f46; line-height: 1.6;">
+                        Dear {{.VendorName}},
+                    </p>
+                    <p style="margin: 16px 0 0 0; font-size: 15px; color: #3f3f46; line-height: 1.6;">
+                        Thank you for your interest in becoming a vendor on <strong>{{.BusinessName}}</strong>. After careful review of your application, we regret to inform you that we are unable to approve your request at this time.
+                    </p>
+                </td>
+            </tr>
+
+            <!-- Reason Box for Rejected -->
+            {{if .StatusReason}}
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #fef2f2; border-radius: 12px; border: 1px solid #fecaca;">
+                        <tr>
+                            <td style="padding: 20px;">
+                                <p style="margin: 0 0 8px 0; font-size: 11px; font-weight: 600; color: #991b1b; text-transform: uppercase; letter-spacing: 0.5px;">Reason</p>
+                                <p style="margin: 0; font-size: 14px; color: #7f1d1d; line-height: 1.5;">{{.StatusReason}}</p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+            {{end}}
+
+            <!-- What You Can Do for Rejected -->
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <p style="margin: 0 0 16px 0; font-size: 14px; font-weight: 600; color: #18181b;">What you can do:</p>
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                        <tr>
+                            <td style="padding: 12px 0; border-bottom: 1px solid #f4f4f5;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 24px; vertical-align: top;">
+                                            <span style="color: #6366f1; font-weight: 700;">&#8226;</span>
+                                        </td>
+                                        <td style="padding-left: 8px;">
+                                            <p style="margin: 0; font-size: 14px; color: #3f3f46;">Review the feedback provided and address any issues mentioned.</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px 0; border-bottom: 1px solid #f4f4f5;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 24px; vertical-align: top;">
+                                            <span style="color: #6366f1; font-weight: 700;">&#8226;</span>
+                                        </td>
+                                        <td style="padding-left: 8px;">
+                                            <p style="margin: 0; font-size: 14px; color: #3f3f46;">You may submit a new application after 30 days.</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px 0;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 24px; vertical-align: top;">
+                                            <span style="color: #6366f1; font-weight: 700;">&#8226;</span>
+                                        </td>
+                                        <td style="padding-left: 8px;">
+                                            <p style="margin: 0; font-size: 14px; color: #3f3f46;">Contact our support team if you have questions about the decision.</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- Closing for Rejected -->
+            <tr>
+                <td style="padding: 24px 40px 32px 40px;" class="mobile-padding">
+                    <p style="margin: 0; font-size: 14px; color: #71717a; line-height: 1.6;">
+                        We appreciate your understanding and wish you the best in your business endeavors. If you believe this decision was made in error, please contact us at <a href="mailto:{{.SupportEmail}}" style="color: #6366f1; text-decoration: none; font-weight: 500;">{{.SupportEmail}}</a>.
+                    </p>
+                </td>
+            </tr>
+            {{end}}
+
+            {{if eq .VendorStatus "SUSPENDED"}}
+            <!-- Message for Suspended -->
+            <tr>
+                <td style="padding: 32px 40px 0 40px;" class="mobile-padding">
+                    <p style="margin: 0; font-size: 15px; color: #3f3f46; line-height: 1.6;">
+                        Dear {{.VendorName}},
+                    </p>
+                    <p style="margin: 16px 0 0 0; font-size: 15px; color: #3f3f46; line-height: 1.6;">
+                        We regret to inform you that your vendor account on <strong>{{.BusinessName}}</strong> has been temporarily suspended.
+                    </p>
+                </td>
+            </tr>
+
+            <!-- Suspension Details -->
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #fffbeb; border-radius: 12px; border: 1px solid #fde68a;">
+                        <tr>
+                            <td style="padding: 20px;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td>
+                                            <p style="margin: 0 0 4px 0; font-size: 11px; font-weight: 600; color: #92400e; text-transform: uppercase; letter-spacing: 0.5px;">Account Status</p>
+                                            <span style="display: inline-block; padding: 4px 12px; font-size: 12px; font-weight: 600; color: #b45309; background-color: #fef3c7; border-radius: 20px;">Suspended</span>
+                                        </td>
+                                    </tr>
+                                    {{if .StatusReason}}
+                                    <tr>
+                                        <td style="padding-top: 16px;">
+                                            <p style="margin: 0 0 4px 0; font-size: 11px; font-weight: 600; color: #92400e; text-transform: uppercase; letter-spacing: 0.5px;">Reason</p>
+                                            <p style="margin: 0; font-size: 14px; color: #78350f; line-height: 1.5;">{{.StatusReason}}</p>
+                                        </td>
+                                    </tr>
+                                    {{end}}
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- What This Means -->
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <p style="margin: 0 0 16px 0; font-size: 14px; font-weight: 600; color: #18181b;">What this means:</p>
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                        <tr>
+                            <td style="padding: 8px 0;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 24px; vertical-align: top;">
+                                            <span style="color: #dc2626;">&#10006;</span>
+                                        </td>
+                                        <td style="padding-left: 8px;">
+                                            <p style="margin: 0; font-size: 14px; color: #3f3f46;">Your products have been hidden from the marketplace.</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 24px; vertical-align: top;">
+                                            <span style="color: #dc2626;">&#10006;</span>
+                                        </td>
+                                        <td style="padding-left: 8px;">
+                                            <p style="margin: 0; font-size: 14px; color: #3f3f46;">You cannot receive new orders during the suspension.</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 24px; vertical-align: top;">
+                                            <span style="color: #16a34a;">&#10004;</span>
+                                        </td>
+                                        <td style="padding-left: 8px;">
+                                            <p style="margin: 0; font-size: 14px; color: #3f3f46;">Existing orders will still be fulfilled.</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 24px; vertical-align: top;">
+                                            <span style="color: #16a34a;">&#10004;</span>
+                                        </td>
+                                        <td style="padding-left: 8px;">
+                                            <p style="margin: 0; font-size: 14px; color: #3f3f46;">Pending payouts will be processed as scheduled.</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- Next Steps for Suspended -->
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f0f9ff; border-radius: 12px; border: 1px solid #bae6fd;">
+                        <tr>
+                            <td style="padding: 20px;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 24px; vertical-align: top;">
+                                            <span style="font-size: 16px;">&#128161;</span>
+                                        </td>
+                                        <td style="padding-left: 12px;">
+                                            <p style="margin: 0; font-size: 14px; font-weight: 600; color: #0369a1;">To reactivate your account:</p>
+                                            <p style="margin: 8px 0 0 0; font-size: 13px; color: #0c4a6e; line-height: 1.5;">
+                                                Please contact our support team to discuss the suspension and steps needed to restore your account.
+                                            </p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- CTA Button for Suspended -->
+            <tr>
+                <td style="padding: 24px 40px 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="background: linear-gradient(135deg, #18181b 0%, #27272a 100%); border-radius: 10px;">
+                                <a href="mailto:{{.SupportEmail}}" style="display: inline-block; padding: 14px 32px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
+                                    Contact Support &#8594;
+                                </a>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+            {{end}}
+        </table>
+    </td>
+</tr>
+{{end}}
+
+{{define "footer"}}
+<!-- Footer -->
+<tr>
+    <td style="padding: 32px 20px; text-align: center;">
+        <p style="margin: 0 0 8px 0; font-size: 13px; color: #71717a;">
+            Questions? Contact us at <a href="mailto:{{.SupportEmail}}" style="color: {{if eq .VendorStatus "APPROVED"}}#10b981{{else if eq .VendorStatus "REJECTED"}}#ef4444{{else if eq .VendorStatus "SUSPENDED"}}#f59e0b{{else}}#6366f1{{end}}; text-decoration: none; font-weight: 500;">{{.SupportEmail}}</a>
+        </p>
+        <p style="margin: 0; font-size: 12px; color: #a1a1aa;">
+            &copy; {{.Year}} {{.BusinessName}}. All rights reserved.
+        </p>
+    </td>
+</tr>
+{{end}}

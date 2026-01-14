@@ -1,0 +1,600 @@
+openapi: 3.0.3
+info:
+  title: QR Service API
+  description: |
+    A comprehensive QR code generation microservice supporting multiple QR types including
+    URLs, WiFi credentials, vCards, emails, phone numbers, SMS, geo locations, app store links,
+    and payment QR codes.
+
+    ## Features
+    - Generate QR codes in PNG or Base64 format
+    - Support for 10+ QR code types
+    - Configurable size and error correction levels
+    - Optional GCP Cloud Storage integration
+    - AES-256 encryption for sensitive data
+    - Batch generation support
+    - Multi-tenant architecture
+  version: 1.0.0
+  contact:
+    name: Tesseract Hub
+    url: https://github.com/tesseract-nexus/tesseract-hub
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+  - url: https://api.tesseract.io
+    description: Production server
+
+tags:
+  - name: QR Code
+    description: QR code generation endpoints
+  - name: Health
+    description: Health check endpoints
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      description: Returns the health status of the service
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /ready:
+    get:
+      tags:
+        - Health
+      summary: Readiness check
+      description: Returns the readiness status of the service
+      operationId: readinessCheck
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /api/v1/qr/generate:
+    post:
+      tags:
+        - QR Code
+      summary: Generate QR code
+      description: Generate a QR code for the specified type and data
+      operationId: generateQRCode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateQRRequest'
+            examples:
+              url:
+                summary: URL QR Code
+                value:
+                  type: url
+                  data:
+                    url: https://example.com
+                  size: 256
+                  quality: high
+              wifi:
+                summary: WiFi QR Code
+                value:
+                  type: wifi
+                  data:
+                    wifi:
+                      ssid: MyNetwork
+                      password: secretpass123
+                      encryption: WPA
+                  size: 256
+              vcard:
+                summary: Contact vCard
+                value:
+                  type: vcard
+                  data:
+                    vcard:
+                      first_name: John
+                      last_name: Doe
+                      email: john.doe@example.com
+                      phone: "+1234567890"
+                      organization: Acme Inc
+              payment:
+                summary: UPI Payment
+                value:
+                  type: payment
+                  data:
+                    payment:
+                      type: upi
+                      upi_id: merchant@upi
+                      name: Store Name
+                      amount: 100.00
+                      currency: INR
+      responses:
+        '200':
+          description: QR code generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerateQRResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/qr/image:
+    get:
+      tags:
+        - QR Code
+      summary: Generate QR code image
+      description: Generate a QR code and return as PNG image (for simple types only)
+      operationId: generateQRCodeImage
+      parameters:
+        - name: type
+          in: query
+          description: QR code type
+          schema:
+            type: string
+            enum: [url, text, phone]
+            default: url
+        - name: url
+          in: query
+          description: URL for URL type QR codes
+          schema:
+            type: string
+            format: uri
+        - name: text
+          in: query
+          description: Text for text type QR codes
+          schema:
+            type: string
+        - name: phone
+          in: query
+          description: Phone number for phone type QR codes
+          schema:
+            type: string
+        - name: size
+          in: query
+          description: Size of the QR code in pixels
+          schema:
+            type: integer
+            minimum: 64
+            maximum: 1024
+            default: 256
+        - name: quality
+          in: query
+          description: Error correction level
+          schema:
+            type: string
+            enum: [low, medium, high, highest]
+            default: medium
+      responses:
+        '200':
+          description: QR code image
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/qr/download:
+    post:
+      tags:
+        - QR Code
+      summary: Download QR code
+      description: Generate and download a QR code as a file
+      operationId: downloadQRCode
+      parameters:
+        - name: filename
+          in: query
+          description: Filename for the downloaded file
+          schema:
+            type: string
+            default: qrcode.png
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateQRRequest'
+      responses:
+        '200':
+          description: QR code file
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/qr/batch:
+    post:
+      tags:
+        - QR Code
+      summary: Batch generate QR codes
+      description: Generate multiple QR codes in a single request
+      operationId: batchGenerateQRCodes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchGenerateRequest'
+      responses:
+        '200':
+          description: Batch generation results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchGenerateResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/qr/types:
+    get:
+      tags:
+        - QR Code
+      summary: List QR code types
+      description: Get a list of all supported QR code types and their fields
+      operationId: getQRTypes
+      responses:
+        '200':
+          description: List of QR types
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  types:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                        name:
+                          type: string
+                        description:
+                          type: string
+                        fields:
+                          type: array
+                          items:
+                            type: string
+
+components:
+  schemas:
+    GenerateQRRequest:
+      type: object
+      required:
+        - type
+        - data
+      properties:
+        type:
+          type: string
+          enum: [url, text, wifi, vcard, email, phone, sms, geo, app, payment]
+          description: Type of QR code to generate
+        data:
+          $ref: '#/components/schemas/QRData'
+        size:
+          type: integer
+          minimum: 64
+          maximum: 1024
+          default: 256
+          description: Size of the QR code in pixels
+        format:
+          type: string
+          enum: [png, base64]
+          default: base64
+          description: Output format
+        quality:
+          type: string
+          enum: [low, medium, high, highest]
+          default: medium
+          description: Error correction level
+        tenant_id:
+          type: string
+          description: Tenant identifier for multi-tenant setups
+        label:
+          type: string
+          description: Optional label for the QR code
+        save:
+          type: boolean
+          default: false
+          description: Whether to save the QR code to storage
+
+    QRData:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+        text:
+          type: string
+        wifi:
+          $ref: '#/components/schemas/WiFiData'
+        vcard:
+          $ref: '#/components/schemas/VCardData'
+        email:
+          $ref: '#/components/schemas/EmailData'
+        phone:
+          type: string
+        sms:
+          $ref: '#/components/schemas/SMSData'
+        geo:
+          $ref: '#/components/schemas/GeoData'
+        app:
+          $ref: '#/components/schemas/AppData'
+        payment:
+          $ref: '#/components/schemas/PaymentData'
+
+    WiFiData:
+      type: object
+      required:
+        - ssid
+      properties:
+        ssid:
+          type: string
+          description: Network name
+        password:
+          type: string
+          description: Network password
+        encryption:
+          type: string
+          enum: [WPA, WEP, nopass]
+          default: WPA
+        hidden:
+          type: boolean
+          default: false
+
+    VCardData:
+      type: object
+      properties:
+        first_name:
+          type: string
+        last_name:
+          type: string
+        organization:
+          type: string
+        title:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        mobile:
+          type: string
+        address:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        zip:
+          type: string
+        country:
+          type: string
+        website:
+          type: string
+          format: uri
+        note:
+          type: string
+
+    EmailData:
+      type: object
+      required:
+        - address
+      properties:
+        address:
+          type: string
+          format: email
+        subject:
+          type: string
+        body:
+          type: string
+
+    SMSData:
+      type: object
+      required:
+        - phone
+      properties:
+        phone:
+          type: string
+        message:
+          type: string
+
+    GeoData:
+      type: object
+      required:
+        - latitude
+        - longitude
+      properties:
+        latitude:
+          type: number
+          format: double
+        longitude:
+          type: number
+          format: double
+        altitude:
+          type: number
+          format: double
+
+    AppData:
+      type: object
+      properties:
+        ios_url:
+          type: string
+          format: uri
+        android_url:
+          type: string
+          format: uri
+        fallback_url:
+          type: string
+          format: uri
+
+    PaymentData:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum: [upi, bitcoin, ethereum]
+        upi_id:
+          type: string
+        address:
+          type: string
+        amount:
+          type: number
+          format: double
+        currency:
+          type: string
+        name:
+          type: string
+        reference:
+          type: string
+
+    GenerateQRResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+        qr_code:
+          type: string
+          description: Base64 encoded QR code image (when format is base64)
+        storage_url:
+          type: string
+          format: uri
+          description: URL to stored QR code (when save is true)
+        format:
+          type: string
+        size:
+          type: integer
+        quality:
+          type: string
+        encrypted:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    BatchGenerateRequest:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            type: object
+            required:
+              - type
+              - data
+            properties:
+              type:
+                type: string
+              data:
+                $ref: '#/components/schemas/QRData'
+              label:
+                type: string
+        size:
+          type: integer
+          default: 256
+        quality:
+          type: string
+          default: medium
+        format:
+          type: string
+          default: base64
+        save:
+          type: boolean
+          default: false
+
+    BatchGenerateResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              label:
+                type: string
+              qr_code:
+                type: string
+              storage_url:
+                type: string
+              error:
+                type: string
+        total:
+          type: integer
+        success:
+          type: integer
+        failed:
+          type: integer
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        service:
+          type: string
+        version:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+        request_id:
+          type: string
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

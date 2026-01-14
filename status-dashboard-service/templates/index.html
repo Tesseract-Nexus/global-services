@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ .title }}</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <link rel="apple-touch-icon" href="/static/favicon.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script>
+        (function() {
+            const theme = localStorage.getItem('theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
+</head>
+<body>
+    <div class="app">
+        <!-- Animated Background -->
+        <div class="bg-gradient"></div>
+
+        <!-- Header -->
+        <header class="header">
+            <div class="header-inner">
+                <div class="logo">
+                    <div class="logo-icon">
+                        <img src="https://storage.googleapis.com/tesseract-assets/logo-icon.png" alt="Tesseract" width="36" height="36" onerror="this.style.display='none'">
+                    </div>
+                    <div class="logo-text">
+                        <span class="logo-title">Tesseract</span>
+                        <span class="logo-badge">Status</span>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <div class="live-badge">
+                        <span class="live-dot"></span>
+                        <span>Live</span>
+                    </div>
+                    <button id="themeToggle" class="theme-btn" aria-label="Toggle theme">
+                        <svg class="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="5"/>
+                            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                        </svg>
+                        <svg class="icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="main">
+            <!-- Hero Status Section -->
+            <section id="statusBanner" class="hero operational">
+                <div class="hero-content">
+                    <div class="hero-icon">
+                        <svg class="check-icon" width="48" height="48" viewBox="0 0 24 24" fill="none">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+                            <polyline points="22 4 12 14.01 9 11.01" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        <svg class="alert-icon" width="48" height="48" viewBox="0 0 24 24" fill="none">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke="currentColor" stroke-width="2"/>
+                            <line x1="12" y1="9" x2="12" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            <circle cx="12" cy="17" r="1" fill="currentColor"/>
+                        </svg>
+                    </div>
+                    <div class="hero-text">
+                        <h1 id="statusTitle">All Systems Operational</h1>
+                        <p id="statusSubtitle">All services are running smoothly</p>
+                    </div>
+                </div>
+                <div class="hero-meta">
+                    <span id="lastUpdated">Checking...</span>
+                </div>
+            </section>
+
+            <!-- Metrics Cards -->
+            <section class="metrics">
+                <div class="metric-card">
+                    <div class="metric-icon uptime-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                        </svg>
+                    </div>
+                    <div class="metric-data">
+                        <span class="metric-value" id="overallUptime">--</span>
+                        <span class="metric-label">Uptime (30d)</span>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon response-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <polyline points="12 6 12 12 16 14"/>
+                        </svg>
+                    </div>
+                    <div class="metric-data">
+                        <span class="metric-value" id="avgResponse">--</span>
+                        <span class="metric-label">Avg Response</span>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon services-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="7" height="7"/>
+                            <rect x="14" y="3" width="7" height="7"/>
+                            <rect x="14" y="14" width="7" height="7"/>
+                            <rect x="3" y="14" width="7" height="7"/>
+                        </svg>
+                    </div>
+                    <div class="metric-data">
+                        <span class="metric-value" id="servicesHealthy">--</span>
+                        <span class="metric-label">Services</span>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon incidents-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                            <line x1="12" y1="9" x2="12" y2="13"/>
+                            <line x1="12" y1="17" x2="12.01" y2="17"/>
+                        </svg>
+                    </div>
+                    <div class="metric-data">
+                        <span class="metric-value" id="activeIncidents">0</span>
+                        <span class="metric-label">Active Incidents</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Uptime History -->
+            <section class="uptime-section">
+                <div class="section-head">
+                    <h2>90-Day Uptime History</h2>
+                    <div class="uptime-legend">
+                        <div class="legend-item">
+                            <span class="legend-dot good"></span>
+                            <span>99%+</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-dot warning"></span>
+                            <span>95-99%</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-dot bad"></span>
+                            <span>&lt;95%</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="uptime-chart-wrapper">
+                    <div id="uptimeChart" class="uptime-chart"></div>
+                    <div class="uptime-timeline">
+                        <span>90 days ago</span>
+                        <span>Today</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Active Incidents -->
+            <section id="incidentsSection" class="incidents-section hidden">
+                <div class="section-head">
+                    <h2>Active Incidents</h2>
+                    <span class="incident-badge" id="incidentCount">0</span>
+                </div>
+                <div id="incidentsList" class="incidents-list"></div>
+            </section>
+
+            <!-- SLA Compliance -->
+            <section class="sla-section">
+                <div class="section-head">
+                    <h2>SLA Compliance</h2>
+                    <span class="sla-badge" id="slaSummary">--/-- meeting SLA</span>
+                </div>
+                <div class="sla-grid">
+                    <div class="sla-card critical">
+                        <div class="sla-header">
+                            <span class="sla-tier-name">Critical Services</span>
+                            <span class="sla-tier-target">99.9% SLA</span>
+                        </div>
+                        <div class="sla-body">
+                            <div class="sla-percentage" id="criticalUptime">--</div>
+                            <div class="sla-bar-container">
+                                <div class="sla-bar" id="criticalProgress" style="width: 0%"></div>
+                            </div>
+                            <div id="criticalStatus" class="sla-status-label">Loading...</div>
+                        </div>
+                    </div>
+                    <div class="sla-card standard">
+                        <div class="sla-header">
+                            <span class="sla-tier-name">Standard Services</span>
+                            <span class="sla-tier-target">99.5% SLA</span>
+                        </div>
+                        <div class="sla-body">
+                            <div class="sla-percentage" id="standardUptime">--</div>
+                            <div class="sla-bar-container">
+                                <div class="sla-bar" id="standardProgress" style="width: 0%"></div>
+                            </div>
+                            <div id="standardStatus" class="sla-status-label">Loading...</div>
+                        </div>
+                    </div>
+                    <div class="sla-card supporting">
+                        <div class="sla-header">
+                            <span class="sla-tier-name">Supporting Services</span>
+                            <span class="sla-tier-target">99.0% SLA</span>
+                        </div>
+                        <div class="sla-body">
+                            <div class="sla-percentage" id="supportingUptime">--</div>
+                            <div class="sla-bar-container">
+                                <div class="sla-bar" id="supportingProgress" style="width: 0%"></div>
+                            </div>
+                            <div id="supportingStatus" class="sla-status-label">Loading...</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Services List -->
+            <section class="services-section">
+                <div class="section-head">
+                    <h2>Service Status</h2>
+                    <div class="filter-group">
+                        <button class="filter-btn active" data-filter="all">All</button>
+                        <button class="filter-btn" data-filter="healthy">Healthy</button>
+                        <button class="filter-btn" data-filter="issues">Issues</button>
+                    </div>
+                </div>
+                <div id="servicesList" class="services-grid"></div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-inner">
+                <p>&copy; 2026 Tesseract Platform. Powered by Tesserix.</p>
+                <div class="footer-links">
+                    <a href="/api/v1/status" target="_blank">API</a>
+                    <a href="https://docs.tesserix.app" target="_blank">Docs</a>
+                    <a href="https://status.tesserix.app/history" target="_blank">History</a>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

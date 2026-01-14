@@ -1,0 +1,398 @@
+{{define "header"}}
+<!-- Logo -->
+<tr>
+    <td style="text-align: center; padding-bottom: 24px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+            <tr>
+                {{/* Dynamic gradient based on status */}}
+                {{if eq .TicketStatus "CREATED"}}
+                <td style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
+                {{else if eq .TicketStatus "ESCALATED"}}
+                <td style="background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
+                {{else if eq .TicketStatus "RESOLVED"}}
+                <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
+                {{else if eq .TicketStatus "REOPENED"}}
+                <td style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
+                {{else if eq .TicketStatus "CLOSED"}}
+                <td style="background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
+                {{else}}
+                <td style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
+                {{end}}
+                    <span style="color: #ffffff; font-size: 24px; font-weight: 700;">{{if .BusinessInitial}}{{.BusinessInitial}}{{else}}T{{end}}</span>
+                </td>
+            </tr>
+        </table>
+        {{if .BusinessName}}
+        <p style="margin: 12px 0 0 0; font-size: 18px; font-weight: 600; color: #18181b; letter-spacing: -0.3px;">{{.BusinessName}}</p>
+        {{end}}
+    </td>
+</tr>
+{{end}}
+
+{{define "content"}}
+<!-- Main Card -->
+<tr>
+    <td>
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1); overflow: hidden;">
+
+            <!-- Header - Dynamic gradient based on status -->
+            <tr>
+                {{if eq .TicketStatus "CREATED"}}
+                <td style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding: 40px 40px; text-align: center;" class="mobile-padding">
+                {{else if eq .TicketStatus "ESCALATED"}}
+                <td style="background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); padding: 40px 40px; text-align: center;" class="mobile-padding">
+                {{else if eq .TicketStatus "RESOLVED"}}
+                <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 40px 40px; text-align: center;" class="mobile-padding">
+                {{else if eq .TicketStatus "REOPENED"}}
+                <td style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); padding: 40px 40px; text-align: center;" class="mobile-padding">
+                {{else if eq .TicketStatus "CLOSED"}}
+                <td style="background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%); padding: 40px 40px; text-align: center;" class="mobile-padding">
+                {{else}}
+                <td style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); padding: 40px 40px; text-align: center;" class="mobile-padding">
+                {{end}}
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="width: 72px; height: 72px; background-color: rgba(255,255,255,0.2); border-radius: 50%; text-align: center; vertical-align: middle;">
+                                {{/* Dynamic icon based on status */}}
+                                {{if eq .TicketStatus "CREATED"}}
+                                <span style="font-size: 36px;">&#127915;</span>
+                                {{else if eq .TicketStatus "ESCALATED"}}
+                                <span style="font-size: 36px;">&#128680;</span>
+                                {{else if eq .TicketStatus "RESOLVED"}}
+                                <span style="font-size: 36px;">&#9989;</span>
+                                {{else if eq .TicketStatus "REOPENED"}}
+                                <span style="font-size: 36px;">&#128260;</span>
+                                {{else if eq .TicketStatus "CLOSED"}}
+                                <span style="font-size: 36px;">&#128451;</span>
+                                {{else}}
+                                <span style="font-size: 36px;">&#128276;</span>
+                                {{end}}
+                            </td>
+                        </tr>
+                    </table>
+                    <h1 style="margin: 20px 0 0 0; font-size: 26px; font-weight: 700; color: #ffffff; line-height: 1.3;">
+                        {{/* Dynamic title based on status */}}
+                        {{if eq .TicketStatus "CREATED"}}
+                        New Support Ticket
+                        {{else if eq .TicketStatus "ESCALATED"}}
+                        ESCALATED - Urgent Attention Required
+                        {{else if eq .TicketStatus "RESOLVED"}}
+                        Ticket Resolved
+                        {{else if eq .TicketStatus "REOPENED"}}
+                        Ticket Reopened
+                        {{else if eq .TicketStatus "CLOSED"}}
+                        Ticket Closed
+                        {{else}}
+                        Ticket Update
+                        {{end}}
+                    </h1>
+                    <p style="margin: 8px 0 0 0; font-size: 15px; color: rgba(255,255,255,0.9);">
+                        Ticket #{{.TicketNumber}}
+                        {{if eq .TicketStatus "CREATED"}} requires attention
+                        {{else if eq .TicketStatus "ESCALATED"}} requires immediate attention
+                        {{else if eq .TicketStatus "RESOLVED"}} has been resolved
+                        {{else if eq .TicketStatus "REOPENED"}} has been reopened
+                        {{else if eq .TicketStatus "CLOSED"}} has been closed
+                        {{else}} status update
+                        {{end}}
+                    </p>
+                </td>
+            </tr>
+
+            {{/* Priority Badge for Created/Escalated tickets */}}
+            {{if or (eq .TicketStatus "CREATED") (eq .TicketStatus "ESCALATED")}}
+            <tr>
+                <td style="padding: 24px 40px 0 40px; text-align: center;" class="mobile-padding">
+                    {{if eq .TicketStatus "ESCALATED"}}
+                    <span style="display: inline-block; padding: 8px 16px; background-color: #fef2f2; color: #dc2626; font-size: 12px; font-weight: 700; border-radius: 20px; border: 1px solid #fecaca; text-transform: uppercase; letter-spacing: 0.5px;">
+                        &#128680; {{if .TicketPriority}}{{.TicketPriority}} PRIORITY{{else}}HIGH PRIORITY{{end}}
+                    </span>
+                    {{else if .TicketPriority}}
+                        {{if eq .TicketPriority "URGENT"}}
+                        <span style="display: inline-block; padding: 6px 16px; background-color: #fef2f2; color: #dc2626; font-size: 12px; font-weight: 700; border-radius: 20px; border: 1px solid #fecaca;">&#9888; URGENT PRIORITY</span>
+                        {{else if eq .TicketPriority "HIGH"}}
+                        <span style="display: inline-block; padding: 6px 16px; background-color: #fff7ed; color: #ea580c; font-size: 12px; font-weight: 700; border-radius: 20px; border: 1px solid #fed7aa;">HIGH PRIORITY</span>
+                        {{else}}
+                        <span style="display: inline-block; padding: 6px 16px; background-color: #f0fdf4; color: #16a34a; font-size: 12px; font-weight: 700; border-radius: 20px; border: 1px solid #bbf7d0;">{{.TicketPriority}} PRIORITY</span>
+                        {{end}}
+                    {{end}}
+                </td>
+            </tr>
+            {{end}}
+
+            <!-- Ticket Details -->
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    {{if eq .TicketStatus "ESCALATED"}}
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #fef2f2; border-radius: 12px; border: 1px solid #fecaca;">
+                        <tr>
+                            <td style="padding: 24px;">
+                                <p style="margin: 0 0 16px 0; font-size: 11px; font-weight: 700; color: #991b1b; text-transform: uppercase; letter-spacing: 1px;">
+                                    Escalated Ticket Details
+                                </p>
+                    {{else if eq .TicketStatus "REOPENED"}}
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f5f3ff; border-radius: 12px; border: 1px solid #c4b5fd;">
+                        <tr>
+                            <td style="padding: 24px;">
+                                <p style="margin: 0 0 16px 0; font-size: 11px; font-weight: 700; color: #6d28d9; text-transform: uppercase; letter-spacing: 1px;">
+                                    Reopened Ticket Details
+                                </p>
+                    {{else if eq .TicketStatus "RESOLVED"}}
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f0fdf4; border-radius: 12px; border: 1px solid #86efac;">
+                        <tr>
+                            <td style="padding: 24px;">
+                                <p style="margin: 0 0 16px 0; font-size: 11px; font-weight: 700; color: #166534; text-transform: uppercase; letter-spacing: 1px;">
+                                    Resolved Ticket Details
+                                </p>
+                    {{else if eq .TicketStatus "CLOSED"}}
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f3f4f6; border-radius: 12px; border: 1px solid #d1d5db;">
+                        <tr>
+                            <td style="padding: 24px;">
+                                <p style="margin: 0 0 16px 0; font-size: 11px; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: 1px;">
+                                    Closed Ticket Details
+                                </p>
+                    {{else}}
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f8fafc; border-radius: 12px;">
+                        <tr>
+                            <td style="padding: 24px;">
+                                <p style="margin: 0 0 16px 0; font-size: 11px; font-weight: 700; color: #71717a; text-transform: uppercase; letter-spacing: 1px;">
+                                    Ticket Details
+                                </p>
+                    {{end}}
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="padding-bottom: 12px;">
+                                            <p style="margin: 0; font-size: 12px; color: {{if eq .TicketStatus "ESCALATED"}}#7f1d1d{{else if eq .TicketStatus "REOPENED"}}#5b21b6{{else if eq .TicketStatus "RESOLVED"}}#166534{{else}}#71717a{{end}};">Ticket Number</p>
+                                            <p style="margin: 4px 0 0 0; font-family: 'SF Mono', 'Roboto Mono', monospace; font-size: 13px; color: #18181b; font-weight: 600;">#{{.TicketNumber}}</p>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding-bottom: 12px;">
+                                            <p style="margin: 0; font-size: 12px; color: {{if eq .TicketStatus "ESCALATED"}}#7f1d1d{{else if eq .TicketStatus "REOPENED"}}#5b21b6{{else if eq .TicketStatus "RESOLVED"}}#166534{{else}}#71717a{{end}};">Subject</p>
+                                            <p style="margin: 4px 0 0 0; font-size: 13px; color: #18181b; font-weight: 500;">{{.TicketSubject}}</p>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding-bottom: 12px;">
+                                            <p style="margin: 0; font-size: 12px; color: {{if eq .TicketStatus "ESCALATED"}}#7f1d1d{{else if eq .TicketStatus "REOPENED"}}#5b21b6{{else if eq .TicketStatus "RESOLVED"}}#166534{{else}}#71717a{{end}};">Customer</p>
+                                            <p style="margin: 4px 0 0 0; font-size: 13px; color: #18181b;">{{.CustomerName}}{{if .Email}} ({{.Email}}){{end}}</p>
+                                        </td>
+                                    </tr>
+                                    {{if and .EscalatedBy (eq .TicketStatus "ESCALATED")}}
+                                    <tr>
+                                        <td style="padding-bottom: 12px;">
+                                            <p style="margin: 0; font-size: 12px; color: #7f1d1d;">Escalated By</p>
+                                            <p style="margin: 4px 0 0 0; font-size: 13px; color: #18181b;">{{.EscalatedBy}}</p>
+                                        </td>
+                                    </tr>
+                                    {{end}}
+                                    {{if and .ReopenedBy (eq .TicketStatus "REOPENED")}}
+                                    <tr>
+                                        <td style="padding-bottom: 12px;">
+                                            <p style="margin: 0; font-size: 12px; color: #5b21b6;">Reopened By</p>
+                                            <p style="margin: 4px 0 0 0; font-size: 13px; color: #18181b;">{{.ReopenedBy}}</p>
+                                        </td>
+                                    </tr>
+                                    {{end}}
+                                    {{if and .AssignedTo (or (eq .TicketStatus "RESOLVED") (eq .TicketStatus "CLOSED"))}}
+                                    <tr>
+                                        <td style="padding-bottom: 12px;">
+                                            <p style="margin: 0; font-size: 12px; color: {{if eq .TicketStatus "RESOLVED"}}#166534{{else}}#71717a{{end}};">Resolved By</p>
+                                            <p style="margin: 4px 0 0 0; font-size: 13px; color: #18181b;">{{.AssignedTo}}</p>
+                                        </td>
+                                    </tr>
+                                    {{end}}
+                                    {{if .TicketCategory}}
+                                    <tr>
+                                        <td style="padding-bottom: 12px;">
+                                            <p style="margin: 0; font-size: 12px; color: {{if eq .TicketStatus "ESCALATED"}}#7f1d1d{{else if eq .TicketStatus "REOPENED"}}#5b21b6{{else if eq .TicketStatus "RESOLVED"}}#166534{{else}}#71717a{{end}};">Category</p>
+                                            <p style="margin: 4px 0 0 0; font-size: 13px; color: #18181b;">{{.TicketCategory}}</p>
+                                        </td>
+                                    </tr>
+                                    {{end}}
+                                    <tr>
+                                        <td>
+                                            <p style="margin: 0; font-size: 12px; color: {{if eq .TicketStatus "ESCALATED"}}#7f1d1d{{else if eq .TicketStatus "REOPENED"}}#5b21b6{{else if eq .TicketStatus "RESOLVED"}}#166534{{else}}#71717a{{end}};">Status</p>
+                                            <p style="margin: 4px 0 0 0;">
+                                                {{if eq .TicketStatus "CREATED"}}
+                                                <span style="display: inline-block; padding: 4px 10px; background-color: #dbeafe; color: #1e40af; font-size: 12px; font-weight: 600; border-radius: 20px;">Open</span>
+                                                {{else if eq .TicketStatus "ESCALATED"}}
+                                                <span style="display: inline-block; padding: 4px 10px; background-color: #dc2626; color: #ffffff; font-size: 12px; font-weight: 600; border-radius: 20px;">&#128680; ESCALATED</span>
+                                                {{else if eq .TicketStatus "RESOLVED"}}
+                                                <span style="display: inline-block; padding: 4px 10px; background-color: #dcfce7; color: #166534; font-size: 12px; font-weight: 600; border-radius: 20px;">&#10003; Resolved</span>
+                                                {{else if eq .TicketStatus "REOPENED"}}
+                                                <span style="display: inline-block; padding: 4px 10px; background-color: #8b5cf6; color: #ffffff; font-size: 12px; font-weight: 600; border-radius: 20px;">&#128260; Reopened</span>
+                                                {{else if eq .TicketStatus "CLOSED"}}
+                                                <span style="display: inline-block; padding: 4px 10px; background-color: #f3f4f6; color: #374151; font-size: 12px; font-weight: 600; border-radius: 20px;">&#128451; Closed</span>
+                                                {{else}}
+                                                <span style="display: inline-block; padding: 4px 10px; background-color: #e0e7ff; color: #3730a3; font-size: 12px; font-weight: 600; border-radius: 20px;">{{.TicketStatus}}</span>
+                                                {{end}}
+                                            </p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            {{/* Escalation Reason */}}
+            {{if and (eq .TicketStatus "ESCALATED") .EscalationReason}}
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #fff7ed; border-radius: 12px; border: 1px solid #fdba74;">
+                        <tr>
+                            <td style="padding: 20px;">
+                                <p style="margin: 0 0 8px 0; font-size: 11px; font-weight: 700; color: #c2410c; text-transform: uppercase; letter-spacing: 1px;">
+                                    Escalation Reason
+                                </p>
+                                <p style="margin: 0; font-size: 13px; color: #9a3412; line-height: 1.6;">
+                                    {{.EscalationReason}}
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+            {{end}}
+
+            {{/* Resolution for resolved tickets */}}
+            {{if and (eq .TicketStatus "RESOLVED") .Resolution}}
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f0fdf4; border-radius: 12px; border: 1px solid #86efac;">
+                        <tr>
+                            <td style="padding: 20px;">
+                                <p style="margin: 0 0 8px 0; font-size: 11px; font-weight: 700; color: #166534; text-transform: uppercase; letter-spacing: 1px;">
+                                    Resolution
+                                </p>
+                                <p style="margin: 0; font-size: 13px; color: #14532d; line-height: 1.6;">
+                                    {{.Resolution}}
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+            {{end}}
+
+            {{/* Description for created tickets */}}
+            {{if and .Description (eq .TicketStatus "CREATED")}}
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #fefce8; border-radius: 12px; border: 1px solid #fef08a;">
+                        <tr>
+                            <td style="padding: 20px;">
+                                <p style="margin: 0 0 8px 0; font-size: 11px; font-weight: 700; color: #a16207; text-transform: uppercase; letter-spacing: 1px;">
+                                    Customer Message
+                                </p>
+                                <p style="margin: 0; font-size: 13px; color: #713f12; line-height: 1.6;">
+                                    {{.Description}}
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+            {{end}}
+
+            {{/* Original Description for escalated tickets */}}
+            {{if and .Description (eq .TicketStatus "ESCALATED")}}
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f8fafc; border-radius: 12px;">
+                        <tr>
+                            <td style="padding: 20px;">
+                                <p style="margin: 0 0 8px 0; font-size: 11px; font-weight: 700; color: #71717a; text-transform: uppercase; letter-spacing: 1px;">
+                                    Original Description
+                                </p>
+                                <p style="margin: 0; font-size: 13px; color: #3f3f46; line-height: 1.6;">
+                                    {{.Description}}
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+            {{end}}
+
+            {{/* Action Required box for reopened tickets */}}
+            {{if eq .TicketStatus "REOPENED"}}
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ede9fe; border-radius: 10px; border: 1px solid #a78bfa;">
+                        <tr>
+                            <td style="padding: 16px 20px;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 28px; vertical-align: top;">
+                                            <span style="font-size: 18px;">&#9888;</span>
+                                        </td>
+                                        <td style="vertical-align: top;">
+                                            <p style="margin: 0 0 4px 0; font-size: 13px; font-weight: 600; color: #5b21b6;">Action Required</p>
+                                            <p style="margin: 0; font-size: 12px; color: #6d28d9; line-height: 1.5;">
+                                                This ticket has been reopened, indicating the original resolution may not have fully addressed the customer's issue. Please review and provide additional assistance.
+                                            </p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+            {{end}}
+
+            <!-- CTA Button -->
+            <tr>
+                <td style="padding: 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            {{if eq .TicketStatus "ESCALATED"}}
+                            <td style="background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); border-radius: 10px;">
+                                <a href="{{.TicketURL}}" style="display: inline-block; padding: 14px 32px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
+                                    Handle Now &#8594;
+                                </a>
+                            </td>
+                            {{else if eq .TicketStatus "REOPENED"}}
+                            <td style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); border-radius: 10px;">
+                                <a href="{{.TicketURL}}" style="display: inline-block; padding: 14px 32px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
+                                    Review Ticket &#8594;
+                                </a>
+                            </td>
+                            {{else}}
+                            <td style="background: linear-gradient(135deg, #18181b 0%, #27272a 100%); border-radius: 10px;">
+                                <a href="{{.TicketURL}}" style="display: inline-block; padding: 14px 32px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
+                                    {{if eq .TicketStatus "CREATED"}}Open Ticket{{else}}View Ticket{{end}} &#8594;
+                                </a>
+                            </td>
+                            {{end}}
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </td>
+</tr>
+{{end}}
+
+{{define "footer"}}
+<!-- Footer -->
+<tr>
+    <td style="padding: 32px 20px; text-align: center;">
+        <p style="margin: 0 0 8px 0; font-size: 13px; color: {{if eq .TicketStatus "ESCALATED"}}#dc2626; font-weight: 600;{{else}}#71717a;{{end}}">
+            {{if eq .TicketStatus "ESCALATED"}}
+            Please respond to this ticket as soon as possible
+            {{else if eq .TicketStatus "REOPENED"}}
+            Please follow up with the customer promptly
+            {{else}}
+            Support Dashboard: <a href="{{.TicketURL}}" style="color: #6366f1; text-decoration: none; font-weight: 500;">View All Tickets</a>
+            {{end}}
+        </p>
+        <p style="margin: 0; font-size: 12px; color: #a1a1aa;">
+            &copy; {{.Year}} {{.BusinessName}}. All rights reserved.
+        </p>
+    </td>
+</tr>
+{{end}}

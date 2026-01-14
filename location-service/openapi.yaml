@@ -1,0 +1,438 @@
+openapi: 3.0.3
+info:
+  title: Location Service API
+  description: Geolocation, address lookup, and location data management
+  version: 1.0.0
+servers:
+  - url: http://localhost:8085
+    description: Local development
+tags:
+  - name: Location Detection
+  - name: Countries
+  - name: States
+  - name: Currencies
+  - name: Timezones
+  - name: Address
+  - name: Admin
+
+paths:
+  /api/v1/location/detect:
+    get:
+      tags: [Location Detection]
+      summary: Detect location from IP
+      operationId: detectLocation
+      parameters:
+        - name: ip
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Location detected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationResponse'
+
+  /api/v1/countries:
+    get:
+      tags: [Countries]
+      summary: List countries
+      operationId: listCountries
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: region
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Countries list
+
+  /api/v1/countries/{countryId}:
+    get:
+      tags: [Countries]
+      summary: Get country
+      operationId: getCountry
+      parameters:
+        - name: countryId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Country details
+
+  /api/v1/countries/{countryId}/states:
+    get:
+      tags: [States]
+      summary: Get states for country
+      operationId: getStatesForCountry
+      parameters:
+        - name: countryId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: States list
+
+  /api/v1/states:
+    get:
+      tags: [States]
+      summary: List all states
+      operationId: listStates
+      parameters:
+        - name: country_id
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: States list
+
+  /api/v1/states/{stateId}:
+    get:
+      tags: [States]
+      summary: Get state
+      operationId: getState
+      parameters:
+        - name: stateId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: State details
+
+  /api/v1/currencies:
+    get:
+      tags: [Currencies]
+      summary: List currencies
+      operationId: listCurrencies
+      parameters:
+        - name: active_only
+          in: query
+          schema:
+            type: boolean
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Currencies list
+
+  /api/v1/currencies/{currencyCode}:
+    get:
+      tags: [Currencies]
+      summary: Get currency
+      operationId: getCurrency
+      parameters:
+        - name: currencyCode
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Currency details
+
+  /api/v1/timezones:
+    get:
+      tags: [Timezones]
+      summary: List timezones
+      operationId: listTimezones
+      parameters:
+        - name: country_id
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Timezones list
+
+  /api/v1/timezones/{timezone}:
+    get:
+      tags: [Timezones]
+      summary: Get timezone
+      operationId: getTimezone
+      parameters:
+        - name: timezone
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Timezone details
+
+  /api/v1/address/autocomplete:
+    get:
+      tags: [Address]
+      summary: Address autocomplete
+      operationId: autocomplete
+      parameters:
+        - name: input
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: session_token
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Address suggestions
+    post:
+      tags: [Address]
+      summary: Address autocomplete with options
+      operationId: autocompletePost
+      responses:
+        '200':
+          description: Address suggestions
+
+  /api/v1/address/geocode:
+    get:
+      tags: [Address]
+      summary: Geocode address
+      operationId: geocode
+      parameters:
+        - name: address
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Geocoded address
+    post:
+      tags: [Address]
+      summary: Geocode address with body
+      operationId: geocodePost
+      responses:
+        '200':
+          description: Geocoded address
+
+  /api/v1/address/reverse-geocode:
+    get:
+      tags: [Address]
+      summary: Reverse geocode
+      operationId: reverseGeocode
+      parameters:
+        - name: latitude
+          in: query
+          required: true
+          schema:
+            type: number
+        - name: longitude
+          in: query
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          description: Address from coordinates
+    post:
+      tags: [Address]
+      summary: Reverse geocode with body
+      operationId: reverseGeocodePost
+      responses:
+        '200':
+          description: Address from coordinates
+
+  /api/v1/address/place-details:
+    get:
+      tags: [Address]
+      summary: Get place details
+      operationId: getPlaceDetails
+      parameters:
+        - name: place_id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Place details
+
+  /api/v1/address/validate:
+    get:
+      tags: [Address]
+      summary: Validate address
+      operationId: validateAddress
+      parameters:
+        - name: address
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Validation result
+    post:
+      tags: [Address]
+      summary: Validate address with body
+      operationId: validateAddressPost
+      responses:
+        '200':
+          description: Validation result
+
+  /api/v1/address/format-manual:
+    post:
+      tags: [Address]
+      summary: Format manual address
+      operationId: formatManualAddress
+      responses:
+        '200':
+          description: Formatted address
+
+  /api/v1/address/parse:
+    post:
+      tags: [Address]
+      summary: Parse address
+      operationId: parseAddress
+      responses:
+        '200':
+          description: Parsed address
+
+  /api/v1/admin/countries:
+    post:
+      tags: [Admin]
+      summary: Create country
+      operationId: createCountry
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: Country created
+
+  /api/v1/admin/countries/{countryId}:
+    put:
+      tags: [Admin]
+      summary: Update country
+      operationId: updateCountry
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: countryId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Country updated
+    delete:
+      tags: [Admin]
+      summary: Delete country
+      operationId: deleteCountry
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: countryId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Country deleted
+
+  /api/v1/admin/cache/stats:
+    get:
+      tags: [Admin]
+      summary: Get cache stats
+      operationId: getCacheStats
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Cache statistics
+
+  /api/v1/admin/cache/cleanup:
+    post:
+      tags: [Admin]
+      summary: Cleanup cache
+      operationId: cleanupCache
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Cache cleaned
+
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: Healthy
+
+  /ready:
+    get:
+      summary: Readiness check
+      responses:
+        '200':
+          description: Ready
+
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      responses:
+        '200':
+          description: Metrics
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    LocationResponse:
+      type: object
+      properties:
+        ip:
+          type: string
+        country:
+          type: string
+        country_name:
+          type: string
+        calling_code:
+          type: string
+        flag_emoji:
+          type: string
+        state:
+          type: string
+        state_name:
+          type: string
+        city:
+          type: string
+        currency:
+          type: string
+        timezone:
+          type: string

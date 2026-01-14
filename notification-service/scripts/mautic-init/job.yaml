@@ -1,0 +1,82 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mautic-campaign-init
+  namespace: email
+  labels:
+    app.kubernetes.io/name: mautic-campaign-init
+    app.kubernetes.io/component: initialization
+    app.kubernetes.io/part-of: tesseract-hub
+  annotations:
+    description: "Initializes benchmark campaigns, segments, and email templates in Mautic"
+spec:
+  ttlSecondsAfterFinished: 3600
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mautic-campaign-init
+        sidecar.istio.io/inject: "false"
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mautic-init
+          image: golang:1.22-alpine
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "=== Mautic Campaign Initialization ==="
+
+              # Install dependencies
+              apk add --no-cache git ca-certificates
+
+              # Copy and run the init script
+              cd /app
+              go run main.go
+
+              echo "=== Initialization Complete ==="
+          env:
+            - name: MAUTIC_URL
+              value: "http://mautic.email.svc.cluster.local"
+            - name: MAUTIC_USERNAME
+              value: "admin"
+            - name: MAUTIC_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mautic-credentials
+                  key: admin-password
+            - name: FROM_EMAIL
+              value: "noreply@mail.tesserix.app"
+            - name: FROM_NAME
+              value: "Tesseract Hub"
+            # Uncomment to send test email during init
+            # - name: TEST_EMAIL
+            #   value: "test@example.com"
+          volumeMounts:
+            - name: init-script
+              mountPath: /app
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+      volumes:
+        - name: init-script
+          configMap:
+            name: mautic-init-script
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mautic-init-script
+  namespace: email
+  labels:
+    app.kubernetes.io/name: mautic-campaign-init
+data:
+  main.go: |
+    # This will be populated by the Helm chart or manually
+    # Copy the contents of main.go here

@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  auth-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - .:/app
+      - /app/vendor
+    environment:
+      GIN_MODE: debug
+      LOG_LEVEL: debug
+      # Enable hot reload
+      AIR_CONFIG: .air.toml
+    command: air
+
+  # Enable adminer in development
+  adminer:
+    profiles: []  # Remove debug profile to always run in dev

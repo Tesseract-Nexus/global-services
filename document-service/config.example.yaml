@@ -1,0 +1,98 @@
+# Document Service Configuration Example
+# Copy this file to config.yaml and update with your settings
+
+server:
+  port: "8082"
+  host: "0.0.0.0"
+  read_timeout: 30
+  write_timeout: 30
+  idle_timeout: 120
+
+database:
+  host: "localhost"
+  port: "5432"
+  name: "document_service"
+  user: "postgres"
+  password: "password"
+  ssl_mode: "disable"
+  max_open_conns: 25
+  max_idle_conns: 10
+  max_lifetime: 300
+
+storage:
+  provider: "aws"  # aws, azure, gcp
+  default_bucket: "tesseract-documents"
+  max_file_size: 104857600  # 100MB in bytes
+  validate_file_type: true
+  enable_virus_scanning: false
+  enable_thumbnails: false
+  default_cache_control: "public, max-age=3600"
+  
+  # Allowed MIME types (empty array = allow all)
+  allowed_mime_types:
+    - "image/*"
+    - "application/pdf"
+    - "text/*"
+    - "application/json"
+    - "application/zip"
+    - "application/vnd.ms-*"
+    - "application/vnd.openxmlformats-*"
+  
+  # AWS S3 Configuration
+  aws:
+    region: "us-east-1"
+    # access_key_id: ""  # Use IAM roles or env vars instead
+    # secret_access_key: ""  # Use IAM roles or env vars instead
+    # endpoint: ""  # For S3-compatible services
+    # force_path_style: false
+    storage_class: "STANDARD"
+    server_side_encryption: "AES256"
+    # kms_key_id: ""  # Required if using aws:kms encryption
+  
+  # Azure Blob Storage Configuration
+  azure:
+    account_name: "your-storage-account"
+    # account_key: ""  # Use env vars
+    # sas_token: ""
+    # connection_string: ""
+    access_tier: "Hot"
+    blob_type: "BlockBlob"
+  
+  # Google Cloud Storage Configuration
+  gcp:
+    project_id: "your-project-id"
+    # key_filename: "/path/to/service-account.json"
+    storage_class: "STANDARD"
+    uniform_bucket_level_access: true
+
+logging:
+  level: "info"  # debug, info, warn, error
+  format: "json"  # json, text
+  output: "stdout"  # stdout, file
+  time_format: "2006-01-02T15:04:05Z07:00"
+
+security:
+  enable_cors: true
+  allowed_origins:
+    - "http://localhost:3000"
+    - "https://your-frontend-domain.com"
+  allowed_headers:
+    - "Origin"
+    - "Content-Type"
+    - "Authorization"
+    - "X-Tenant-ID"
+    - "X-User-ID"
+  allowed_methods:
+    - "GET"
+    - "POST"
+    - "PUT"
+    - "PATCH"
+    - "DELETE"
+    - "OPTIONS"
+  enable_tls: false
+  # tls_cert_file: "/path/to/cert.pem"
+  # tls_key_file: "/path/to/key.pem"
+  enable_auth: true
+  # jwt_secret: "your-jwt-secret"
+  enable_rate_limit: true
+  rate_limit_per_min: 100

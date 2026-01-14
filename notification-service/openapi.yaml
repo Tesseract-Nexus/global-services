@@ -1,0 +1,249 @@
+openapi: 3.0.3
+info:
+  title: Notification Service API
+  description: Email and SMS notification delivery service
+  version: 1.0.0
+servers:
+  - url: http://localhost:8090
+    description: Local development
+tags:
+  - name: Notifications
+  - name: Templates
+  - name: Preferences
+
+paths:
+  /api/v1/notifications/send:
+    post:
+      tags: [Notifications]
+      summary: Send notification
+      operationId: sendNotification
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendNotificationRequest'
+      responses:
+        '200':
+          description: Notification sent
+
+  /api/v1/notifications/send-bulk:
+    post:
+      tags: [Notifications]
+      summary: Send bulk notifications
+      operationId: sendBulkNotifications
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Notifications queued
+
+  /api/v1/notifications:
+    get:
+      tags: [Notifications]
+      summary: List notifications
+      operationId: listNotifications
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: recipient
+          in: query
+          schema:
+            type: string
+        - name: channel
+          in: query
+          schema:
+            type: string
+            enum: [email, sms, push]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, sent, delivered, failed]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Notifications list
+
+  /api/v1/notifications/{id}:
+    get:
+      tags: [Notifications]
+      summary: Get notification
+      operationId: getNotification
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Notification details
+
+  /api/v1/notifications/{id}/resend:
+    post:
+      tags: [Notifications]
+      summary: Resend notification
+      operationId: resendNotification
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Notification resent
+
+  /api/v1/templates:
+    post:
+      tags: [Templates]
+      summary: Create template
+      operationId: createTemplate
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: Template created
+    get:
+      tags: [Templates]
+      summary: List templates
+      operationId: listTemplates
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Templates list
+
+  /api/v1/templates/{id}:
+    get:
+      tags: [Templates]
+      summary: Get template
+      operationId: getTemplate
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Template details
+    put:
+      tags: [Templates]
+      summary: Update template
+      operationId: updateTemplate
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Template updated
+    delete:
+      tags: [Templates]
+      summary: Delete template
+      operationId: deleteTemplate
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Template deleted
+
+  /api/v1/preferences/{userId}:
+    get:
+      tags: [Preferences]
+      summary: Get user preferences
+      operationId: getUserPreferences
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: User preferences
+    put:
+      tags: [Preferences]
+      summary: Update preferences
+      operationId: updateUserPreferences
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Preferences updated
+
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: Healthy
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    SendNotificationRequest:
+      type: object
+      required: [channel, recipient, templateId]
+      properties:
+        channel:
+          type: string
+          enum: [email, sms, push]
+        recipient:
+          type: string
+        templateId:
+          type: string
+        variables:
+          type: object
+        priority:
+          type: string
+          enum: [low, normal, high]
+          default: normal

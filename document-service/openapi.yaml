@@ -1,0 +1,260 @@
+openapi: 3.0.3
+info:
+  title: Document Service API
+  description: File storage and management (S3, GCS, Azure Blob)
+  version: 1.0.0
+servers:
+  - url: http://localhost:8094
+    description: Local development
+tags:
+  - name: Documents
+  - name: Storage
+
+paths:
+  /api/v1/documents/upload:
+    post:
+      tags: [Documents]
+      summary: Upload document
+      operationId: uploadDocument
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                bucket:
+                  type: string
+                path:
+                  type: string
+      responses:
+        '200':
+          description: Document uploaded
+
+  /api/v1/documents:
+    get:
+      tags: [Documents]
+      summary: List documents
+      operationId: listDocuments
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: bucket
+          in: query
+          schema:
+            type: string
+        - name: prefix
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Documents list
+
+  /api/v1/documents/presigned-url:
+    post:
+      tags: [Documents]
+      summary: Generate presigned URL
+      operationId: generatePresignedUrl
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                bucket:
+                  type: string
+                path:
+                  type: string
+                operation:
+                  type: string
+                  enum: [upload, download]
+                expires_in:
+                  type: integer
+      responses:
+        '200':
+          description: Presigned URL
+
+  /api/v1/documents/copy:
+    post:
+      tags: [Documents]
+      summary: Copy document
+      operationId: copyDocument
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Document copied
+
+  /api/v1/documents/move:
+    post:
+      tags: [Documents]
+      summary: Move document
+      operationId: moveDocument
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Document moved
+
+  /api/v1/documents/batch/delete:
+    post:
+      tags: [Documents]
+      summary: Batch delete documents
+      operationId: batchDeleteDocuments
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Documents deleted
+
+  /api/v1/documents/{bucket}/metadata/{path}:
+    get:
+      tags: [Documents]
+      summary: Get document metadata
+      operationId: getDocumentMetadata
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: bucket
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Document metadata
+    patch:
+      tags: [Documents]
+      summary: Update document metadata
+      operationId: updateDocumentMetadata
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: bucket
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Metadata updated
+
+  /api/v1/documents/{bucket}/exists/{path}:
+    get:
+      tags: [Documents]
+      summary: Check if document exists
+      operationId: documentExists
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: bucket
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Exists check result
+
+  /api/v1/documents/{bucket}/file/{path}:
+    get:
+      tags: [Documents]
+      summary: Download document
+      operationId: downloadDocument
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: bucket
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Document file
+    delete:
+      tags: [Documents]
+      summary: Delete document
+      operationId: deleteDocument
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: bucket
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Document deleted
+
+  /api/v1/storage/usage:
+    get:
+      tags: [Storage]
+      summary: Get storage usage
+      operationId: getStorageUsage
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Storage usage
+
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: Healthy
+
+  /health/ready:
+    get:
+      summary: Readiness check
+      responses:
+        '200':
+          description: Ready
+
+  /health/live:
+    get:
+      summary: Liveness check
+      responses:
+        '200':
+          description: Alive
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

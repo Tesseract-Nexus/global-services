@@ -1,0 +1,191 @@
+openapi: 3.0.3
+info:
+  title: Analytics Service API
+  description: Business analytics and reporting for sales, inventory, customers, and financials
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+    description: Local development
+tags:
+  - name: Sales
+  - name: Inventory
+  - name: Customers
+  - name: Financial
+  - name: Export
+
+paths:
+  /api/v1/analytics/sales:
+    get:
+      tags: [Sales]
+      summary: Get sales dashboard
+      operationId: getSalesDashboard
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: preset
+          in: query
+          schema:
+            type: string
+            enum: [today, yesterday, last7days, last30days, thisMonth, lastMonth, thisYear]
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Sales dashboard data
+
+  /api/v1/analytics/sales/export:
+    get:
+      tags: [Export]
+      summary: Export sales data
+      operationId: exportSales
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [json, csv]
+            default: json
+      responses:
+        '200':
+          description: Export file
+
+  /api/v1/analytics/inventory:
+    get:
+      tags: [Inventory]
+      summary: Get inventory report
+      operationId: getInventoryReport
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Inventory report data
+
+  /api/v1/analytics/inventory/export:
+    get:
+      tags: [Export]
+      summary: Export inventory data
+      operationId: exportInventory
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [json, csv]
+            default: json
+      responses:
+        '200':
+          description: Export file
+
+  /api/v1/analytics/customers:
+    get:
+      tags: [Customers]
+      summary: Get customer analytics
+      operationId: getCustomerAnalytics
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: preset
+          in: query
+          schema:
+            type: string
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Customer analytics data
+
+  /api/v1/analytics/customers/export:
+    get:
+      tags: [Export]
+      summary: Export customer data
+      operationId: exportCustomers
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [json, csv]
+            default: json
+      responses:
+        '200':
+          description: Export file
+
+  /api/v1/analytics/financial:
+    get:
+      tags: [Financial]
+      summary: Get financial report
+      operationId: getFinancialReport
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: preset
+          in: query
+          schema:
+            type: string
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Financial report data
+
+  /api/v1/analytics/financial/export:
+    get:
+      tags: [Export]
+      summary: Export financial data
+      operationId: exportFinancial
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [json, csv]
+            default: json
+      responses:
+        '200':
+          description: Export file
+
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: Healthy
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

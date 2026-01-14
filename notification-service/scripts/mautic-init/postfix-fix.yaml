@@ -1,0 +1,46 @@
+# Postfix Sender Rewriting Fix for Postal -> Postfix -> AWS SES relay
+# This ConfigMap and deployment patch fix the sender address rewriting issue
+# where Postfix was using postal-relay.email.svc.cluster.local instead of tesserix.app
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postfix-generic-maps
+  namespace: email
+  labels:
+    app.kubernetes.io/name: postal
+    app.kubernetes.io/component: postfix-relay
+    app.kubernetes.io/part-of: tesseract-hub
+  annotations:
+    description: "Postfix sender address rewriting maps for AWS SES relay"
+data:
+  generic: |
+    # Rewrite any internal addresses to tesserix.app domain
+    # This ensures AWS SES accepts emails from verified domain
+    /^(.*)@postal-relay\.email\.svc\.cluster\.local$/    ${1}@tesserix.app
+    /^(.*)@localhost$/    ${1}@tesserix.app
+    /^(.*)@localhost\.localdomain$/    ${1}@tesserix.app
+    # Catch-all for any unknown internal domains
+    /@.*\.svc\.cluster\.local$/    noreply@tesserix.app
+
+---
+# Note: The deployment patch should be applied via Helm values or kubectl patch
+#
+# Required environment variables for postfix-relay container:
+#   - name: POSTFIX_myorigin
+#     value: "tesserix.app"
+#   - name: POSTFIX_smtp_generic_maps
+#     value: "regexp:/etc/postfix/generic"
+#
+# Required volume mount for postfix-relay container:
+#   volumeMounts:
+#     - name: postfix-generic
+#       mountPath: /etc/postfix/generic
+#       subPath: generic
+#
+# Required volume in pod spec:
+#   volumes:
+#     - name: postfix-generic
+#       configMap:
+#         name: postfix-generic-maps

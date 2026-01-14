@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  qr-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - GIN_MODE=debug
+      - LOG_LEVEL=debug
+      - STORAGE_PROVIDER=local
+      - LOCAL_STORAGE_PATH=/tmp/qr-codes
+      - ENCRYPTION_ENABLED=true
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-your-secret-encryption-key-here}
+      - QR_DEFAULT_SIZE=256
+      - QR_MAX_SIZE=1024
+      - QR_MIN_SIZE=64
+      - QR_DEFAULT_QUALITY=medium
+    volumes:
+      - qr-storage:/tmp/qr-codes
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - qr-network
+
+  qr-service-gcs:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8080"
+    environment:
+      - PORT=8080
+      - GIN_MODE=release
+      - LOG_LEVEL=info
+      - STORAGE_PROVIDER=gcs
+      - GCS_BUCKET_NAME=${GCS_BUCKET_NAME}
+      - GCS_BASE_PATH=qr-codes
+      - GCS_PUBLIC_URL=https://storage.googleapis.com
+      - ENCRYPTION_ENABLED=true
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/gcs-key.json
+    volumes:
+      - ${GCS_CREDENTIALS_PATH:-./credentials}:/app/credentials:ro
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - qr-network
+    profiles:
+      - gcs
+
+volumes:
+  qr-storage:
+
+networks:
+  qr-network:
+    driver: bridge

@@ -1,0 +1,340 @@
+{{define "header"}}
+<!-- Logo -->
+<tr>
+    <td style="text-align: center; padding-bottom: 24px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+            <tr>
+                {{if eq .ReviewStatus "APPROVED"}}
+                <td style="background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
+                {{else if eq .ReviewStatus "REJECTED"}}
+                <td style="background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
+                {{else}}
+                <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
+                {{end}}
+                    <span style="color: #ffffff; font-size: 24px; font-weight: 700;">{{if .BusinessInitial}}{{.BusinessInitial}}{{else}}T{{end}}</span>
+                </td>
+            </tr>
+        </table>
+        {{if .BusinessName}}
+        <p style="margin: 12px 0 0 0; font-size: 18px; font-weight: 600; color: #18181b; letter-spacing: -0.3px;">{{.BusinessName}}</p>
+        {{end}}
+    </td>
+</tr>
+{{end}}
+
+{{define "content"}}
+<!-- Main Card -->
+<tr>
+    <td>
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1); overflow: hidden;">
+
+            <!-- Dynamic Header based on ReviewStatus -->
+            <tr>
+                {{if eq .ReviewStatus "SUBMITTED"}}
+                <td style="background: linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%); padding: 48px 40px; text-align: center;" class="mobile-padding">
+                    <span style="font-size: 56px; display: block; margin-bottom: 16px;">&#11088;</span>
+                    <h1 style="margin: 0 0 8px 0; font-size: 28px; font-weight: 700; color: #ffffff; line-height: 1.2;">
+                        Thanks for Your Review!
+                    </h1>
+                    <p style="margin: 0; font-size: 16px; color: rgba(255,255,255,0.9);">
+                        We've received your feedback for {{.ProductName}}
+                    </p>
+                </td>
+                {{else if eq .ReviewStatus "APPROVED"}}
+                <td style="background: linear-gradient(135deg, #22c55e 0%, #16a34a 50%, #15803d 100%); padding: 48px 40px; text-align: center;" class="mobile-padding">
+                    <span style="font-size: 56px; display: block; margin-bottom: 16px;">&#127881;</span>
+                    <h1 style="margin: 0 0 8px 0; font-size: 28px; font-weight: 700; color: #ffffff; line-height: 1.2;">
+                        Your Review is Live!
+                    </h1>
+                    <p style="margin: 0; font-size: 16px; color: rgba(255,255,255,0.9);">
+                        Thank you for sharing your experience with {{.ProductName}}
+                    </p>
+                </td>
+                {{else if eq .ReviewStatus "REJECTED"}}
+                <td style="background: linear-gradient(135deg, #6366f1 0%, #4f46e5 50%, #4338ca 100%); padding: 48px 40px; text-align: center;" class="mobile-padding">
+                    <span style="font-size: 48px; display: block; margin-bottom: 16px;">&#128172;</span>
+                    <h1 style="margin: 0 0 8px 0; font-size: 26px; font-weight: 700; color: #ffffff; line-height: 1.2;">
+                        Review Update
+                    </h1>
+                    <p style="margin: 0; font-size: 16px; color: rgba(255,255,255,0.9);">
+                        We couldn't publish your review for {{.ProductName}}
+                    </p>
+                </td>
+                {{else}}
+                <td style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); padding: 48px 40px; text-align: center;" class="mobile-padding">
+                    <span style="font-size: 56px; display: block; margin-bottom: 16px;">&#11088;</span>
+                    <h1 style="margin: 0 0 8px 0; font-size: 28px; font-weight: 700; color: #ffffff; line-height: 1.2;">
+                        Review Update
+                    </h1>
+                    <p style="margin: 0; font-size: 16px; color: rgba(255,255,255,0.9);">
+                        Here's an update on your review for {{.ProductName}}
+                    </p>
+                </td>
+                {{end}}
+            </tr>
+
+            {{if eq .ReviewStatus "APPROVED"}}
+            <!-- Success Message for Approved -->
+            <tr>
+                <td style="padding: 32px 40px 0 40px;" class="mobile-padding">
+                    <p style="margin: 0; font-size: 16px; color: #3f3f46; line-height: 1.6; text-align: center;">
+                        Great news{{if .CustomerName}}, {{.CustomerName}}{{end}}! Your review has been approved and is now visible to other customers.
+                    </p>
+                </td>
+            </tr>
+            {{end}}
+
+            {{if eq .ReviewStatus "REJECTED"}}
+            <!-- Explanation for Rejected -->
+            <tr>
+                <td style="padding: 32px 40px 0 40px;" class="mobile-padding">
+                    <p style="margin: 0; font-size: 16px; color: #3f3f46; line-height: 1.6;">
+                        Hi{{if .CustomerName}} {{.CustomerName}}{{end}},
+                    </p>
+                    <p style="margin: 16px 0 0 0; font-size: 15px; color: #52525b; line-height: 1.6;">
+                        Thank you for taking the time to share your feedback. Unfortunately, we weren't able to publish your review as it didn't meet our community guidelines.
+                    </p>
+                </td>
+            </tr>
+
+            {{if .RejectReason}}
+            <!-- Reason Box for Rejected -->
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); border-radius: 12px; border-left: 4px solid #ef4444;">
+                        <tr>
+                            <td style="padding: 20px;">
+                                <p style="margin: 0 0 8px 0; font-size: 13px; font-weight: 600; color: #991b1b; text-transform: uppercase; letter-spacing: 0.5px;">Reason</p>
+                                <p style="margin: 0; font-size: 15px; color: #7f1d1d; line-height: 1.6;">
+                                    {{.RejectReason}}
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+            {{end}}
+            {{end}}
+
+            <!-- Review Card -->
+            <tr>
+                <td style="padding: {{if eq .ReviewStatus "REJECTED"}}24px{{else}}32px{{end}} 40px 0 40px;" class="mobile-padding">
+                    {{if eq .ReviewStatus "REJECTED"}}
+                    <p style="margin: 0 0 12px 0; font-size: 13px; font-weight: 600; color: #71717a; text-transform: uppercase; letter-spacing: 0.5px;">Your Original Review</p>
+                    {{end}}
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="{{if eq .ReviewStatus "APPROVED"}}background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1px solid #bbf7d0;{{else if eq .ReviewStatus "REJECTED"}}background: #f9fafb;{{else}}background: #f4f4f5;{{end}} border-radius: 12px;">
+                        <tr>
+                            <td style="padding: 24px;">
+                                {{if eq .ReviewStatus "APPROVED"}}
+                                <!-- Published Badge -->
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin-bottom: 16px;">
+                                    <tr>
+                                        <td style="background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); border-radius: 20px; padding: 6px 16px;">
+                                            <span style="font-size: 12px; color: #ffffff; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">&#10003; Published</span>
+                                        </td>
+                                    </tr>
+                                </table>
+                                {{end}}
+
+                                {{if ne .ReviewStatus "APPROVED"}}
+                                <!-- Product Name (not centered for non-approved) -->
+                                <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #71717a; text-transform: uppercase; letter-spacing: 0.5px;">Your Review For</p>
+                                <p style="margin: 0 0 16px 0; font-size: 18px; font-weight: 700; color: #18181b;">{{.ProductName}}</p>
+                                {{else}}
+                                <!-- Product Name (centered for approved) -->
+                                <p style="margin: 0 0 12px 0; font-size: 18px; font-weight: 700; color: #18181b; text-align: center;">{{.ProductName}}</p>
+                                {{end}}
+
+                                <!-- Rating -->
+                                <p style="margin: 0 0 16px 0; font-size: {{if eq .ReviewStatus "APPROVED"}}28{{else if eq .ReviewStatus "REJECTED"}}20{{else}}24{{end}}px; color: #f59e0b; letter-spacing: {{if eq .ReviewStatus "APPROVED"}}3{{else}}2{{end}}px; {{if eq .ReviewStatus "APPROVED"}}text-align: center;{{end}}">{{.RatingStars}}</p>
+
+                                {{if .ReviewTitle}}
+                                <!-- Review Title -->
+                                <p style="margin: 0 0 12px 0; font-size: {{if eq .ReviewStatus "REJECTED"}}15{{else}}16{{end}}px; font-weight: 600; color: #18181b; {{if eq .ReviewStatus "APPROVED"}}text-align: center;{{end}}">"{{.ReviewTitle}}"</p>
+                                {{end}}
+
+                                <!-- Review Content -->
+                                <p style="margin: 0; font-size: {{if eq .ReviewStatus "REJECTED"}}14{{else}}15{{end}}px; color: {{if eq .ReviewStatus "REJECTED"}}#52525b{{else}}#3f3f46{{end}}; line-height: 1.6; font-style: italic; {{if eq .ReviewStatus "APPROVED"}}text-align: center;{{end}}">
+                                    "{{.ReviewContent}}"
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            {{if eq .ReviewStatus "SUBMITTED"}}
+            <!-- Status Info for Submitted -->
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); border-radius: 12px;">
+                        <tr>
+                            <td style="padding: 20px; text-align: center;">
+                                <span style="font-size: 24px; display: block; margin-bottom: 8px;">&#128269;</span>
+                                <p style="margin: 0 0 4px 0; font-size: 14px; font-weight: 600; color: #1e40af;">Review Under Moderation</p>
+                                <p style="margin: 0; font-size: 13px; color: #3b82f6;">
+                                    Your review will be published once it passes our review guidelines.
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            {{if .IsVerified}}
+            <!-- Verified Purchase Badge -->
+            <tr>
+                <td style="padding: 16px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); border-radius: 20px; padding: 8px 16px;">
+                                <span style="font-size: 13px; color: #166534; font-weight: 600;">&#10003; Verified Purchase</span>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+            {{end}}
+
+            <!-- Thank You Message for Submitted -->
+            <tr>
+                <td style="padding: 24px 40px;" class="mobile-padding">
+                    <p style="margin: 0; font-size: 15px; color: #71717a; text-align: center; line-height: 1.6;">
+                        Thank you for taking the time to share your experience. Your feedback helps other customers make informed decisions.
+                    </p>
+                </td>
+            </tr>
+            {{end}}
+
+            {{if eq .ReviewStatus "REJECTED"}}
+            <!-- What You Can Do for Rejected -->
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <p style="margin: 0 0 16px 0; font-size: 15px; font-weight: 600; color: #18181b;">What you can do:</p>
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                        <tr>
+                            <td style="padding-bottom: 12px;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 32px; vertical-align: top;">
+                                            <div style="width: 24px; height: 24px; background: #dbeafe; border-radius: 6px; text-align: center; line-height: 24px;">
+                                                <span style="font-size: 12px; color: #2563eb; font-weight: 700;">1</span>
+                                            </div>
+                                        </td>
+                                        <td style="vertical-align: top; padding-left: 8px;">
+                                            <p style="margin: 0; font-size: 14px; color: #3f3f46; line-height: 1.5;">
+                                                <strong>Submit a new review</strong> - Make sure it focuses on your genuine experience with the product
+                                            </p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding-bottom: 12px;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 32px; vertical-align: top;">
+                                            <div style="width: 24px; height: 24px; background: #dbeafe; border-radius: 6px; text-align: center; line-height: 24px;">
+                                                <span style="font-size: 12px; color: #2563eb; font-weight: 700;">2</span>
+                                            </div>
+                                        </td>
+                                        <td style="vertical-align: top; padding-left: 8px;">
+                                            <p style="margin: 0; font-size: 14px; color: #3f3f46; line-height: 1.5;">
+                                                <strong>Check our guidelines</strong> - Review our community guidelines for helpful tips
+                                            </p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 32px; vertical-align: top;">
+                                            <div style="width: 24px; height: 24px; background: #dbeafe; border-radius: 6px; text-align: center; line-height: 24px;">
+                                                <span style="font-size: 12px; color: #2563eb; font-weight: 700;">3</span>
+                                            </div>
+                                        </td>
+                                        <td style="vertical-align: top; padding-left: 8px;">
+                                            <p style="margin: 0; font-size: 14px; color: #3f3f46; line-height: 1.5;">
+                                                <strong>Contact us</strong> - If you believe this was an error, please reach out to our support team
+                                            </p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+            {{end}}
+
+            {{if eq .ReviewStatus "APPROVED"}}
+            <!-- View Review Button for Approved -->
+            <tr>
+                <td style="padding: 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="background: linear-gradient(135deg, #18181b 0%, #27272a 100%); border-radius: 10px; box-shadow: 0 4px 14px rgba(0,0,0,0.15);">
+                                <a href="{{.ProductURL}}" style="display: inline-block; padding: 16px 40px; font-size: 15px; font-weight: 600; color: #ffffff; text-decoration: none;">
+                                    View Your Review &#8594;
+                                </a>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- Thank You Message for Approved -->
+            <tr>
+                <td style="padding: 0 40px 32px 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background: #fafafa; border-radius: 12px;">
+                        <tr>
+                            <td style="padding: 20px; text-align: center;">
+                                <span style="font-size: 24px; display: block; margin-bottom: 8px;">&#128150;</span>
+                                <p style="margin: 0; font-size: 14px; color: #71717a; line-height: 1.5;">
+                                    Your feedback helps other customers make informed decisions and helps us improve our products and services.
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+            {{end}}
+
+            {{if eq .ReviewStatus "REJECTED"}}
+            <!-- CTA Button for Rejected -->
+            <tr>
+                <td style="padding: 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="background: linear-gradient(135deg, #18181b 0%, #27272a 100%); border-radius: 10px; box-shadow: 0 4px 14px rgba(0,0,0,0.15);">
+                                <a href="{{.ProductURL}}" style="display: inline-block; padding: 16px 40px; font-size: 15px; font-weight: 600; color: #ffffff; text-decoration: none;">
+                                    Write a New Review &#8594;
+                                </a>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+            {{end}}
+        </table>
+    </td>
+</tr>
+{{end}}
+
+{{define "footer"}}
+<!-- Footer -->
+<tr>
+    <td style="padding: 32px 20px; text-align: center;">
+        <p style="margin: 0 0 12px 0; font-size: 13px; color: #71717a;">
+            Need help? <a href="mailto:{{.SupportEmail}}" style="color: {{if eq .ReviewStatus "APPROVED"}}#22c55e{{else if eq .ReviewStatus "REJECTED"}}#6366f1{{else}}#10b981{{end}}; text-decoration: none; font-weight: 500;">Contact us</a>
+        </p>
+        <p style="margin: 0; font-size: 12px; color: #a1a1aa;">
+            &copy; {{.Year}} {{.BusinessName}}. All rights reserved.
+        </p>
+    </td>
+</tr>
+{{end}}

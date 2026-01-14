@@ -1,0 +1,204 @@
+openapi: 3.0.3
+info:
+  title: Verification Service API
+  description: OTP verification and transactional email service
+  version: 1.0.0
+servers:
+  - url: http://localhost:8088
+    description: Local development
+tags:
+  - name: Verification
+  - name: Email
+  - name: Health
+
+paths:
+  /api/v1/verify/send:
+    post:
+      tags: [Verification]
+      summary: Send verification code
+      operationId: sendVerificationCode
+      security:
+        - apiKey: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendVerificationRequest'
+      responses:
+        '200':
+          description: Code sent
+        '429':
+          description: Rate limit exceeded
+
+  /api/v1/verify/code:
+    post:
+      tags: [Verification]
+      summary: Verify code
+      operationId: verifyCode
+      security:
+        - apiKey: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyCodeRequest'
+      responses:
+        '200':
+          description: Verification result
+        '400':
+          description: Invalid or expired code
+
+  /api/v1/verify/resend:
+    post:
+      tags: [Verification]
+      summary: Resend verification code
+      operationId: resendVerificationCode
+      security:
+        - apiKey: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResendVerificationRequest'
+      responses:
+        '200':
+          description: Code resent
+        '429':
+          description: Rate limit exceeded
+
+  /api/v1/verify/status:
+    get:
+      tags: [Verification]
+      summary: Check verification status
+      operationId: getVerificationStatus
+      security:
+        - apiKey: []
+      parameters:
+        - name: recipient
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: purpose
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Verification status
+
+  /api/v1/email/send:
+    post:
+      tags: [Email]
+      summary: Send templated email
+      operationId: sendEmail
+      security:
+        - apiKey: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendEmailRequest'
+      responses:
+        '200':
+          description: Email sent
+
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Healthy
+
+  /ready:
+    get:
+      tags: [Health]
+      summary: Readiness check
+      operationId: readinessCheck
+      responses:
+        '200':
+          description: Ready
+
+  /metrics:
+    get:
+      tags: [Health]
+      summary: Prometheus metrics
+      operationId: getMetrics
+      responses:
+        '200':
+          description: Metrics
+
+components:
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  schemas:
+    SendVerificationRequest:
+      type: object
+      required: [recipient, channel, purpose]
+      properties:
+        recipient:
+          type: string
+        channel:
+          type: string
+          enum: [email, sms]
+        purpose:
+          type: string
+        session_id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        metadata:
+          type: object
+
+    VerifyCodeRequest:
+      type: object
+      required: [recipient, code, purpose]
+      properties:
+        recipient:
+          type: string
+        code:
+          type: string
+        purpose:
+          type: string
+
+    ResendVerificationRequest:
+      type: object
+      required: [recipient, purpose]
+      properties:
+        recipient:
+          type: string
+        purpose:
+          type: string
+
+    SendEmailRequest:
+      type: object
+      required: [recipient, email_type]
+      properties:
+        recipient:
+          type: string
+        email_type:
+          type: string
+          enum: [welcome, account_created, email_verification_link, welcome_pack]
+        first_name:
+          type: string
+        business_name:
+          type: string
+        subdomain:
+          type: string
+        tenant_slug:
+          type: string
+        admin_url:
+          type: string
+        storefront_url:
+          type: string
+        verification_link:
+          type: string

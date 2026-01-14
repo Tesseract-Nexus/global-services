@@ -1,0 +1,1062 @@
+openapi: 3.0.3
+info:
+  title: Tenant Service API
+  description: |
+    Multi-tenant management and onboarding service for Tesseract Hub.
+    Handles tenant creation, user-tenant relationships, onboarding flows, and session management.
+  version: 1.0.0
+  contact:
+    name: Tesseract Hub Team
+    email: support@tesserix.app
+  license:
+    name: Proprietary
+    url: https://tesserix.app/license
+
+servers:
+  - url: https://api.tesserix.app/tenant-service
+    description: Production
+  - url: https://dev-api.tesserix.app/tenant-service
+    description: Development
+  - url: http://localhost:8086
+    description: Local Development
+
+tags:
+  - name: Health
+    description: Health check endpoints
+  - name: Onboarding
+    description: Tenant onboarding flow management
+  - name: Verification
+    description: Email/phone verification
+  - name: Validation
+    description: Subdomain and domain validation
+  - name: Draft
+    description: Draft form data management
+  - name: Tenants
+    description: Tenant management
+  - name: Users
+    description: User-tenant relationships
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Liveness check
+      description: Returns 200 if the service is alive
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /ready:
+    get:
+      tags: [Health]
+      summary: Readiness check
+      description: Returns 200 if the service is ready to accept traffic
+      operationId: readinessCheck
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ready
+                  database:
+                    type: string
+                    example: connected
+
+  /api/v1/onboarding/sessions:
+    post:
+      tags: [Onboarding]
+      summary: Start new onboarding session
+      description: Creates a new onboarding session for tenant registration
+      operationId: startOnboarding
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartOnboardingRequest'
+            example:
+              application_type: ecommerce
+      responses:
+        '201':
+          description: Session created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnboardingSessionResponse'
+              example:
+                success: true
+                message: Onboarding session started
+                data:
+                  id: "550e8400-e29b-41d4-a716-446655440000"
+                  application_type: ecommerce
+                  status: started
+                  progress_percentage: 0
+                  expires_at: "2024-12-27T12:00:00Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/onboarding/sessions/{sessionId}:
+    get:
+      tags: [Onboarding]
+      summary: Get onboarding session
+      description: Retrieves the current state of an onboarding session
+      operationId: getOnboardingSession
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Session retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnboardingSessionResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/onboarding/sessions/{sessionId}/business-information:
+    post:
+      tags: [Onboarding]
+      summary: Save business information
+      description: Saves business information for the onboarding session
+      operationId: saveBusinessInformation
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BusinessInformationRequest'
+            example:
+              business_name: "My Amazing Store"
+              business_type: "llc"
+              industry: "Fashion & Apparel"
+              business_description: "Online fashion store"
+              website: "https://mystore.com"
+              has_existing_store: false
+      responses:
+        '200':
+          description: Business information saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/onboarding/sessions/{sessionId}/contact-information:
+    post:
+      tags: [Onboarding]
+      summary: Save contact information
+      description: Saves primary contact details for the onboarding session
+      operationId: saveContactInformation
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContactInformationRequest'
+            example:
+              first_name: "John"
+              last_name: "Doe"
+              email: "john@example.com"
+              phone: "+1234567890"
+              phone_country_code: "+1"
+              position: "CEO/Founder"
+      responses:
+        '200':
+          description: Contact information saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/onboarding/sessions/{sessionId}/business-addresses:
+    post:
+      tags: [Onboarding]
+      summary: Save business address
+      description: Saves business and optional billing address
+      operationId: saveBusinessAddress
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BusinessAddressRequest'
+            example:
+              street_address: "123 Main Street"
+              city: "New York"
+              state_province: "NY"
+              postal_code: "10001"
+              country: "US"
+              address_type: "business"
+              billing_same_as_business: true
+      responses:
+        '200':
+          description: Address saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/onboarding/sessions/{sessionId}/verification/email:
+    post:
+      tags: [Verification]
+      summary: Send email verification code
+      description: Sends a 6-digit OTP to the user's email address
+      operationId: sendEmailVerification
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+            example:
+              email: "john@example.com"
+      responses:
+        '200':
+          description: Verification code sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      expires_at:
+                        type: string
+                        format: date-time
+                      attempts_remaining:
+                        type: integer
+              example:
+                success: true
+                message: Verification code sent
+                data:
+                  expires_at: "2024-12-20T12:10:00Z"
+                  attempts_remaining: 3
+        '429':
+          description: Too many requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/onboarding/sessions/{sessionId}/verification/verify:
+    post:
+      tags: [Verification]
+      summary: Verify OTP code
+      description: Verifies the 6-digit OTP code sent to the user
+      operationId: verifyCode
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - code
+                - type
+              properties:
+                code:
+                  type: string
+                  pattern: '^\d{6}$'
+                type:
+                  type: string
+                  enum: [email, phone]
+            example:
+              code: "123456"
+              type: "email"
+      responses:
+        '200':
+          description: Code verified successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Invalid or expired code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: INVALID_OTP
+                  message: Invalid verification code
+
+  /api/v1/onboarding/sessions/{sessionId}/account-setup:
+    post:
+      tags: [Onboarding]
+      summary: Complete account setup
+      description: |
+        Final step of onboarding. Creates the tenant, user account, and returns auth tokens.
+        The user must have verified their email before calling this endpoint.
+      operationId: completeAccountSetup
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountSetupRequest'
+            example:
+              password: "SecurePass123!"
+              auth_method: "password"
+              timezone: "America/New_York"
+              currency: "USD"
+              business_model: "ONLINE_STORE"
+      responses:
+        '201':
+          description: Account created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountSetupResponse'
+              example:
+                success: true
+                message: Account created successfully
+                data:
+                  tenant_id: "550e8400-e29b-41d4-a716-446655440000"
+                  tenant_slug: "my-amazing-store"
+                  user_id: "660e8400-e29b-41d4-a716-446655440001"
+                  email: "john@example.com"
+                  business_name: "My Amazing Store"
+                  access_token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  refresh_token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  admin_url: "https://my-amazing-store-admin.tesserix.app"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Email not verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/onboarding/validate/subdomain:
+    post:
+      tags: [Validation]
+      summary: Validate subdomain availability
+      description: Checks if a subdomain/slug is available for use
+      operationId: validateSubdomain
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - subdomain
+              properties:
+                subdomain:
+                  type: string
+                  minLength: 3
+                  maxLength: 50
+                  pattern: '^[a-z0-9][a-z0-9-]*[a-z0-9]$'
+                session_id:
+                  type: string
+                  format: uuid
+            example:
+              subdomain: "my-store"
+              session_id: "550e8400-e29b-41d4-a716-446655440000"
+      responses:
+        '200':
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  available:
+                    type: boolean
+                  message:
+                    type: string
+                  suggestions:
+                    type: array
+                    items:
+                      type: string
+              example:
+                available: true
+                message: Subdomain is available
+                suggestions: []
+
+  /api/v1/onboarding/draft/save:
+    post:
+      tags: [Draft]
+      summary: Save draft form data
+      description: Saves the current form state as a draft for later recovery
+      operationId: saveDraft
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - session_id
+                - form_data
+              properties:
+                session_id:
+                  type: string
+                  format: uuid
+                form_data:
+                  type: object
+                current_step:
+                  type: integer
+            example:
+              session_id: "550e8400-e29b-41d4-a716-446655440000"
+              form_data:
+                businessInfo:
+                  businessName: "My Store"
+                  businessType: "llc"
+              current_step: 0
+      responses:
+        '200':
+          description: Draft saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /api/v1/onboarding/draft/{sessionId}:
+    get:
+      tags: [Draft]
+      summary: Get draft data
+      description: Retrieves saved draft form data
+      operationId: getDraft
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Draft retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      session_id:
+                        type: string
+                      form_data:
+                        type: object
+                      current_step:
+                        type: integer
+                      saved_at:
+                        type: string
+                        format: date-time
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Draft]
+      summary: Delete draft
+      description: Deletes saved draft data
+      operationId: deleteDraft
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Draft deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /api/v1/users/me/tenants:
+    get:
+      tags: [Users]
+      summary: Get user's tenants
+      description: Returns all tenants the authenticated user belongs to
+      operationId: getUserTenants
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Tenants retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  tenants:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TenantSummary'
+              example:
+                success: true
+                tenants:
+                  - id: "550e8400-e29b-41d4-a716-446655440000"
+                    name: "My Amazing Store"
+                    slug: "my-amazing-store"
+                    role: "owner"
+                    isDefault: true
+                    logoUrl: null
+                    primaryColor: "#3B82F6"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/tenants/{id}:
+    get:
+      tags: [Tenants]
+      summary: Get tenant by ID
+      description: Returns tenant details
+      operationId: getTenant
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Tenant retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/Tenant'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Tenants]
+      summary: Update tenant
+      description: Updates tenant settings
+      operationId: updateTenant
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTenantRequest'
+      responses:
+        '200':
+          description: Tenant updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      description: Onboarding session UUID
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    StartOnboardingRequest:
+      type: object
+      required:
+        - application_type
+      properties:
+        application_type:
+          type: string
+          enum: [ecommerce, saas, marketplace, b2b]
+          description: Type of application being onboarded
+
+    BusinessInformationRequest:
+      type: object
+      required:
+        - business_name
+        - business_type
+        - industry
+      properties:
+        business_name:
+          type: string
+          minLength: 2
+          maxLength: 255
+        business_type:
+          type: string
+          enum: [sole_proprietorship, partnership, llc, corporation, non_profit, other]
+        industry:
+          type: string
+        business_description:
+          type: string
+          maxLength: 1000
+        website:
+          type: string
+          format: uri
+        registration_number:
+          type: string
+        has_existing_store:
+          type: boolean
+          default: false
+        existing_store_platforms:
+          type: array
+          items:
+            type: string
+        migration_interest:
+          type: boolean
+
+    ContactInformationRequest:
+      type: object
+      required:
+        - first_name
+        - last_name
+        - email
+        - phone
+      properties:
+        first_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        last_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        phone_country_code:
+          type: string
+        position:
+          type: string
+
+    BusinessAddressRequest:
+      type: object
+      required:
+        - street_address
+        - city
+        - state_province
+        - postal_code
+        - country
+      properties:
+        street_address:
+          type: string
+        address_line_2:
+          type: string
+        city:
+          type: string
+        state_province:
+          type: string
+        postal_code:
+          type: string
+        country:
+          type: string
+        address_type:
+          type: string
+          enum: [business, billing, shipping]
+        billing_same_as_business:
+          type: boolean
+          default: true
+        billing_street_address:
+          type: string
+        billing_city:
+          type: string
+        billing_state:
+          type: string
+        billing_postal_code:
+          type: string
+        billing_country:
+          type: string
+
+    AccountSetupRequest:
+      type: object
+      required:
+        - password
+        - auth_method
+      properties:
+        password:
+          type: string
+          minLength: 8
+          description: User password (min 8 characters)
+        auth_method:
+          type: string
+          enum: [password, social]
+        timezone:
+          type: string
+          default: UTC
+        currency:
+          type: string
+          default: USD
+        business_model:
+          type: string
+          enum: [ONLINE_STORE, MARKETPLACE]
+          default: ONLINE_STORE
+
+    AccountSetupResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          type: object
+          properties:
+            tenant_id:
+              type: string
+              format: uuid
+            tenant_slug:
+              type: string
+            user_id:
+              type: string
+              format: uuid
+            email:
+              type: string
+            business_name:
+              type: string
+            access_token:
+              type: string
+            refresh_token:
+              type: string
+            admin_url:
+              type: string
+              format: uri
+
+    OnboardingSessionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/OnboardingSession'
+
+    OnboardingSession:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+          nullable: true
+        template_id:
+          type: string
+          format: uuid
+        application_type:
+          type: string
+        status:
+          type: string
+          enum: [started, in_progress, completed, failed, abandoned]
+        current_step:
+          type: string
+        progress_percentage:
+          type: integer
+        business_model:
+          type: string
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        expires_at:
+          type: string
+          format: date-time
+        business_information:
+          $ref: '#/components/schemas/BusinessInformation'
+        contact_information:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContactInformation'
+        business_addresses:
+          type: array
+          items:
+            $ref: '#/components/schemas/BusinessAddress'
+
+    BusinessInformation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        business_name:
+          type: string
+        business_type:
+          type: string
+        industry:
+          type: string
+        business_description:
+          type: string
+        website:
+          type: string
+        tenant_slug:
+          type: string
+        storefront_slug:
+          type: string
+
+    ContactInformation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        first_name:
+          type: string
+        last_name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        job_title:
+          type: string
+        is_primary_contact:
+          type: boolean
+
+    BusinessAddress:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        address_type:
+          type: string
+        street_address:
+          type: string
+        city:
+          type: string
+        state_province:
+          type: string
+        postal_code:
+          type: string
+        country:
+          type: string
+        is_primary:
+          type: boolean
+
+    Tenant:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        subdomain:
+          type: string
+        display_name:
+          type: string
+        logo_url:
+          type: string
+        business_type:
+          type: string
+        industry:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive, suspended]
+        mode:
+          type: string
+          enum: [development, production]
+        business_model:
+          type: string
+          enum: [ONLINE_STORE, MARKETPLACE]
+        primary_color:
+          type: string
+        secondary_color:
+          type: string
+        default_timezone:
+          type: string
+        default_currency:
+          type: string
+        pricing_tier:
+          type: string
+          enum: [free, starter, professional, enterprise]
+        owner_user_id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    TenantSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        role:
+          type: string
+          enum: [owner, admin, manager, member, viewer]
+        isDefault:
+          type: boolean
+        logoUrl:
+          type: string
+          nullable: true
+        primaryColor:
+          type: string
+
+    UpdateTenantRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        display_name:
+          type: string
+        logo_url:
+          type: string
+        primary_color:
+          type: string
+        secondary_color:
+          type: string
+        default_timezone:
+          type: string
+        default_currency:
+          type: string
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+
+  responses:
+    BadRequest:
+      description: Bad request - validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            error:
+              code: VALIDATION_ERROR
+              message: Invalid request payload
+
+    Unauthorized:
+      description: Unauthorized - missing or invalid token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            error:
+              code: UNAUTHORIZED
+              message: Invalid or expired token
+
+    Forbidden:
+      description: Forbidden - insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            error:
+              code: FORBIDDEN
+              message: Insufficient permissions
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            error:
+              code: NOT_FOUND
+              message: Resource not found

@@ -1,0 +1,219 @@
+{{define "header"}}
+<!-- Logo -->
+<tr>
+    <td style="text-align: center; padding-bottom: 24px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+            <tr>
+                <td style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
+                    <span style="color: #ffffff; font-size: 24px; font-weight: 700;">T</span>
+                </td>
+            </tr>
+        </table>
+        <p style="margin: 12px 0 0 0; font-size: 18px; font-weight: 600; color: #18181b; letter-spacing: -0.3px;">Tesseract Hub</p>
+    </td>
+</tr>
+{{end}}
+
+{{define "content"}}
+<!-- Main Card -->
+<tr>
+    <td>
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1); overflow: hidden;">
+
+            <!-- Welcome Header -->
+            <tr>
+                <td style="background: linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%); padding: 48px 40px; text-align: center;" class="mobile-padding">
+                    <span style="font-size: 56px; display: block; margin-bottom: 16px;">&#127881;</span>
+                    <h1 style="margin: 0 0 8px 0; font-size: 28px; font-weight: 700; color: #ffffff; line-height: 1.2;">
+                        Your Store is Ready!
+                    </h1>
+                    <p style="margin: 0; font-size: 16px; color: rgba(255,255,255,0.9);">
+                        {{.BusinessName}} is now live on Tesseract Hub
+                    </p>
+                </td>
+            </tr>
+
+            <!-- Welcome Message -->
+            <tr>
+                <td style="padding: 32px 40px 0 40px;" class="mobile-padding">
+                    <p style="margin: 0; font-size: 16px; color: #3f3f46; line-height: 1.6;">
+                        Congratulations! Your store <strong>{{.BusinessName}}</strong> has been successfully created. You're all set to start managing your business and reaching customers worldwide.
+                    </p>
+                </td>
+            </tr>
+
+            <!-- Quick Access URLs -->
+            <tr>
+                <td style="padding: 32px 40px 0 40px;" class="mobile-padding">
+                    <p style="margin: 0 0 16px 0; font-size: 14px; font-weight: 600; color: #18181b; text-transform: uppercase; letter-spacing: 0.5px;">Your Store URLs</p>
+
+                    <!-- Admin Panel URL -->
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 12px; background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%); border-radius: 12px; border: 1px solid #ddd6fe;">
+                        <tr>
+                            <td style="padding: 16px;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 44px; vertical-align: top;">
+                                            <div style="width: 36px; height: 36px; background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); border-radius: 8px; text-align: center; line-height: 36px;">
+                                                <span style="font-size: 18px;">&#9881;</span>
+                                            </div>
+                                        </td>
+                                        <td style="vertical-align: top; padding-left: 12px;">
+                                            <p style="margin: 0 0 2px 0; font-size: 13px; font-weight: 600; color: #5b21b6;">Admin Panel</p>
+                                            <a href="{{.AdminURL}}" style="font-size: 14px; color: #6d28d9; text-decoration: none; word-break: break-all;">{{.AdminURL}}</a>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <!-- Storefront URL -->
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border-radius: 12px; border: 1px solid #a7f3d0;">
+                        <tr>
+                            <td style="padding: 16px;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 44px; vertical-align: top;">
+                                            <div style="width: 36px; height: 36px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 8px; text-align: center; line-height: 36px;">
+                                                <span style="font-size: 18px;">&#128722;</span>
+                                            </div>
+                                        </td>
+                                        <td style="vertical-align: top; padding-left: 12px;">
+                                            <p style="margin: 0 0 2px 0; font-size: 13px; font-weight: 600; color: #047857;">Your Storefront</p>
+                                            <a href="{{.StorefrontURL}}" style="font-size: 14px; color: #059669; text-decoration: none; word-break: break-all;">{{.StorefrontURL}}</a>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- Quick Start Features -->
+            <tr>
+                <td style="padding: 32px 40px 0 40px;" class="mobile-padding">
+                    <p style="margin: 0 0 16px 0; font-size: 14px; font-weight: 600; color: #18181b; text-transform: uppercase; letter-spacing: 0.5px;">Quick Start Guide</p>
+
+                    <!-- Feature 1 -->
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 16px;">
+                        <tr>
+                            <td style="width: 48px; vertical-align: top;">
+                                <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); border-radius: 50%; text-align: center; line-height: 32px; font-size: 14px; font-weight: 700; color: #2563eb;">1</div>
+                            </td>
+                            <td style="vertical-align: top; padding-left: 12px;">
+                                <p style="margin: 0 0 4px 0; font-size: 14px; font-weight: 600; color: #18181b;">Add Your Products</p>
+                                <p style="margin: 0; font-size: 13px; color: #71717a; line-height: 1.4;">Upload your inventory, set prices, and configure variants</p>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <!-- Feature 2 -->
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 16px;">
+                        <tr>
+                            <td style="width: 48px; vertical-align: top;">
+                                <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); border-radius: 50%; text-align: center; line-height: 32px; font-size: 14px; font-weight: 700; color: #16a34a;">2</div>
+                            </td>
+                            <td style="vertical-align: top; padding-left: 12px;">
+                                <p style="margin: 0 0 4px 0; font-size: 14px; font-weight: 600; color: #18181b;">Configure Payments</p>
+                                <p style="margin: 0; font-size: 13px; color: #71717a; line-height: 1.4;">Connect Stripe, PayPal, or Razorpay to accept payments</p>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <!-- Feature 3 -->
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 16px;">
+                        <tr>
+                            <td style="width: 48px; vertical-align: top;">
+                                <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 50%; text-align: center; line-height: 32px; font-size: 14px; font-weight: 700; color: #d97706;">3</div>
+                            </td>
+                            <td style="vertical-align: top; padding-left: 12px;">
+                                <p style="margin: 0 0 4px 0; font-size: 14px; font-weight: 600; color: #18181b;">Set Up Shipping</p>
+                                <p style="margin: 0; font-size: 13px; color: #71717a; line-height: 1.4;">Define shipping zones, rates, and delivery options</p>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <!-- Feature 4 -->
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                        <tr>
+                            <td style="width: 48px; vertical-align: top;">
+                                <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%); border-radius: 50%; text-align: center; line-height: 32px; font-size: 14px; font-weight: 700; color: #db2777;">4</div>
+                            </td>
+                            <td style="vertical-align: top; padding-left: 12px;">
+                                <p style="margin: 0 0 4px 0; font-size: 14px; font-weight: 600; color: #18181b;">Customize Your Store</p>
+                                <p style="margin: 0; font-size: 13px; color: #71717a; line-height: 1.4;">Brand your storefront, add pages, and configure settings</p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- Account Info -->
+            <tr>
+                <td style="padding: 32px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background: #fafafa; border-radius: 12px; border: 1px solid #e4e4e7;">
+                        <tr>
+                            <td style="padding: 20px;">
+                                <p style="margin: 0 0 12px 0; font-size: 12px; font-weight: 600; color: #71717a; text-transform: uppercase; letter-spacing: 0.5px;">Account Details</p>
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="padding: 4px 0;">
+                                            <span style="font-size: 13px; color: #71717a;">Email:</span>
+                                            <span style="font-size: 13px; color: #18181b; font-weight: 500; padding-left: 8px;">{{.Email}}</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 4px 0;">
+                                            <span style="font-size: 13px; color: #71717a;">Store:</span>
+                                            <span style="font-size: 13px; color: #18181b; font-weight: 500; padding-left: 8px;">{{.BusinessName}}</span>
+                                        </td>
+                                    </tr>
+                                    {{if .TenantSlug}}
+                                    <tr>
+                                        <td style="padding: 4px 0;">
+                                            <span style="font-size: 13px; color: #71717a;">Store ID:</span>
+                                            <span style="font-size: 13px; color: #18181b; font-weight: 500; padding-left: 8px; font-family: 'SF Mono', monospace;">{{.TenantSlug}}</span>
+                                        </td>
+                                    </tr>
+                                    {{end}}
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- CTA Button -->
+            <tr>
+                <td style="padding: 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); border-radius: 10px; box-shadow: 0 4px 14px rgba(139, 92, 246, 0.3);">
+                                <a href="{{.AdminURL}}" style="display: inline-block; padding: 16px 40px; font-size: 15px; font-weight: 600; color: #ffffff; text-decoration: none;">
+                                    Open Admin Panel &#8594;
+                                </a>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </td>
+</tr>
+{{end}}
+
+{{define "footer"}}
+<!-- Footer -->
+<tr>
+    <td style="padding: 32px 20px; text-align: center;">
+        <p style="margin: 0 0 12px 0; font-size: 13px; color: #71717a;">
+            Need help getting started? <a href="mailto:{{.SupportEmail}}" style="color: #6366f1; text-decoration: none; font-weight: 500;">Contact our support team</a>
+        </p>
+        <p style="margin: 0; font-size: 12px; color: #a1a1aa;">
+            &copy; {{.Year}} Tesseract Hub. All rights reserved.
+        </p>
+    </td>
+</tr>
+{{end}}

@@ -1,0 +1,29 @@
+# DestinationRule for notification-hub WebSocket support
+# This configuration is critical for WebSocket connections to work properly
+# Key settings:
+# - h2UpgradePolicy: DO_NOT_UPGRADE - Prevents HTTP/2 upgrade which breaks WebSocket
+# - maxRequestsPerConnection: 0 - Unlimited requests for long-lived WebSocket connections
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: notification-hub-dr
+  namespace: devtest
+  labels:
+    app.kubernetes.io/managed-by: tenant-router-service
+    app.kubernetes.io/name: notification-hub
+spec:
+  host: notification-hub.devtest.svc.cluster.local
+  trafficPolicy:
+    connectionPool:
+      http:
+        # DO_NOT_UPGRADE is essential for WebSocket - HTTP/2 upgrade breaks WebSocket handshake
+        h2UpgradePolicy: DO_NOT_UPGRADE
+        http1MaxPendingRequests: 1000
+        http2MaxRequests: 1000
+        # 0 means unlimited - required for long-lived WebSocket connections
+        maxRequestsPerConnection: 0
+      tcp:
+        connectTimeout: 30s
+        maxConnections: 1000
+    tls:
+      mode: DISABLE
