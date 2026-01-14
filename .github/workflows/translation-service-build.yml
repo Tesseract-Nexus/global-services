@@ -30,8 +30,7 @@ env:
 jobs:
   build:
     name: Build and Push translation-service
-    runs-on:
-  workflow_dispatch: ubuntu-latest
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
@@ -96,8 +95,7 @@ jobs:
         run: |
           echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Application:
-  workflow_dispatch:** translation-service" >> $GITHUB_STEP_SUMMARY
+          echo "**Application:** translation-service" >> $GITHUB_STEP_SUMMARY
           echo "**Architecture:** AMD64" >> $GITHUB_STEP_SUMMARY
           echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
           echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
