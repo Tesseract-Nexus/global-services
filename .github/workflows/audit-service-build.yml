@@ -6,13 +6,11 @@ on:
     branches: [main, 'feat/**', 'bugfix/**']
     paths:
       - 'audit-service/**'
-      - 'packages/go-shared/**'
       - '.github/workflows/audit-service-build.yml'
   pull_request:
     branches: [main]
     paths:
       - 'audit-service/**'
-      - 'packages/go-shared/**'
       - '.github/workflows/audit-service-build.yml'
 
 env:

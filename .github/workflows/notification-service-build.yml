@@ -11,14 +11,12 @@ on:
       - 'hotfix/**'
     paths:
       - 'notification-service/**'
-      - 'packages/go-shared/**'
       - '.github/workflows/notification-service-build.yml'
   pull_request:
     branches:
       - main
     paths:
       - 'notification-service/**'
-      - 'packages/go-shared/**'
 
 permissions:
   contents: read

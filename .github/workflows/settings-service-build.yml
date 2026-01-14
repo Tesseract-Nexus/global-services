@@ -11,14 +11,12 @@ on:
       - 'hotfix/**'
     paths:
       - 'settings-service/**'
-      - 'packages/go-shared/**'
       - '.github/workflows/settings-service-build.yml'
   pull_request:
     branches:
       - main
     paths:
       - 'settings-service/**'
-      - 'packages/go-shared/**'
 
 permissions:
   contents: read

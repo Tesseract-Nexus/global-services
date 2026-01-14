@@ -10,14 +10,12 @@ on:
       - 'hotfix/**'
     paths:
       - 'document-service/**'
-      - 'packages/go-shared/**'
       - '.github/workflows/document-service-build.yml'
   pull_request:
     branches:
       - main
     paths:
       - 'document-service/**'
-      - 'packages/go-shared/**'
   workflow_dispatch:
 
 permissions:

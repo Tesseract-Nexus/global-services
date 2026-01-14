@@ -10,14 +10,12 @@ on:
       - 'hotfix/**'
     paths:
       - 'tenant-service/**'
-      - 'packages/go-shared/**'
       - '.github/workflows/tenant-service-build.yml'
   pull_request:
     branches:
       - main
     paths:
       - 'tenant-service/**'
-      - 'packages/go-shared/**'
   workflow_dispatch:
 
 permissions:

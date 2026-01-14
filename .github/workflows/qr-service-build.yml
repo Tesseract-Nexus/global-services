@@ -11,14 +11,12 @@ on:
       - 'hotfix/**'
     paths:
       - 'qr-service/**'
-      - 'packages/go-shared/**'
       - '.github/workflows/qr-service-build.yml'
   pull_request:
     branches:
       - main
     paths:
       - 'qr-service/**'
-      - 'packages/go-shared/**'
 
 permissions:
   contents: read

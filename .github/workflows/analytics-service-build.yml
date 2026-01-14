@@ -11,14 +11,12 @@ on:
       - 'hotfix/**'
     paths:
       - 'analytics-service/**'
-      - 'packages/go-shared/**'
       - '.github/workflows/analytics-service-build.yml'
   pull_request:
     branches:
       - main
     paths:
       - 'analytics-service/**'
-      - 'packages/go-shared/**'
 
 permissions:
   contents: read

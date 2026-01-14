@@ -11,14 +11,12 @@ on:
       - 'hotfix/**'
     paths:
       - 'feature-flags-service/**'
-      - 'packages/go-shared/**'
       - '.github/workflows/feature-flags-service-build.yml'
   pull_request:
     branches:
       - main
     paths:
       - 'feature-flags-service/**'
-      - 'packages/go-shared/**'
 
 permissions:
   contents: read
@@ -87,8 +85,6 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=feature-flags-service-v2
           cache-to: type=gha,mode=max,scope=feature-flags-service-v2
-          build-contexts: |
-            go-shared=packages/go-shared
 
       - name: Run Trivy vulnerability scanner
         if: github.event_name != 'pull_request'

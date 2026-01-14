@@ -11,14 +11,12 @@ on:
       - 'hotfix/**'
     paths:
       - 'location-service/**'
-      - 'packages/go-shared/**'
       - '.github/workflows/location-service-build.yml'
   pull_request:
     branches:
       - main
     paths:
       - 'location-service/**'
-      - 'packages/go-shared/**'
 
 permissions:
   contents: read
