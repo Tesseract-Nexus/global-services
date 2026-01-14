@@ -5,9 +5,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/tesseract-nexus/tesseract-hub/services/notification-service/internal/models"
-	"github.com/tesseract-nexus/tesseract-hub/services/notification-service/internal/repository"
-	"github.com/tesseract-nexus/tesseract-hub/services/notification-service/internal/template"
+	"notification-service/internal/models"
+	"notification-service/internal/repository"
+	"notification-service/internal/template"
 )
 
 // TemplateHandler handles template-related requests

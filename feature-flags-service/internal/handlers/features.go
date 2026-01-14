@@ -4,9 +4,9 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/tesseract-hub/feature-flags-service/internal/clients"
-	"github.com/tesseract-hub/feature-flags-service/internal/config"
-	gosharedmw "github.com/tesseract-hub/go-shared/middleware"
+	"feature-flags-service/internal/clients"
+	"feature-flags-service/internal/config"
+	gosharedmw "github.com/Tesseract-Nexus/go-shared/middleware"
 )
 
 // FeaturesHandler handles feature flag operations

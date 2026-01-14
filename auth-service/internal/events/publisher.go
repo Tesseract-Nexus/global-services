@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/sirupsen/logrus"
-	"github.com/tesseract-hub/go-shared/events"
+	"github.com/Tesseract-Nexus/go-shared/events"
 )
 
 // Publisher wraps the shared events publisher for auth-specific events

@@ -13,20 +13,20 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 
-	"github.com/tesseract-hub/audit-service/internal/cache"
-	"github.com/tesseract-hub/audit-service/internal/config"
-	"github.com/tesseract-hub/audit-service/internal/consumer"
-	"github.com/tesseract-hub/audit-service/internal/database"
-	"github.com/tesseract-hub/audit-service/internal/handlers"
-	"github.com/tesseract-hub/audit-service/internal/middleware"
-	auditNats "github.com/tesseract-hub/audit-service/internal/nats"
-	"github.com/tesseract-hub/audit-service/internal/repository"
-	"github.com/tesseract-hub/audit-service/internal/scheduler"
-	"github.com/tesseract-hub/audit-service/internal/services"
-	"github.com/tesseract-hub/audit-service/internal/tenant"
+	"audit-service/internal/cache"
+	"audit-service/internal/config"
+	"audit-service/internal/consumer"
+	"audit-service/internal/database"
+	"audit-service/internal/handlers"
+	"audit-service/internal/middleware"
+	auditNats "audit-service/internal/nats"
+	"audit-service/internal/repository"
+	"audit-service/internal/scheduler"
+	"audit-service/internal/services"
+	"audit-service/internal/tenant"
 
-	gosharedmw "github.com/tesseract-hub/go-shared/middleware"
-	"github.com/tesseract-hub/go-shared/tracing"
+	gosharedmw "github.com/Tesseract-Nexus/go-shared/middleware"
+	"github.com/Tesseract-Nexus/go-shared/tracing"
 )
 
 // @title Audit Service API

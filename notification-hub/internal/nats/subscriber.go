@@ -8,9 +8,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
-	"github.com/tesseract-nexus/tesseract-hub/services/notification-hub/internal/models"
-	"github.com/tesseract-nexus/tesseract-hub/services/notification-hub/internal/repository"
-	"github.com/tesseract-nexus/tesseract-hub/services/notification-hub/internal/websocket"
+	"notification-hub/internal/models"
+	"notification-hub/internal/repository"
+	"notification-hub/internal/websocket"
 )
 
 // TargetUserResolver resolves the target user(s) for a notification

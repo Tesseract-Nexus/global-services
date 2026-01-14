@@ -9,7 +9,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
-	"github.com/tesseract-hub/go-shared/secrets")
+	"github.com/Tesseract-Nexus/go-shared/secrets")
 
 // Config holds the application configuration
 type Config struct {

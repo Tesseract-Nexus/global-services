@@ -6,8 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/tesseract-hub/domains/common/services/location-service/internal/models"
-	"github.com/tesseract-hub/domains/common/services/location-service/internal/services"
+	"location-service/internal/models"
+	"location-service/internal/services"
 )
 
 // GeoTagHandler handles GeoTag API requests

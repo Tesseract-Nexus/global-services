@@ -12,15 +12,15 @@ import (
 	"github.com/joho/godotenv"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
-	"github.com/tesseract-hub/feature-flags-service/internal/clients"
-	"github.com/tesseract-hub/feature-flags-service/internal/config"
-	"github.com/tesseract-hub/feature-flags-service/internal/handlers"
-	"github.com/tesseract-hub/feature-flags-service/internal/middleware"
+	"feature-flags-service/internal/clients"
+	"feature-flags-service/internal/config"
+	"feature-flags-service/internal/handlers"
+	"feature-flags-service/internal/middleware"
 
-	_ "github.com/tesseract-hub/feature-flags-service/docs"
+	_ "feature-flags-service/docs"
 
-	gosharedmw "github.com/tesseract-hub/go-shared/middleware"
-	"github.com/tesseract-hub/go-shared/tracing"
+	gosharedmw "github.com/Tesseract-Nexus/go-shared/middleware"
+	"github.com/Tesseract-Nexus/go-shared/tracing"
 )
 
 // @title Feature Flags Service API

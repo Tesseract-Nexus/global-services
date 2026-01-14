@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/sirupsen/logrus"
-	"github.com/tesseract-hub/go-shared/events"
+	"github.com/Tesseract-Nexus/go-shared/events"
 )
 
 var (

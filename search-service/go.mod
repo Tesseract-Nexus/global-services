@@ -1,15 +1,15 @@
-module github.com/tesseract-hub/search-service
+module search-service
 
 go 1.25
 
 require (
+	github.com/Tesseract-Nexus/go-shared v0.0.0-20260114152147-11cd2a14e96d
 	github.com/gin-gonic/gin v1.11.0
 	github.com/joho/godotenv v1.5.1
 	github.com/redis/go-redis/v9 v9.17.2
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.1
 	github.com/swaggo/swag v1.16.6
-	github.com/Tesseract-Nexus/go-shared v0.0.0-20260114144102-9ee4116ec0c6
 	github.com/typesense/typesense-go/v2 v2.0.0
 	go.opentelemetry.io/otel v1.21.0
 )
@@ -101,4 +101,3 @@ require (
 	google.golang.org/grpc v1.59.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )
-

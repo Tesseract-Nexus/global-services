@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tesseract-hub/domains/common/services/location-service/internal/models"
+	"location-service/internal/models"
 )
 
 // AddressProvider defines the interface for address lookup providers

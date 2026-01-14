@@ -6,8 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/tesseract-hub/settings-service/internal/models"
-	"github.com/tesseract-hub/settings-service/internal/services"
+	"settings-service/internal/models"
+	"settings-service/internal/services"
 )
 
 // StorefrontThemeHandler handles HTTP requests for storefront theme settings

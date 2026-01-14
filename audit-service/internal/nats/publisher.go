@@ -7,7 +7,7 @@ import (
 
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
-	"github.com/tesseract-hub/audit-service/internal/models"
+	"audit-service/internal/models"
 )
 
 // AuditEvent represents an audit event for NATS publishing

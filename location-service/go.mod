@@ -1,14 +1,14 @@
-module github.com/tesseract-hub/domains/common/services/location-service
+module location-service
 
 go 1.25
 
 require (
+	github.com/Tesseract-Nexus/go-shared v0.0.0-20260114152147-11cd2a14e96d
 	github.com/gin-gonic/gin v1.11.0
 	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.10.9
 	github.com/prometheus/client_golang v1.23.2
 	github.com/sirupsen/logrus v1.9.3
-	github.com/Tesseract-Nexus/go-shared v0.0.0-20260114144102-9ee4116ec0c6-00010101000000-000000000000
 	gorm.io/driver/postgres v1.5.6
 	gorm.io/gorm v1.25.7
 )
@@ -80,4 +80,3 @@ require (
 	google.golang.org/grpc v1.59.0 // indirect
 	google.golang.org/protobuf v1.36.9 // indirect
 )
-

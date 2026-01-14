@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/tesseract-nexus/tesseract-hub/services/notification-service/internal/models"
+	"notification-service/internal/models"
 	"gorm.io/gorm"
 )
 

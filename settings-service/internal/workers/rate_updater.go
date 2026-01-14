@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tesseract-hub/settings-service/internal/services"
+	"settings-service/internal/services"
 )
 
 const (

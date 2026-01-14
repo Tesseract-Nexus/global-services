@@ -9,8 +9,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/tesseract-hub/analytics-service/internal/models"
-	"github.com/tesseract-hub/analytics-service/internal/repository"
+	"analytics-service/internal/models"
+	"analytics-service/internal/repository"
 )
 
 // AnalyticsService handles business logic for analytics

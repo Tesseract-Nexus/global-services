@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/tesseract-hub/go-shared/secrets"
-	"github.com/tesseract-hub/go-shared/security"
+	"github.com/Tesseract-Nexus/go-shared/secrets"
+	"github.com/Tesseract-Nexus/go-shared/security"
 )
 
 // NotificationService handles notification business logic

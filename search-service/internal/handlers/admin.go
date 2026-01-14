@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/tesseract-hub/search-service/internal/clients"
+	"search-service/internal/clients"
 	"github.com/typesense/typesense-go/v2/typesense/api"
 )
 

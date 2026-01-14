@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/tesseract-hub/analytics-service/internal/clients"
+	"analytics-service/internal/clients"
 )
 
 // TenantMiddlewareWithResolver creates a tenant middleware with slug resolution

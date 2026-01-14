@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/tesseract-nexus/tesseract-hub/services/notification-hub/internal/models"
+	"notification-hub/internal/models"
 	"gorm.io/gorm"
 )
 

@@ -12,8 +12,8 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/sirupsen/logrus"
 
-	"github.com/tesseract-hub/audit-service/internal/models"
-	"github.com/tesseract-hub/audit-service/internal/services"
+	"audit-service/internal/models"
+	"audit-service/internal/services"
 )
 
 // DomainEventConsumer consumes domain events from all services and creates audit logs

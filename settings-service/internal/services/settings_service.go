@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/tesseract-hub/settings-service/internal/models"
-	"github.com/tesseract-hub/settings-service/internal/repository"
+	"settings-service/internal/models"
+	"settings-service/internal/repository"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )

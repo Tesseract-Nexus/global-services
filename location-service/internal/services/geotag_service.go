@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/tesseract-hub/domains/common/services/location-service/internal/models"
-	"github.com/tesseract-hub/domains/common/services/location-service/internal/repository"
+	"location-service/internal/models"
+	"location-service/internal/repository"
 )
 
 // GeoTagService provides high-level GeoTag API operations

@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/tesseract-hub/domains/common/services/verification-service/internal/models"
+	"verification-service/internal/models"
 	"gorm.io/gorm"
 )
 

@@ -7,7 +7,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/tesseract-hub/go-shared/security"
+	"github.com/Tesseract-Nexus/go-shared/security"
 )
 
 // EmailService handles email sending operations

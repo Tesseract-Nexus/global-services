@@ -9,9 +9,9 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/clients"
-	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/models"
-	natsClient "github.com/tesseract-hub/domains/common/services/tenant-service/internal/nats"
+	"tenant-service/internal/clients"
+	"tenant-service/internal/models"
+	natsClient "tenant-service/internal/nats"
 	"gorm.io/gorm"
 )
 

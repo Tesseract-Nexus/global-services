@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/tesseract-hub/domains/common/services/location-service/internal/repository"
+	"location-service/internal/repository"
 )
 
 // CacheCleanupConfig holds configuration for the cleanup worker

@@ -1,10 +1,11 @@
-module github.com/tesseract-nexus/tesseract-hub/services/notification-service
+module notification-service
 
 go 1.25.5
 
 require (
 	cloud.google.com/go/pubsub v1.36.1
 	firebase.google.com/go/v4 v4.14.0
+	github.com/Tesseract-Nexus/go-shared v0.0.0-20260114152147-11cd2a14e96d
 	github.com/aws/aws-sdk-go-v2 v1.41.0
 	github.com/aws/aws-sdk-go-v2/config v1.32.6
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.6
@@ -15,13 +16,11 @@ require (
 	github.com/nats-io/nats.go v1.31.0
 	github.com/sendgrid/sendgrid-go v3.14.0+incompatible
 	github.com/sirupsen/logrus v1.9.3
-	github.com/Tesseract-Nexus/go-shared v0.0.0-20260114144102-9ee4116ec0c6
 	google.golang.org/api v0.170.0
 	gorm.io/datatypes v1.2.0
 	gorm.io/driver/postgres v1.5.6
 	gorm.io/gorm v1.25.7
 )
-
 
 require (
 	cloud.google.com/go v0.112.1 // indirect

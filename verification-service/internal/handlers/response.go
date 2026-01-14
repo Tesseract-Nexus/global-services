@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/tesseract-hub/domains/common/services/verification-service/internal/models"
+	"verification-service/internal/models"
 )
 
 // SuccessResponse sends a success response

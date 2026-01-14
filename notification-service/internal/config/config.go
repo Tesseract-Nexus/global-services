@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/tesseract-hub/go-shared/secrets")
+	"github.com/Tesseract-Nexus/go-shared/secrets")
 
 // Config holds all configuration
 type Config struct {

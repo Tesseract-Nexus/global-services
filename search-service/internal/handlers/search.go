@@ -6,9 +6,9 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/tesseract-hub/search-service/internal/cache"
-	"github.com/tesseract-hub/search-service/internal/clients"
-	gosharedmw "github.com/tesseract-hub/go-shared/middleware"
+	"search-service/internal/cache"
+	"search-service/internal/clients"
+	gosharedmw "github.com/Tesseract-Nexus/go-shared/middleware"
 	"github.com/typesense/typesense-go/v2/typesense/api"
 )
 

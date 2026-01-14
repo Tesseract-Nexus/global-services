@@ -4,13 +4,12 @@ go 1.25
 
 require (
 	cloud.google.com/go/storage v1.43.0
+	github.com/Tesseract-Nexus/go-shared v0.0.0-20260114152147-11cd2a14e96d
 	github.com/gin-gonic/gin v1.10.0
 	github.com/google/uuid v1.6.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
-	github.com/Tesseract-Nexus/go-shared v0.0.0-20260114144102-9ee4116ec0c6-00010101000000-000000000000
 )
-
 
 require (
 	cloud.google.com/go v0.115.0 // indirect

@@ -9,9 +9,9 @@ import (
 	"github.com/robfig/cron/v3"
 	"github.com/sirupsen/logrus"
 
-	"github.com/tesseract-hub/audit-service/internal/config"
-	"github.com/tesseract-hub/audit-service/internal/repository"
-	"github.com/tesseract-hub/audit-service/internal/tenant"
+	"audit-service/internal/config"
+	"audit-service/internal/repository"
+	"audit-service/internal/tenant"
 )
 
 // CleanupScheduler handles scheduled cleanup of old audit logs

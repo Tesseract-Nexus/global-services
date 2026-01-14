@@ -6,8 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/tesseract-hub/status-dashboard-service/internal/models"
-	"github.com/tesseract-hub/status-dashboard-service/internal/services"
+	"status-dashboard-service/internal/models"
+	"status-dashboard-service/internal/services"
 )
 
 // Handler contains all HTTP handlers

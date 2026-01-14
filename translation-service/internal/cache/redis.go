@@ -8,7 +8,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
-	"github.com/tesseract-hub/translation-service/internal/models"
+	"translation-service/internal/models"
 )
 
 // TranslationCache provides Redis-based caching for translations

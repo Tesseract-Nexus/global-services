@@ -4,9 +4,9 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/tesseract-hub/search-service/internal/clients"
-	"github.com/tesseract-hub/search-service/internal/services"
-	gosharedmw "github.com/tesseract-hub/go-shared/middleware"
+	"search-service/internal/clients"
+	"search-service/internal/services"
+	gosharedmw "github.com/Tesseract-Nexus/go-shared/middleware"
 )
 
 // IndexHandler handles document indexing operations

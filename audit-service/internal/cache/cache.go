@@ -11,7 +11,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 
-	"github.com/tesseract-hub/audit-service/internal/models"
+	"audit-service/internal/models"
 )
 
 var (

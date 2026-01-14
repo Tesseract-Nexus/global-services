@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/tesseract-hub/audit-service/internal/models"
+	"audit-service/internal/models"
 )
 
 // AuditRepository handles database operations for audit logs

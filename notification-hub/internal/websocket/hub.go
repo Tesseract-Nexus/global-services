@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/tesseract-nexus/tesseract-hub/services/notification-hub/internal/models"
+	"notification-hub/internal/models"
 )
 
 // MessageType represents the type of WebSocket message

@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tesseract-hub/go-shared/security"
-	"github.com/tesseract-nexus/tesseract-hub/services/notification-service/internal/config"
+	"github.com/Tesseract-Nexus/go-shared/security"
+	"notification-service/internal/config"
 )
 
 // TwilioVerifyProvider implements OTP sending and verification via Twilio Verify API

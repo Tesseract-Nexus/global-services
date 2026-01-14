@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/tesseract-hub/domains/common/services/location-service/internal/models"
-	"github.com/tesseract-hub/domains/common/services/location-service/internal/services"
+	"location-service/internal/models"
+	"location-service/internal/services"
 )
 
 // AddressHandler handles address-related HTTP requests

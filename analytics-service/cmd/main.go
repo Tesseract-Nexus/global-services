@@ -9,16 +9,16 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/sirupsen/logrus"
 
-	"github.com/tesseract-hub/analytics-service/internal/clients"
-	"github.com/tesseract-hub/analytics-service/internal/config"
-	"github.com/tesseract-hub/analytics-service/internal/events"
-	"github.com/tesseract-hub/analytics-service/internal/handlers"
-	"github.com/tesseract-hub/analytics-service/internal/middleware"
-	"github.com/tesseract-hub/analytics-service/internal/repository"
-	"github.com/tesseract-hub/analytics-service/internal/services"
+	"analytics-service/internal/clients"
+	"analytics-service/internal/config"
+	"analytics-service/internal/events"
+	"analytics-service/internal/handlers"
+	"analytics-service/internal/middleware"
+	"analytics-service/internal/repository"
+	"analytics-service/internal/services"
 
-	gosharedmw "github.com/tesseract-hub/go-shared/middleware"
-	"github.com/tesseract-hub/go-shared/rbac"
+	gosharedmw "github.com/Tesseract-Nexus/go-shared/middleware"
+	"github.com/Tesseract-Nexus/go-shared/rbac"
 )
 
 func main() {

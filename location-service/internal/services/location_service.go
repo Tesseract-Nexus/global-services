@@ -4,8 +4,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/tesseract-hub/domains/common/services/location-service/internal/models"
-	"github.com/tesseract-hub/domains/common/services/location-service/internal/repository"
+	"location-service/internal/models"
+	"location-service/internal/repository"
 )
 
 // LocationService handles location-related business logic

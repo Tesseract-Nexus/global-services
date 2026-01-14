@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/services"
+	"tenant-service/internal/services"
 )
 
 // TenantHandler handles tenant-related HTTP requests

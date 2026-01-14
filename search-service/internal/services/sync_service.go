@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
-	"github.com/tesseract-hub/search-service/internal/clients"
-	"github.com/tesseract-hub/search-service/internal/config"
+	"search-service/internal/clients"
+	"search-service/internal/config"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 )

@@ -1,4 +1,4 @@
-module github.com/tesseract-hub/status-dashboard-service
+module status-dashboard-service
 
 go 1.23
 

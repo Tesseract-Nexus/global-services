@@ -15,16 +15,16 @@ import (
 	"gorm.io/gorm"
 	gormLogger "gorm.io/gorm/logger"
 
-	"github.com/tesseract-hub/translation-service/internal/cache"
-	"github.com/tesseract-hub/translation-service/internal/clients"
-	"github.com/tesseract-hub/translation-service/internal/config"
-	"github.com/tesseract-hub/translation-service/internal/handlers"
-	"github.com/tesseract-hub/translation-service/internal/middleware"
-	"github.com/tesseract-hub/translation-service/internal/models"
-	"github.com/tesseract-hub/translation-service/internal/repository"
+	"translation-service/internal/cache"
+	"translation-service/internal/clients"
+	"translation-service/internal/config"
+	"translation-service/internal/handlers"
+	"translation-service/internal/middleware"
+	"translation-service/internal/models"
+	"translation-service/internal/repository"
 
-	gosharedmw "github.com/tesseract-hub/go-shared/middleware"
-	"github.com/tesseract-hub/go-shared/tracing"
+	gosharedmw "github.com/Tesseract-Nexus/go-shared/middleware"
+	"github.com/Tesseract-Nexus/go-shared/tracing"
 )
 
 func main() {

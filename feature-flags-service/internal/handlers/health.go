@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/tesseract-hub/feature-flags-service/internal/clients"
+	"feature-flags-service/internal/clients"
 )
 
 // HealthCheck handles health check requests

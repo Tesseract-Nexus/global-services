@@ -12,19 +12,19 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/tesseract-nexus/tesseract-hub/services/notification-hub/internal/config"
-	"github.com/tesseract-nexus/tesseract-hub/services/notification-hub/internal/handlers"
-	"github.com/tesseract-nexus/tesseract-hub/services/notification-hub/internal/middleware"
-	"github.com/tesseract-nexus/tesseract-hub/services/notification-hub/internal/models"
-	natsc "github.com/tesseract-nexus/tesseract-hub/services/notification-hub/internal/nats"
-	"github.com/tesseract-nexus/tesseract-hub/services/notification-hub/internal/repository"
-	"github.com/tesseract-nexus/tesseract-hub/services/notification-hub/internal/websocket"
+	"notification-hub/internal/config"
+	"notification-hub/internal/handlers"
+	"notification-hub/internal/middleware"
+	"notification-hub/internal/models"
+	natsc "notification-hub/internal/nats"
+	"notification-hub/internal/repository"
+	"notification-hub/internal/websocket"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
-	gosharedmw "github.com/tesseract-hub/go-shared/middleware"
-	"github.com/tesseract-hub/go-shared/tracing"
+	gosharedmw "github.com/Tesseract-Nexus/go-shared/middleware"
+	"github.com/Tesseract-Nexus/go-shared/tracing"
 )
 
 func main() {

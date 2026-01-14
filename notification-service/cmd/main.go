@@ -15,16 +15,16 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
-	"github.com/tesseract-nexus/tesseract-hub/services/notification-service/internal/config"
-	"github.com/tesseract-nexus/tesseract-hub/services/notification-service/internal/handlers"
-	"github.com/tesseract-nexus/tesseract-hub/services/notification-service/internal/middleware"
-	"github.com/tesseract-nexus/tesseract-hub/services/notification-service/internal/models"
-	"github.com/tesseract-nexus/tesseract-hub/services/notification-service/internal/nats"
-	"github.com/tesseract-nexus/tesseract-hub/services/notification-service/internal/repository"
-	"github.com/tesseract-nexus/tesseract-hub/services/notification-service/internal/services"
+	"notification-service/internal/config"
+	"notification-service/internal/handlers"
+	"notification-service/internal/middleware"
+	"notification-service/internal/models"
+	"notification-service/internal/nats"
+	"notification-service/internal/repository"
+	"notification-service/internal/services"
 
 	"github.com/sirupsen/logrus"
-	gosharedmw "github.com/tesseract-hub/go-shared/middleware"
+	gosharedmw "github.com/Tesseract-Nexus/go-shared/middleware"
 )
 
 func main() {

@@ -7,7 +7,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/tesseract-hub/analytics-service/internal/models"
+	"analytics-service/internal/models"
 )
 
 // AnalyticsRepository handles data aggregation for analytics

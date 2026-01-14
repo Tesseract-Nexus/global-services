@@ -1,8 +1,9 @@
-module github.com/tesseract-hub/settings-service
+module settings-service
 
 go 1.25.5
 
 require (
+	github.com/Tesseract-Nexus/go-shared v0.0.0-20260114152147-11cd2a14e96d
 	github.com/gin-contrib/cors v1.4.0
 	github.com/gin-gonic/gin v1.10.0
 	github.com/google/uuid v1.6.0
@@ -12,12 +13,10 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.0
-	github.com/Tesseract-Nexus/go-shared v0.0.0-20260114144102-9ee4116ec0c6
 	gorm.io/datatypes v1.2.6
 	gorm.io/driver/postgres v1.5.6
 	gorm.io/gorm v1.30.0
 )
-
 
 require (
 	cloud.google.com/go/compute/metadata v0.3.0 // indirect

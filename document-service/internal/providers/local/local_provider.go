@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"github.com/tesseract-hub/document-service/internal/models"
+	"document-service/internal/models"
 )
 
 // LocalProvider implements the CloudStorageProvider interface for local filesystem storage

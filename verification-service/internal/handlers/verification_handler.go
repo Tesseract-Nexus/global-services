@@ -4,8 +4,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/tesseract-hub/domains/common/services/verification-service/internal/models"
-	"github.com/tesseract-hub/domains/common/services/verification-service/internal/services"
+	"verification-service/internal/models"
+	"verification-service/internal/services"
 )
 
 // VerificationHandler handles verification HTTP requests

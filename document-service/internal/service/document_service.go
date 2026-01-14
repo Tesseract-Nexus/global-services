@@ -12,9 +12,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
-	"github.com/tesseract-hub/document-service/internal/cache"
-	"github.com/tesseract-hub/document-service/internal/models"
-	"github.com/tesseract-hub/document-service/internal/utils"
+	"document-service/internal/cache"
+	"document-service/internal/models"
+	"document-service/internal/utils"
 )
 
 // documentService implements the DocumentService interface

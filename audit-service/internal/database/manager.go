@@ -13,8 +13,8 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
-	"github.com/tesseract-hub/audit-service/internal/models"
-	"github.com/tesseract-hub/audit-service/internal/tenant"
+	"audit-service/internal/models"
+	"audit-service/internal/tenant"
 )
 
 var (

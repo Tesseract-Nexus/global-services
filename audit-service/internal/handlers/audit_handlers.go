@@ -11,9 +11,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 
-	"github.com/tesseract-hub/audit-service/internal/models"
-	auditNats "github.com/tesseract-hub/audit-service/internal/nats"
-	"github.com/tesseract-hub/audit-service/internal/services"
+	"audit-service/internal/models"
+	auditNats "audit-service/internal/nats"
+	"audit-service/internal/services"
 )
 
 // AuditHandlers handles HTTP requests for audit logs

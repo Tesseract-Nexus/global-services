@@ -9,12 +9,12 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
-	"github.com/tesseract-hub/go-shared/events"
-	"github.com/tesseract-nexus/tesseract-hub/services/notification-service/internal/models"
-	"github.com/tesseract-nexus/tesseract-hub/services/notification-service/internal/repository"
-	"github.com/tesseract-nexus/tesseract-hub/services/notification-service/internal/services"
-	"github.com/tesseract-nexus/tesseract-hub/services/notification-service/internal/template"
-	"github.com/tesseract-nexus/tesseract-hub/services/notification-service/internal/templates"
+	"github.com/Tesseract-Nexus/go-shared/events"
+	"notification-service/internal/models"
+	"notification-service/internal/repository"
+	"notification-service/internal/services"
+	"notification-service/internal/template"
+	"notification-service/internal/templates"
 )
 
 // NotificationCategory maps event types to preference categories

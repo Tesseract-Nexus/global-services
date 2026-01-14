@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
-	"github.com/tesseract-nexus/tesseract-hub/services/notification-hub/internal/config"
+	"notification-hub/internal/config"
 )
 
 // Client represents a single WebSocket connection

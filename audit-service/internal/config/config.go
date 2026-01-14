@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/tesseract-hub/go-shared/secrets")
+	"github.com/Tesseract-Nexus/go-shared/secrets")
 
 // Config holds all configuration for the audit service
 type Config struct {

@@ -10,7 +10,7 @@ import (
 
 	"github.com/Azure/azure-storage-blob-go/azblob"
 	"github.com/sirupsen/logrus"
-	"github.com/tesseract-hub/document-service/internal/models"
+	"document-service/internal/models"
 )
 
 // BlobProvider implements the CloudStorageProvider interface for Azure Blob Storage

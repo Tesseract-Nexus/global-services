@@ -9,8 +9,8 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
-	"github.com/tesseract-hub/status-dashboard-service/internal/config"
-	"github.com/tesseract-hub/status-dashboard-service/internal/models"
+	"status-dashboard-service/internal/config"
+	"status-dashboard-service/internal/models"
 )
 
 // HealthChecker performs health checks on services (stateless, in-memory)

@@ -10,9 +10,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 
-	"github.com/tesseract-hub/audit-service/internal/models"
-	auditNats "github.com/tesseract-hub/audit-service/internal/nats"
-	"github.com/tesseract-hub/audit-service/internal/repository"
+	"audit-service/internal/models"
+	auditNats "audit-service/internal/nats"
+	"audit-service/internal/repository"
 )
 
 // AuditService handles business logic for audit logging

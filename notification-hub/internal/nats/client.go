@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/nats-io/nats.go"
-	"github.com/tesseract-nexus/tesseract-hub/services/notification-hub/internal/config"
+	"notification-hub/internal/config"
 )
 
 // Client wraps the NATS connection and JetStream context

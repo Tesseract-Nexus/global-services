@@ -4,7 +4,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/tesseract-hub/go-shared/secrets")
+	"github.com/Tesseract-Nexus/go-shared/secrets")
 
 // Config holds the configuration for the location service
 type Config struct {

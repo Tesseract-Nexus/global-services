@@ -6,9 +6,9 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/tesseract-hub/settings-service/internal/models"
-	"github.com/tesseract-hub/settings-service/internal/services"
-	"github.com/tesseract-hub/settings-service/internal/workers"
+	"settings-service/internal/models"
+	"settings-service/internal/services"
+	"settings-service/internal/workers"
 )
 
 // CurrencyHandler handles currency-related HTTP requests

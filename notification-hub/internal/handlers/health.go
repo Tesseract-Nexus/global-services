@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	natsc "github.com/tesseract-nexus/tesseract-hub/services/notification-hub/internal/nats"
+	natsc "notification-hub/internal/nats"
 	"gorm.io/gorm"
 )
 

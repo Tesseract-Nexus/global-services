@@ -17,19 +17,19 @@ import (
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 
-	"github.com/tesseract-hub/document-service/internal/config"
-	"github.com/tesseract-hub/document-service/internal/events"
-	"github.com/tesseract-hub/document-service/internal/handlers"
-	"github.com/tesseract-hub/document-service/internal/middleware"
-	"github.com/tesseract-hub/document-service/internal/models"
-	"github.com/tesseract-hub/document-service/internal/providers/aws"
-	"github.com/tesseract-hub/document-service/internal/providers/gcp"
-	"github.com/tesseract-hub/document-service/internal/providers/local"
-	// "github.com/tesseract-hub/document-service/internal/providers/azure" // Temporarily disabled due to API compatibility issues
-	"github.com/tesseract-hub/document-service/internal/cache"
-	"github.com/tesseract-hub/document-service/internal/repository"
-	"github.com/tesseract-hub/document-service/internal/service"
-	gosharedmw "github.com/tesseract-hub/go-shared/middleware"
+	"document-service/internal/config"
+	"document-service/internal/events"
+	"document-service/internal/handlers"
+	"document-service/internal/middleware"
+	"document-service/internal/models"
+	"document-service/internal/providers/aws"
+	"document-service/internal/providers/gcp"
+	"document-service/internal/providers/local"
+	// "document-service/internal/providers/azure" // Temporarily disabled due to API compatibility issues
+	"document-service/internal/cache"
+	"document-service/internal/repository"
+	"document-service/internal/service"
+	gosharedmw "github.com/Tesseract-Nexus/go-shared/middleware"
 )
 
 func main() {

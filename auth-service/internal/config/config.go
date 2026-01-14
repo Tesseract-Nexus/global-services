@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/spf13/viper"
-	"github.com/tesseract-hub/go-shared/secrets"
+	"github.com/Tesseract-Nexus/go-shared/secrets"
 )
 
 type Config struct {

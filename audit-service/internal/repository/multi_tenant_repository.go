@@ -9,9 +9,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 
-	"github.com/tesseract-hub/audit-service/internal/cache"
-	"github.com/tesseract-hub/audit-service/internal/database"
-	"github.com/tesseract-hub/audit-service/internal/models"
+	"audit-service/internal/cache"
+	"audit-service/internal/database"
+	"audit-service/internal/models"
 )
 
 // MultiTenantRepository handles audit log operations across multiple tenant databases

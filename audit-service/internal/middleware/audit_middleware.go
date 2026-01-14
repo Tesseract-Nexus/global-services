@@ -10,8 +10,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"github.com/tesseract-hub/audit-service/internal/models"
-	"github.com/tesseract-hub/audit-service/internal/services"
+	"audit-service/internal/models"
+	"audit-service/internal/services"
 )
 
 // AuditMiddleware logs all API requests

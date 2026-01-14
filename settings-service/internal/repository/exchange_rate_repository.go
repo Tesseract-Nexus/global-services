@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/tesseract-hub/settings-service/internal/models"
+	"settings-service/internal/models"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )

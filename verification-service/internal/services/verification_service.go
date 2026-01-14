@@ -6,12 +6,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/tesseract-hub/domains/common/services/verification-service/internal/config"
-	"github.com/tesseract-hub/domains/common/services/verification-service/internal/models"
-	"github.com/tesseract-hub/domains/common/services/verification-service/internal/providers"
-	"github.com/tesseract-hub/domains/common/services/verification-service/internal/repository"
-	"github.com/tesseract-hub/domains/common/services/verification-service/pkg/crypto"
-	"github.com/tesseract-hub/domains/common/services/verification-service/pkg/otp"
+	"verification-service/internal/config"
+	"verification-service/internal/models"
+	"verification-service/internal/providers"
+	"verification-service/internal/repository"
+	"verification-service/pkg/crypto"
+	"verification-service/pkg/otp"
 	"gorm.io/gorm"
 )
 

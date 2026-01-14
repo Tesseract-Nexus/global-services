@@ -8,9 +8,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
-	"github.com/tesseract-nexus/tesseract-hub/services/notification-hub/internal/config"
-	"github.com/tesseract-nexus/tesseract-hub/services/notification-hub/internal/repository"
-	ws "github.com/tesseract-nexus/tesseract-hub/services/notification-hub/internal/websocket"
+	"notification-hub/internal/config"
+	"notification-hub/internal/repository"
+	ws "notification-hub/internal/websocket"
 )
 
 var upgrader = websocket.Upgrader{

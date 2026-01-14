@@ -8,8 +8,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
-	"github.com/tesseract-hub/document-service/internal/middleware"
-	"github.com/tesseract-hub/document-service/internal/models"
+	"document-service/internal/middleware"
+	"document-service/internal/models"
 )
 
 // DocumentHandler handles HTTP requests for document operations

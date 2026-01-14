@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tesseract-hub/go-shared/security"
+	"github.com/Tesseract-Nexus/go-shared/security"
 )
 
 // PostalHTTPProvider implements email sending via Postal HTTP API

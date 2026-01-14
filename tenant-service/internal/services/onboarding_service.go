@@ -11,13 +11,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/clients"
-	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/models"
-	natsClient "github.com/tesseract-hub/domains/common/services/tenant-service/internal/nats"
-	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/repository"
-	"github.com/tesseract-hub/go-shared/auth"
-	"github.com/tesseract-hub/go-shared/secrets"
-	"github.com/tesseract-hub/go-shared/security"
+	"tenant-service/internal/clients"
+	"tenant-service/internal/models"
+	natsClient "tenant-service/internal/nats"
+	"tenant-service/internal/repository"
+	"github.com/Tesseract-Nexus/go-shared/auth"
+	"github.com/Tesseract-Nexus/go-shared/secrets"
+	"github.com/Tesseract-Nexus/go-shared/security"
 	"gorm.io/gorm"
 )
 

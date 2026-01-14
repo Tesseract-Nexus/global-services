@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"github.com/tesseract-hub/analytics-service/internal/services"
+	"analytics-service/internal/services"
 )
 
 // AnalyticsHandlers handles HTTP requests for analytics

@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/spf13/viper"
-	"github.com/tesseract-hub/document-service/internal/models"
-	"github.com/tesseract-hub/go-shared/secrets"
+	"document-service/internal/models"
+	"github.com/Tesseract-Nexus/go-shared/secrets"
 )
 
 // Config holds the application configuration

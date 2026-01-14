@@ -16,20 +16,20 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
-	"github.com/tesseract-hub/settings-service/internal/cache"
-	"github.com/tesseract-hub/settings-service/internal/events"
-	"github.com/tesseract-hub/settings-service/internal/clients/frankfurter"
-	"github.com/tesseract-hub/settings-service/internal/config"
-	"github.com/tesseract-hub/settings-service/internal/handlers"
-	"github.com/tesseract-hub/settings-service/internal/health"
-	"github.com/tesseract-hub/settings-service/internal/middleware"
-	"github.com/tesseract-hub/settings-service/internal/models"
-	"github.com/tesseract-hub/settings-service/internal/repository"
-	"github.com/tesseract-hub/settings-service/internal/services"
-	"github.com/tesseract-hub/settings-service/internal/workers"
+	"settings-service/internal/cache"
+	"settings-service/internal/events"
+	"settings-service/internal/clients/frankfurter"
+	"settings-service/internal/config"
+	"settings-service/internal/handlers"
+	"settings-service/internal/health"
+	"settings-service/internal/middleware"
+	"settings-service/internal/models"
+	"settings-service/internal/repository"
+	"settings-service/internal/services"
+	"settings-service/internal/workers"
 
-	gosharedmw "github.com/tesseract-hub/go-shared/middleware"
-	"github.com/tesseract-hub/go-shared/rbac"
+	gosharedmw "github.com/Tesseract-Nexus/go-shared/middleware"
+	"github.com/Tesseract-Nexus/go-shared/rbac"
 )
 
 // @title Settings Management API

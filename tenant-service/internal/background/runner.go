@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/config"
-	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/services"
+	"tenant-service/internal/config"
+	"tenant-service/internal/services"
 )
 
 // Runner manages background jobs for draft persistence

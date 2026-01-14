@@ -10,7 +10,7 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/sirupsen/logrus"
-	"github.com/tesseract-hub/document-service/internal/models"
+	"document-service/internal/models"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 )

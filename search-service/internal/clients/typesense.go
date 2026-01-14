@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/tesseract-hub/search-service/internal/config"
+	"search-service/internal/config"
 	"github.com/typesense/typesense-go/v2/typesense"
 	"github.com/typesense/typesense-go/v2/typesense/api"
 )

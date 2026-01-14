@@ -13,17 +13,17 @@ import (
 	"github.com/redis/go-redis/v9"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
-	"github.com/tesseract-hub/search-service/internal/clients"
-	"github.com/tesseract-hub/search-service/internal/config"
-	"github.com/tesseract-hub/search-service/internal/handlers"
-	"github.com/tesseract-hub/search-service/internal/middleware"
-	"github.com/tesseract-hub/search-service/internal/services"
+	"search-service/internal/clients"
+	"search-service/internal/config"
+	"search-service/internal/handlers"
+	"search-service/internal/middleware"
+	"search-service/internal/services"
 
-	_ "github.com/tesseract-hub/search-service/docs"
+	_ "search-service/docs"
 
-	gosharedmw "github.com/tesseract-hub/go-shared/middleware"
-	"github.com/tesseract-hub/go-shared/secrets"
-	"github.com/tesseract-hub/go-shared/tracing"
+	gosharedmw "github.com/Tesseract-Nexus/go-shared/middleware"
+	"github.com/Tesseract-Nexus/go-shared/secrets"
+	"github.com/Tesseract-Nexus/go-shared/tracing"
 )
 
 // @title Search Service API

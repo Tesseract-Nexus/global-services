@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tesseract-hub/domains/common/services/location-service/internal/models"
-	"github.com/tesseract-hub/domains/common/services/location-service/internal/repository"
+	"location-service/internal/models"
+	"location-service/internal/repository"
 )
 
 // CacheConfig holds configuration for the address cache

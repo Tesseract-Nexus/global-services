@@ -8,12 +8,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
-	"github.com/tesseract-hub/translation-service/internal/cache"
-	"github.com/tesseract-hub/translation-service/internal/clients"
-	"github.com/tesseract-hub/translation-service/internal/config"
-	"github.com/tesseract-hub/translation-service/internal/middleware"
-	"github.com/tesseract-hub/translation-service/internal/models"
-	"github.com/tesseract-hub/translation-service/internal/repository"
+	"translation-service/internal/cache"
+	"translation-service/internal/clients"
+	"translation-service/internal/config"
+	"translation-service/internal/middleware"
+	"translation-service/internal/models"
+	"translation-service/internal/repository"
 )
 
 // TranslationHandler handles translation API requests

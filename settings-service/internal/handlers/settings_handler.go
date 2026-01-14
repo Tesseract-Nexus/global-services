@@ -6,9 +6,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/tesseract-hub/settings-service/internal/models"
-	"github.com/tesseract-hub/settings-service/internal/repository"
-	"github.com/tesseract-hub/settings-service/internal/services"
+	"settings-service/internal/models"
+	"settings-service/internal/repository"
+	"settings-service/internal/services"
 )
 
 type SettingsHandler struct {

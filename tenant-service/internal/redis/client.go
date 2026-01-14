@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
-	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/config"
+	"tenant-service/internal/config"
 )
 
 // Client wraps the Redis client with application-specific methods

@@ -10,9 +10,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
-	"github.com/tesseract-hub/status-dashboard-service/internal/config"
-	"github.com/tesseract-hub/status-dashboard-service/internal/handlers"
-	"github.com/tesseract-hub/status-dashboard-service/internal/services"
+	"status-dashboard-service/internal/config"
+	"status-dashboard-service/internal/handlers"
+	"status-dashboard-service/internal/services"
 )
 
 func main() {

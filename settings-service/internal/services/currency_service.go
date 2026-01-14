@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tesseract-hub/settings-service/internal/cache"
-	"github.com/tesseract-hub/settings-service/internal/clients/frankfurter"
-	"github.com/tesseract-hub/settings-service/internal/models"
-	"github.com/tesseract-hub/settings-service/internal/repository"
+	"settings-service/internal/cache"
+	"settings-service/internal/clients/frankfurter"
+	"settings-service/internal/models"
+	"settings-service/internal/repository"
 )
 
 // CurrencyService defines the interface for currency operations

@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/tesseract-nexus/tesseract-hub/services/notification-service/internal/services"
+	"notification-service/internal/services"
 )
 
 // VerifyHandler handles OTP/verification-related requests

@@ -6,9 +6,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/tesseract-nexus/tesseract-hub/services/notification-hub/internal/models"
-	"github.com/tesseract-nexus/tesseract-hub/services/notification-hub/internal/repository"
-	"github.com/tesseract-nexus/tesseract-hub/services/notification-hub/internal/websocket"
+	"notification-hub/internal/models"
+	"notification-hub/internal/repository"
+	"notification-hub/internal/websocket"
 )
 
 // NotificationHandler handles notification-related HTTP requests

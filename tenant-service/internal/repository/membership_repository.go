@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/tesseract-hub/domains/common/services/tenant-service/internal/models"
+	"tenant-service/internal/models"
 	"gorm.io/gorm"
 )
 

@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
-	"github.com/tesseract-hub/document-service/internal/models"
+	"document-service/internal/models"
 )
 
 // HealthHandler handles health check requests

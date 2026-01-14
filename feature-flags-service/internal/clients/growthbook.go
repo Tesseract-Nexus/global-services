@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tesseract-hub/feature-flags-service/internal/config"
+	"feature-flags-service/internal/config"
 )
 
 // GrowthbookClient wraps Growthbook API calls

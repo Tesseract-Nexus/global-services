@@ -6,7 +6,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/tesseract-hub/audit-service/internal/models"
+	"audit-service/internal/models"
 )
 
 // AuditRepositoryInterface defines the contract for audit log operations

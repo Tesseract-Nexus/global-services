@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/tesseract-hub/domains/common/services/verification-service/internal/templates"
+	"verification-service/internal/templates"
 )
 
 // EmailProvider defines the interface for email providers
