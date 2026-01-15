@@ -493,7 +493,7 @@ func (s *OnboardingService) ValidateAndReserveSlug(ctx context.Context, slug str
 	}
 
 	// Get the session to use email as reservedBy identifier
-	session, err := s.onboardingRepo.GetSessionByID(ctx, sessionID, []string{"ContactInformation", "BusinessInformation"})
+	session, err := s.onboardingRepo.GetSessionByID(ctx, sessionID, []string{"contact_information", "business_information"})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get session: %w", err)
 	}
@@ -538,8 +538,8 @@ func (s *OnboardingService) ValidateAndReserveSlug(ctx context.Context, slug str
 // UpdateStorefrontSlug updates the storefront slug in the session's business information
 // This is called when a user validates a storefront slug with session_id
 func (s *OnboardingService) UpdateStorefrontSlug(ctx context.Context, sessionID uuid.UUID, storefrontSlug string) error {
-	// Get the session with business information
-	session, err := s.onboardingRepo.GetSessionByID(ctx, sessionID, []string{"BusinessInformation"})
+	// Get the session with business information (use lowercase key to match switch case)
+	session, err := s.onboardingRepo.GetSessionByID(ctx, sessionID, []string{"business_information"})
 	if err != nil {
 		return fmt.Errorf("failed to get session: %w", err)
 	}
@@ -784,7 +784,7 @@ type CompleteAccountSetupResponse struct {
 // CompleteAccountSetup creates tenant and user account from onboarding session
 func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID uuid.UUID, password, authMethod, timezone, currency, businessModel string) (*CompleteAccountSetupResponse, error) {
 	// Get onboarding session with all related data
-	session, err := s.onboardingRepo.GetSessionByID(ctx, sessionID, []string{"business_information", "contact_information", "business_address"})
+	session, err := s.onboardingRepo.GetSessionByID(ctx, sessionID, []string{"business_information", "contact_information", "business_addresses"})
 	if err != nil {
 		return nil, fmt.Errorf("session not found: %w", err)
 	}
