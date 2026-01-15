@@ -535,6 +535,32 @@ func (s *OnboardingService) ValidateAndReserveSlug(ctx context.Context, slug str
 	return result, nil
 }
 
+// UpdateStorefrontSlug updates the storefront slug in the session's business information
+// This is called when a user validates a storefront slug with session_id
+func (s *OnboardingService) UpdateStorefrontSlug(ctx context.Context, sessionID uuid.UUID, storefrontSlug string) error {
+	// Get the session with business information
+	session, err := s.onboardingRepo.GetSessionByID(ctx, sessionID, []string{"BusinessInformation"})
+	if err != nil {
+		return fmt.Errorf("failed to get session: %w", err)
+	}
+
+	// Create or update business information with the storefront slug
+	if session.BusinessInformation == nil {
+		session.BusinessInformation = &models.BusinessInformation{
+			OnboardingSessionID: sessionID,
+		}
+	}
+	session.BusinessInformation.StorefrontSlug = storefrontSlug
+
+	// Save the updated business information
+	if _, err := s.businessRepo.CreateOrUpdate(ctx, sessionID, session.BusinessInformation); err != nil {
+		return fmt.Errorf("failed to update business info with storefront slug: %w", err)
+	}
+
+	log.Printf("[OnboardingService] Updated storefront slug to '%s' for session %s", storefrontSlug, sessionID)
+	return nil
+}
+
 // ValidateBusinessName validates if a business name is available
 func (s *OnboardingService) ValidateBusinessName(ctx context.Context, businessName string) (bool, error) {
 	// This would check against existing business names
@@ -602,6 +628,37 @@ func (s *OnboardingService) initializeSessionTasks(ctx context.Context, sessionI
 // updateSessionProgress updates the progress of a session
 func (s *OnboardingService) updateSessionProgress(ctx context.Context, sessionID uuid.UUID, currentStep string, progressPercentage int) error {
 	return s.onboardingRepo.UpdateSessionProgress(ctx, sessionID, currentStep, progressPercentage)
+}
+
+// CompleteTask marks a specific task as completed by its task_id (public API)
+// This is used by handlers to mark tasks complete after successful operations
+func (s *OnboardingService) CompleteTask(ctx context.Context, sessionID uuid.UUID, taskID string) error {
+	if err := s.completeTaskByID(ctx, sessionID, taskID); err != nil {
+		return fmt.Errorf("failed to complete task %s: %w", taskID, err)
+	}
+
+	// Recalculate and update session progress
+	tasks, err := s.taskRepo.GetTasksBySession(ctx, sessionID)
+	if err != nil {
+		return nil // Task completed, progress update is best-effort
+	}
+
+	completedCount := 0
+	for _, t := range tasks {
+		if t.Status == "completed" {
+			completedCount++
+		}
+	}
+
+	progress := 0
+	if len(tasks) > 0 {
+		progress = (completedCount * 100) / len(tasks)
+	}
+
+	// Update session progress
+	s.updateSessionProgress(ctx, sessionID, "", progress)
+
+	return nil
 }
 
 // completeTaskByID marks a task as completed by its task_id
@@ -738,18 +795,50 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 		return nil, fmt.Errorf("onboarding session is not ready for account setup (progress: %d%%)", session.ProgressPercentage)
 	}
 
-	// Get primary contact info (first in array)
+	// ============================================================================
+	// COMPREHENSIVE DATA VALIDATION
+	// Validate all required data exists before proceeding with account setup
+	// This prevents partial state creation and cryptic errors downstream
+	// ============================================================================
+
+	// Validate business information exists
+	if session.BusinessInformation == nil {
+		return nil, fmt.Errorf("business information is required - please complete the business details step")
+	}
+	if session.BusinessInformation.BusinessName == "" {
+		return nil, fmt.Errorf("business name is required - please complete the business details step")
+	}
+
+	// Validate contact information exists and has email
 	if len(session.ContactInformation) == 0 {
-		return nil, fmt.Errorf("no contact information found")
+		return nil, fmt.Errorf("contact information is required - please complete the contact details step")
 	}
 	primaryContact := session.ContactInformation[0]
+	if primaryContact.Email == "" {
+		return nil, fmt.Errorf("email address is required - please complete the contact details step")
+	}
+	if primaryContact.FirstName == "" || primaryContact.LastName == "" {
+		return nil, fmt.Errorf("first and last name are required - please complete the contact details step")
+	}
 
-	// TODO: Validate email is verified
-	// For now, we skip verification check as it's handled separately
-	// isVerified, err := s.verificationSvc.IsEmailVerified(ctx, sessionID, primaryContact.Email)
-	// if err != nil || !isVerified {
-	// 	return nil, fmt.Errorf("email is not verified")
-	// }
+	// Validate email is verified (check verification status)
+	if s.verificationSvc != nil {
+		isVerified, verifyErr := s.verificationSvc.IsEmailVerifiedByRecipient(ctx, primaryContact.Email, "email_verification")
+		if verifyErr != nil {
+			log.Printf("[OnboardingService] Warning: Could not check email verification status: %v", verifyErr)
+			// Don't fail - verification service might be unavailable
+		} else if !isVerified {
+			return nil, fmt.Errorf("email address must be verified before setting up your account")
+		}
+	}
+
+	// Validate password requirements
+	if password == "" {
+		return nil, fmt.Errorf("password is required")
+	}
+	if len(password) < 8 {
+		return nil, fmt.Errorf("password must be at least 8 characters")
+	}
 
 	// Check if tenant already created for this session
 	if session.TenantID != nil && *session.TenantID != uuid.Nil {
@@ -1012,13 +1101,18 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 
 	// Create owner membership for multi-tenant access
 	// This links the local user to the tenant with owner role
+	// CRITICAL: Without membership, user cannot access the tenant - fail onboarding
 	if s.membershipSvc != nil {
 		if _, membershipErr := s.membershipSvc.CreateOwnerMembership(ctx, tenantID, userID); membershipErr != nil {
-			// Log error but don't fail - membership can be created manually later
-			fmt.Printf("Warning: Failed to create owner membership: %v\n", membershipErr)
-		} else {
-			fmt.Printf("Created owner membership for user %s in tenant %s\n", userID, tenantID)
+			log.Printf("[OnboardingService] CRITICAL: Failed to create owner membership for user %s in tenant %s: %v", userID, tenantID, membershipErr)
+			// Mark tenant as inactive since user won't be able to access it
+			s.db.Model(&models.Tenant{}).Where("id = ?", tenantID).Update("status", "inactive")
+			return nil, fmt.Errorf("failed to create user access to tenant: %w - please contact support", membershipErr)
 		}
+		log.Printf("[OnboardingService] Created owner membership for user %s in tenant %s", userID, tenantID)
+	} else {
+		log.Printf("[OnboardingService] CRITICAL: Membership service not configured - user %s will not have access to tenant %s", userID, tenantID)
+		return nil, fmt.Errorf("membership service not configured - cannot complete onboarding")
 	}
 
 	// ============================================================================

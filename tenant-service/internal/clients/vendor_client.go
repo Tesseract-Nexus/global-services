@@ -203,6 +203,11 @@ type StorefrontData struct {
 	IsActive  bool      `json:"isActive"`
 }
 
+// GetTenantID implements the StorefrontInfo interface for tenant resolution
+func (s *StorefrontData) GetTenantID() string {
+	return s.TenantID
+}
+
 // CreateStorefrontResponse represents the response from creating a storefront
 type CreateStorefrontResponse struct {
 	Success bool            `json:"success"`
@@ -265,6 +270,56 @@ func (c *VendorClient) CreateStorefront(ctx context.Context, tenantID, vendorID 
 			return nil, fmt.Errorf("storefront creation failed: %s - %s", response.Error.Code, response.Error.Message)
 		}
 		return nil, fmt.Errorf("storefront creation failed: unknown error")
+	}
+
+	return response.Data, nil
+}
+
+// GetStorefrontBySlugResponse represents the response from getting a storefront by slug
+type GetStorefrontBySlugResponse struct {
+	Success bool            `json:"success"`
+	Data    *StorefrontData `json:"data,omitempty"`
+	Error   *ErrorData      `json:"error,omitempty"`
+}
+
+// GetStorefrontBySlug retrieves a storefront by its slug
+// Returns the storefront data including tenant_id, which can be used to resolve the tenant
+func (c *VendorClient) GetStorefrontBySlug(ctx context.Context, slug string) (*StorefrontData, error) {
+	url := fmt.Sprintf("%s/internal/storefronts/by-slug/%s", c.baseURL, slug)
+	httpReq, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, nil // Storefront doesn't exist
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("vendor service returned status %d", resp.StatusCode)
+	}
+
+	var response GetStorefrontBySlugResponse
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	if !response.Success || response.Data == nil {
+		if response.Error != nil {
+			return nil, fmt.Errorf("storefront lookup failed: %s - %s", response.Error.Code, response.Error.Message)
+		}
+		return nil, nil // Not found
 	}
 
 	return response.Data, nil

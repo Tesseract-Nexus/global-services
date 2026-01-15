@@ -141,6 +141,14 @@ func (h *VerificationHandler) VerifyCode(c *gin.Context) {
 		return
 	}
 
+	// Mark email_verification task as completed and update session progress
+	if err := h.onboardingService.CompleteTask(c.Request.Context(), sessionID, "email_verification"); err != nil {
+		// Log warning but don't fail - verification succeeded
+		log.Printf("[VerificationHandler] Warning: Failed to mark email_verification task complete for session %s: %v", sessionID, err)
+	} else {
+		log.Printf("[VerificationHandler] Marked email_verification task complete for session %s", sessionID)
+	}
+
 	// Return without sensitive data
 	response := map[string]interface{}{
 		"id":                record.ID,

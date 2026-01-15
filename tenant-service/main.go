@@ -33,6 +33,16 @@ import (
 	"gorm.io/gorm"
 )
 
+// vendorClientAdapter adapts clients.VendorClient to repository.VendorClientInterface
+// This is needed because the interface returns StorefrontInfo, but the client returns *StorefrontData
+type vendorClientAdapter struct {
+	client *clients.VendorClient
+}
+
+func (a *vendorClientAdapter) GetStorefrontBySlug(ctx context.Context, slug string) (repository.StorefrontInfo, error) {
+	return a.client.GetStorefrontBySlug(ctx, slug)
+}
+
 func main() {
 	// Load configuration
 	cfg := config.New()
@@ -138,6 +148,11 @@ func main() {
 	// Initialize vendor client for tenant creation
 	vendorServiceURL := getEnv("VENDOR_SERVICE_URL", "http://localhost:8087")
 	vendorClient := clients.NewVendorClient(vendorServiceURL)
+
+	// Wire vendor client to membership repo for storefront slug resolution
+	// This allows tenant lookup to fall back to storefront slug when tenant slug not found
+	membershipRepo.SetVendorClient(&vendorClientAdapter{vendorClient})
+	log.Printf("Membership repository: vendor-service client wired for storefront slug resolution")
 
 	// Initialize tenant service (for quick tenant creation)
 	tenantSvc := services.NewTenantService(db, membershipSvc, vendorClient, nc)
@@ -518,12 +533,17 @@ func setupRouter(
 			authRoutes.POST("/request-password-reset", authHandler.RequestPasswordReset) // Request password reset email
 			authRoutes.POST("/validate-reset-token", authHandler.ValidateResetToken)     // Validate reset token
 			authRoutes.POST("/reset-password", authHandler.ResetPassword)                // Reset password with token
+		}
 
-			// Protected endpoints (require auth)
-			authRoutes.POST("/change-password", authHandler.ChangePassword)        // Change password for a tenant
-			authRoutes.POST("/set-password", authHandler.SetPassword)              // Set password (password reset)
-			authRoutes.POST("/unlock-account", authHandler.UnlockAccount)          // Admin: unlock locked account
-			authRoutes.POST("/deactivate-account", authHandler.DeactivateAccount)  // Customer self-service deactivation
+		// Protected auth endpoints (require Istio JWT auth)
+		// SECURITY: These endpoints modify user credentials and must be authenticated
+		protectedAuth := v1.Group("/auth")
+		protectedAuth.Use(istioAuth)
+		{
+			protectedAuth.POST("/change-password", authHandler.ChangePassword)        // Change password for a tenant
+			protectedAuth.POST("/set-password", authHandler.SetPassword)              // Set password (after verification)
+			protectedAuth.POST("/unlock-account", authHandler.UnlockAccount)          // Admin: unlock locked account
+			protectedAuth.POST("/deactivate-account", authHandler.DeactivateAccount)  // Customer self-service deactivation
 		}
 
 		// Internal service-to-service endpoints (requires X-Internal-Service header)

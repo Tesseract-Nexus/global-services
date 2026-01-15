@@ -71,6 +71,26 @@ func (s *TenantAuthService) SetVerificationClient(client *clients.VerificationCl
 	s.verificationClient = client
 }
 
+// GetUserByKeycloakOrLocalID resolves a user by either Keycloak ID or local ID
+// This handles the case where JWT tokens contain Keycloak subject (sub) but
+// existing users may have a different local ID in tenant_users table
+// Priority: keycloak_id (from JWT) -> id (legacy/direct lookup)
+func (s *TenantAuthService) GetUserByKeycloakOrLocalID(ctx context.Context, userID uuid.UUID) (*models.User, error) {
+	var user models.User
+
+	// First try to find by keycloak_id (this is what JWT tokens contain)
+	if err := s.db.WithContext(ctx).Where("keycloak_id = ?", userID).First(&user).Error; err == nil {
+		return &user, nil
+	}
+
+	// Fall back to local ID lookup (for backwards compatibility)
+	if err := s.db.WithContext(ctx).Where("id = ?", userID).First(&user).Error; err == nil {
+		return &user, nil
+	}
+
+	return nil, fmt.Errorf("user not found with id or keycloak_id: %s", userID)
+}
+
 // AuthContext defines the authentication context
 // This prevents staff members from logging into the storefront
 const (
@@ -448,9 +468,9 @@ func (s *TenantAuthService) validateGlobalPassword(hashedPassword, plainPassword
 
 // ChangePassword changes a user's password in Keycloak
 func (s *TenantAuthService) ChangePassword(ctx context.Context, userID, tenantID uuid.UUID, currentPassword, newPassword string, changedBy *uuid.UUID) error {
-	// Get user to find KeycloakID and email
-	var user models.User
-	if err := s.db.WithContext(ctx).Where("id = ?", userID).First(&user).Error; err != nil {
+	// Get user by Keycloak ID or local ID (handles JWT subject vs local ID mismatch)
+	user, err := s.GetUserByKeycloakOrLocalID(ctx, userID)
+	if err != nil {
 		return fmt.Errorf("failed to get user: %w", err)
 	}
 
@@ -487,10 +507,11 @@ func (s *TenantAuthService) ChangePassword(ctx context.Context, userID, tenantID
 		return fmt.Errorf("failed to update password in Keycloak: %w", err)
 	}
 
-	// Log password change event
+	// Log password change event (use user.ID for consistent audit trail)
+	localUserID := user.ID
 	auditLog := &models.TenantAuthAuditLog{
 		TenantID:    tenantID,
-		UserID:      &userID,
+		UserID:      &localUserID,
 		EventType:   models.AuthEventPasswordChanged,
 		EventStatus: models.AuthEventStatusSuccess,
 		Details:     models.MustNewJSONB(map[string]interface{}{"changed_by": changedBy}),
@@ -506,9 +527,9 @@ func (s *TenantAuthService) ChangePassword(ctx context.Context, userID, tenantID
 // This is used during onboarding or password reset
 // Note: Password is stored ONLY in Keycloak, not in tenant_credentials
 func (s *TenantAuthService) SetPassword(ctx context.Context, userID, tenantID uuid.UUID, password string, setBy *uuid.UUID) error {
-	// Get user to find KeycloakID
-	var user models.User
-	if err := s.db.WithContext(ctx).Where("id = ?", userID).First(&user).Error; err != nil {
+	// Get user by Keycloak ID or local ID (handles JWT subject vs local ID mismatch)
+	user, err := s.GetUserByKeycloakOrLocalID(ctx, userID)
+	if err != nil {
 		return fmt.Errorf("failed to get user: %w", err)
 	}
 
@@ -534,14 +555,15 @@ func (s *TenantAuthService) SetPassword(ctx context.Context, userID, tenantID uu
 	}
 
 	// Ensure a credential record exists for tracking (without password hash)
-	existing, err := s.credentialRepo.GetCredential(ctx, userID, tenantID)
+	// Use user.ID (local ID) for credential records, not the passed userID (which may be Keycloak ID)
+	existing, err := s.credentialRepo.GetCredential(ctx, user.ID, tenantID)
 	if err != nil {
 		return fmt.Errorf("failed to check existing credential: %w", err)
 	}
 
 	if existing == nil {
 		// Create credential record without password (just for tracking/MFA)
-		_, err = s.credentialRepo.CreateCredentialWithoutPassword(ctx, userID, tenantID, setBy)
+		_, err = s.credentialRepo.CreateCredentialWithoutPassword(ctx, user.ID, tenantID, setBy)
 		if err != nil {
 			log.Printf("[TenantAuthService] Warning: Failed to create credential record: %v", err)
 			// Don't fail - password was set in Keycloak successfully

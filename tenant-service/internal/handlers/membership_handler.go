@@ -183,7 +183,18 @@ func (h *MembershipHandler) GetUserDefaultTenant(c *gin.Context) {
 		return
 	}
 
-	tenant, err := h.membershipSvc.GetUserDefaultTenant(c.Request.Context(), userID)
+	// Resolve Keycloak ID to local user ID if needed
+	// This handles the case where X-User-ID is a Keycloak ID but memberships use local IDs
+	resolvedUserID, err := h.membershipSvc.ResolveUserID(c.Request.Context(), userID)
+	if err != nil {
+		log.Printf("[MembershipHandler] Warning: Failed to resolve user ID %s: %v", userID, err)
+		// Continue with original ID as fallback
+		resolvedUserID = userID
+	} else if resolvedUserID != userID {
+		log.Printf("[MembershipHandler] Resolved Keycloak ID %s to local user ID %s", userID, resolvedUserID)
+	}
+
+	tenant, err := h.membershipSvc.GetUserDefaultTenant(c.Request.Context(), resolvedUserID)
 	if err != nil {
 		ErrorResponse(c, http.StatusInternalServerError, "Failed to get default tenant", err)
 		return
@@ -214,6 +225,16 @@ func (h *MembershipHandler) SetUserDefaultTenant(c *gin.Context) {
 		return
 	}
 
+	// Resolve Keycloak ID to local user ID if needed
+	resolvedUserID, err := h.membershipSvc.ResolveUserID(c.Request.Context(), userID)
+	if err != nil {
+		log.Printf("[MembershipHandler] Warning: Failed to resolve user ID %s: %v", userID, err)
+		// Continue with original ID as fallback
+		resolvedUserID = userID
+	} else if resolvedUserID != userID {
+		log.Printf("[MembershipHandler] Resolved Keycloak ID %s to local user ID %s", userID, resolvedUserID)
+	}
+
 	var req struct {
 		TenantID string `json:"tenant_id" binding:"required"`
 	}
@@ -228,7 +249,7 @@ func (h *MembershipHandler) SetUserDefaultTenant(c *gin.Context) {
 		return
 	}
 
-	if err := h.membershipSvc.SetUserDefaultTenant(c.Request.Context(), userID, tenantID); err != nil {
+	if err := h.membershipSvc.SetUserDefaultTenant(c.Request.Context(), resolvedUserID, tenantID); err != nil {
 		ErrorResponse(c, http.StatusInternalServerError, "Failed to set default tenant", err)
 		return
 	}

@@ -17,11 +17,23 @@ import (
 type MembershipRepository struct {
 	db                 *gorm.DB
 	tenantRouterClient TenantRouterClientInterface
+	vendorClient       VendorClientInterface
 }
 
 // TenantRouterClientInterface defines the interface for tenant-router-service client
 type TenantRouterClientInterface interface {
 	IsSlugRecentlyDeleted(ctx context.Context, slug string) (bool, int, string, error)
+}
+
+// VendorClientInterface defines the interface for vendor-service client
+// Used to resolve storefronts when tenant slug lookup fails
+type VendorClientInterface interface {
+	GetStorefrontBySlug(ctx context.Context, slug string) (StorefrontInfo, error)
+}
+
+// StorefrontInfo is an interface for storefront data needed for tenant resolution
+type StorefrontInfo interface {
+	GetTenantID() string
 }
 
 // NewMembershipRepository creates a new membership repository
@@ -34,15 +46,35 @@ func (r *MembershipRepository) SetTenantRouterClient(client TenantRouterClientIn
 	r.tenantRouterClient = client
 }
 
+// SetVendorClient sets the vendor client for storefront slug resolution
+func (r *MembershipRepository) SetVendorClient(client VendorClientInterface) {
+	r.vendorClient = client
+}
+
 // ============================================================================
 // Tenant Operations
 // ============================================================================
 
 // GetTenantBySlug retrieves a tenant by its URL slug
+// Falls back to storefront slug lookup if tenant slug not found
+// This handles the case where storefront slug differs from tenant slug
 func (r *MembershipRepository) GetTenantBySlug(ctx context.Context, slug string) (*models.Tenant, error) {
 	var tenant models.Tenant
 	if err := r.db.WithContext(ctx).Where("slug = ?", slug).First(&tenant).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
+			// Try storefront slug lookup as fallback
+			if r.vendorClient != nil {
+				storefront, sfErr := r.vendorClient.GetStorefrontBySlug(ctx, slug)
+				if sfErr == nil && storefront != nil && storefront.GetTenantID() != "" {
+					// Parse tenant ID and fetch tenant
+					tenantID, parseErr := uuid.Parse(storefront.GetTenantID())
+					if parseErr == nil {
+						if lookupErr := r.db.WithContext(ctx).First(&tenant, "id = ?", tenantID).Error; lookupErr == nil {
+							return &tenant, nil
+						}
+					}
+				}
+			}
 			return nil, fmt.Errorf("tenant not found: %s", slug)
 		}
 		return nil, fmt.Errorf("failed to get tenant by slug: %w", err)

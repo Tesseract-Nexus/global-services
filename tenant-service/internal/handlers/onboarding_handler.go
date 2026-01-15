@@ -328,7 +328,7 @@ func (h *OnboardingHandler) ValidateSubdomain(c *gin.Context) {
 }
 
 // ValidateStorefront validates storefront slug availability with suggestions
-// If session_id is provided, the slug will be reserved for that session to prevent race conditions
+// If session_id is provided, the slug will be reserved and persisted to the session
 func (h *OnboardingHandler) ValidateStorefront(c *gin.Context) {
 	storefrontSlug := c.Query("storefront_slug")
 	if storefrontSlug == "" {
@@ -336,7 +336,7 @@ func (h *OnboardingHandler) ValidateStorefront(c *gin.Context) {
 		return
 	}
 
-	// Get optional session ID for slug reservation
+	// Get optional session ID for slug reservation and persistence
 	sessionIDStr := c.Query("session_id")
 	var sessionID *uuid.UUID
 	if sessionIDStr != "" {
@@ -351,6 +351,14 @@ func (h *OnboardingHandler) ValidateStorefront(c *gin.Context) {
 	if err != nil {
 		ErrorResponse(c, http.StatusInternalServerError, "Failed to validate storefront slug", err)
 		return
+	}
+
+	// If session_id provided and slug is available, persist the storefront slug
+	if sessionID != nil && result.Available {
+		if err := h.onboardingService.UpdateStorefrontSlug(c.Request.Context(), *sessionID, result.Slug); err != nil {
+			// Log warning but don't fail - validation succeeded
+			log.Printf("[OnboardingHandler] Warning: Failed to persist storefront slug for session %s: %v", sessionID, err)
+		}
 	}
 
 	// Return the full validation result with suggestions

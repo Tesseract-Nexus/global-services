@@ -24,22 +24,28 @@ type PasswordResetService struct {
 	membershipRepo     *repository.MembershipRepository
 	keycloakClient     *auth.KeycloakAdminClient
 	notificationClient *clients.NotificationClient
-	storefrontBaseURL  string // e.g., "https://demo-store.tesserix.app"
+	baseDomain         string // e.g., "tesserix.app" - used to construct tenant-specific URLs
 }
 
 // NewPasswordResetService creates a new password reset service
 func NewPasswordResetService(db *gorm.DB, keycloakClient *auth.KeycloakAdminClient, notificationClient *clients.NotificationClient) *PasswordResetService {
-	storefrontBaseURL := os.Getenv("STOREFRONT_BASE_URL")
-	if storefrontBaseURL == "" {
-		storefrontBaseURL = "https://demo-store.tesserix.app"
+	baseDomain := os.Getenv("BASE_DOMAIN")
+	if baseDomain == "" {
+		baseDomain = "tesserix.app"
 	}
 	return &PasswordResetService{
 		db:                 db,
 		membershipRepo:     repository.NewMembershipRepository(db),
 		keycloakClient:     keycloakClient,
 		notificationClient: notificationClient,
-		storefrontBaseURL:  storefrontBaseURL,
+		baseDomain:         baseDomain,
 	}
+}
+
+// getStorefrontURL constructs the tenant-specific storefront URL
+// URL pattern: https://{slug}-store.{baseDomain}
+func (s *PasswordResetService) getStorefrontURL(tenantSlug string) string {
+	return fmt.Sprintf("https://%s-store.%s", tenantSlug, s.baseDomain)
 }
 
 // RequestPasswordResetInput represents input for requesting a password reset
@@ -119,8 +125,9 @@ func (s *PasswordResetService) RequestPasswordReset(ctx context.Context, input *
 		return nil, fmt.Errorf("failed to create token record: %w", err)
 	}
 
-	// Build reset link with raw (unhashed) token
-	resetLink := fmt.Sprintf("%s/reset-password?token=%s", s.storefrontBaseURL, rawToken)
+	// Build reset link with raw (unhashed) token using tenant-specific URL
+	storefrontURL := s.getStorefrontURL(tenant.Slug)
+	resetLink := fmt.Sprintf("%s/reset-password?token=%s", storefrontURL, rawToken)
 
 	// Send password reset email
 	if s.notificationClient != nil {

@@ -382,24 +382,93 @@ func (s *VerificationService) ResendVerificationCode(ctx context.Context, sessio
 }
 
 // GetVerificationStatus gets the verification status for a session
+// Fetches contact information from the session and checks verification status
 func (s *VerificationService) GetVerificationStatus(ctx context.Context, sessionID uuid.UUID) (map[string]interface{}, error) {
-	// This method would need to be refactored to query verification-service
-	// For now, return a placeholder response
-	// TODO: Implement proper status tracking
-	return map[string]interface{}{
+	result := map[string]interface{}{
 		"email_verified": false,
 		"phone_verified": false,
 		"verifications":  []map[string]interface{}{},
-		"note":           "Status tracking via verification-service not yet fully implemented",
-	}, nil
+	}
+
+	// Get session to retrieve contact information
+	if s.onboardingRepo == nil {
+		return result, nil
+	}
+
+	session, err := s.onboardingRepo.GetSessionByID(ctx, sessionID, []string{"contact_information"})
+	if err != nil {
+		return result, nil // Return defaults if session not found
+	}
+
+	if len(session.ContactInformation) == 0 {
+		return result, nil
+	}
+
+	contact := session.ContactInformation[0]
+
+	// Check email verification status
+	if contact.Email != "" {
+		isVerified, _ := s.IsEmailVerifiedByRecipient(ctx, contact.Email, "email_verification")
+		result["email_verified"] = isVerified
+	}
+
+	// Check phone verification status
+	if contact.Phone != "" {
+		phoneVerified, _ := s.IsEmailVerifiedByRecipient(ctx, contact.Phone, "phone_verification")
+		result["phone_verified"] = phoneVerified
+	}
+
+	return result, nil
 }
 
-// IsVerified checks if a specific verification type is verified
+// IsVerified checks if a specific verification type is verified for a session
 func (s *VerificationService) IsVerified(ctx context.Context, sessionID uuid.UUID, verificationType string) (bool, error) {
-	// This would need recipient information to check with verification-service
-	// For now, return false
-	// TODO: Implement proper verification check
-	return false, nil
+	// Get session to retrieve contact information
+	if s.onboardingRepo == nil {
+		return false, fmt.Errorf("onboarding repository not configured")
+	}
+
+	session, err := s.onboardingRepo.GetSessionByID(ctx, sessionID, []string{"contact_information"})
+	if err != nil {
+		return false, fmt.Errorf("failed to get session: %w", err)
+	}
+
+	if len(session.ContactInformation) == 0 {
+		return false, fmt.Errorf("no contact information found")
+	}
+
+	contact := session.ContactInformation[0]
+
+	// Determine recipient based on verification type
+	var recipient string
+	switch verificationType {
+	case "email", "email_verification":
+		recipient = contact.Email
+	case "phone", "phone_verification":
+		recipient = contact.Phone
+	default:
+		return false, fmt.Errorf("unknown verification type: %s", verificationType)
+	}
+
+	if recipient == "" {
+		return false, fmt.Errorf("no %s found in contact information", verificationType)
+	}
+
+	return s.IsEmailVerifiedByRecipient(ctx, recipient, verificationType)
+}
+
+// IsEmailVerifiedByRecipient checks if a recipient's email/phone is verified
+func (s *VerificationService) IsEmailVerifiedByRecipient(ctx context.Context, recipient, purpose string) (bool, error) {
+	if s.verificationClient == nil {
+		return false, fmt.Errorf("verification client not configured")
+	}
+
+	resp, err := s.verificationClient.GetStatus(ctx, recipient, purpose)
+	if err != nil {
+		return false, fmt.Errorf("failed to check verification status: %w", err)
+	}
+
+	return resp.IsVerified, nil
 }
 
 // GetVerificationStatusByRecipient gets verification status by recipient
