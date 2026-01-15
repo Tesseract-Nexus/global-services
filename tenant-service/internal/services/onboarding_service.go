@@ -190,13 +190,20 @@ func initKeycloakClient() (*auth.KeycloakAdminClient, *KeycloakOnboardingConfig)
 		log.Printf("Warning: KEYCLOAK_ADMIN_CLIENT_SECRET not set - user registration will fail")
 	}
 
-	// Public client configuration for password grant
+	// Public client configuration for password grant (auto-login after registration)
 	publicClientID := os.Getenv("KEYCLOAK_PUBLIC_CLIENT_ID")
 	if publicClientID == "" {
 		publicClientID = "tesserix-onboarding"
 	}
 
-	publicClientSecret := os.Getenv("KEYCLOAK_PUBLIC_CLIENT_SECRET") // Can be empty for public clients
+	// Get client secret from GCP Secret Manager (via KEYCLOAK_CLIENT_SECRET_NAME) or fall back to env var
+	// This enables auto-login with confidential clients like marketplace-dashboard
+	publicClientSecret := secrets.GetSecretOrEnv("KEYCLOAK_CLIENT_SECRET_NAME", "KEYCLOAK_PUBLIC_CLIENT_SECRET", "")
+	if publicClientSecret != "" {
+		log.Printf("Keycloak public client secret loaded for auto-login")
+	} else {
+		log.Printf("Warning: No Keycloak public client secret - auto-login after registration will fail")
+	}
 
 	defaultRole := os.Getenv("KEYCLOAK_DEFAULT_ROLE")
 	if defaultRole == "" {
