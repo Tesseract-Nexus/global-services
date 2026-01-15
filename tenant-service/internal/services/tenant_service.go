@@ -114,6 +114,9 @@ func (s *TenantService) CreateTenantForUser(ctx context.Context, req *CreateTena
 	}()
 
 	// Create tenant
+	// FIX-CRITICAL: Create tenant with "creating" status instead of "active"
+	// Status will be updated to "active" only after vendor/storefront are successfully created
+	// This prevents orphaned tenants in "active" status that lack required downstream resources
 	tenantID := uuid.New()
 	tenant := &models.Tenant{
 		ID:             tenantID,
@@ -122,7 +125,7 @@ func (s *TenantService) CreateTenantForUser(ctx context.Context, req *CreateTena
 		Subdomain:      req.Slug, // Use slug as subdomain
 		DisplayName:    req.Name,
 		Industry:       industry,
-		Status:         "active",
+		Status:         "creating",
 		Mode:           "development",
 		DefaultTimezone: "UTC",
 		DefaultCurrency: "USD",
@@ -191,6 +194,14 @@ func (s *TenantService) CreateTenantForUser(ctx context.Context, req *CreateTena
 		if vendorErr != nil {
 			// CRITICAL: Vendor creation is essential - fail tenant creation
 			log.Printf("[TenantService] CRITICAL: Failed to create vendor for tenant %s after retries: %v", tenantID, vendorErr)
+
+			// FIX-CRITICAL: Mark tenant as failed when vendor creation fails
+			if updateErr := s.db.Model(&models.Tenant{}).
+				Where("id = ?", tenantID).
+				Update("status", "failed").Error; updateErr != nil {
+				log.Printf("[TenantService] Warning: Failed to mark tenant as failed: %v", updateErr)
+			}
+
 			return nil, fmt.Errorf("failed to create vendor for tenant %s: %w - tenant creation cannot complete without a vendor", tenantID, vendorErr)
 		}
 
@@ -213,10 +224,29 @@ func (s *TenantService) CreateTenantForUser(ctx context.Context, req *CreateTena
 		if sfErr != nil {
 			// CRITICAL: Storefront creation is essential - fail tenant creation
 			log.Printf("[TenantService] CRITICAL: Failed to create storefront for vendor %s after retries: %v", vendorData.ID, sfErr)
+
+			// FIX-CRITICAL: Mark tenant as failed when storefront creation fails
+			if updateErr := s.db.Model(&models.Tenant{}).
+				Where("id = ?", tenantID).
+				Update("status", "failed").Error; updateErr != nil {
+				log.Printf("[TenantService] Warning: Failed to mark tenant as failed: %v", updateErr)
+			}
+
 			return nil, fmt.Errorf("failed to create storefront for vendor %s: %w - tenant creation cannot complete without a storefront", vendorData.ID, sfErr)
 		}
 
 		log.Printf("[TenantService] Created default storefront %s for vendor %s", storefrontData.ID, vendorData.ID)
+
+		// FIX-CRITICAL: Activate tenant now that vendor and storefront are created
+		// Tenant was created with "creating" status, now update to "active"
+		if updateErr := s.db.Model(&models.Tenant{}).
+			Where("id = ?", tenantID).
+			Update("status", "active").Error; updateErr != nil {
+			log.Printf("[TenantService] Warning: Failed to activate tenant: %v", updateErr)
+			// Don't fail - tenant is usable, just not marked active
+		} else {
+			log.Printf("[TenantService] Activated tenant %s (status: creating -> active)", tenantID)
+		}
 	} else {
 		// No vendor client configured - this is a critical configuration error
 		log.Printf("[TenantService] CRITICAL: Vendor client not configured - cannot create vendor for tenant %s", tenantID)

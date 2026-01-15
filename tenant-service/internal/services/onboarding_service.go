@@ -770,8 +770,13 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 		}
 
 		// Try to register in Keycloak (idempotent - handles existing users for multi-tenant)
+		// FIX-MEDIUM: Surface Keycloak password failures instead of just logging
+		// Previously, password setup failures were logged but user saw "success" and couldn't login
 		if _, regErr := s.registerUserInAuthService(primaryContact.Email, password, primaryContact.FirstName+" "+primaryContact.LastName, tenantID.String(), tenant.Slug); regErr != nil {
-			fmt.Printf("Warning: Failed to register user in Keycloak: %v\n", regErr)
+			// If password was provided and Keycloak failed, this is a critical error
+			// User won't be able to log in
+			log.Printf("[OnboardingService] CRITICAL: Failed to register/update user in Keycloak: %v", regErr)
+			return nil, fmt.Errorf("failed to set up authentication: %w - please try again", regErr)
 		}
 
 		// Generate admin URL (subdomain-based routing)
@@ -1072,6 +1077,25 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 		// CRITICAL: Owner RBAC bootstrap failure means owner can't access admin panel
 		// This is a fatal error - tenant without owner permissions is unusable
 		log.Printf("[OnboardingService] CRITICAL: Failed to bootstrap owner RBAC for tenant %s: %v", tenantID, bootstrapErr)
+
+		// FIX-CRITICAL: Mark tenant as failed when staff bootstrap fails
+		// Previously, the tenant was committed but left in an unusable state without staff permissions
+		if updateErr := s.db.Model(&models.Tenant{}).
+			Where("id = ?", tenantID).
+			Updates(map[string]interface{}{
+				"status":      "failed",
+				"description": fmt.Sprintf("Staff bootstrap failed: %v", bootstrapErr),
+			}).Error; updateErr != nil {
+			log.Printf("[OnboardingService] Warning: Failed to mark tenant as failed: %v", updateErr)
+		}
+
+		// Update session status to reflect the failure
+		if updateErr := s.db.Model(&models.OnboardingSession{}).
+			Where("id = ?", sessionID).
+			Update("status", "failed").Error; updateErr != nil {
+			log.Printf("[OnboardingService] Warning: Failed to update session status to failed: %v", updateErr)
+		}
+
 		return nil, fmt.Errorf("failed to bootstrap owner permissions: %w", bootstrapErr)
 	}
 	log.Printf("[OnboardingService] Bootstrapped owner RBAC for user %s in tenant %s", keycloakUserID, tenantID)
@@ -1115,6 +1139,21 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 			// CRITICAL: Vendor creation is essential - fail onboarding
 			// Without a vendor, the tenant cannot manage storefronts, products, or orders
 			log.Printf("[OnboardingService] CRITICAL: Failed to create vendor for tenant %s after retries: %v", tenantID, vendorErr)
+
+			// Update session status to "failed" to reflect provisioning failure
+			if updateErr := s.db.Model(&models.OnboardingSession{}).
+				Where("id = ?", sessionID).
+				Update("status", "failed").Error; updateErr != nil {
+				log.Printf("[OnboardingService] Warning: Failed to update session status to failed: %v", updateErr)
+			}
+
+			// Mark tenant as inactive since provisioning failed (tenant exists but is unusable)
+			if updateErr := s.db.Model(&models.Tenant{}).
+				Where("id = ?", tenantID).
+				Update("status", "inactive").Error; updateErr != nil {
+				log.Printf("[OnboardingService] Warning: Failed to update tenant status to inactive: %v", updateErr)
+			}
+
 			return nil, fmt.Errorf("failed to create vendor for tenant %s: %w - onboarding cannot complete without a vendor", tenantID, vendorErr)
 		}
 
@@ -1124,6 +1163,11 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 		// This prevents data corruption from race conditions or partial failures
 		if vendorData.TenantID != tenantID.String() {
 			log.Printf("[OnboardingService] CRITICAL: Vendor tenant_id mismatch! Expected %s, got %s. Failing onboarding.", tenantID.String(), vendorData.TenantID)
+
+			// Update session and tenant status to reflect data integrity failure
+			s.db.Model(&models.OnboardingSession{}).Where("id = ?", sessionID).Update("status", "failed")
+			s.db.Model(&models.Tenant{}).Where("id = ?", tenantID).Update("status", "inactive")
+
 			return nil, fmt.Errorf("vendor tenant_id mismatch: expected %s, got %s - data integrity issue detected", tenantID.String(), vendorData.TenantID)
 		}
 
@@ -1152,6 +1196,21 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 			// CRITICAL: Storefront creation is essential - fail onboarding
 			// Without a storefront, customers cannot access the store
 			log.Printf("[OnboardingService] CRITICAL: Failed to create storefront for vendor %s after retries: %v", vendorData.ID, storefrontErr)
+
+			// Update session status to "failed" to reflect provisioning failure
+			if updateErr := s.db.Model(&models.OnboardingSession{}).
+				Where("id = ?", sessionID).
+				Update("status", "failed").Error; updateErr != nil {
+				log.Printf("[OnboardingService] Warning: Failed to update session status to failed: %v", updateErr)
+			}
+
+			// Mark tenant as inactive since provisioning failed (tenant exists but is unusable)
+			if updateErr := s.db.Model(&models.Tenant{}).
+				Where("id = ?", tenantID).
+				Update("status", "inactive").Error; updateErr != nil {
+				log.Printf("[OnboardingService] Warning: Failed to update tenant status to inactive: %v", updateErr)
+			}
+
 			return nil, fmt.Errorf("failed to create storefront for vendor %s: %w - onboarding cannot complete without a storefront", vendorData.ID, storefrontErr)
 		}
 
@@ -1488,11 +1547,11 @@ func (s *OnboardingService) addTenantToExistingUser(ctx context.Context, user *a
 	// Update password if provided (e.g., during onboarding with password setup)
 	if password != "" {
 		if err := s.keycloakClient.SetUserPassword(ctx, user.ID, password, false); err != nil {
-			log.Printf("Warning: Failed to update password for existing user %s: %v", security.MaskEmail(user.Email), err)
-			// Don't fail the whole operation, user can reset password later
-		} else {
-			log.Printf("Successfully updated password for existing user %s", security.MaskEmail(user.Email))
+			// Password update failure is critical during onboarding - user won't be able to log in to new tenant
+			log.Printf("Error: Failed to update password for existing user %s: %v", security.MaskEmail(user.Email), err)
+			return "", fmt.Errorf("failed to set password for user: %w - please try again or use password reset", err)
 		}
+		log.Printf("Successfully updated password for existing user %s", security.MaskEmail(user.Email))
 	}
 
 	log.Printf("Successfully added tenant %s (slug: %s) to user %s (now has %d tenants)", tenantID, tenantSlug, security.MaskEmail(user.Email), len(updatedTenantIDs))
