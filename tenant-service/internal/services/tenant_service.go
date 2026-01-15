@@ -30,6 +30,11 @@ func NewTenantService(
 	vendorClient *clients.VendorClient,
 	natsClient *natsClient.Client,
 ) *TenantService {
+	if vendorClient != nil {
+		log.Printf("TenantService: vendor-service client wired for storefront slug resolution")
+	} else {
+		log.Printf("TenantService: WARNING - vendor-service client is nil, storefront fallback disabled")
+	}
 	return &TenantService{
 		db:            db,
 		membershipSvc: membershipSvc,
@@ -387,28 +392,61 @@ func (s *TenantService) GetTenantByID(ctx context.Context, tenantID uuid.UUID) (
 // GetTenantBySlug retrieves basic tenant information by slug (for internal service calls)
 // Falls back to storefront slug lookup if tenant slug not found (matches MembershipRepository behavior)
 func (s *TenantService) GetTenantBySlug(ctx context.Context, slug string) (*TenantBasicInfo, error) {
+	log.Printf("[TenantService] GetTenantBySlug called for slug: %s", slug)
+
 	var tenant models.Tenant
 	if err := s.db.WithContext(ctx).Where("slug = ?", slug).First(&tenant).Error; err != nil {
-		if err == gorm.ErrRecordNotFound && s.vendorClient != nil {
+		log.Printf("[TenantService] Tenant not found by slug %s, error: %v", slug, err)
+
+		if err == gorm.ErrRecordNotFound {
 			// Fallback: Try storefront slug lookup
 			// This handles cases where storefront slug differs from tenant slug
-			storefront, sfErr := s.vendorClient.GetStorefrontBySlug(ctx, slug)
-			if sfErr == nil && storefront != nil && storefront.GetTenantID() != "" {
-				tenantID, parseErr := uuid.Parse(storefront.GetTenantID())
-				if parseErr == nil {
-					if lookupErr := s.db.WithContext(ctx).First(&tenant, "id = ?", tenantID).Error; lookupErr == nil {
-						return &TenantBasicInfo{
-							ID:           tenant.ID.String(),
-							Slug:         tenant.Slug,
-							Name:         tenant.Name,
-							DisplayName:  tenant.DisplayName,
-							Subdomain:    tenant.Subdomain,
-							BillingEmail: tenant.BillingEmail,
-							Status:       tenant.Status,
-						}, nil
-					}
-				}
+			if s.vendorClient == nil {
+				log.Printf("[TenantService] WARN: vendorClient is nil, cannot perform storefront fallback for slug: %s", slug)
+				return nil, err
 			}
+
+			log.Printf("[TenantService] Attempting storefront fallback for slug: %s", slug)
+			storefront, sfErr := s.vendorClient.GetStorefrontBySlug(ctx, slug)
+			if sfErr != nil {
+				log.Printf("[TenantService] Storefront lookup failed for slug %s: %v", slug, sfErr)
+				return nil, err
+			}
+
+			if storefront == nil {
+				log.Printf("[TenantService] Storefront not found for slug: %s", slug)
+				return nil, err
+			}
+
+			tenantIDStr := storefront.GetTenantID()
+			if tenantIDStr == "" {
+				log.Printf("[TenantService] Storefront found but has no tenant ID for slug: %s", slug)
+				return nil, err
+			}
+
+			log.Printf("[TenantService] Storefront found with tenant ID: %s for slug: %s", tenantIDStr, slug)
+
+			tenantID, parseErr := uuid.Parse(tenantIDStr)
+			if parseErr != nil {
+				log.Printf("[TenantService] Failed to parse tenant ID %s: %v", tenantIDStr, parseErr)
+				return nil, err
+			}
+
+			if lookupErr := s.db.WithContext(ctx).First(&tenant, "id = ?", tenantID).Error; lookupErr != nil {
+				log.Printf("[TenantService] Tenant lookup by ID %s failed: %v", tenantID, lookupErr)
+				return nil, err
+			}
+
+			log.Printf("[TenantService] Successfully resolved slug %s to tenant %s via storefront fallback", slug, tenant.ID.String())
+			return &TenantBasicInfo{
+				ID:           tenant.ID.String(),
+				Slug:         tenant.Slug,
+				Name:         tenant.Name,
+				DisplayName:  tenant.DisplayName,
+				Subdomain:    tenant.Subdomain,
+				BillingEmail: tenant.BillingEmail,
+				Status:       tenant.Status,
+			}, nil
 		}
 		return nil, err
 	}
