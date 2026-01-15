@@ -363,6 +363,7 @@ type TenantBasicInfo struct {
 	DisplayName  string `json:"displayName,omitempty"`
 	Subdomain    string `json:"subdomain,omitempty"`
 	BillingEmail string `json:"billingEmail,omitempty"`
+	Status       string `json:"status"` // Required for middleware tenant validation
 }
 
 // GetTenantByID retrieves basic tenant information by ID (for internal service calls)
@@ -373,12 +374,13 @@ func (s *TenantService) GetTenantByID(ctx context.Context, tenantID uuid.UUID) (
 	}
 
 	return &TenantBasicInfo{
-		ID:          tenant.ID.String(),
-		Slug:        tenant.Slug,
-		Name:        tenant.Name,
-		DisplayName: tenant.DisplayName,
-		Subdomain:   tenant.Subdomain,
+		ID:           tenant.ID.String(),
+		Slug:         tenant.Slug,
+		Name:         tenant.Name,
+		DisplayName:  tenant.DisplayName,
+		Subdomain:    tenant.Subdomain,
 		BillingEmail: tenant.BillingEmail,
+		Status:       tenant.Status,
 	}, nil
 }
 
@@ -390,12 +392,13 @@ func (s *TenantService) GetTenantBySlug(ctx context.Context, slug string) (*Tena
 	}
 
 	return &TenantBasicInfo{
-		ID:          tenant.ID.String(),
-		Slug:        tenant.Slug,
-		Name:        tenant.Name,
-		DisplayName: tenant.DisplayName,
-		Subdomain:   tenant.Subdomain,
+		ID:           tenant.ID.String(),
+		Slug:         tenant.Slug,
+		Name:         tenant.Name,
+		DisplayName:  tenant.DisplayName,
+		Subdomain:    tenant.Subdomain,
 		BillingEmail: tenant.BillingEmail,
+		Status:       tenant.Status,
 	}, nil
 }
 
