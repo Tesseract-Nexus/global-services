@@ -26,6 +26,8 @@ RUN addgroup -g 1000 -S appgroup && adduser -D -u 1000 -S appuser -G appgroup
 WORKDIR /app
 
 COPY --from=builder /build/status-dashboard-service .
+COPY --from=builder /build/templates ./templates
+COPY --from=builder /build/static ./static
 
 RUN chown -R appuser:appgroup /app
 
