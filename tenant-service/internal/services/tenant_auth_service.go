@@ -483,7 +483,7 @@ func (s *TenantAuthService) ChangePassword(ctx context.Context, userID, tenantID
 		return fmt.Errorf("authentication service not properly configured")
 	}
 
-	_, err := s.keycloakClient.GetTokenWithPassword(
+	_, err = s.keycloakClient.GetTokenWithPassword(
 		ctx,
 		s.keycloakConfig.ClientID,
 		s.keycloakConfig.ClientSecret,
