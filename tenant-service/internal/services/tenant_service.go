@@ -385,9 +385,31 @@ func (s *TenantService) GetTenantByID(ctx context.Context, tenantID uuid.UUID) (
 }
 
 // GetTenantBySlug retrieves basic tenant information by slug (for internal service calls)
+// Falls back to storefront slug lookup if tenant slug not found (matches MembershipRepository behavior)
 func (s *TenantService) GetTenantBySlug(ctx context.Context, slug string) (*TenantBasicInfo, error) {
 	var tenant models.Tenant
 	if err := s.db.WithContext(ctx).Where("slug = ?", slug).First(&tenant).Error; err != nil {
+		if err == gorm.ErrRecordNotFound && s.vendorClient != nil {
+			// Fallback: Try storefront slug lookup
+			// This handles cases where storefront slug differs from tenant slug
+			storefront, sfErr := s.vendorClient.GetStorefrontBySlug(ctx, slug)
+			if sfErr == nil && storefront != nil && storefront.GetTenantID() != "" {
+				tenantID, parseErr := uuid.Parse(storefront.GetTenantID())
+				if parseErr == nil {
+					if lookupErr := s.db.WithContext(ctx).First(&tenant, "id = ?", tenantID).Error; lookupErr == nil {
+						return &TenantBasicInfo{
+							ID:           tenant.ID.String(),
+							Slug:         tenant.Slug,
+							Name:         tenant.Name,
+							DisplayName:  tenant.DisplayName,
+							Subdomain:    tenant.Subdomain,
+							BillingEmail: tenant.BillingEmail,
+							Status:       tenant.Status,
+						}, nil
+					}
+				}
+			}
+		}
 		return nil, err
 	}
 
