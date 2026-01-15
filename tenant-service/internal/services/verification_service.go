@@ -458,14 +458,31 @@ func (s *VerificationService) IsVerified(ctx context.Context, sessionID uuid.UUI
 }
 
 // IsEmailVerifiedByRecipient checks if a recipient's email/phone is verified
+// First checks Redis (for link-based verification), then falls back to verification-service (for OTP)
 func (s *VerificationService) IsEmailVerifiedByRecipient(ctx context.Context, recipient, purpose string) (bool, error) {
+	// First check Redis for link-based verification status
+	// This is where VerifyByToken stores the verification status
+	if s.redisClient != nil && (purpose == "email_verification" || purpose == "email") {
+		status, err := s.redisClient.GetEmailVerificationStatus(ctx, recipient)
+		if err != nil {
+			log.Printf("[VerificationService] Warning: Redis lookup failed for %s: %v", recipient, err)
+			// Continue to verification-service fallback
+		} else if status != nil && status.IsVerified {
+			log.Printf("[VerificationService] Email %s verified via link (from Redis)", recipient)
+			return true, nil
+		}
+	}
+
+	// Fall back to verification-service for OTP-based verification
 	if s.verificationClient == nil {
 		return false, fmt.Errorf("verification client not configured")
 	}
 
 	resp, err := s.verificationClient.GetStatus(ctx, recipient, purpose)
 	if err != nil {
-		return false, fmt.Errorf("failed to check verification status: %w", err)
+		// If verification-service also fails, but we checked Redis above, return false gracefully
+		log.Printf("[VerificationService] Warning: verification-service lookup failed for %s: %v", recipient, err)
+		return false, nil
 	}
 
 	return resp.IsVerified, nil
