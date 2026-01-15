@@ -634,19 +634,42 @@ func autoMigrate(db *gorm.DB) error {
 		log.Printf("Warning: Failed to seed default templates: %v", err)
 	}
 
+	// Seed reserved slugs for URL protection
+	if err := seedReservedSlugs(db); err != nil {
+		log.Printf("Warning: Failed to seed reserved slugs: %v", err)
+	}
+
 	return nil
 }
 
 // seedDefaultTemplates creates default onboarding templates if they don't exist
 func seedDefaultTemplates(db *gorm.DB) error {
-	// Check if ecommerce template already exists
-	var count int64
-	if err := db.Model(&models.OnboardingTemplate{}).Where("application_type = ? AND is_default = ?", "ecommerce", true).Count(&count).Error; err != nil {
+	// Check if ACTIVE ecommerce template already exists
+	// IMPORTANT: Must check is_active = true to match GetDefaultTemplate query
+	var activeCount int64
+	if err := db.Model(&models.OnboardingTemplate{}).Where("application_type = ? AND is_default = ? AND is_active = ?", "ecommerce", true, true).Count(&activeCount).Error; err != nil {
 		return fmt.Errorf("failed to check existing templates: %w", err)
 	}
 
-	if count > 0 {
-		log.Println("Default templates already exist, skipping seed")
+	if activeCount > 0 {
+		log.Println("Default active templates already exist, skipping seed")
+		return nil
+	}
+
+	// Check if inactive template exists and reactivate it
+	var inactiveCount int64
+	if err := db.Model(&models.OnboardingTemplate{}).Where("application_type = ? AND is_default = ? AND is_active = ?", "ecommerce", true, false).Count(&inactiveCount).Error; err != nil {
+		log.Printf("Warning: Failed to check inactive templates: %v", err)
+	}
+
+	if inactiveCount > 0 {
+		log.Println("Found inactive default template, reactivating...")
+		if err := db.Model(&models.OnboardingTemplate{}).
+			Where("application_type = ? AND is_default = ?", "ecommerce", true).
+			Update("is_active", true).Error; err != nil {
+			return fmt.Errorf("failed to reactivate template: %w", err)
+		}
+		log.Println("Default ecommerce template reactivated successfully")
 		return nil
 	}
 
@@ -713,6 +736,96 @@ func seedDefaultTemplates(db *gorm.DB) error {
 	}
 
 	log.Printf("Created default ecommerce template with ID: %s", ecommerceTemplate.ID)
+	return nil
+}
+
+// seedReservedSlugs creates default reserved slugs for URL protection
+func seedReservedSlugs(db *gorm.DB) error {
+	// Check if reserved slugs already exist
+	var count int64
+	if err := db.Model(&models.ReservedSlug{}).Where("is_active = ?", true).Count(&count).Error; err != nil {
+		return fmt.Errorf("failed to check existing reserved slugs: %w", err)
+	}
+
+	if count > 0 {
+		log.Printf("Reserved slugs already exist (%d active), skipping seed", count)
+		return nil
+	}
+
+	log.Println("Seeding reserved slugs for URL protection...")
+
+	// Define reserved slugs by category
+	reservedSlugs := []models.ReservedSlug{
+		// System slugs - critical paths
+		{Slug: "admin", Reason: "System administration", Category: "system", IsActive: true, CreatedBy: "system"},
+		{Slug: "api", Reason: "API endpoints", Category: "system", IsActive: true, CreatedBy: "system"},
+		{Slug: "app", Reason: "Application path", Category: "system", IsActive: true, CreatedBy: "system"},
+		{Slug: "auth", Reason: "Authentication", Category: "system", IsActive: true, CreatedBy: "system"},
+		{Slug: "login", Reason: "Login page", Category: "system", IsActive: true, CreatedBy: "system"},
+		{Slug: "logout", Reason: "Logout page", Category: "system", IsActive: true, CreatedBy: "system"},
+		{Slug: "register", Reason: "Registration page", Category: "system", IsActive: true, CreatedBy: "system"},
+		{Slug: "signup", Reason: "Signup page", Category: "system", IsActive: true, CreatedBy: "system"},
+		{Slug: "signin", Reason: "Signin page", Category: "system", IsActive: true, CreatedBy: "system"},
+		{Slug: "dashboard", Reason: "Dashboard path", Category: "system", IsActive: true, CreatedBy: "system"},
+		{Slug: "settings", Reason: "Settings path", Category: "system", IsActive: true, CreatedBy: "system"},
+		{Slug: "account", Reason: "Account path", Category: "system", IsActive: true, CreatedBy: "system"},
+		{Slug: "profile", Reason: "Profile path", Category: "system", IsActive: true, CreatedBy: "system"},
+		{Slug: "help", Reason: "Help page", Category: "system", IsActive: true, CreatedBy: "system"},
+		{Slug: "support", Reason: "Support page", Category: "system", IsActive: true, CreatedBy: "system"},
+		{Slug: "status", Reason: "Status page", Category: "system", IsActive: true, CreatedBy: "system"},
+		{Slug: "health", Reason: "Health check", Category: "system", IsActive: true, CreatedBy: "system"},
+		{Slug: "metrics", Reason: "Metrics endpoint", Category: "system", IsActive: true, CreatedBy: "system"},
+		{Slug: "docs", Reason: "Documentation", Category: "system", IsActive: true, CreatedBy: "system"},
+		{Slug: "api-docs", Reason: "API documentation", Category: "system", IsActive: true, CreatedBy: "system"},
+		// Infrastructure slugs
+		{Slug: "www", Reason: "Web subdomain", Category: "infrastructure", IsActive: true, CreatedBy: "system"},
+		{Slug: "cdn", Reason: "CDN subdomain", Category: "infrastructure", IsActive: true, CreatedBy: "system"},
+		{Slug: "mail", Reason: "Mail subdomain", Category: "infrastructure", IsActive: true, CreatedBy: "system"},
+		{Slug: "smtp", Reason: "SMTP subdomain", Category: "infrastructure", IsActive: true, CreatedBy: "system"},
+		{Slug: "ftp", Reason: "FTP subdomain", Category: "infrastructure", IsActive: true, CreatedBy: "system"},
+		{Slug: "static", Reason: "Static assets", Category: "infrastructure", IsActive: true, CreatedBy: "system"},
+		{Slug: "assets", Reason: "Assets path", Category: "infrastructure", IsActive: true, CreatedBy: "system"},
+		{Slug: "images", Reason: "Images path", Category: "infrastructure", IsActive: true, CreatedBy: "system"},
+		{Slug: "files", Reason: "Files path", Category: "infrastructure", IsActive: true, CreatedBy: "system"},
+		{Slug: "uploads", Reason: "Uploads path", Category: "infrastructure", IsActive: true, CreatedBy: "system"},
+		{Slug: "media", Reason: "Media path", Category: "infrastructure", IsActive: true, CreatedBy: "system"},
+		// Brand slugs
+		{Slug: "tesseract", Reason: "Brand protection", Category: "brand", IsActive: true, CreatedBy: "system"},
+		{Slug: "tesserix", Reason: "Brand protection", Category: "brand", IsActive: true, CreatedBy: "system"},
+		{Slug: "tesseract-hub", Reason: "Brand protection", Category: "brand", IsActive: true, CreatedBy: "system"},
+		{Slug: "marketplace", Reason: "Platform name", Category: "brand", IsActive: true, CreatedBy: "system"},
+		// Common reserved terms
+		{Slug: "test", Reason: "Reserved for testing", Category: "system", IsActive: true, CreatedBy: "system"},
+		{Slug: "demo", Reason: "Reserved for demos", Category: "system", IsActive: true, CreatedBy: "system"},
+		{Slug: "staging", Reason: "Reserved for staging", Category: "system", IsActive: true, CreatedBy: "system"},
+		{Slug: "dev", Reason: "Reserved for development", Category: "system", IsActive: true, CreatedBy: "system"},
+		{Slug: "prod", Reason: "Reserved for production", Category: "system", IsActive: true, CreatedBy: "system"},
+		{Slug: "production", Reason: "Reserved for production", Category: "system", IsActive: true, CreatedBy: "system"},
+		{Slug: "internal", Reason: "Internal use", Category: "system", IsActive: true, CreatedBy: "system"},
+		{Slug: "private", Reason: "Private use", Category: "system", IsActive: true, CreatedBy: "system"},
+		{Slug: "public", Reason: "Public use", Category: "system", IsActive: true, CreatedBy: "system"},
+		{Slug: "root", Reason: "Root access", Category: "system", IsActive: true, CreatedBy: "system"},
+		{Slug: "system", Reason: "System use", Category: "system", IsActive: true, CreatedBy: "system"},
+		{Slug: "null", Reason: "Reserved keyword", Category: "system", IsActive: true, CreatedBy: "system"},
+		{Slug: "undefined", Reason: "Reserved keyword", Category: "system", IsActive: true, CreatedBy: "system"},
+		{Slug: "true", Reason: "Reserved keyword", Category: "system", IsActive: true, CreatedBy: "system"},
+		{Slug: "false", Reason: "Reserved keyword", Category: "system", IsActive: true, CreatedBy: "system"},
+	}
+
+	// Insert reserved slugs, ignoring duplicates
+	var inserted int
+	for _, slug := range reservedSlugs {
+		result := db.Where("slug = ?", slug.Slug).FirstOrCreate(&slug)
+		if result.Error != nil {
+			log.Printf("Warning: Failed to create reserved slug '%s': %v", slug.Slug, result.Error)
+			continue
+		}
+		if result.RowsAffected > 0 {
+			inserted++
+		}
+	}
+
+	log.Printf("Seeded %d reserved slugs successfully", inserted)
 	return nil
 }
 
