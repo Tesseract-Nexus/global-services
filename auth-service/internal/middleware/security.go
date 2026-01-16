@@ -290,10 +290,12 @@ func (sm *SecurityMiddleware) LoginRateLimitMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// First, apply IP-based rate limiting
 		ip := c.ClientIP()
-		limiter := baseRateLimiter
 
-		// Get rate limit key and check
-		if !limiter.Middleware()(c); c.IsAborted() {
+		// Apply the rate limiter middleware
+		baseRateLimiter.Middleware()(c)
+
+		// Check if rate limit was exceeded (context aborted)
+		if c.IsAborted() {
 			sm.logSecurityEvent("rate_limit_exceeded", ip, "", map[string]interface{}{
 				"endpoint": c.Request.URL.Path,
 			})
