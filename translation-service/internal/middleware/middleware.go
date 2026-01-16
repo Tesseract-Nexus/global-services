@@ -165,6 +165,14 @@ func (rl *RateLimiter) Middleware() gin.HandlerFunc {
 func GetTenantID(c *gin.Context) (string, bool) {
 	tenantID, exists := c.Get("tenant_id")
 	if !exists {
+		// Fallback to headers for BFF calls
+		tenantIDStr := c.GetHeader("X-Tenant-ID")
+		if tenantIDStr == "" {
+			tenantIDStr = c.GetHeader("x-jwt-claim-tenant-id")
+		}
+		if tenantIDStr != "" {
+			return tenantIDStr, true
+		}
 		return "", false
 	}
 	return tenantID.(string), true
@@ -223,6 +231,9 @@ func GetUserID(c *gin.Context) (uuid.UUID, bool) {
 	if !exists {
 		// Try to parse from header as fallback
 		userIDStr := c.GetHeader("X-User-ID")
+		if userIDStr == "" {
+			userIDStr = c.GetHeader("x-jwt-claim-sub")
+		}
 		if userIDStr != "" {
 			if parsed, err := uuid.Parse(userIDStr); err == nil {
 				return parsed, true
@@ -230,5 +241,14 @@ func GetUserID(c *gin.Context) (uuid.UUID, bool) {
 		}
 		return uuid.Nil, false
 	}
-	return userID.(uuid.UUID), true
+	// Handle both uuid.UUID and string types (go-shared sets string)
+	switch v := userID.(type) {
+	case uuid.UUID:
+		return v, true
+	case string:
+		if parsed, err := uuid.Parse(v); err == nil {
+			return parsed, true
+		}
+	}
+	return uuid.Nil, false
 }

@@ -8,10 +8,8 @@ cloud.google.com/go/iam v1.1.3/go.mod h1:3khUlaBXfPKKe7huYgEpDn6FtgRyMEqbkvBxrQy
 cloud.google.com/go/secretmanager v1.11.4 h1:krnX9qpG2kR2fJ+u+uNyNo+ACVhplIAS4Pu7u+4gd+k=
 cloud.google.com/go/secretmanager v1.11.4/go.mod h1:wreJlbS9Zdq21lMzWmJ0XhWW2ZxgPeahsqeV/vZoJ3w=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
-github.com/Tesseract-Nexus/go-shared v0.0.0-20260114152147-11cd2a14e96d h1:ZDMevDiXoEqpfbP2e/C6eTkHG9y3jR3BgyrGtDyUcwI=
-github.com/Tesseract-Nexus/go-shared v0.0.0-20260114152147-11cd2a14e96d/go.mod h1:8pz+AQH7vqnb5jSJUf3q1xWoszVZyhON4p8bBTS894U=
-github.com/Tesseract-Nexus/go-shared v0.0.0-20260116025029-bf676bd77644 h1:MYbVvmrmvtYnuBdcNY2LCk7hvQ++5OlcAJyHRXeC1WU=
-github.com/Tesseract-Nexus/go-shared v0.0.0-20260116025029-bf676bd77644/go.mod h1:8pz+AQH7vqnb5jSJUf3q1xWoszVZyhON4p8bBTS894U=
+github.com/Tesseract-Nexus/go-shared v0.0.0-20260116071333-4de9a2a176a9 h1:YLxi2h4sOIAXs3A54Oqx+G38JXAjeEv7kWID1cofbX4=
+github.com/Tesseract-Nexus/go-shared v0.0.0-20260116071333-4de9a2a176a9/go.mod h1:8pz+AQH7vqnb5jSJUf3q1xWoszVZyhON4p8bBTS894U=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/bsm/ginkgo/v2 v2.12.0 h1:Ny8MWAHyOepLGlLKYmXG4IEkioBysk6GpaRTLC8zwWs=

@@ -3,7 +3,7 @@ module translation-service
 go 1.25.5
 
 require (
-	github.com/Tesseract-Nexus/go-shared v0.0.0-20260116025029-bf676bd77644
+	github.com/Tesseract-Nexus/go-shared v0.0.0-20260116071333-4de9a2a176a9
 	github.com/gin-gonic/gin v1.10.0
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
