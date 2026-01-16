@@ -471,6 +471,59 @@ export async function authRoutes(fastify: FastifyInstance) {
   });
 
   // ============================================================================
+  // GET /internal/get-token
+  // Internal endpoint for BFF services (Next.js) to get the access token
+  // This enables server-side API calls to backend services with proper auth
+  // SECURITY: Should only be accessible from internal services (not exposed externally)
+  // ============================================================================
+  fastify.get('/internal/get-token', async (request, reply) => {
+    const session = await getSession(request);
+
+    if (!session) {
+      return reply.code(401).send({ error: 'no_session' });
+    }
+
+    // Check if session is expired
+    const now = Math.floor(Date.now() / 1000);
+    if (session.expiresAt < now) {
+      // Try to refresh if we have a refresh token
+      if (session.refreshToken) {
+        try {
+          const newTokens = await oidcClient.refreshTokens(session.clientType, session.refreshToken);
+          await sessionStore.updateSession(session.id, {
+            accessToken: newTokens.accessToken,
+            idToken: newTokens.idToken,
+            refreshToken: newTokens.refreshToken || session.refreshToken,
+            expiresAt: newTokens.expiresAt,
+          });
+
+          return reply.send({
+            access_token: newTokens.accessToken,
+            user_id: session.userId,
+            tenant_id: session.tenantId,
+            tenant_slug: session.tenantSlug,
+            expires_at: newTokens.expiresAt,
+          });
+        } catch (error) {
+          logger.error({ error, sessionId: session.id }, 'Token refresh failed during internal get-token');
+          return reply.code(401).send({ error: 'session_expired' });
+        }
+      }
+      return reply.code(401).send({ error: 'session_expired' });
+    }
+
+    logger.debug({ userId: session.userId }, 'Internal token retrieved');
+
+    return reply.send({
+      access_token: session.accessToken,
+      user_id: session.userId,
+      tenant_id: session.tenantId,
+      tenant_slug: session.tenantSlug,
+      expires_at: session.expiresAt,
+    });
+  });
+
+  // ============================================================================
   // POST /auth/transfer-session
   // Creates a one-time transfer code for cross-subdomain session handoff
   // Used when redirecting from onboarding to admin dashboard
