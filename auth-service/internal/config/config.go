@@ -73,8 +73,9 @@ func LoadConfig() *Config {
 	viper.SetDefault("redis.password", "")
 	viper.SetDefault("redis.db", 0)
 
-	viper.SetDefault("jwt.secret", "your-super-secret-jwt-key-change-in-production")
-	viper.SetDefault("jwt.refresh_secret", "your-refresh-token-secret-here")
+	// SECURITY: No default secrets - must be configured via environment or GCP Secret Manager
+	viper.SetDefault("jwt.secret", "")
+	viper.SetDefault("jwt.refresh_secret", "")
 	viper.SetDefault("jwt.access_expiry_hours", 8)
 	viper.SetDefault("jwt.refresh_expiry_days", 30)
 
@@ -160,6 +161,25 @@ func LoadConfig() *Config {
 	// Unmarshal into config struct
 	if err := viper.Unmarshal(config); err != nil {
 		log.Fatalf("Unable to decode config: %v", err)
+	}
+
+	// SECURITY: Validate required secrets in production
+	// In development mode (debug), allow empty secrets for local testing
+	// In production mode (release), require all secrets to be properly configured
+	if config.Server.Mode != "debug" {
+		if config.JWT.Secret == "" {
+			log.Fatal("SECURITY ERROR: JWT_SECRET is required in production. " +
+				"Set JWT_SECRET environment variable or configure GCP Secret Manager.")
+		}
+		if config.JWT.RefreshSecret == "" {
+			log.Fatal("SECURITY ERROR: JWT_REFRESH_SECRET is required in production. " +
+				"Set JWT_REFRESH_SECRET environment variable.")
+		}
+		if config.Database.Password == "" {
+			log.Fatal("SECURITY ERROR: DB_PASSWORD is required in production. " +
+				"Set DB_PASSWORD environment variable or configure GCP Secret Manager.")
+		}
+		log.Println("✓ Security validation passed: all required secrets are configured")
 	}
 
 	return config

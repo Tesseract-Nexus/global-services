@@ -73,12 +73,18 @@ func (h *AuthHandlers) Login(c *gin.Context) {
 			req.Email, req.Password, nil, req.TenantID, ipAddress, userAgent,
 		)
 		if err != nil {
+			// Record failed login attempt for account lockout
+			middleware.RecordLoginAttemptFromContext(c, false)
+
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error":   "Invalid credentials",
 				"details": err.Error(),
 			})
 			return
 		}
+
+		// Record successful login attempt (clears lockout state)
+		middleware.RecordLoginAttemptFromContext(c, true)
 
 		// TODO: Re-enable email verification check after integrating with onboarding verification
 		// For now, we allow login without email verification since it's handled in onboarding

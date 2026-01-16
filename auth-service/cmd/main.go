@@ -21,6 +21,8 @@ import (
 	"auth-service/internal/migration"
 	"auth-service/internal/repository"
 	"auth-service/internal/services"
+
+	sharedmw "github.com/Tesseract-Nexus/go-shared/middleware"
 )
 
 func main() {
@@ -108,6 +110,10 @@ func main() {
 	// Initialize middleware
 	authMiddleware := middleware.NewAuthMiddleware(authService)
 
+	// Initialize security middleware for rate limiting and account lockout
+	securityMiddleware := middleware.NewSecurityMiddleware(redisClient, logger)
+	log.Println("✓ Security middleware initialized (rate limiting and account lockout enabled)")
+
 	// Setup Gin router
 	if cfg.Server.Mode == "release" {
 		gin.SetMode(gin.ReleaseMode)
@@ -129,17 +135,54 @@ func main() {
 	// API routes
 	api := router.Group("/api/v1")
 	{
-		// Public authentication routes
+		// Public authentication routes with rate limiting
 		auth := api.Group("/auth")
 		{
-			auth.POST("/login", authHandlers.Login)
-			auth.POST("/refresh", authHandlers.RefreshToken)
+			// Login endpoint with combined rate limiting:
+			// - IP-based rate limiting (go-shared AuthRateLimit)
+			// - Account lockout with exponential backoff (IP + email combination)
+			auth.POST("/login",
+				sharedmw.AuthRateLimit(),                        // IP-based rate limiting
+				securityMiddleware.AccountLockoutMiddleware(),   // Account lockout check
+				authHandlers.Login,
+			)
+
+			// Refresh token with auth rate limiting
+			auth.POST("/refresh",
+				sharedmw.AuthRateLimit(),
+				authHandlers.RefreshToken,
+			)
+
+			// Logout endpoint (lighter rate limiting)
 			auth.POST("/logout", authHandlers.Logout)
+
+			// Token validation
 			auth.POST("/validate", authHandlers.ValidateToken)
 
-			// Password-based authentication
-			auth.POST("/register", passwordHandlers.Register)
+			// Registration with auth rate limiting
+			auth.POST("/register",
+				sharedmw.AuthRateLimit(),
+				passwordHandlers.Register,
+			)
+
+			// Email verification
 			auth.POST("/verify-email", passwordHandlers.VerifyEmail)
+
+			// Password reset with strict rate limiting (prevents abuse)
+			auth.POST("/password/forgot",
+				sharedmw.PasswordResetRateLimit(), // Very strict: ~3 requests per hour
+				passwordHandlers.ForgotPassword,
+			)
+			auth.POST("/password/reset",
+				sharedmw.PasswordResetRateLimit(),
+				passwordHandlers.ResetPassword,
+			)
+
+			// Resend verification email (rate limited to prevent spam)
+			auth.POST("/resend-verification",
+				sharedmw.PasswordResetRateLimit(),
+				passwordHandlers.ResendVerification,
+			)
 		}
 
 		// Protected routes
@@ -148,6 +191,12 @@ func main() {
 		{
 			// User profile
 			protected.GET("/profile", authHandlers.GetProfile)
+
+			// Password change (requires authentication + rate limiting)
+			protected.POST("/password/change",
+				sharedmw.AuthRateLimit(), // Rate limited to prevent brute force
+				passwordHandlers.ChangePassword,
+			)
 
 			// Permission checking
 			protected.GET("/permissions/:permission", authHandlers.CheckPermission)

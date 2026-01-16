@@ -28,6 +28,82 @@ env:
   IMAGE_NAME: ${{ github.repository }}/auth-service
 
 jobs:
+  # =============================================================================
+  # Test Job - Runs in parallel with build for faster feedback
+  # =============================================================================
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: auth-service
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+          cache-dependency-path: auth-service/go.sum
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run tests with coverage
+        run: go test ./... -v -race -coverprofile=coverage.out -covermode=atomic
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-auth-service
+          path: auth-service/coverage.out
+          retention-days: 7
+        continue-on-error: true
+
+      - name: Test Summary
+        if: always()
+        run: |
+          echo "## Test Summary - auth-service" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f coverage.out ]; then
+            go tool cover -func=coverage.out | tail -1 | awk '{print "**Coverage:** " $3}' >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # =============================================================================
+  # Lint Job - Runs in parallel
+  # =============================================================================
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: auth-service
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+          cache-dependency-path: auth-service/go.sum
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v4
+        with:
+          working-directory: auth-service
+          version: latest
+          args: --timeout=5m
+        continue-on-error: true
+
+  # =============================================================================
+  # Build Job - Runs in parallel with tests
+  # =============================================================================
   build:
     name: Build and Push auth-service
     runs-on: ubuntu-latest
