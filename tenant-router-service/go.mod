@@ -3,7 +3,7 @@ module tenant-router-service
 go 1.25
 
 require (
-	github.com/Tesseract-Nexus/go-shared v0.0.0-20260114152147-11cd2a14e96d
+	github.com/Tesseract-Nexus/go-shared v0.0.0-20260116025029-bf676bd77644
 	github.com/cert-manager/cert-manager v1.13.2
 	github.com/gin-gonic/gin v1.10.0
 	github.com/google/uuid v1.6.0

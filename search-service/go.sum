@@ -15,6 +15,8 @@ github.com/KyleBanks/depth v1.2.1/go.mod h1:jzSb9d0L43HxTQfT+oSA1EEp2q+ne2uh6Xge
 github.com/RaveNoX/go-jsoncommentstrip v1.0.0/go.mod h1:78ihd09MekBnJnxpICcwzCMzGrKSKYe4AqU6PDYYpjk=
 github.com/Tesseract-Nexus/go-shared v0.0.0-20260114152147-11cd2a14e96d h1:ZDMevDiXoEqpfbP2e/C6eTkHG9y3jR3BgyrGtDyUcwI=
 github.com/Tesseract-Nexus/go-shared v0.0.0-20260114152147-11cd2a14e96d/go.mod h1:8pz+AQH7vqnb5jSJUf3q1xWoszVZyhON4p8bBTS894U=
+github.com/Tesseract-Nexus/go-shared v0.0.0-20260116025029-bf676bd77644 h1:MYbVvmrmvtYnuBdcNY2LCk7hvQ++5OlcAJyHRXeC1WU=
+github.com/Tesseract-Nexus/go-shared v0.0.0-20260116025029-bf676bd77644/go.mod h1:8pz+AQH7vqnb5jSJUf3q1xWoszVZyhON4p8bBTS894U=
 github.com/apapsch/go-jsonmerge/v2 v2.0.0 h1:axGnT1gRIfimI7gJifB699GoE/oq+F2MU7Dml6nw9rQ=
 github.com/apapsch/go-jsonmerge/v2 v2.0.0/go.mod h1:lvDnEdqiQrp0O42VQGgmlKpxL1AP2+08jFMw88y4klk=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=

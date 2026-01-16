@@ -26,6 +26,8 @@ github.com/MicahParks/keyfunc v1.9.0 h1:lhKd5xrFHLNOWrDc4Tyb/Q1AJ4LCzQ48GVJyVIID
 github.com/MicahParks/keyfunc v1.9.0/go.mod h1:IdnCilugA0O/99dW+/MkvlyrsX8+L8+x95xuVNtM5jw=
 github.com/Tesseract-Nexus/go-shared v0.0.0-20260114152147-11cd2a14e96d h1:ZDMevDiXoEqpfbP2e/C6eTkHG9y3jR3BgyrGtDyUcwI=
 github.com/Tesseract-Nexus/go-shared v0.0.0-20260114152147-11cd2a14e96d/go.mod h1:8pz+AQH7vqnb5jSJUf3q1xWoszVZyhON4p8bBTS894U=
+github.com/Tesseract-Nexus/go-shared v0.0.0-20260116025029-bf676bd77644 h1:MYbVvmrmvtYnuBdcNY2LCk7hvQ++5OlcAJyHRXeC1WU=
+github.com/Tesseract-Nexus/go-shared v0.0.0-20260116025029-bf676bd77644/go.mod h1:8pz+AQH7vqnb5jSJUf3q1xWoszVZyhON4p8bBTS894U=
 github.com/aws/aws-sdk-go-v2 v1.41.0 h1:tNvqh1s+v0vFYdA1xq0aOJH+Y5cRyZ5upu6roPgPKd4=
 github.com/aws/aws-sdk-go-v2 v1.41.0/go.mod h1:MayyLB8y+buD9hZqkCW3kX1AKq07Y5pXxtgB+rRFhz0=
 github.com/aws/aws-sdk-go-v2/config v1.32.6 h1:hFLBGUKjmLAekvi1evLi5hVvFQtSo3GYwi+Bx4lpJf8=

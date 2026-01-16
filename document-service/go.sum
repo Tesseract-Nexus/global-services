@@ -29,6 +29,8 @@ github.com/Azure/go-autorest/tracing v0.6.0/go.mod h1:+vhtPC754Xsa23ID7GlGsrdKBp
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/Tesseract-Nexus/go-shared v0.0.0-20260114152147-11cd2a14e96d h1:ZDMevDiXoEqpfbP2e/C6eTkHG9y3jR3BgyrGtDyUcwI=
 github.com/Tesseract-Nexus/go-shared v0.0.0-20260114152147-11cd2a14e96d/go.mod h1:8pz+AQH7vqnb5jSJUf3q1xWoszVZyhON4p8bBTS894U=
+github.com/Tesseract-Nexus/go-shared v0.0.0-20260116025029-bf676bd77644 h1:MYbVvmrmvtYnuBdcNY2LCk7hvQ++5OlcAJyHRXeC1WU=
+github.com/Tesseract-Nexus/go-shared v0.0.0-20260116025029-bf676bd77644/go.mod h1:8pz+AQH7vqnb5jSJUf3q1xWoszVZyhON4p8bBTS894U=
 github.com/aws/aws-sdk-go-v2 v1.30.5 h1:mWSRTwQAb0aLE17dSzztCVJWI9+cRMgqebndjwDyK0g=
 github.com/aws/aws-sdk-go-v2 v1.30.5/go.mod h1:CT+ZPWXbYrci8chcARI3OmI/qgd+f6WtuLOoaIA8PR0=
 github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.4 h1:70PVAiL15/aBMh5LThwgXdSQorVr91L127ttckI9QQU=

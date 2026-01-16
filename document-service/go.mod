@@ -5,7 +5,7 @@ go 1.25
 require (
 	cloud.google.com/go/storage v1.38.0
 	github.com/Azure/azure-storage-blob-go v0.15.0
-	github.com/Tesseract-Nexus/go-shared v0.0.0-20260114152147-11cd2a14e96d
+	github.com/Tesseract-Nexus/go-shared v0.0.0-20260116025029-bf676bd77644
 	github.com/aws/aws-sdk-go-v2 v1.30.5
 	github.com/aws/aws-sdk-go-v2/config v1.27.33
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.32

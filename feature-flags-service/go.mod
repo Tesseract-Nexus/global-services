@@ -3,7 +3,7 @@ module feature-flags-service
 go 1.25
 
 require (
-	github.com/Tesseract-Nexus/go-shared v0.0.0-20260114152147-11cd2a14e96d
+	github.com/Tesseract-Nexus/go-shared v0.0.0-20260116025029-bf676bd77644
 	github.com/gin-gonic/gin v1.11.0
 	github.com/joho/godotenv v1.5.1
 	github.com/swaggo/files v1.0.1
