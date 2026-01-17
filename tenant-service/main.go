@@ -127,7 +127,7 @@ func main() {
 	verificationSvc.SetOnboardingRepo(onboardingRepo)
 	templateSvc := services.NewTemplateService(templateRepo)
 	notificationSvc := services.NewNotificationService()
-	membershipSvc := services.NewMembershipService(membershipRepo)
+	membershipSvc := services.NewMembershipService(membershipRepo, notificationClient)
 	onboardingSvc := services.NewOnboardingService(
 		onboardingRepo,
 		taskRepo,
@@ -288,6 +288,13 @@ func main() {
 		bgRunner.Start()
 	}
 
+	// Initialize test handler (for E2E testing - only enabled in dev/test)
+	var testHandler *handlers.TestHandler
+	if handlers.IsTestMode() {
+		testHandler = handlers.NewTestHandler(verificationSvc, onboardingSvc, redisClient)
+		log.Println("Test handler initialized (dev/test mode) - test endpoints are available")
+	}
+
 	// Setup router
 	router := setupRouter(
 		healthHandler,
@@ -298,6 +305,7 @@ func main() {
 		tenantHandler,
 		authHandler,
 		draftHandler,
+		testHandler,
 		metricsCollector,
 	)
 
@@ -354,6 +362,7 @@ func setupRouter(
 	tenantHandler *handlers.TenantHandler,
 	authHandler *handlers.AuthHandler,
 	draftHandler *handlers.DraftHandler,
+	testHandler *handlers.TestHandler,
 	metricsCollector *metrics.Metrics,
 ) *gin.Engine {
 	// Set Gin mode
@@ -464,6 +473,13 @@ func setupRouter(
 			verify.GET("/method", verificationHandler.GetVerificationMethod)
 			verify.POST("/token", verificationHandler.VerifyByToken)
 			verify.GET("/token-info", verificationHandler.GetTokenInfo)
+			verify.POST("/token-info", verificationHandler.GetTokenInfoPost)
+		}
+
+		// Public invitation acceptance (no auth)
+		publicInvitations := v1.Group("/invitations")
+		{
+			publicInvitations.POST("/accept-public", authHandler.AcceptInvitationPublic)
 		}
 
 		// Initialize Istio auth middleware for protected routes
@@ -562,6 +578,16 @@ func setupRouter(
 				draft.DELETE("/:sessionId", draftHandler.DeleteDraft)
 				draft.POST("/heartbeat", draftHandler.ProcessHeartbeat)
 				draft.POST("/browser-close", draftHandler.MarkBrowserClosed)
+			}
+		}
+
+		// Test endpoints (only available in dev/test mode for E2E testing)
+		if testHandler != nil {
+			test := v1.Group("/test")
+			{
+				test.POST("/verify-email", testHandler.VerifyEmailForTest)
+				test.GET("/verification-token", testHandler.GetVerificationTokenForTest)
+				test.GET("/otp", testHandler.GetOTPForTest)
 			}
 		}
 	}

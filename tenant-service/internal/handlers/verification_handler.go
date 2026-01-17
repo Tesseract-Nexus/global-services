@@ -298,7 +298,7 @@ func (h *VerificationHandler) VerifyByToken(c *gin.Context) {
 	SuccessResponse(c, http.StatusOK, "Email verified successfully", response)
 }
 
-// GetTokenInfo retrieves information about a verification token
+// GetTokenInfo retrieves information about a verification token (GET with query param)
 func (h *VerificationHandler) GetTokenInfo(c *gin.Context) {
 	token := c.Query("token")
 	if token == "" {
@@ -306,6 +306,25 @@ func (h *VerificationHandler) GetTokenInfo(c *gin.Context) {
 		return
 	}
 
+	h.getTokenInfoInternal(c, token)
+}
+
+// GetTokenInfoPost retrieves information about a verification token (POST with body)
+func (h *VerificationHandler) GetTokenInfoPost(c *gin.Context) {
+	var req struct {
+		Token string `json:"token" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Token is required", err)
+		return
+	}
+
+	h.getTokenInfoInternal(c, req.Token)
+}
+
+// getTokenInfoInternal contains the shared logic for token info retrieval
+func (h *VerificationHandler) getTokenInfoInternal(c *gin.Context, token string) {
 	tokenData, err := h.verificationService.GetTokenInfo(c.Request.Context(), token)
 	if err != nil {
 		ErrorResponse(c, http.StatusNotFound, "Token not found or expired", err)
