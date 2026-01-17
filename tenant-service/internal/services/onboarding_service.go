@@ -266,6 +266,43 @@ func (s *OnboardingService) GetOnboardingSession(ctx context.Context, sessionID 
 	return s.onboardingRepo.GetSessionByID(ctx, sessionID, includeRelations)
 }
 
+// SaveApplicationConfiguration saves or updates an application configuration for a session
+func (s *OnboardingService) SaveApplicationConfiguration(ctx context.Context, sessionID uuid.UUID, config *models.ApplicationConfiguration) (*models.ApplicationConfiguration, error) {
+	// Verify session exists and is active
+	session, err := s.onboardingRepo.GetSessionByID(ctx, sessionID, nil)
+	if err != nil {
+		return nil, fmt.Errorf("session not found: %w", err)
+	}
+
+	if session.Status == "completed" || session.Status == "failed" || session.Status == "abandoned" {
+		return nil, fmt.Errorf("cannot update configuration for session in %s status", session.Status)
+	}
+
+	config.OnboardingSessionID = sessionID
+
+	// Check if configuration already exists for this type
+	var existing models.ApplicationConfiguration
+	err = s.db.WithContext(ctx).
+		Where("onboarding_session_id = ? AND application_type = ?", sessionID, config.ApplicationType).
+		First(&existing).Error
+
+	if err == nil {
+		// Update existing
+		existing.ConfigurationData = config.ConfigurationData
+		if err := s.db.WithContext(ctx).Save(&existing).Error; err != nil {
+			return nil, fmt.Errorf("failed to update application configuration: %w", err)
+		}
+		return &existing, nil
+	}
+
+	// Create new
+	if err := s.db.WithContext(ctx).Create(config).Error; err != nil {
+		return nil, fmt.Errorf("failed to create application configuration: %w", err)
+	}
+
+	return config, nil
+}
+
 // UpdateBusinessInformation updates business information for a session
 func (s *OnboardingService) UpdateBusinessInformation(ctx context.Context, sessionID uuid.UUID, businessInfo *models.BusinessInformation) (*models.BusinessInformation, error) {
 	// Verify session exists and is active

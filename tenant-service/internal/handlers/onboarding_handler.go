@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 	"strconv"
@@ -10,6 +11,25 @@ import (
 	"tenant-service/internal/models"
 	"tenant-service/internal/services"
 )
+
+// StoreSetup represents store configuration extracted from application_configurations
+type StoreSetup struct {
+	Subdomain      string `json:"subdomain,omitempty"`
+	StorefrontSlug string `json:"storefront_slug,omitempty"`
+	Currency       string `json:"currency,omitempty"`
+	Timezone       string `json:"timezone,omitempty"`
+	Language       string `json:"language,omitempty"`
+	BusinessModel  string `json:"business_model,omitempty"`
+	LogoURL        string `json:"logo_url,omitempty"`
+	PrimaryColor   string `json:"primary_color,omitempty"`
+	SecondaryColor string `json:"secondary_color,omitempty"`
+}
+
+// SessionResponseWithStoreSetup wraps the session with extracted store_setup
+type SessionResponseWithStoreSetup struct {
+	*models.OnboardingSession
+	StoreSetup *StoreSetup `json:"store_setup,omitempty"`
+}
 
 // OnboardingHandler handles onboarding HTTP requests
 type OnboardingHandler struct {
@@ -73,13 +93,41 @@ func (h *OnboardingHandler) GetOnboardingSession(c *gin.Context) {
 	// Get include relations from query params
 	includeRelations := c.QueryArray("include")
 
+	// Always include application_configurations to extract store_setup
+	hasAppConfigs := false
+	for _, rel := range includeRelations {
+		if rel == "application_configurations" {
+			hasAppConfigs = true
+			break
+		}
+	}
+	if !hasAppConfigs {
+		includeRelations = append(includeRelations, "application_configurations")
+	}
+
 	session, err := h.onboardingService.GetOnboardingSession(c.Request.Context(), sessionID, includeRelations)
 	if err != nil {
 		ErrorResponse(c, http.StatusNotFound, "Onboarding session not found", err)
 		return
 	}
 
-	SuccessResponse(c, http.StatusOK, "Onboarding session retrieved successfully", session)
+	// Extract store_setup from application_configurations for frontend compatibility
+	response := &SessionResponseWithStoreSetup{
+		OnboardingSession: session,
+	}
+
+	// Find store_setup in application_configurations
+	for _, config := range session.ApplicationConfigurations {
+		if config.ApplicationType == "store_setup" {
+			var storeSetup StoreSetup
+			if err := json.Unmarshal(config.ConfigurationData, &storeSetup); err == nil {
+				response.StoreSetup = &storeSetup
+			}
+			break
+		}
+	}
+
+	SuccessResponse(c, http.StatusOK, "Onboarding session retrieved successfully", response)
 }
 
 // UpdateBusinessInformation updates business information for a session
@@ -198,6 +246,56 @@ func (h *OnboardingHandler) UpdateBusinessAddress(c *gin.Context) {
 	}
 
 	SuccessResponse(c, http.StatusOK, "Business address updated successfully", updatedAddress)
+}
+
+// UpdateStoreSetupRequest represents the store setup form data
+type UpdateStoreSetupRequest struct {
+	Subdomain      string `json:"subdomain"`
+	StorefrontSlug string `json:"storefront_slug"`
+	Currency       string `json:"currency"`
+	Timezone       string `json:"timezone"`
+	Language       string `json:"language"`
+	BusinessModel  string `json:"business_model"`
+	LogoURL        string `json:"logo_url"`
+	PrimaryColor   string `json:"primary_color"`
+	SecondaryColor string `json:"secondary_color"`
+}
+
+// UpdateStoreSetup saves store setup to application_configurations
+func (h *OnboardingHandler) UpdateStoreSetup(c *gin.Context) {
+	sessionID, err := uuid.Parse(c.Param("sessionId"))
+	if err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid session ID", err)
+		return
+	}
+
+	var req UpdateStoreSetupRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid request payload", err)
+		return
+	}
+
+	// Convert request to JSON for storage
+	configData, err := json.Marshal(req)
+	if err != nil {
+		ErrorResponse(c, http.StatusInternalServerError, "Failed to serialize store setup", err)
+		return
+	}
+
+	// Save to application_configurations
+	config := &models.ApplicationConfiguration{
+		OnboardingSessionID: sessionID,
+		ApplicationType:     "store_setup",
+		ConfigurationData:   configData,
+	}
+
+	savedConfig, err := h.onboardingService.SaveApplicationConfiguration(c.Request.Context(), sessionID, config)
+	if err != nil {
+		ErrorResponse(c, http.StatusInternalServerError, "Failed to save store setup", err)
+		return
+	}
+
+	SuccessResponse(c, http.StatusOK, "Store setup saved successfully", savedConfig)
 }
 
 // CompleteOnboarding completes an onboarding session

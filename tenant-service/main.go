@@ -445,6 +445,10 @@ func setupRouter(
 			// Business addresses
 			sessions.POST("/:sessionId/business-addresses", onboardingHandler.UpdateBusinessAddress)
 
+			// Store setup (saves to application_configurations)
+			sessions.POST("/:sessionId/store-setup", onboardingHandler.UpdateStoreSetup)
+			sessions.PUT("/:sessionId/store-setup", onboardingHandler.UpdateStoreSetup)
+
 			// Verification
 			verification := sessions.Group("/:sessionId/verification")
 			{
