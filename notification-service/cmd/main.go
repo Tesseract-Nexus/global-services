@@ -181,22 +181,28 @@ func initDatabase(cfg *config.Config) (*gorm.DB, error) {
 
 // migrateDatabase runs database migrations
 func migrateDatabase(db *gorm.DB) error {
-	// Skip AutoMigrate if tables already exist
-	// This avoids GORM's constraint naming mismatch issues with existing databases
-	var count int64
-	db.Raw("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = CURRENT_SCHEMA() AND table_name = 'notifications'").Scan(&count)
-	if count > 0 {
-		log.Println("Database tables already exist, skipping AutoMigrate")
-		return nil
-	}
-
-	return db.AutoMigrate(
+	// Run AutoMigrate for all models
+	// GORM AutoMigrate safely handles existing tables:
+	// - Creates tables if they don't exist
+	// - Adds missing columns to existing tables
+	// - Creates missing indexes
+	// - Does NOT drop columns, change types, or delete data
+	modelsToMigrate := []interface{}{
 		&models.Notification{},
 		&models.NotificationTemplate{},
 		&models.NotificationPreference{},
 		&models.NotificationLog{},
 		&models.NotificationBatch{},
-	)
+	}
+
+	for _, model := range modelsToMigrate {
+		if err := db.AutoMigrate(model); err != nil {
+			return fmt.Errorf("failed to migrate %T: %w", model, err)
+		}
+	}
+
+	log.Println("Database migration completed successfully")
+	return nil
 }
 
 // initEmailProvider initializes the email provider with failover chain
