@@ -100,13 +100,14 @@ const (
 
 // ValidateCredentialsRequest represents a request to validate tenant-specific credentials
 type ValidateCredentialsRequest struct {
-	Email       string    `json:"email" validate:"required,email"`
-	Password    string    `json:"password" validate:"required"`
-	TenantID    uuid.UUID `json:"tenant_id"`    // Either tenant_id or tenant_slug required
-	TenantSlug  string    `json:"tenant_slug"`  // Either tenant_id or tenant_slug required
-	AuthContext string    `json:"auth_context"` // "customer" or "staff" - controls whether staff fallback is allowed
-	IPAddress   string    `json:"ip_address,omitempty"`
-	UserAgent   string    `json:"user_agent,omitempty"`
+	Email                  string    `json:"email" validate:"required,email"`
+	Password               string    `json:"password" validate:"required"`
+	TenantID               uuid.UUID `json:"tenant_id"`    // Either tenant_id or tenant_slug required
+	TenantSlug             string    `json:"tenant_slug"`  // Either tenant_id or tenant_slug required
+	AuthContext            string    `json:"auth_context"` // "customer" or "staff" - controls whether staff fallback is allowed
+	IPAddress              string    `json:"ip_address,omitempty"`
+	UserAgent              string    `json:"user_agent,omitempty"`
+	SkipPasswordValidation bool      `json:"skip_password_validation,omitempty"` // Skip password check, only check account status
 }
 
 // ValidateCredentialsResponse represents the response from credential validation
