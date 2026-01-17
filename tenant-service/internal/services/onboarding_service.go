@@ -1535,19 +1535,27 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 	finalRefreshToken := keycloakResult.RefreshToken
 	finalExpiresIn := keycloakResult.ExpiresIn
 
-	if s.keycloakClient != nil {
+	if s.keycloakClient != nil && s.keycloakConfig != nil {
 		log.Printf("[OnboardingService] Refreshing token to include updated claims (staff_id, tenant_id, vendor_id)...")
+		log.Printf("[OnboardingService] Token refresh config: clientID=%s, hasSecret=%v",
+			s.keycloakConfig.ClientID, s.keycloakConfig.ClientSecret != "")
+
 		refreshedTokens, refreshErr := s.loginAndGetTokens(primaryContact.Email, password)
 		if refreshErr != nil {
-			log.Printf("[OnboardingService] Warning: Failed to refresh token with updated claims: %v", refreshErr)
-			log.Printf("[OnboardingService] User may need to log out and log back in to get updated JWT claims")
+			log.Printf("[OnboardingService] CRITICAL: Failed to refresh token with updated claims: %v", refreshErr)
+			log.Printf("[OnboardingService] User %s will receive a token WITHOUT staff_id/vendor_id claims", security.MaskEmail(primaryContact.Email))
+			log.Printf("[OnboardingService] User MUST log out and log back in to get proper permissions")
 			// Don't fail - user can still use the old token, they'll just need to re-login
+			// But log this as CRITICAL since it means the P0 fix didn't work
 		} else {
 			finalAccessToken = refreshedTokens.AccessToken
 			finalRefreshToken = refreshedTokens.RefreshToken
 			finalExpiresIn = refreshedTokens.ExpiresIn
 			log.Printf("[OnboardingService] Successfully refreshed token with updated claims for user %s", security.MaskEmail(primaryContact.Email))
 		}
+	} else {
+		log.Printf("[OnboardingService] WARNING: Cannot refresh token - keycloakClient=%v, keycloakConfig=%v",
+			s.keycloakClient != nil, s.keycloakConfig != nil)
 	}
 
 	response := &CompleteAccountSetupResponse{
