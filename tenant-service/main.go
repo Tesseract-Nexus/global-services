@@ -127,7 +127,7 @@ func main() {
 	verificationSvc.SetOnboardingRepo(onboardingRepo)
 	templateSvc := services.NewTemplateService(templateRepo)
 	notificationSvc := services.NewNotificationService()
-	membershipSvc := services.NewMembershipService(membershipRepo, notificationClient)
+	membershipSvc := services.NewMembershipService(membershipRepo)
 	onboardingSvc := services.NewOnboardingService(
 		onboardingRepo,
 		taskRepo,
