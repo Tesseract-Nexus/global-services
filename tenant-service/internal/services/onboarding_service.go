@@ -909,7 +909,7 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 
 	// Check if tenant already created for this session
 	if session.TenantID != nil && *session.TenantID != uuid.Nil {
-		// Tenant already exists - just register user in Keycloak if not already done
+		// Tenant already exists - use unified Keycloak setup with verification
 		// This handles re-running account setup after initial creation
 		tenantID := *session.TenantID
 
@@ -925,14 +925,20 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 			return nil, fmt.Errorf("failed to find user for existing tenant: %w", err)
 		}
 
-		// Try to register in Keycloak (idempotent - handles existing users for multi-tenant)
-		// FIX-MEDIUM: Surface Keycloak password failures instead of just logging
-		// Previously, password setup failures were logged but user saw "success" and couldn't login
-		if _, regErr := s.registerUserInAuthService(primaryContact.Email, password, primaryContact.FirstName+" "+primaryContact.LastName, tenantID.String(), tenant.Slug); regErr != nil {
-			// If password was provided and Keycloak failed, this is a critical error
-			// User won't be able to log in
-			log.Printf("[OnboardingService] CRITICAL: Failed to register/update user in Keycloak: %v", regErr)
-			return nil, fmt.Errorf("failed to set up authentication: %w - please try again", regErr)
+		// Use unified Keycloak setup with verification (P0 FIX)
+		// This ensures: password is set, role is assigned, and login is verified
+		keycloakResult, keycloakErr := s.setupUserInKeycloak(ctx, &KeycloakSetupRequest{
+			Email:      primaryContact.Email,
+			Password:   password,
+			FirstName:  primaryContact.FirstName,
+			LastName:   primaryContact.LastName,
+			TenantID:   tenantID.String(),
+			TenantSlug: tenant.Slug,
+			Role:       s.keycloakConfig.DefaultRole, // "store_owner" - NOW INCLUDED FOR EXISTING USERS
+		})
+		if keycloakErr != nil {
+			log.Printf("[OnboardingService] CRITICAL: Failed to setup user in Keycloak: %v", keycloakErr)
+			return nil, fmt.Errorf("failed to set up authentication: %w", keycloakErr)
 		}
 
 		// Generate admin URL (subdomain-based routing)
@@ -943,19 +949,7 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 		}
 		adminURL := fmt.Sprintf("https://%s-admin.%s", tenant.Slug, baseDomain)
 
-		// Login user to get auth tokens for automatic authentication
-		var accessToken, refreshToken string
-		var expiresIn int
-		authTokens, err := s.loginAndGetTokens(primaryContact.Email, password)
-		if err != nil {
-			fmt.Printf("Warning: Failed to auto-login existing user: %v\n", err)
-		} else if authTokens != nil {
-			accessToken = authTokens.AccessToken
-			refreshToken = authTokens.RefreshToken
-			expiresIn = authTokens.ExpiresIn
-			fmt.Printf("Auto-logged in existing user %s\n", security.MaskEmail(primaryContact.Email))
-		}
-
+		// Tokens are already obtained and verified by setupUserInKeycloak
 		return &CompleteAccountSetupResponse{
 			TenantID:     tenantID,
 			TenantSlug:   tenant.Slug,
@@ -963,9 +957,9 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 			Email:        primaryContact.Email,
 			BusinessName: session.BusinessInformation.BusinessName,
 			AdminURL:     adminURL,
-			AccessToken:  accessToken,
-			RefreshToken: refreshToken,
-			ExpiresIn:    expiresIn,
+			AccessToken:  keycloakResult.AccessToken,
+			RefreshToken: keycloakResult.RefreshToken,
+			ExpiresIn:    keycloakResult.ExpiresIn,
 			Message:      "Account already set up. User logged in successfully.",
 		}, nil
 	}
@@ -1067,22 +1061,30 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 	// 4. All systems (Keycloak, tenant, membership) now use the SAME user ID
 	// ============================================================================
 
-	// Step 1: Register/get user from Keycloak FIRST (source of truth)
-	// CRITICAL: Keycloak registration MUST succeed for proper multi-tenant auth
-	// If this fails, we cannot guarantee the user can log in, so fail the entire onboarding
-	log.Printf("[OnboardingService] Registering user %s in Keycloak...", security.MaskEmail(primaryContact.Email))
-	keycloakUserIDStr, authErr := s.registerUserInAuthService(primaryContact.Email, password, primaryContact.FirstName+" "+primaryContact.LastName, tenantID.String(), slug)
+	// Step 1: Use unified Keycloak setup with verification (P0 FIX)
+	// This ensures: user is created, password is set, role is assigned, and login is verified
+	// CRITICAL: If this fails, we cannot guarantee the user can log in, so fail the entire onboarding
+	log.Printf("[OnboardingService] Setting up user %s in Keycloak with verification...", security.MaskEmail(primaryContact.Email))
+	keycloakResult, keycloakErr := s.setupUserInKeycloak(ctx, &KeycloakSetupRequest{
+		Email:      primaryContact.Email,
+		Password:   password,
+		FirstName:  primaryContact.FirstName,
+		LastName:   primaryContact.LastName,
+		TenantID:   tenantID.String(),
+		TenantSlug: slug,
+		Role:       s.keycloakConfig.DefaultRole, // "store_owner"
+	})
 
 	var userID uuid.UUID
-	if authErr != nil {
-		// Keycloak failed - this is a CRITICAL error, fail onboarding
+	if keycloakErr != nil {
+		// Keycloak setup failed - this is a CRITICAL error, fail onboarding
 		// Without Keycloak registration, user won't be able to log in
 		tx.Rollback()
-		log.Printf("[OnboardingService] CRITICAL: Failed to register user in Keycloak: %v", authErr)
-		return nil, fmt.Errorf("failed to register user: authentication service unavailable. Please try again later")
+		log.Printf("[OnboardingService] CRITICAL: Failed to setup user in Keycloak: %v", keycloakErr)
+		return nil, fmt.Errorf("failed to register user: %w", keycloakErr)
 	}
 
-	if keycloakUserIDStr == "" {
+	if keycloakResult.UserID == "" {
 		// Keycloak returned empty user ID - this is also a CRITICAL error
 		tx.Rollback()
 		log.Printf("[OnboardingService] CRITICAL: Keycloak returned empty user ID")
@@ -1090,14 +1092,14 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 	}
 
 	// Parse the Keycloak user ID - this is our authoritative ID
-	parsedID, parseErr := uuid.Parse(keycloakUserIDStr)
+	parsedID, parseErr := uuid.Parse(keycloakResult.UserID)
 	if parseErr != nil {
 		tx.Rollback()
 		log.Printf("[OnboardingService] CRITICAL: Could not parse Keycloak user ID: %v", parseErr)
 		return nil, fmt.Errorf("failed to register user: invalid user ID format")
 	}
 	userID = parsedID
-	log.Printf("[OnboardingService] Got user ID from Keycloak: %s", userID)
+	log.Printf("[OnboardingService] Got verified user ID from Keycloak: %s (role: %s assigned: %v)", userID, s.keycloakConfig.DefaultRole, keycloakResult.RoleAssigned)
 
 	// Step 2: Create/update tenant_users record with the Keycloak user ID
 	// NOTE: Password is stored in Keycloak only - no local password storage
@@ -1433,20 +1435,8 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 		}
 	}
 
-	// Login user to get auth tokens for automatic authentication
-	var accessToken, refreshToken string
-	var expiresIn int
-	authTokens, err := s.loginAndGetTokens(primaryContact.Email, password)
-	if err != nil {
-		// Log warning but don't fail - account was created, user can login manually
-		fmt.Printf("Warning: Failed to auto-login user after registration: %v\n", err)
-	} else if authTokens != nil {
-		accessToken = authTokens.AccessToken
-		refreshToken = authTokens.RefreshToken
-		expiresIn = authTokens.ExpiresIn
-		fmt.Printf("Auto-logged in user %s after registration\n", security.MaskEmail(primaryContact.Email))
-	}
-
+	// Tokens are already obtained and verified by setupUserInKeycloak
+	// No need to call loginAndGetTokens again - we already verified authentication works
 	response := &CompleteAccountSetupResponse{
 		TenantID:     tenantID,
 		TenantSlug:   slug,
@@ -1454,9 +1444,9 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 		Email:        primaryContact.Email,
 		BusinessName: session.BusinessInformation.BusinessName,
 		AdminURL:     adminURL,
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-		ExpiresIn:    expiresIn,
+		AccessToken:  keycloakResult.AccessToken,
+		RefreshToken: keycloakResult.RefreshToken,
+		ExpiresIn:    keycloakResult.ExpiresIn,
 		Message:      "Account created successfully. You can now access your admin dashboard.",
 	}
 
