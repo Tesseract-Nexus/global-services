@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"math"
@@ -788,12 +789,71 @@ type CompleteAccountSetupResponse struct {
 	Message      string    `json:"message"`
 }
 
+// KeycloakSetupRequest contains all data needed for Keycloak user setup
+type KeycloakSetupRequest struct {
+	Email      string
+	Password   string
+	FirstName  string
+	LastName   string
+	TenantID   string
+	TenantSlug string
+	Role       string // e.g., "store_owner"
+}
+
+// KeycloakSetupResult represents the complete result of Keycloak user setup
+type KeycloakSetupResult struct {
+	UserID       string
+	Email        string
+	RoleAssigned bool
+	Verified     bool // True only if we've verified login works
+	AccessToken  string
+	RefreshToken string
+	ExpiresIn    int
+}
+
 // CompleteAccountSetup creates tenant and user account from onboarding session
 func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID uuid.UUID, password, authMethod, timezone, currency, businessModel string) (*CompleteAccountSetupResponse, error) {
-	// Get onboarding session with all related data
-	session, err := s.onboardingRepo.GetSessionByID(ctx, sessionID, []string{"business_information", "contact_information", "business_addresses"})
+	// Get onboarding session with all related data including application_configurations
+	// which contains store setup data (currency, timezone) saved during onboarding
+	session, err := s.onboardingRepo.GetSessionByID(ctx, sessionID, []string{"business_information", "contact_information", "business_addresses", "application_configurations"})
 	if err != nil {
 		return nil, fmt.Errorf("session not found: %w", err)
+	}
+
+	// Extract currency/timezone from application_configurations if not provided in request
+	// This ensures user selections from onboarding are preserved
+	if timezone == "" || currency == "" {
+		for _, config := range session.ApplicationConfigurations {
+			if config.ApplicationType == "store_setup" {
+				// Parse the JSONB configuration data (JSONB is json.RawMessage)
+				var configData map[string]interface{}
+				if err := json.Unmarshal(config.ConfigurationData, &configData); err == nil {
+					if timezone == "" {
+						if tz, exists := configData["timezone"]; exists {
+							if tzStr, ok := tz.(string); ok && tzStr != "" {
+								timezone = tzStr
+							}
+						}
+					}
+					if currency == "" {
+						if curr, exists := configData["currency"]; exists {
+							if currStr, ok := curr.(string); ok && currStr != "" {
+								currency = currStr
+							}
+						}
+					}
+				}
+				break
+			}
+		}
+	}
+
+	// Set defaults only if still not available from request or application_configurations
+	if timezone == "" {
+		timezone = "UTC"
+	}
+	if currency == "" {
+		currency = "USD"
 	}
 
 	// Validate session is ready for account setup (completed OR at verification step with 75%+ progress)
@@ -1704,4 +1764,198 @@ func (s *OnboardingService) loginAndGetTokens(email, password string) (*AuthToke
 		ExpiresIn:    tokenResp.ExpiresIn,
 		IDToken:      tokenResp.IDToken,
 	}, nil
+}
+
+// ============================================================================
+// UNIFIED KEYCLOAK USER SETUP (P0 FIX)
+// ============================================================================
+// These methods provide a single, verified path for Keycloak user setup.
+// Key principles:
+// 1. Password setting is CRITICAL - must succeed
+// 2. Role assignment is CRITICAL - must succeed
+// 3. Verification via login is REQUIRED before returning success
+// ============================================================================
+
+// setupUserInKeycloak performs complete Keycloak user setup with verification.
+// This is the ONLY method that should be used for Keycloak user setup during onboarding.
+//
+// Operations performed (in order):
+// 1. Create user OR update existing user's tenant attributes
+// 2. Set password (required for both new and existing users)
+// 3. Assign role (required - failure is fatal)
+// 4. Verify setup by attempting authentication
+//
+// If ANY step fails, appropriate cleanup is performed and error is returned.
+// Success is ONLY returned when user can actually authenticate.
+func (s *OnboardingService) setupUserInKeycloak(ctx context.Context, req *KeycloakSetupRequest) (*KeycloakSetupResult, error) {
+	if s.keycloakClient == nil {
+		return nil, fmt.Errorf("keycloak client not configured - authentication service unavailable")
+	}
+
+	result := &KeycloakSetupResult{
+		Email: req.Email,
+	}
+
+	// Step 1: Check if user exists
+	existingUser, err := s.keycloakClient.GetUserByEmail(ctx, req.Email)
+	if err != nil {
+		log.Printf("[KeycloakSetup] Warning: Failed to check if user exists: %v", err)
+		// Continue with user creation attempt - GetUserByEmail failure shouldn't block onboarding
+	}
+
+	var userID string
+	isNewUser := existingUser == nil || existingUser.ID == ""
+
+	if isNewUser {
+		// Step 1a: Create new user
+		userID, err = s.createKeycloakUser(ctx, req)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create user in authentication service: %w", err)
+		}
+		log.Printf("[KeycloakSetup] Created new user %s with ID: %s", security.MaskEmail(req.Email), userID)
+	} else {
+		// Step 1b: Update existing user's tenant attributes
+		userID = existingUser.ID
+		if err := s.updateUserTenantAttributes(ctx, existingUser, req.TenantID, req.TenantSlug); err != nil {
+			return nil, fmt.Errorf("failed to update user tenant attributes: %w", err)
+		}
+		log.Printf("[KeycloakSetup] Updated existing user %s with tenant %s", security.MaskEmail(req.Email), req.TenantID)
+	}
+	result.UserID = userID
+
+	// Step 2: Set password (CRITICAL - must succeed)
+	if err := s.keycloakClient.SetUserPassword(ctx, userID, req.Password, false); err != nil {
+		if isNewUser {
+			// Cleanup: delete the user we just created
+			log.Printf("[KeycloakSetup] Cleaning up user %s after password failure", userID)
+			_ = s.keycloakClient.DeleteUser(ctx, userID)
+		}
+		return nil, fmt.Errorf("failed to set password: %w", err)
+	}
+	log.Printf("[KeycloakSetup] Password set for user %s", security.MaskEmail(req.Email))
+
+	// Step 3: Assign role (CRITICAL - must succeed)
+	if req.Role != "" {
+		if err := s.assignRoleWithRetry(ctx, userID, req.Role); err != nil {
+			if isNewUser {
+				// Cleanup: delete the user we just created
+				log.Printf("[KeycloakSetup] Cleaning up user %s after role assignment failure", userID)
+				_ = s.keycloakClient.DeleteUser(ctx, userID)
+			}
+			return nil, fmt.Errorf("failed to assign role '%s': %w", req.Role, err)
+		}
+		result.RoleAssigned = true
+		log.Printf("[KeycloakSetup] Role '%s' assigned to user %s", req.Role, security.MaskEmail(req.Email))
+	}
+
+	// Step 4: VERIFY - Attempt authentication to confirm setup worked
+	tokenResp, err := s.keycloakClient.GetTokenWithPassword(
+		ctx,
+		s.keycloakConfig.ClientID,
+		s.keycloakConfig.ClientSecret,
+		req.Email,
+		req.Password,
+	)
+	if err != nil {
+		// This is a critical failure - user was "set up" but can't actually login
+		log.Printf("[KeycloakSetup] CRITICAL: User %s setup completed but verification failed: %v", security.MaskEmail(req.Email), err)
+		// Don't cleanup for existing users - they may have other tenants
+		// For new users, cleanup since they can't login anyway
+		if isNewUser {
+			log.Printf("[KeycloakSetup] Cleaning up user %s after verification failure", userID)
+			_ = s.keycloakClient.DeleteUser(ctx, userID)
+		}
+		return nil, fmt.Errorf("authentication verification failed after setup - please try again: %w", err)
+	}
+
+	result.Verified = true
+	result.AccessToken = tokenResp.AccessToken
+	result.RefreshToken = tokenResp.RefreshToken
+	result.ExpiresIn = tokenResp.ExpiresIn
+	log.Printf("[KeycloakSetup] Verified user %s can authenticate successfully", security.MaskEmail(req.Email))
+
+	return result, nil
+}
+
+// assignRoleWithRetry attempts to assign a role with retry logic and verification
+func (s *OnboardingService) assignRoleWithRetry(ctx context.Context, userID, roleName string) error {
+	cfg := retryConfig{
+		maxAttempts: 3,
+		baseDelay:   500 * time.Millisecond,
+		maxDelay:    5 * time.Second,
+	}
+
+	_, err := retryWithBackoff(ctx, cfg, "Role assignment", func() (bool, error) {
+		if err := s.keycloakClient.AssignRealmRole(ctx, userID, roleName); err != nil {
+			return false, err
+		}
+		return true, nil
+	})
+
+	if err != nil {
+		return err
+	}
+
+	// Verify role was actually assigned
+	roles, err := s.keycloakClient.GetUserRealmRoles(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("failed to verify role assignment: %w", err)
+	}
+
+	for _, role := range roles {
+		if role.Name == roleName {
+			return nil // Role verified
+		}
+	}
+
+	return fmt.Errorf("role '%s' not found on user after assignment - verification failed", roleName)
+}
+
+// createKeycloakUser creates a new user in Keycloak (without password/role - those are set separately)
+func (s *OnboardingService) createKeycloakUser(ctx context.Context, req *KeycloakSetupRequest) (string, error) {
+	user := auth.UserRepresentation{
+		Username:      req.Email,
+		Email:         req.Email,
+		FirstName:     req.FirstName,
+		LastName:      req.LastName,
+		Enabled:       true,
+		EmailVerified: true, // Auto-verify since onboarding handles verification
+		Attributes: map[string][]string{
+			"tenant_id":   {req.TenantID},
+			"tenant_slug": {req.TenantSlug},
+		},
+	}
+
+	return s.keycloakClient.CreateUser(ctx, user)
+}
+
+// updateUserTenantAttributes adds a new tenant to an existing user's attributes
+func (s *OnboardingService) updateUserTenantAttributes(ctx context.Context, user *auth.UserRepresentation, tenantID, tenantSlug string) error {
+	existingTenantIDs := []string{}
+	existingTenantSlugs := []string{}
+
+	if user.Attributes != nil {
+		if ids, ok := user.Attributes["tenant_id"]; ok {
+			existingTenantIDs = ids
+		}
+		if slugs, ok := user.Attributes["tenant_slug"]; ok {
+			existingTenantSlugs = slugs
+		}
+	}
+
+	// Check if already associated
+	for _, id := range existingTenantIDs {
+		if id == tenantID {
+			log.Printf("[KeycloakSetup] Tenant %s already associated with user %s", tenantID, security.MaskEmail(user.Email))
+			return nil // Already associated, nothing to do
+		}
+	}
+
+	// Add new tenant
+	updatedAttributes := map[string][]string{
+		"tenant_id":   append(existingTenantIDs, tenantID),
+		"tenant_slug": append(existingTenantSlugs, tenantSlug),
+	}
+
+	return s.keycloakClient.UpdateUserAttributes(ctx, user.ID, updatedAttributes)
 }

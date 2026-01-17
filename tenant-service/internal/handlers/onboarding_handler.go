@@ -434,13 +434,11 @@ func (h *OnboardingHandler) CompleteAccountSetup(c *gin.Context) {
 		return
 	}
 
-	// Set defaults if not provided
-	if req.Timezone == "" {
-		req.Timezone = "UTC"
-	}
-	if req.Currency == "" {
-		req.Currency = "USD"
-	}
+	// Note: timezone and currency defaults are now handled in the service layer
+	// which first checks application_configurations from the onboarding session
+	// before falling back to defaults. This ensures user selections are preserved.
+
+	// Only set business model default here as it's not stored in application_configurations
 	if req.BusinessModel == "" {
 		req.BusinessModel = "ONLINE_STORE"
 	}
