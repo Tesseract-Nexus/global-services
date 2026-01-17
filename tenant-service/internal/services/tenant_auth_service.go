@@ -1115,7 +1115,7 @@ type AcceptInvitationPublicResponse struct {
 // CanUnlockAccount checks if the admin user has permission to unlock accounts in a tenant
 func (s *TenantAuthService) CanUnlockAccount(ctx context.Context, adminUserID, tenantID uuid.UUID) (bool, error) {
 	// Check if the admin user has membership in this tenant with admin role
-	membership, err := s.membershipRepo.GetUserMembership(ctx, adminUserID, tenantID)
+	membership, err := s.membershipRepo.GetMembership(ctx, adminUserID, tenantID)
 	if err != nil {
 		return false, fmt.Errorf("failed to get membership: %w", err)
 	}
