@@ -1266,20 +1266,25 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 
 	bootstrapCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	if _, bootstrapErr := s.staffClient.BootstrapOwner(
+	bootstrapResult, bootstrapErr := s.staffClient.BootstrapOwner(
 		bootstrapCtx,
 		tenantID,
 		keycloakUserID,
 		primaryContact.Email,
 		primaryContact.FirstName,
 		primaryContact.LastName,
-	); bootstrapErr != nil {
+	)
+	if bootstrapErr != nil {
 		// CRITICAL: Owner RBAC bootstrap failure means owner can't access admin panel
 		// This is a fatal error - tenant without owner permissions is unusable
 		log.Printf("[OnboardingService] CRITICAL: Failed to bootstrap owner RBAC for tenant %s: %v", tenantID, bootstrapErr)
 
-		// FIX-CRITICAL: Mark tenant as failed when staff bootstrap fails
-		// Previously, the tenant was committed but left in an unusable state without staff permissions
+		// ============================================================================
+		// COMPENSATION: Clean up resources created before this failure
+		// Since transaction was already committed, we need to manually compensate
+		// ============================================================================
+
+		// 1. Mark tenant as failed
 		if updateErr := s.db.Model(&models.Tenant{}).
 			Where("id = ?", tenantID).
 			Updates(map[string]interface{}{
@@ -1289,16 +1294,53 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 			log.Printf("[OnboardingService] Warning: Failed to mark tenant as failed: %v", updateErr)
 		}
 
-		// Update session status to reflect the failure
+		// 2. Update session status to reflect the failure
 		if updateErr := s.db.Model(&models.OnboardingSession{}).
 			Where("id = ?", sessionID).
 			Update("status", "failed").Error; updateErr != nil {
 			log.Printf("[OnboardingService] Warning: Failed to update session status to failed: %v", updateErr)
 		}
 
+		// 3. Clean up the membership that was created
+		if s.membershipSvc != nil {
+			if cleanupErr := s.membershipSvc.DeleteMembershipInternal(ctx, userID, tenantID); cleanupErr != nil {
+				log.Printf("[OnboardingService] Warning: Failed to cleanup membership for user %s in tenant %s: %v", userID, tenantID, cleanupErr)
+			} else {
+				log.Printf("[OnboardingService] Cleaned up membership for user %s in tenant %s due to bootstrap failure", userID, tenantID)
+			}
+		}
+
+		// 4. Release the slug reservation back to pending (so user can retry)
+		if s.membershipSvc != nil {
+			// Note: We don't have a method to release slug, but marking tenant as failed
+			// should prevent it from being used. The slug can be reclaimed on retry.
+			log.Printf("[OnboardingService] Slug '%s' will remain reserved for retry. Tenant marked as failed.", slug)
+		}
+
 		return nil, fmt.Errorf("failed to bootstrap owner permissions: %w", bootstrapErr)
 	}
 	log.Printf("[OnboardingService] Bootstrapped owner RBAC for user %s in tenant %s", keycloakUserID, tenantID)
+
+	// FIX-P0: Update Keycloak user with staff_id from bootstrap result
+	// This is CRITICAL - without staff_id in the JWT, all service calls return 403
+	if s.keycloakClient != nil && bootstrapResult != nil && bootstrapResult.StaffID != "" {
+		keycloakAttrs := map[string][]string{
+			"staff_id":    {bootstrapResult.StaffID},
+			"tenant_id":   {tenantID.String()},
+			"tenant_slug": {slug},
+		}
+		if updateErr := s.keycloakClient.UpdateUserAttributes(ctx, keycloakUserID.String(), keycloakAttrs); updateErr != nil {
+			log.Printf("[OnboardingService] CRITICAL: Failed to update Keycloak user %s with staff_id: %v", keycloakUserID, updateErr)
+			// Don't fail the entire onboarding - the staff record exists, just the JWT won't have the claim
+			// The user can re-sync via staff activation or admin intervention
+		} else {
+			log.Printf("[OnboardingService] Updated Keycloak user %s with staff_id=%s, tenant_id=%s, tenant_slug=%s",
+				keycloakUserID, bootstrapResult.StaffID, tenantID, slug)
+		}
+	} else {
+		log.Printf("[OnboardingService] Warning: Cannot update Keycloak - keycloakClient=%v, bootstrapResult=%v",
+			s.keycloakClient != nil, bootstrapResult != nil)
+	}
 
 	// Update tenant with owner user ID
 	if err := s.db.Model(&models.Tenant{}).Where("id = ?", tenantID).Update("owner_user_id", keycloakUserID).Error; err != nil {
@@ -1358,6 +1400,19 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 		}
 
 		log.Printf("[OnboardingService] Created vendor %s for tenant %s", vendorData.ID, tenantID)
+
+		// FIX-P0: Update Keycloak user with vendor_id
+		// This is required for vendor-scoped operations (inventory, products, etc.)
+		if s.keycloakClient != nil && vendorData.ID != uuid.Nil {
+			vendorAttrs := map[string][]string{
+				"vendor_id": {vendorData.ID.String()},
+			}
+			if updateErr := s.keycloakClient.UpdateUserAttributes(ctx, keycloakUserID.String(), vendorAttrs); updateErr != nil {
+				log.Printf("[OnboardingService] Warning: Failed to update Keycloak user %s with vendor_id: %v", keycloakUserID, updateErr)
+			} else {
+				log.Printf("[OnboardingService] Updated Keycloak user %s with vendor_id=%s", keycloakUserID, vendorData.ID)
+			}
+		}
 
 		// CRITICAL: Verify tenant_id consistency
 		// This prevents data corruption from race conditions or partial failures

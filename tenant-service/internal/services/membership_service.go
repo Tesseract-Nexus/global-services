@@ -524,3 +524,9 @@ func (s *MembershipService) ValidateAndReserveSlug(ctx context.Context, slug str
 func (s *MembershipService) ActivateSlugReservation(ctx context.Context, slug string, tenantID uuid.UUID) error {
 	return s.membershipRepo.ActivateSlugReservation(ctx, slug, tenantID)
 }
+
+// DeleteMembershipInternal removes a membership without permission checks
+// This is used for cleanup during onboarding failures - should NOT be exposed via API
+func (s *MembershipService) DeleteMembershipInternal(ctx context.Context, userID, tenantID uuid.UUID) error {
+	return s.membershipRepo.DeactivateMembership(ctx, userID, tenantID)
+}
