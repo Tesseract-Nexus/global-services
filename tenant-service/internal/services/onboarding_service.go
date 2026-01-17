@@ -1527,8 +1527,29 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 		}
 	}
 
-	// Tokens are already obtained and verified by setupUserInKeycloak
-	// No need to call loginAndGetTokens again - we already verified authentication works
+	// FIX-P0: Refresh token AFTER all Keycloak attributes are set
+	// The original token from setupUserInKeycloak was issued BEFORE staff_id, tenant_id, vendor_id
+	// were set as user attributes. Without refreshing, the JWT won't have these claims and
+	// all backend services will return 401/403 "Failed to verify permissions".
+	finalAccessToken := keycloakResult.AccessToken
+	finalRefreshToken := keycloakResult.RefreshToken
+	finalExpiresIn := keycloakResult.ExpiresIn
+
+	if s.keycloakClient != nil {
+		log.Printf("[OnboardingService] Refreshing token to include updated claims (staff_id, tenant_id, vendor_id)...")
+		refreshedTokens, refreshErr := s.loginAndGetTokens(primaryContact.Email, password)
+		if refreshErr != nil {
+			log.Printf("[OnboardingService] Warning: Failed to refresh token with updated claims: %v", refreshErr)
+			log.Printf("[OnboardingService] User may need to log out and log back in to get updated JWT claims")
+			// Don't fail - user can still use the old token, they'll just need to re-login
+		} else {
+			finalAccessToken = refreshedTokens.AccessToken
+			finalRefreshToken = refreshedTokens.RefreshToken
+			finalExpiresIn = refreshedTokens.ExpiresIn
+			log.Printf("[OnboardingService] Successfully refreshed token with updated claims for user %s", security.MaskEmail(primaryContact.Email))
+		}
+	}
+
 	response := &CompleteAccountSetupResponse{
 		TenantID:     tenantID,
 		TenantSlug:   slug,
@@ -1536,9 +1557,9 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 		Email:        primaryContact.Email,
 		BusinessName: session.BusinessInformation.BusinessName,
 		AdminURL:     adminURL,
-		AccessToken:  keycloakResult.AccessToken,
-		RefreshToken: keycloakResult.RefreshToken,
-		ExpiresIn:    keycloakResult.ExpiresIn,
+		AccessToken:  finalAccessToken,
+		RefreshToken: finalRefreshToken,
+		ExpiresIn:    finalExpiresIn,
 		Message:      "Account created successfully. You can now access your admin dashboard.",
 	}
 
