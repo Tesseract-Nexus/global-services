@@ -493,11 +493,12 @@ type OnboardingBusiness struct {
 
 // OnboardingContact represents primary contact information from onboarding
 type OnboardingContact struct {
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-	Email     string `json:"email"`
-	Phone     string `json:"phone,omitempty"`
-	JobTitle  string `json:"job_title,omitempty"`
+	FirstName        string `json:"first_name"`
+	LastName         string `json:"last_name"`
+	Email            string `json:"email"`
+	Phone            string `json:"phone,omitempty"`
+	PhoneCountryCode string `json:"phone_country_code,omitempty"`
+	JobTitle         string `json:"job_title,omitempty"`
 }
 
 // OnboardingAddress represents business address from onboarding
@@ -611,12 +612,18 @@ func (s *TenantService) GetTenantOnboardingData(ctx context.Context, tenantID uu
 	// Map primary contact (first contact in list)
 	if len(session.ContactInformation) > 0 {
 		ci := session.ContactInformation[0]
+		// Combine phone with country code if available for display
+		phone := ci.Phone
+		if ci.PhoneCountryCode != "" && phone != "" && !strings.HasPrefix(phone, "+") {
+			phone = ci.PhoneCountryCode + " " + phone
+		}
 		result.Contact = &OnboardingContact{
-			FirstName: ci.FirstName,
-			LastName:  ci.LastName,
-			Email:     ci.Email,
-			Phone:     ci.Phone,
-			JobTitle:  ci.JobTitle,
+			FirstName:        ci.FirstName,
+			LastName:         ci.LastName,
+			Email:            ci.Email,
+			Phone:            phone,
+			PhoneCountryCode: ci.PhoneCountryCode,
+			JobTitle:         ci.JobTitle,
 		}
 	}
 
