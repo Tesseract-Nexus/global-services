@@ -315,3 +315,44 @@ func (c *Client) GetEmailVerificationStatus(ctx context.Context, email string) (
 
 	return &status, nil
 }
+
+// GetVerificationTokenBySession retrieves a verification token by session ID and email
+// This is used for E2E testing to retrieve the verification link token
+func (c *Client) GetVerificationTokenBySession(ctx context.Context, sessionID, email string) (string, error) {
+	// Scan for keys matching the verification token pattern for this session
+	pattern := fmt.Sprintf("verification:token:*:%s:%s", sessionID, email)
+	var token string
+
+	iter := c.rdb.Scan(ctx, 0, pattern, 100).Iterator()
+	for iter.Next(ctx) {
+		key := iter.Val()
+		// Extract token from key: verification:token:{token}:{sessionID}:{email}
+		parts := make([]string, 0)
+		current := ""
+		for _, c := range key {
+			if c == ':' {
+				parts = append(parts, current)
+				current = ""
+			} else {
+				current += string(c)
+			}
+		}
+		if current != "" {
+			parts = append(parts, current)
+		}
+		if len(parts) >= 3 {
+			token = parts[2] // The token is the 3rd part
+			break
+		}
+	}
+
+	if err := iter.Err(); err != nil {
+		return "", fmt.Errorf("failed to scan for verification token: %w", err)
+	}
+
+	if token == "" {
+		return "", fmt.Errorf("verification token not found for session %s and email %s", sessionID, email)
+	}
+
+	return token, nil
+}

@@ -1092,3 +1092,45 @@ func (s *TenantAuthService) RegisterCustomer(ctx context.Context, req *RegisterC
 
 	return response, nil
 }
+
+// AcceptInvitationPublicRequest represents a request to accept an invitation without authentication
+type AcceptInvitationPublicRequest struct {
+	Token     string
+	Email     string
+	Password  string
+	FirstName string
+	LastName  string
+	Phone     string
+}
+
+// AcceptInvitationPublicResponse represents the response from accepting a public invitation
+type AcceptInvitationPublicResponse struct {
+	Success    bool       `json:"success"`
+	UserID     *uuid.UUID `json:"user_id,omitempty"`
+	TenantID   uuid.UUID  `json:"tenant_id"`
+	TenantSlug string     `json:"tenant_slug"`
+	Message    string     `json:"message,omitempty"`
+}
+
+// CanUnlockAccount checks if the admin user has permission to unlock accounts in a tenant
+func (s *TenantAuthService) CanUnlockAccount(ctx context.Context, adminUserID, tenantID uuid.UUID) (bool, error) {
+	// Check if the admin user has membership in this tenant with admin role
+	membership, err := s.membershipRepo.GetUserMembership(ctx, adminUserID, tenantID)
+	if err != nil {
+		return false, fmt.Errorf("failed to get membership: %w", err)
+	}
+
+	// Only admin roles can unlock accounts
+	return membership.Role == "admin" || membership.Role == "owner", nil
+}
+
+// AcceptInvitationPublic accepts a tenant invitation and creates the user account
+func (s *TenantAuthService) AcceptInvitationPublic(ctx context.Context, req *AcceptInvitationPublicRequest) (*AcceptInvitationPublicResponse, error) {
+	// This is a placeholder implementation
+	// The actual implementation would:
+	// 1. Validate the invitation token
+	// 2. Create the user in Keycloak
+	// 3. Create local user record
+	// 4. Accept the invitation
+	return nil, fmt.Errorf("AcceptInvitationPublic not yet implemented")
+}
