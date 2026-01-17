@@ -4,11 +4,11 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/Tesseract-Nexus/go-shared/security"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"tenant-service/internal/clients"
 	"tenant-service/internal/services"
-	"github.com/Tesseract-Nexus/go-shared/security"
 )
 
 // AuthHandler handles tenant-aware authentication HTTP requests
@@ -336,7 +336,15 @@ func (h *AuthHandler) UnlockAccount(c *gin.Context) {
 		return
 	}
 
-	// TODO: Add authorization check - only tenant admins should be able to unlock accounts
+	canUnlock, err := h.authSvc.CanUnlockAccount(c.Request.Context(), adminUserID, tenantID)
+	if err != nil {
+		ErrorResponse(c, http.StatusForbidden, "Insufficient permissions", err)
+		return
+	}
+	if !canUnlock {
+		ErrorResponse(c, http.StatusForbidden, "Insufficient permissions", nil)
+		return
+	}
 
 	// Unlock account
 	if err := h.authSvc.UnlockAccount(c.Request.Context(), userID, tenantID, adminUserID); err != nil {
@@ -362,11 +370,12 @@ func (h *AuthHandler) CheckAccountStatus(c *gin.Context) {
 	// This is a lightweight check without full credential validation
 	// Used to show users if their account is locked before they enter password
 	result, err := h.authSvc.ValidateCredentials(c.Request.Context(), &services.ValidateCredentialsRequest{
-		Email:      req.Email,
-		Password:   "dummy-password-for-status-check", // Won't be validated
-		TenantSlug: req.TenantSlug,
-		IPAddress:  c.ClientIP(),
-		UserAgent:  c.GetHeader("User-Agent"),
+		Email:                  req.Email,
+		Password:               "dummy-password-for-status-check", // Will be ignored
+		TenantSlug:             req.TenantSlug,
+		IPAddress:              c.ClientIP(),
+		UserAgent:              c.GetHeader("User-Agent"),
+		SkipPasswordValidation: true,
 	})
 
 	if err != nil {
@@ -396,6 +405,16 @@ type RegisterCustomerRequest struct {
 	LastName   string `json:"last_name" binding:"required"`
 	Phone      string `json:"phone"`
 	TenantSlug string `json:"tenant_slug" binding:"required"`
+}
+
+// AcceptInvitationPublicRequest represents a request to accept an invitation without auth
+type AcceptInvitationPublicRequest struct {
+	Token     string `json:"token" binding:"required"`
+	Email     string `json:"email" binding:"required,email"`
+	Password  string `json:"password" binding:"required,min=8"`
+	FirstName string `json:"first_name" binding:"required"`
+	LastName  string `json:"last_name" binding:"required"`
+	Phone     string `json:"phone"`
 }
 
 // RegisterCustomer registers a new customer for storefront direct registration
@@ -463,6 +482,31 @@ func (h *AuthHandler) RegisterCustomer(c *gin.Context) {
 	}
 
 	SuccessResponse(c, http.StatusCreated, "Customer registered successfully", response)
+}
+
+// AcceptInvitationPublic accepts a tenant invitation and creates the user if needed
+// POST /api/v1/invitations/accept-public
+func (h *AuthHandler) AcceptInvitationPublic(c *gin.Context) {
+	var req AcceptInvitationPublicRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+
+	result, err := h.authSvc.AcceptInvitationPublic(c.Request.Context(), &services.AcceptInvitationPublicRequest{
+		Token:     req.Token,
+		Email:     req.Email,
+		Password:  req.Password,
+		FirstName: req.FirstName,
+		LastName:  req.LastName,
+		Phone:     req.Phone,
+	})
+	if err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Failed to accept invitation", err)
+		return
+	}
+
+	SuccessResponse(c, http.StatusOK, "Invitation accepted", result)
 }
 
 // DeactivateAccountRequest represents a request to deactivate a customer account
@@ -534,11 +578,11 @@ func (h *AuthHandler) DeactivateAccount(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"success":           true,
-		"message":           result.Message,
-		"deactivated_at":    result.DeactivatedAt,
+		"success":            true,
+		"message":            result.Message,
+		"deactivated_at":     result.DeactivatedAt,
 		"scheduled_purge_at": result.ScheduledPurgeAt,
-		"days_until_purge":  result.DaysUntilPurge,
+		"days_until_purge":   result.DaysUntilPurge,
 	})
 }
 
