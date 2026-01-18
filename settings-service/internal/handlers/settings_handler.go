@@ -799,3 +799,91 @@ func (h *SettingsHandler) GetSettingsHistory(c *gin.Context) {
 		"data":    history,
 	})
 }
+
+// GetPublicSettingsByContext returns settings for public storefront access
+// This endpoint is used by storefronts to read marketing and localization settings
+// without authentication. It reads tenantId from query parameter instead of X-Tenant-ID header.
+// @Summary Get public settings by context
+// @Description Get settings for a specific context without authentication (read-only)
+// @Tags public
+// @Accept json
+// @Produce json
+// @Param tenantId query string true "Tenant ID (storefront ID)"
+// @Param applicationId query string true "Application ID"
+// @Param scope query string true "Settings scope"
+// @Success 200 {object} models.SettingsResponse
+// @Failure 400 {object} models.SettingsResponse
+// @Failure 404 {object} models.SettingsResponse
+// @Router /api/v1/public/settings/context [get]
+func (h *SettingsHandler) GetPublicSettingsByContext(c *gin.Context) {
+	// Get tenantId from query parameter for public access
+	tenantIDStr := c.Query("tenantId")
+	if tenantIDStr == "" {
+		c.JSON(http.StatusBadRequest, models.SettingsResponse{
+			Success: false,
+			Message: "tenantId query parameter is required",
+		})
+		return
+	}
+
+	// Try to parse as UUID first, if that fails, generate a deterministic UUID from the string
+	tenantID, err := uuid.Parse(tenantIDStr)
+	if err != nil {
+		// Generate a deterministic UUID from the tenant string
+		namespace := uuid.MustParse("6ba7b811-9dad-11d1-80b4-00c04fd430c8")
+		tenantID = uuid.NewSHA1(namespace, []byte(tenantIDStr))
+	}
+
+	applicationIDStr := c.Query("applicationId")
+	if applicationIDStr == "" {
+		c.JSON(http.StatusBadRequest, models.SettingsResponse{
+			Success: false,
+			Message: "applicationId query parameter is required",
+		})
+		return
+	}
+
+	// Try to parse as UUID first, if that fails, generate a deterministic UUID from the string
+	applicationID, err := uuid.Parse(applicationIDStr)
+	if err != nil {
+		namespace := uuid.MustParse("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
+		applicationID = uuid.NewSHA1(namespace, []byte(applicationIDStr))
+	}
+
+	scope := c.Query("scope")
+	if scope == "" {
+		c.JSON(http.StatusBadRequest, models.SettingsResponse{
+			Success: false,
+			Message: "scope query parameter is required",
+		})
+		return
+	}
+
+	context := models.SettingsContext{
+		TenantID:      tenantID,
+		ApplicationID: applicationID,
+		Scope:         scope,
+	}
+
+	settings, err := h.settingsService.GetSettingsByContext(context)
+	if err != nil {
+		if err == repository.ErrNotFound {
+			// Return empty settings instead of error for public access
+			c.JSON(http.StatusOK, models.SettingsResponse{
+				Success: true,
+				Data:    nil,
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.SettingsResponse{
+			Success: false,
+			Message: "Failed to get settings: " + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.SettingsResponse{
+		Success: true,
+		Data:    settings,
+	})
+}

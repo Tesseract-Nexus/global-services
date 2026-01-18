@@ -218,6 +218,9 @@ func setupRouter(settingsHandler *handlers.SettingsHandler, storefrontThemeHandl
 		publicV1.GET("/storefront-theme/:storefrontId", storefrontThemeHandler.GetStorefrontTheme)
 		// Public theme presets
 		publicV1.GET("/storefront-theme/presets", storefrontThemeHandler.GetThemePresets)
+		// Public settings context endpoint - allows storefronts to read marketing/localization settings
+		// Uses tenantId from query parameter instead of X-Tenant-ID header
+		publicV1.GET("/settings/context", settingsHandler.GetPublicSettingsByContext)
 	}
 
 	// Initialize Istio auth middleware for Keycloak JWT validation
