@@ -1323,6 +1323,7 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 
 	// FIX-P0: Update Keycloak user with staff_id from bootstrap result
 	// This is CRITICAL - without staff_id in the JWT, all service calls return 403
+	// FIX-P1: Make this mandatory - tenant_id mismatch between Keycloak and staff_db causes RBAC failures
 	if s.keycloakClient != nil && bootstrapResult != nil && bootstrapResult.StaffID != "" {
 		keycloakAttrs := map[string][]string{
 			"staff_id":    {bootstrapResult.StaffID},
@@ -1331,14 +1332,35 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 		}
 		if updateErr := s.keycloakClient.UpdateUserAttributes(ctx, keycloakUserID.String(), keycloakAttrs); updateErr != nil {
 			log.Printf("[OnboardingService] CRITICAL: Failed to update Keycloak user %s with staff_id: %v", keycloakUserID, updateErr)
-			// Don't fail the entire onboarding - the staff record exists, just the JWT won't have the claim
-			// The user can re-sync via staff activation or admin intervention
-		} else {
-			log.Printf("[OnboardingService] Updated Keycloak user %s with staff_id=%s, tenant_id=%s, tenant_slug=%s",
-				keycloakUserID, bootstrapResult.StaffID, tenantID, slug)
+
+			// FIX-P1: Keycloak update is now MANDATORY to prevent tenant_id mismatch
+			// Without this, the JWT will have wrong/no tenant_id, causing all RBAC checks to fail
+			// Mark tenant as failed and return error
+			if updateErr := s.db.Model(&models.Tenant{}).
+				Where("id = ?", tenantID).
+				Updates(map[string]interface{}{
+					"status":      "failed",
+					"description": fmt.Sprintf("Keycloak sync failed: %v", updateErr),
+				}).Error; updateErr != nil {
+				log.Printf("[OnboardingService] Warning: Failed to mark tenant as failed: %v", updateErr)
+			}
+
+			// Update session status
+			if updateErr := s.db.Model(&models.OnboardingSession{}).
+				Where("id = ?", sessionID).
+				Update("status", "failed").Error; updateErr != nil {
+				log.Printf("[OnboardingService] Warning: Failed to update session status: %v", updateErr)
+			}
+
+			return nil, fmt.Errorf("failed to sync Keycloak user attributes (tenant_id, staff_id): %w - this would cause RBAC permission failures", updateErr)
 		}
+		log.Printf("[OnboardingService] Updated Keycloak user %s with staff_id=%s, tenant_id=%s, tenant_slug=%s",
+			keycloakUserID, bootstrapResult.StaffID, tenantID, slug)
 	} else {
-		log.Printf("[OnboardingService] Warning: Cannot update Keycloak - keycloakClient=%v, bootstrapResult=%v",
+		// FIX-P1: Missing keycloakClient or bootstrapResult is a configuration error
+		log.Printf("[OnboardingService] CRITICAL: Cannot update Keycloak - keycloakClient=%v, bootstrapResult=%v",
+			s.keycloakClient != nil, bootstrapResult != nil)
+		return nil, fmt.Errorf("keycloak sync not possible: keycloakClient=%v, bootstrapResult=%v - this would cause RBAC failures",
 			s.keycloakClient != nil, bootstrapResult != nil)
 	}
 
