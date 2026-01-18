@@ -530,3 +530,18 @@ func (s *MembershipService) ActivateSlugReservation(ctx context.Context, slug st
 func (s *MembershipService) DeleteMembershipInternal(ctx context.Context, userID, tenantID uuid.UUID) error {
 	return s.membershipRepo.DeactivateMembership(ctx, userID, tenantID)
 }
+
+// ============================================================================
+// Business Name Validation
+// ============================================================================
+
+// IsBusinessNameAvailable checks if a business name is available (simple boolean check)
+func (s *MembershipService) IsBusinessNameAvailable(ctx context.Context, businessName string) (bool, error) {
+	return s.membershipRepo.IsBusinessNameAvailable(ctx, businessName, nil)
+}
+
+// ValidateBusinessNameWithSuggestions validates a business name and returns suggestions if taken
+// If sessionID is provided, it excludes that session's own business information from the check
+func (s *MembershipService) ValidateBusinessNameWithSuggestions(ctx context.Context, businessName string, sessionID *uuid.UUID) (*repository.BusinessNameValidationResult, error) {
+	return s.membershipRepo.ValidateBusinessNameWithSuggestions(ctx, businessName, sessionID)
+}

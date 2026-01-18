@@ -1073,3 +1073,131 @@ func (r *MembershipRepository) GetAllTenants(ctx context.Context) ([]models.Tena
 	}
 	return tenants, nil
 }
+
+// ============================================================================
+// Business Name Validation Operations
+// ============================================================================
+
+// BusinessNameValidationResult contains the result of business name validation with suggestions
+type BusinessNameValidationResult struct {
+	BusinessName string   `json:"business_name"`
+	Available    bool     `json:"available"`
+	Message      string   `json:"message,omitempty"`
+	Suggestions  []string `json:"suggestions,omitempty"`
+}
+
+// normalizeBusinessName normalizes a business name for comparison
+// Converts to lowercase and trims whitespace for consistent comparison
+func normalizeBusinessName(input string) string {
+	return strings.TrimSpace(strings.ToLower(input))
+}
+
+// IsBusinessNameAvailable checks if a business name is available for use
+// Checks both existing tenants and pending onboarding sessions
+func (r *MembershipRepository) IsBusinessNameAvailable(ctx context.Context, businessName string, excludeSessionID *uuid.UUID) (bool, error) {
+	normalizedName := normalizeBusinessName(businessName)
+
+	// Check existing tenants table (case-insensitive)
+	var tenantCount int64
+	if err := r.db.WithContext(ctx).Model(&models.Tenant{}).
+		Where("LOWER(name) = ?", normalizedName).
+		Count(&tenantCount).Error; err != nil {
+		return false, fmt.Errorf("failed to check tenant name availability: %w", err)
+	}
+	if tenantCount > 0 {
+		return false, nil
+	}
+
+	// Check pending onboarding sessions (business_information table)
+	query := r.db.WithContext(ctx).Model(&models.BusinessInformation{}).
+		Where("LOWER(business_name) = ?", normalizedName)
+	if excludeSessionID != nil {
+		query = query.Where("onboarding_session_id != ?", *excludeSessionID)
+	}
+
+	var pendingCount int64
+	if err := query.Count(&pendingCount).Error; err != nil {
+		return false, fmt.Errorf("failed to check pending business name: %w", err)
+	}
+
+	return pendingCount == 0, nil
+}
+
+// generateBusinessNameSuggestions generates alternative business name suggestions
+func (r *MembershipRepository) generateBusinessNameSuggestions(ctx context.Context, baseName string, count int) []string {
+	suggestions := make([]string, 0, count)
+	suffixes := []string{"Inc", "Co", "Group", "Hub", "Store"}
+
+	for i, suffix := range suffixes {
+		if i >= count {
+			break
+		}
+		suggestion := fmt.Sprintf("%s %s", baseName, suffix)
+		// Check if suggestion is available
+		available, err := r.IsBusinessNameAvailable(ctx, suggestion, nil)
+		if err == nil && available {
+			suggestions = append(suggestions, suggestion)
+		}
+	}
+
+	// If we still need more suggestions, try numbered variants
+	counter := 2
+	for len(suggestions) < count && counter <= 10 {
+		suggestion := fmt.Sprintf("%s %d", baseName, counter)
+		available, err := r.IsBusinessNameAvailable(ctx, suggestion, nil)
+		if err == nil && available {
+			suggestions = append(suggestions, suggestion)
+		}
+		counter++
+	}
+
+	return suggestions
+}
+
+// ValidateBusinessNameWithSuggestions checks if a business name is available and provides alternatives if not
+// If sessionID is provided, it excludes that session's own business information from the check
+func (r *MembershipRepository) ValidateBusinessNameWithSuggestions(ctx context.Context, businessName string, sessionID *uuid.UUID) (*BusinessNameValidationResult, error) {
+	// Normalize the business name
+	trimmedName := strings.TrimSpace(businessName)
+
+	// Validate business name format
+	if len(trimmedName) < 2 {
+		return &BusinessNameValidationResult{
+			BusinessName: businessName,
+			Available:    false,
+			Message:      "Business name must be at least 2 characters long",
+		}, nil
+	}
+
+	if len(trimmedName) > 255 {
+		return &BusinessNameValidationResult{
+			BusinessName: businessName,
+			Available:    false,
+			Message:      "Business name must be 255 characters or less",
+		}, nil
+	}
+
+	// Check if business name is available
+	available, err := r.IsBusinessNameAvailable(ctx, trimmedName, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check business name availability: %w", err)
+	}
+
+	if available {
+		return &BusinessNameValidationResult{
+			BusinessName: trimmedName,
+			Available:    true,
+			Message:      "This business name is available!",
+		}, nil
+	}
+
+	// Not available - generate suggestions
+	suggestions := r.generateBusinessNameSuggestions(ctx, trimmedName, 5)
+
+	return &BusinessNameValidationResult{
+		BusinessName: trimmedName,
+		Available:    false,
+		Message:      "This business name is already taken. Try one of these alternatives:",
+		Suggestions:  suggestions,
+	}, nil
+}

@@ -537,3 +537,29 @@ func (h *MembershipHandler) GenerateSlug(c *gin.Context) {
 		"name": name,
 	})
 }
+
+// ValidateBusinessName validates if a business name is available
+// GET /api/v1/validation/business-name?name=MyBusiness
+func (h *MembershipHandler) ValidateBusinessName(c *gin.Context) {
+	businessName := c.Query("name")
+	if businessName == "" {
+		ErrorResponse(c, http.StatusBadRequest, "Business name is required", nil)
+		return
+	}
+
+	// Check if caller wants to exclude a specific session (for updates)
+	var excludeSessionID *uuid.UUID
+	if excludeStr := c.Query("exclude_session_id"); excludeStr != "" {
+		if id, err := uuid.Parse(excludeStr); err == nil {
+			excludeSessionID = &id
+		}
+	}
+
+	result, err := h.membershipSvc.ValidateBusinessNameWithSuggestions(c.Request.Context(), businessName, excludeSessionID)
+	if err != nil {
+		ErrorResponse(c, http.StatusInternalServerError, "Failed to validate business name", err)
+		return
+	}
+
+	SuccessResponse(c, http.StatusOK, "Business name validated", result)
+}

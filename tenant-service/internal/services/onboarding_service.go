@@ -315,6 +315,23 @@ func (s *OnboardingService) UpdateBusinessInformation(ctx context.Context, sessi
 		return nil, fmt.Errorf("cannot update business information for session in %s status", session.Status)
 	}
 
+	// Validate business name uniqueness before saving
+	// This ensures no two tenants can have the same business name
+	if businessInfo.BusinessName != "" {
+		validationResult, err := s.ValidateBusinessNameWithSuggestions(ctx, businessInfo.BusinessName, &sessionID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to validate business name: %w", err)
+		}
+		if !validationResult.Available {
+			// Return validation error with suggestions
+			suggestionsStr := ""
+			if len(validationResult.Suggestions) > 0 {
+				suggestionsStr = fmt.Sprintf(" Suggestions: %s", strings.Join(validationResult.Suggestions, ", "))
+			}
+			return nil, fmt.Errorf("business name '%s' is already taken.%s", businessInfo.BusinessName, suggestionsStr)
+		}
+	}
+
 	// Save business information
 	savedBusinessInfo, err := s.businessRepo.CreateOrUpdate(ctx, sessionID, businessInfo)
 	if err != nil {
@@ -524,6 +541,29 @@ func (s *OnboardingService) ValidateSlugWithSuggestions(ctx context.Context, slu
 	return s.membershipSvc.ValidateSlugWithSuggestions(ctx, slug, sessionID)
 }
 
+// ValidateBusinessName validates if a business name is available
+func (s *OnboardingService) ValidateBusinessName(ctx context.Context, businessName string) (bool, error) {
+	if s.membershipSvc == nil {
+		// Fallback if membership service not initialized
+		return true, nil
+	}
+	return s.membershipSvc.IsBusinessNameAvailable(ctx, businessName)
+}
+
+// ValidateBusinessNameWithSuggestions validates a business name and returns suggestions if taken
+// If sessionID is provided, it excludes that session's own business information from the check
+func (s *OnboardingService) ValidateBusinessNameWithSuggestions(ctx context.Context, businessName string, sessionID *uuid.UUID) (*repository.BusinessNameValidationResult, error) {
+	if s.membershipSvc == nil {
+		// Fallback if membership service not initialized
+		return &repository.BusinessNameValidationResult{
+			BusinessName: businessName,
+			Available:    true,
+			Message:      "Validation service unavailable",
+		}, nil
+	}
+	return s.membershipSvc.ValidateBusinessNameWithSuggestions(ctx, businessName, sessionID)
+}
+
 // ValidateAndReserveSlug validates a slug and reserves it for the session if available
 // This prevents race conditions where two users try to claim the same slug
 // Also saves the optional storefrontSlug for the customer-facing store URL
@@ -604,13 +644,6 @@ func (s *OnboardingService) UpdateStorefrontSlug(ctx context.Context, sessionID 
 
 	log.Printf("[OnboardingService] Updated storefront slug to '%s' for session %s", storefrontSlug, sessionID)
 	return nil
-}
-
-// ValidateBusinessName validates if a business name is available
-func (s *OnboardingService) ValidateBusinessName(ctx context.Context, businessName string) (bool, error) {
-	// This would check against existing business names
-	// For now, we'll simulate validation
-	return true, nil
 }
 
 // Private helper methods

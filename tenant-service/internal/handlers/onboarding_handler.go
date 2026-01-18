@@ -464,7 +464,9 @@ func (h *OnboardingHandler) ValidateStorefront(c *gin.Context) {
 	SuccessResponse(c, http.StatusOK, result.Message, result)
 }
 
-// ValidateBusinessName validates business name availability
+// ValidateBusinessName validates business name availability with suggestions
+// GET /api/v1/validation/business-name?business_name=MyStore
+// Optional: ?session_id=<uuid> to exclude current session's business info from check
 func (h *OnboardingHandler) ValidateBusinessName(c *gin.Context) {
 	businessName := c.Query("business_name")
 	if businessName == "" {
@@ -472,18 +474,21 @@ func (h *OnboardingHandler) ValidateBusinessName(c *gin.Context) {
 		return
 	}
 
-	isAvailable, err := h.onboardingService.ValidateBusinessName(c.Request.Context(), businessName)
+	// Check if caller wants to exclude a specific session (for updates during onboarding)
+	var sessionID *uuid.UUID
+	if sessionIDStr := c.Query("session_id"); sessionIDStr != "" {
+		if id, err := uuid.Parse(sessionIDStr); err == nil {
+			sessionID = &id
+		}
+	}
+
+	result, err := h.onboardingService.ValidateBusinessNameWithSuggestions(c.Request.Context(), businessName, sessionID)
 	if err != nil {
 		ErrorResponse(c, http.StatusInternalServerError, "Failed to validate business name", err)
 		return
 	}
 
-	response := map[string]interface{}{
-		"business_name": businessName,
-		"available":     isAvailable,
-	}
-
-	SuccessResponse(c, http.StatusOK, "Business name validation completed", response)
+	SuccessResponse(c, http.StatusOK, result.Message, result)
 }
 
 // ListSessions lists onboarding sessions with pagination
