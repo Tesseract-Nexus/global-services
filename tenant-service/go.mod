@@ -3,7 +3,7 @@ module tenant-service
 go 1.25
 
 require (
-	github.com/Tesseract-Nexus/go-shared v0.0.0-20260116025029-bf676bd77644
+	github.com/Tesseract-Nexus/go-shared v0.0.2-0.20260118215758-0eef19bcc93b
 	github.com/gin-contrib/cors v1.7.6
 	github.com/gin-gonic/gin v1.11.0
 	github.com/google/uuid v1.6.0

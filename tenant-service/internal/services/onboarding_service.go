@@ -1122,6 +1122,37 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 	}
 
 	// ============================================================================
+	// KEYCLOAK ORGANIZATION: Create organization for tenant identity isolation
+	// This enables users to have separate identities per tenant (store)
+	// ============================================================================
+	var keycloakOrgID string
+	if s.keycloakClient != nil {
+		log.Printf("[OnboardingService] Creating Keycloak Organization for tenant %s (slug: %s)...", tenantID, slug)
+		orgID, orgErr := s.keycloakClient.CreateOrganizationForTenant(ctx, tenantID.String(), tenant.Name, slug)
+		if orgErr != nil {
+			// Log error but don't fail onboarding - organization can be created later
+			// This ensures backward compatibility during rollout
+			log.Printf("[OnboardingService] Warning: Failed to create Keycloak Organization for tenant %s: %v", tenantID, orgErr)
+		} else {
+			keycloakOrgID = orgID
+			log.Printf("[OnboardingService] Created Keycloak Organization %s for tenant %s", orgID, tenantID)
+
+			// Update tenant with organization ID
+			orgUUID, parseErr := uuid.Parse(orgID)
+			if parseErr == nil {
+				if updateErr := tx.WithContext(ctx).Model(&models.Tenant{}).
+					Where("id = ?", tenantID).
+					Update("keycloak_org_id", orgUUID).Error; updateErr != nil {
+					log.Printf("[OnboardingService] Warning: Failed to update tenant with keycloak_org_id: %v", updateErr)
+				} else {
+					tenant.KeycloakOrgID = &orgUUID
+					log.Printf("[OnboardingService] Updated tenant %s with keycloak_org_id: %s", tenantID, orgID)
+				}
+			}
+		}
+	}
+
+	// ============================================================================
 	// USER ID STRATEGY: Keycloak is the source of truth for user IDs
 	//
 	// Flow:
@@ -1252,6 +1283,21 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 	} else {
 		log.Printf("[OnboardingService] CRITICAL: Membership service not configured - user %s will not have access to tenant %s", userID, tenantID)
 		return nil, fmt.Errorf("membership service not configured - cannot complete onboarding")
+	}
+
+	// ============================================================================
+	// KEYCLOAK ORGANIZATION MEMBERSHIP
+	// Add owner to the organization for identity isolation
+	// ============================================================================
+	if s.keycloakClient != nil && keycloakOrgID != "" {
+		// keycloakUserID is the Keycloak user ID (may differ from local userID for existing users)
+		log.Printf("[OnboardingService] Adding user %s to Keycloak Organization %s...", keycloakUserID, keycloakOrgID)
+		if addErr := s.keycloakClient.AddOrganizationMember(ctx, keycloakOrgID, keycloakUserID.String()); addErr != nil {
+			// Log error but don't fail - membership can be added later
+			log.Printf("[OnboardingService] Warning: Failed to add user %s to organization %s: %v", keycloakUserID, keycloakOrgID, addErr)
+		} else {
+			log.Printf("[OnboardingService] Added user %s to Keycloak Organization %s", keycloakUserID, keycloakOrgID)
+		}
 	}
 
 	// ============================================================================

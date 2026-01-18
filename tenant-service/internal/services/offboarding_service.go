@@ -229,6 +229,29 @@ func (s *OffboardingService) DeleteTenant(ctx context.Context, req *DeleteTenant
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
+	// 11b. Disable Keycloak Organization (don't delete - preserve audit trail)
+	// This prevents any new logins to this tenant's identity context
+	if s.keycloakClient != nil && tenant.KeycloakOrgID != nil {
+		orgID := tenant.KeycloakOrgID.String()
+		log.Printf("[OffboardingService] Disabling Keycloak Organization %s for deleted tenant %s...", orgID, tenant.ID)
+
+		// Get current org state
+		org, getErr := s.keycloakClient.GetOrganization(ctx, orgID)
+		if getErr != nil {
+			log.Printf("[OffboardingService] Warning: Failed to get Keycloak Organization %s: %v", orgID, getErr)
+		} else if org != nil {
+			// Disable the organization
+			org.Enabled = false
+			org.Description = fmt.Sprintf("[DELETED] %s - Tenant deleted at %s", org.Description, time.Now().Format(time.RFC3339))
+
+			if updateErr := s.keycloakClient.UpdateOrganization(ctx, orgID, *org); updateErr != nil {
+				log.Printf("[OffboardingService] Warning: Failed to disable Keycloak Organization %s: %v", orgID, updateErr)
+			} else {
+				log.Printf("[OffboardingService] Disabled Keycloak Organization %s for deleted tenant %s", orgID, tenant.ID)
+			}
+		}
+	}
+
 	// 12. Publish NATS event for K8s resource cleanup (synchronous with retry)
 	if s.natsClient != nil {
 		baseDomain := os.Getenv("BASE_DOMAIN")
