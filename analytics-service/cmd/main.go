@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -12,6 +15,7 @@ import (
 	"analytics-service/internal/clients"
 	"analytics-service/internal/config"
 	"analytics-service/internal/events"
+	"analytics-service/internal/fdw"
 	"analytics-service/internal/handlers"
 	"analytics-service/internal/middleware"
 	"analytics-service/internal/repository"
@@ -57,6 +61,38 @@ func main() {
 		logger.WithError(err).Fatal("Failed to connect to database")
 	}
 	logger.Info("Connected to database")
+
+	// Initialize FDW (Foreign Data Wrapper) for cross-database queries
+	// This is critical for analytics - without FDW, the service cannot query orders/customers/products
+	fdwConfig := &fdw.FDWConfig{
+		DBHost:          cfg.DBHost,
+		DBPort:          fmt.Sprintf("%d", cfg.DBPort),
+		DBUser:          cfg.DBUser,
+		DBPassword:      cfg.DBPassword,
+		ProductsDB:      getEnv("FDW_PRODUCTS_DB", "products_db"),
+		OrdersDB:        getEnv("FDW_ORDERS_DB", "orders_db"),
+		CustomersDB:     getEnv("FDW_CUSTOMERS_DB", "customers_db"),
+		ProductsTables:  []string{"products"},
+		OrdersTables:    []string{"orders", "order_items"},
+		CustomersTables: []string{"customers"},
+		Enabled:         getEnv("FDW_ENABLED", "true") == "true",
+		MaxRetries:      5,
+		RetryInterval:   10 * time.Second,
+	}
+
+	fdwManager := fdw.NewFDWManager(db, fdwConfig, logger)
+
+	// Initialize FDW with timeout
+	fdwCtx, fdwCancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer fdwCancel()
+
+	if err := fdwManager.Initialize(fdwCtx); err != nil {
+		// FDW initialization failed - this is critical
+		// Log error but don't exit - allow health checks to report unhealthy
+		logger.WithError(err).Error("FDW initialization failed - analytics queries will not work")
+	} else {
+		logger.Info("FDW initialized successfully - cross-database queries ready")
+	}
 
 	// Initialize tenant client for slug resolution
 	tenantClient := clients.NewTenantClient()
@@ -111,7 +147,43 @@ func main() {
 			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "not ready", "error": "database ping failed"})
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"status": "ready"})
+
+		// Check FDW health (critical for analytics queries)
+		fdwHealthy, fdwErr := fdwManager.IsHealthy(c.Request.Context())
+		if !fdwHealthy {
+			errMsg := "fdw not initialized"
+			if fdwErr != nil {
+				errMsg = fdwErr.Error()
+			}
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"status":    "not ready",
+				"error":     "fdw health check failed",
+				"fdw_error": errMsg,
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"status": "ready", "fdw": "healthy"})
+	})
+
+	// FDW status endpoint for debugging
+	router.GET("/fdw/status", func(c *gin.Context) {
+		c.JSON(http.StatusOK, fdwManager.Status())
+	})
+
+	// FDW reinitialize endpoint (for manual recovery)
+	router.POST("/fdw/reinitialize", func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Minute)
+		defer cancel()
+
+		if err := fdwManager.Reinitialize(ctx); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status": "error",
+				"error":  err.Error(),
+			})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"status": "reinitialized"})
 	})
 
 	// API routes (tenant required - with slug resolution)
@@ -156,4 +228,12 @@ func main() {
 	if err := router.Run(addr); err != nil {
 		logger.WithError(err).Fatal("Failed to start server")
 	}
+}
+
+// getEnv gets an environment variable or returns a default value
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
 }
