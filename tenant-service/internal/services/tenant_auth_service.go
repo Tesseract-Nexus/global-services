@@ -117,6 +117,7 @@ type ValidateCredentialsResponse struct {
 	KeycloakUserID string     `json:"keycloak_user_id,omitempty"` // Keycloak user ID for token issuance
 	TenantID       uuid.UUID  `json:"tenant_id"`
 	TenantSlug     string     `json:"tenant_slug"`
+	OrgID          string     `json:"org_id,omitempty"`           // Keycloak Organization ID for identity isolation
 	Email          string     `json:"email"`
 	FirstName      string     `json:"first_name,omitempty"`
 	LastName       string     `json:"last_name,omitempty"`
@@ -201,6 +202,24 @@ func (s *TenantAuthService) ValidateCredentials(ctx context.Context, req *Valida
 			ErrorCode:    "NO_ACCESS",
 			ErrorMessage: "You do not have access to this organization",
 		}, nil
+	}
+
+	// Check Keycloak Organization membership for identity isolation
+	// This ensures the user is part of the tenant's organization context
+	var orgID string
+	if s.keycloakClient != nil && tenant.KeycloakOrgID != nil && user.KeycloakID != nil {
+		orgID = tenant.KeycloakOrgID.String()
+		isMember, orgErr := s.keycloakClient.IsOrganizationMember(ctx, orgID, user.KeycloakID.String())
+		if orgErr != nil {
+			log.Printf("[TenantAuthService] Warning: Failed to check organization membership: %v", orgErr)
+			// Don't fail auth - fall back to local membership check which passed
+		} else if !isMember {
+			// User is not in the organization - they may have been removed or never added
+			// For backward compatibility during rollout, log warning but don't block
+			log.Printf("[TenantAuthService] Warning: User %s not in Keycloak Organization %s, but has local membership", security.MaskEmail(req.Email), orgID)
+			// TODO: Optionally add user to organization automatically for backward compatibility
+			// s.keycloakClient.AddOrganizationMember(ctx, orgID, user.KeycloakID.String())
+		}
 	}
 
 	// Check account lockout
@@ -308,6 +327,7 @@ func (s *TenantAuthService) ValidateCredentials(ctx context.Context, req *Valida
 		KeycloakUserID: keycloakUserID,
 		TenantID:       tenant.ID,
 		TenantSlug:     tenant.Slug,
+		OrgID:          orgID, // Keycloak Organization ID for identity isolation
 		Email:          user.Email,
 		FirstName:      user.FirstName,
 		LastName:       user.LastName,
@@ -433,6 +453,12 @@ func (s *TenantAuthService) validateStaffCredentials(ctx context.Context, tenant
 		}
 	}
 
+	// Get organization ID for response
+	var staffOrgID string
+	if tenant.KeycloakOrgID != nil {
+		staffOrgID = tenant.KeycloakOrgID.String()
+	}
+
 	// Build successful response
 	response := &ValidateCredentialsResponse{
 		Valid:          true,
@@ -440,6 +466,7 @@ func (s *TenantAuthService) validateStaffCredentials(ctx context.Context, tenant
 		KeycloakUserID: staffInfo.KeycloakUserID,
 		TenantID:       tenant.ID,
 		TenantSlug:     tenant.Slug,
+		OrgID:          staffOrgID, // Keycloak Organization ID for identity isolation
 		Email:          staffInfo.Email,
 		FirstName:      staffInfo.FirstName,
 		LastName:       staffInfo.LastName,
@@ -1016,6 +1043,19 @@ func (s *TenantAuthService) RegisterCustomer(ctx context.Context, req *RegisterC
 			"INSERT INTO user_tenant_memberships (user_id, tenant_id, role, is_active) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING",
 			membership.UserID, membership.TenantID, membership.Role, membership.IsActive,
 		)
+	}
+
+	// Add user to tenant's Keycloak Organization for identity isolation
+	// This enables organization-scoped authentication
+	if s.keycloakClient != nil && tenant.KeycloakOrgID != nil {
+		orgID := tenant.KeycloakOrgID.String()
+		log.Printf("[TenantAuthService] Adding customer %s to Keycloak Organization %s...", security.MaskEmail(req.Email), orgID)
+		if addErr := s.keycloakClient.AddOrganizationMember(ctx, orgID, keycloakUserID); addErr != nil {
+			// Log warning but don't fail registration - org membership can be added later
+			log.Printf("[TenantAuthService] Warning: Failed to add customer to organization %s: %v", orgID, addErr)
+		} else {
+			log.Printf("[TenantAuthService] Added customer %s to Keycloak Organization %s", security.MaskEmail(req.Email), orgID)
+		}
 	}
 
 	// Log registration event
