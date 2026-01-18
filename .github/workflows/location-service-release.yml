@@ -104,7 +104,6 @@ jobs:
             type=semver,pattern={{version}},value=${{ steps.version.outputs.version }}
             type=semver,pattern={{major}}.{{minor}},value=${{ steps.version.outputs.version }}
             type=semver,pattern={{major}},value=${{ steps.version.outputs.version }}
-            type=raw,value=latest
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.title=location-service
