@@ -867,23 +867,17 @@ func (h *SettingsHandler) GetPublicSettingsByContext(c *gin.Context) {
 
 	settings, err := h.settingsService.GetSettingsByContext(context)
 	if err != nil {
-		if err == repository.ErrNotFound {
-			// Return empty settings instead of error for public access
-			c.JSON(http.StatusOK, models.SettingsResponse{
-				Success: true,
-				Data:    nil,
-			})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, models.SettingsResponse{
-			Success: false,
-			Message: "Failed to get settings: " + err.Error(),
+		// For public access, return empty response instead of error
+		// This allows storefronts to gracefully handle missing settings
+		c.JSON(http.StatusOK, models.SettingsResponse{
+			Success: true,
+			Message: "Settings not found for this context",
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, models.SettingsResponse{
 		Success: true,
-		Data:    settings,
+		Data:    *settings,
 	})
 }
