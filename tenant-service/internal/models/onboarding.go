@@ -412,6 +412,11 @@ type Tenant struct {
 	// Owner tracking (user_id from auth-service)
 	OwnerUserID *uuid.UUID `json:"owner_user_id" gorm:"type:uuid;index"`
 
+	// Keycloak Organization ID for multi-tenant identity isolation
+	// Each tenant maps 1:1 to a Keycloak Organization
+	// Used for: user isolation per tenant, organization-scoped authentication
+	KeycloakOrgID *uuid.UUID `json:"keycloak_org_id,omitempty" gorm:"type:uuid;index"`
+
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 
