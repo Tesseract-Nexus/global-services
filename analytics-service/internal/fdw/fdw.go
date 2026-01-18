@@ -28,6 +28,13 @@ type FDWConfig struct {
 	DBUser     string
 	DBPassword string
 
+	// FDW Server Host - the host used by PostgreSQL for FDW connections
+	// IMPORTANT: When all databases (analytics_db, products_db, orders_db, customers_db)
+	// are on the SAME PostgreSQL instance, this should be "localhost" because
+	// FDW connections happen FROM PostgreSQL, not from the application.
+	// If databases are on different servers, use the actual hostnames.
+	FDWServerHost string
+
 	// Source database names
 	ProductsDB  string
 	OrdersDB    string
@@ -66,6 +73,11 @@ func DefaultConfig() *FDWConfig {
 		DBPort:     getEnv("DB_PORT", "5432"),
 		DBUser:     getEnv("DB_USER", "postgres"),
 		DBPassword: getEnv("DB_PASSWORD", ""),
+
+		// FDW Server Host defaults to "localhost" because all databases are typically
+		// on the same PostgreSQL instance. FDW connections happen FROM PostgreSQL,
+		// not from the application, so localhost is correct when DBs share an instance.
+		FDWServerHost: getEnv("FDW_SERVER_HOST", "localhost"),
 
 		ProductsDB:  getEnv("FDW_PRODUCTS_DB", "products_db"),
 		OrdersDB:    getEnv("FDW_ORDERS_DB", "orders_db"),
@@ -222,19 +234,33 @@ func (m *FDWManager) createForeignServer(ctx context.Context, serverName, dbname
 		return err
 	}
 
+	// Determine the host to use for FDW connections
+	// FDWServerHost is used because FDW connections happen FROM PostgreSQL itself
+	// When all databases are on the same instance, this should be "localhost"
+	fdwHost := m.config.FDWServerHost
+	if fdwHost == "" {
+		fdwHost = "localhost" // Default to localhost for same-instance databases
+	}
+
+	m.logger.WithFields(logrus.Fields{
+		"server":   serverName,
+		"fdw_host": fdwHost,
+		"port":     m.config.DBPort,
+		"dbname":   dbname,
+	}).Debug("Configuring foreign server...")
+
 	if count > 0 {
 		// Server exists, update options in case they changed
 		m.logger.WithField("server", serverName).Debug("Foreign server exists, updating options...")
 
-		// Drop and recreate to update options (ALTER SERVER doesn't support all option changes)
-		// First check if there are any dependent objects
+		// Update server options to ensure they're correct
 		updateSQL := fmt.Sprintf(`
 			ALTER SERVER %s OPTIONS (
 				SET host '%s',
 				SET port '%s',
 				SET dbname '%s'
 			)
-		`, serverName, m.config.DBHost, m.config.DBPort, dbname)
+		`, serverName, fdwHost, m.config.DBPort, dbname)
 
 		if err := m.db.WithContext(ctx).Exec(updateSQL).Error; err != nil {
 			// If ALTER fails, the server might have been created with different initial options
@@ -242,16 +268,19 @@ func (m *FDWManager) createForeignServer(ctx context.Context, serverName, dbname
 			m.logger.WithError(err).WithField("server", serverName).Debug("Could not update server options (non-fatal)")
 		}
 	} else {
-		// Create new server
+		// Create new server with FDWServerHost (typically "localhost" for same-instance DBs)
 		createSQL := fmt.Sprintf(`
 			CREATE SERVER %s FOREIGN DATA WRAPPER postgres_fdw
 			OPTIONS (host '%s', port '%s', dbname '%s')
-		`, serverName, m.config.DBHost, m.config.DBPort, dbname)
+		`, serverName, fdwHost, m.config.DBPort, dbname)
 
 		if err := m.db.WithContext(ctx).Exec(createSQL).Error; err != nil {
 			return err
 		}
-		m.logger.WithField("server", serverName).Info("Created foreign server")
+		m.logger.WithFields(logrus.Fields{
+			"server":   serverName,
+			"fdw_host": fdwHost,
+		}).Info("Created foreign server")
 	}
 
 	return nil

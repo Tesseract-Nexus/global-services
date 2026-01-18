@@ -65,10 +65,15 @@ func main() {
 	// Initialize FDW (Foreign Data Wrapper) for cross-database queries
 	// This is critical for analytics - without FDW, the service cannot query orders/customers/products
 	fdwConfig := &fdw.FDWConfig{
-		DBHost:          cfg.DBHost,
-		DBPort:          fmt.Sprintf("%d", cfg.DBPort),
-		DBUser:          cfg.DBUser,
-		DBPassword:      cfg.DBPassword,
+		DBHost:     cfg.DBHost,
+		DBPort:     fmt.Sprintf("%d", cfg.DBPort),
+		DBUser:     cfg.DBUser,
+		DBPassword: cfg.DBPassword,
+		// FDWServerHost: CRITICAL - this must be "localhost" when all databases are on
+		// the same PostgreSQL instance. FDW connections happen FROM PostgreSQL itself,
+		// not from this application. Using the K8s service hostname would fail because
+		// PostgreSQL cannot resolve K8s DNS names.
+		FDWServerHost:   getEnv("FDW_SERVER_HOST", "localhost"),
 		ProductsDB:      getEnv("FDW_PRODUCTS_DB", "products_db"),
 		OrdersDB:        getEnv("FDW_ORDERS_DB", "orders_db"),
 		CustomersDB:     getEnv("FDW_CUSTOMERS_DB", "customers_db"),
