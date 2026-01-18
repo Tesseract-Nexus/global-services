@@ -1767,12 +1767,20 @@ func (s *OnboardingService) registerUserInKeycloak(email, password, name, tenant
 		return "", fmt.Errorf("failed to set user password: %w", err)
 	}
 
-	// Assign default role
+	// Assign default role - CRITICAL: This must succeed for user to access admin panel
 	if s.keycloakConfig.DefaultRole != "" {
 		if err := s.keycloakClient.AssignRealmRole(ctx, userID, s.keycloakConfig.DefaultRole); err != nil {
-			// Log warning but don't fail - user was created
-			log.Printf("Warning: Failed to assign role %s to user: %v", s.keycloakConfig.DefaultRole, err)
+			// FIX-CRITICAL: Role assignment failure means user cannot access admin panel
+			// Clean up the created user and fail the operation
+			log.Printf("[OnboardingService] CRITICAL: Failed to assign role %s to user %s: %v", s.keycloakConfig.DefaultRole, userID, err)
+			if delErr := s.keycloakClient.DeleteUser(ctx, userID); delErr != nil {
+				log.Printf("[OnboardingService] Warning: Failed to cleanup user after role assignment failure: %v", delErr)
+			}
+			return "", fmt.Errorf("failed to assign role %s to user: %w - user creation rolled back", s.keycloakConfig.DefaultRole, err)
 		}
+		log.Printf("[OnboardingService] Successfully assigned role %s to user %s", s.keycloakConfig.DefaultRole, userID)
+	} else {
+		log.Printf("[OnboardingService] Warning: No default role configured (KEYCLOAK_DEFAULT_ROLE), user %s will have no realm roles", userID)
 	}
 
 	log.Printf("Successfully registered user %s in Keycloak with ID: %s", security.MaskEmail(email), userID)
@@ -1824,6 +1832,23 @@ func (s *OnboardingService) addTenantToExistingUser(ctx context.Context, user *a
 			return "", fmt.Errorf("failed to set password for user: %w - please try again or use password reset", err)
 		}
 		log.Printf("Successfully updated password for existing user %s", security.MaskEmail(user.Email))
+	}
+
+	// FIX-CRITICAL: Ensure existing user has the default role for the new tenant
+	// Multi-tenant users need the store_owner role to access their new tenant's admin panel
+	if s.keycloakConfig.DefaultRole != "" {
+		// Try to assign the role (idempotent - Keycloak handles already-assigned roles gracefully)
+		if err := s.keycloakClient.AssignRealmRole(ctx, user.ID, s.keycloakConfig.DefaultRole); err != nil {
+			// Check if error is because role already exists (which is fine)
+			errStr := err.Error()
+			if !strings.Contains(errStr, "already") && !strings.Contains(errStr, "409") {
+				log.Printf("[OnboardingService] CRITICAL: Failed to assign role %s to existing user %s: %v", s.keycloakConfig.DefaultRole, user.ID, err)
+				return "", fmt.Errorf("failed to assign role %s to user: %w", s.keycloakConfig.DefaultRole, err)
+			}
+			log.Printf("[OnboardingService] Role %s already assigned to user %s (expected for multi-tenant)", s.keycloakConfig.DefaultRole, user.ID)
+		} else {
+			log.Printf("[OnboardingService] Successfully assigned role %s to existing user %s", s.keycloakConfig.DefaultRole, user.ID)
+		}
 	}
 
 	log.Printf("Successfully added tenant %s (slug: %s) to user %s (now has %d tenants)", tenantID, tenantSlug, security.MaskEmail(user.Email), len(updatedTenantIDs))
