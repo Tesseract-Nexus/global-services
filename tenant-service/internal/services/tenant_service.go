@@ -7,9 +7,11 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"tenant-service/internal/clients"
+	"tenant-service/internal/integrations"
 	"tenant-service/internal/models"
 	natsClient "tenant-service/internal/nats"
 	"gorm.io/gorm"
@@ -241,6 +243,10 @@ func (s *TenantService) CreateTenantForUser(ctx context.Context, req *CreateTena
 		}
 
 		log.Printf("[TenantService] Created default storefront %s for vendor %s", storefrontData.ID, vendorData.ID)
+
+		// Provision GrowthBook organization for feature flags
+		// This is done asynchronously to not block tenant creation
+		go s.provisionGrowthBook(context.Background(), tenantID, req.Slug, req.Name)
 
 		// FIX-CRITICAL: Activate tenant now that vendor and storefront are created
 		// Tenant was created with "creating" status, now update to "active"
@@ -654,4 +660,111 @@ func (s *TenantService) GetTenantOnboardingData(ctx context.Context, tenantID uu
 	}
 
 	return result, nil
+}
+
+// provisionGrowthBook creates a GrowthBook organization for the tenant
+// This is called asynchronously to not block tenant creation
+func (s *TenantService) provisionGrowthBook(ctx context.Context, tenantID uuid.UUID, slug, name string) {
+	log.Printf("[TenantService] Provisioning GrowthBook organization for tenant %s (slug: %s)", tenantID, slug)
+
+	// Create GrowthBook client
+	gbClient := integrations.NewGrowthBookClient()
+
+	// Provision the organization
+	result, err := gbClient.ProvisionTenantOrg(slug, name)
+	if err != nil {
+		log.Printf("[TenantService] WARNING: Failed to provision GrowthBook for tenant %s: %v", tenantID, err)
+		// Don't fail tenant creation - GrowthBook can be provisioned later
+		return
+	}
+
+	// Update tenant with GrowthBook credentials
+	now := time.Now()
+	updates := map[string]interface{}{
+		"growthbook_org_id":         result.OrgID,
+		"growthbook_sdk_key":        result.SDKKey,
+		"growthbook_enabled":        true,
+		"growthbook_provisioned_at": now,
+	}
+
+	if err := s.db.Model(&models.Tenant{}).
+		Where("id = ?", tenantID).
+		Updates(updates).Error; err != nil {
+		log.Printf("[TenantService] WARNING: Failed to save GrowthBook credentials for tenant %s: %v", tenantID, err)
+		return
+	}
+
+	log.Printf("[TenantService] Successfully provisioned GrowthBook for tenant %s (org: %s, sdk: %s...)",
+		tenantID, result.OrgID, result.SDKKey[:min(10, len(result.SDKKey))])
+}
+
+// min returns the minimum of two integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+// GrowthBookConfig contains the GrowthBook configuration for a tenant
+type GrowthBookConfig struct {
+	OrgID         string     `json:"org_id"`
+	SDKKey        string     `json:"sdk_key"`
+	Enabled       bool       `json:"enabled"`
+	ProvisionedAt *time.Time `json:"provisioned_at,omitempty"`
+}
+
+// GetTenantGrowthBookConfig returns the GrowthBook configuration for a tenant
+func (s *TenantService) GetTenantGrowthBookConfig(ctx context.Context, tenantIDOrSlug string) (*GrowthBookConfig, error) {
+	var tenant models.Tenant
+
+	// Try to parse as UUID first
+	if tenantID, err := uuid.Parse(tenantIDOrSlug); err == nil {
+		if err := s.db.WithContext(ctx).First(&tenant, "id = ?", tenantID).Error; err != nil {
+			return nil, fmt.Errorf("tenant not found")
+		}
+	} else {
+		// Try as slug
+		if err := s.db.WithContext(ctx).First(&tenant, "slug = ?", tenantIDOrSlug).Error; err != nil {
+			return nil, fmt.Errorf("tenant not found")
+		}
+	}
+
+	if !tenant.GrowthBookEnabled || tenant.GrowthBookSDKKey == "" {
+		return nil, fmt.Errorf("growthbook not provisioned")
+	}
+
+	return &GrowthBookConfig{
+		OrgID:         tenant.GrowthBookOrgID,
+		SDKKey:        tenant.GrowthBookSDKKey,
+		Enabled:       tenant.GrowthBookEnabled,
+		ProvisionedAt: tenant.GrowthBookProvisionedAt,
+	}, nil
+}
+
+// GetTenantGrowthBookSDKKey returns just the SDK key for a tenant
+func (s *TenantService) GetTenantGrowthBookSDKKey(ctx context.Context, tenantIDOrSlug string) (string, error) {
+	var tenant models.Tenant
+
+	// Try to parse as UUID first
+	if tenantID, err := uuid.Parse(tenantIDOrSlug); err == nil {
+		if err := s.db.WithContext(ctx).
+			Select("growthbook_sdk_key", "growthbook_enabled").
+			First(&tenant, "id = ?", tenantID).Error; err != nil {
+			return "", fmt.Errorf("tenant not found")
+		}
+	} else {
+		// Try as slug
+		if err := s.db.WithContext(ctx).
+			Select("growthbook_sdk_key", "growthbook_enabled").
+			First(&tenant, "slug = ?", tenantIDOrSlug).Error; err != nil {
+			return "", fmt.Errorf("tenant not found")
+		}
+	}
+
+	if !tenant.GrowthBookEnabled || tenant.GrowthBookSDKKey == "" {
+		return "", fmt.Errorf("growthbook not provisioned")
+	}
+
+	return tenant.GrowthBookSDKKey, nil
 }

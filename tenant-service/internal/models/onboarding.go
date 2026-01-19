@@ -417,6 +417,14 @@ type Tenant struct {
 	// Used for: user isolation per tenant, organization-scoped authentication
 	KeycloakOrgID *uuid.UUID `json:"keycloak_org_id,omitempty" gorm:"type:uuid;index"`
 
+	// GrowthBook feature flags integration
+	// Each tenant gets their own GrowthBook organization for isolated feature flag management
+	GrowthBookOrgID         string     `json:"growthbook_org_id,omitempty" gorm:"size:255"`
+	GrowthBookSDKKey        string     `json:"-" gorm:"size:255"`                        // Hidden from JSON - sensitive
+	GrowthBookAdminKey      string     `json:"-" gorm:"size:255"`                        // Hidden from JSON - sensitive
+	GrowthBookEnabled       bool       `json:"growthbook_enabled" gorm:"default:false"`
+	GrowthBookProvisionedAt *time.Time `json:"growthbook_provisioned_at,omitempty"`
+
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 

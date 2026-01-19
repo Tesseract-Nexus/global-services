@@ -520,6 +520,10 @@ func setupRouter(
 			// Tenant onboarding data (for settings auto-population)
 			tenants.GET("/:id/onboarding-data", tenantHandler.GetTenantOnboardingData)
 
+			// GrowthBook feature flags configuration (per-tenant)
+			tenants.GET("/:id/growthbook", tenantHandler.GetTenantGrowthBookConfig)
+			tenants.GET("/:id/growthbook/sdk-key", tenantHandler.GetTenantGrowthBookSDKKey)
+
 			// Member management (uses tenant ID)
 			tenants.POST("/:id/members/invite", membershipHandler.InviteMember)
 			tenants.DELETE("/:id/members/:memberId", membershipHandler.RemoveMember)

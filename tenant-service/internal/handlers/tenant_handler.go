@@ -378,3 +378,63 @@ func (h *TenantHandler) GetTenantOnboardingData(c *gin.Context) {
 
 	SuccessResponse(c, http.StatusOK, "Onboarding data retrieved", data)
 }
+
+// GetTenantGrowthBookConfig returns the GrowthBook configuration for a tenant
+// @Summary Get tenant GrowthBook configuration
+// @Description Returns the GrowthBook SDK key and org ID for a tenant
+// @Tags tenants
+// @Produce json
+// @Param id path string true "Tenant ID or slug"
+// @Success 200 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/tenants/{id}/growthbook [get]
+func (h *TenantHandler) GetTenantGrowthBookConfig(c *gin.Context) {
+	tenantIDOrSlug := c.Param("id")
+
+	// Try to get by ID first, then by slug
+	config, err := h.tenantService.GetTenantGrowthBookConfig(c.Request.Context(), tenantIDOrSlug)
+	if err != nil {
+		errMsg := err.Error()
+		if errMsg == "tenant not found" || errMsg == "growthbook not provisioned" {
+			ErrorResponse(c, http.StatusNotFound, errMsg, nil)
+			return
+		}
+		ErrorResponse(c, http.StatusInternalServerError, "Failed to get GrowthBook config", err)
+		return
+	}
+
+	SuccessResponse(c, http.StatusOK, "GrowthBook configuration retrieved", config)
+}
+
+// GetTenantGrowthBookSDKKey returns only the SDK key for client-side usage
+// This endpoint is used by storefronts and admin apps to get the SDK key
+// @Summary Get tenant GrowthBook SDK key
+// @Description Returns the GrowthBook SDK client key for a tenant
+// @Tags tenants
+// @Produce json
+// @Param id path string true "Tenant ID or slug"
+// @Success 200 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Router /api/v1/tenants/{id}/growthbook/sdk-key [get]
+func (h *TenantHandler) GetTenantGrowthBookSDKKey(c *gin.Context) {
+	tenantIDOrSlug := c.Param("id")
+
+	sdkKey, err := h.tenantService.GetTenantGrowthBookSDKKey(c.Request.Context(), tenantIDOrSlug)
+	if err != nil {
+		errMsg := err.Error()
+		if errMsg == "tenant not found" || errMsg == "growthbook not provisioned" {
+			ErrorResponse(c, http.StatusNotFound, errMsg, nil)
+			return
+		}
+		ErrorResponse(c, http.StatusInternalServerError, "Failed to get SDK key", err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"sdk_key": sdkKey,
+		},
+	})
+}
