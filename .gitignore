@@ -56,3 +56,4 @@ temp/
 # Kubernetes secrets (local)
 *-secret.yaml
 secrets/
+tenant-service/migrate-organizations

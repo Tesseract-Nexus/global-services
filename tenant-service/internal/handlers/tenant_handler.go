@@ -6,7 +6,19 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"tenant-service/internal/services"
+	sharedMiddleware "github.com/Tesseract-Nexus/go-shared/middleware"
 )
+
+// getUserID extracts user ID from Istio auth context or legacy header
+// Priority: Istio JWT claims > legacy X-User-ID header
+func getUserID(c *gin.Context) string {
+	// First try Istio auth context (set by IstioAuth middleware from JWT claims)
+	if userID := sharedMiddleware.GetIstioUserID(c); userID != "" {
+		return userID
+	}
+	// Fallback to legacy header for backward compatibility
+	return c.GetHeader("X-User-ID")
+}
 
 // TenantHandler handles tenant-related HTTP requests
 type TenantHandler struct {
@@ -46,8 +58,8 @@ type CreateTenantForUserRequest struct {
 // @Failure 500 {object} map[string]interface{}
 // @Router /api/v1/tenants/create-for-user [post]
 func (h *TenantHandler) CreateTenantForUser(c *gin.Context) {
-	// Get user ID from header (set by auth middleware)
-	userIDStr := c.GetHeader("X-User-ID")
+	// Get user ID from Istio auth context or legacy header
+	userIDStr := getUserID(c)
 	if userIDStr == "" {
 		ErrorResponse(c, http.StatusUnauthorized, "User ID is required", nil)
 		return
@@ -144,8 +156,8 @@ func (h *TenantHandler) DeleteTenant(c *gin.Context) {
 		return
 	}
 
-	// Get user ID from header (set by auth middleware)
-	userIDStr := c.GetHeader("X-User-ID")
+	// Get user ID from Istio auth context or legacy header
+	userIDStr := getUserID(c)
 	if userIDStr == "" {
 		ErrorResponse(c, http.StatusUnauthorized, "User ID is required", nil)
 		return
@@ -216,8 +228,8 @@ func (h *TenantHandler) GetTenantDeletionInfo(c *gin.Context) {
 		return
 	}
 
-	// Get user ID from header
-	userIDStr := c.GetHeader("X-User-ID")
+	// Get user ID from Istio auth context or legacy header
+	userIDStr := getUserID(c)
 	if userIDStr == "" {
 		ErrorResponse(c, http.StatusUnauthorized, "User ID is required", nil)
 		return
@@ -347,8 +359,8 @@ func (h *TenantHandler) GetTenantOnboardingData(c *gin.Context) {
 		return
 	}
 
-	// Get user ID from header (required for access control)
-	userIDStr := c.GetHeader("X-User-ID")
+	// Get user ID from Istio auth context or legacy header (required for access control)
+	userIDStr := getUserID(c)
 	if userIDStr == "" {
 		ErrorResponse(c, http.StatusUnauthorized, "User ID is required", nil)
 		return
