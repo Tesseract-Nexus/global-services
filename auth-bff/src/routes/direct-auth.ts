@@ -376,6 +376,176 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
   });
 
   // ==========================================================================
+  // POST /auth/direct/admin/login
+  // Authenticates STAFF members for admin portal access
+  // This endpoint uses auth_context: 'staff' to allow staff-only login
+  // ==========================================================================
+  fastify.post<{
+    Body: z.infer<typeof directLoginSchema>;
+  }>('/auth/direct/admin/login', async (request, reply) => {
+    const validation = directLoginSchema.safeParse(request.body);
+    if (!validation.success) {
+      return reply.code(400).send({
+        success: false,
+        error: 'VALIDATION_ERROR',
+        message: validation.error.issues[0]?.message || 'Invalid request',
+      });
+    }
+
+    const { email, password, tenant_slug, tenant_id, remember_me } = validation.data;
+    const clientIP = request.ip;
+    const userAgent = request.headers['user-agent'] || 'unknown';
+
+    // Rate limit by IP + email combination
+    const rateLimitKey = `admin-login:${clientIP}:${email.toLowerCase()}`;
+    const rateLimit = checkRateLimit(rateLimitKey);
+    if (!rateLimit.allowed) {
+      logger.warn({ ip: clientIP, email: maskEmail(email) }, 'Rate limit exceeded for admin login');
+      return reply.code(429).send({
+        success: false,
+        error: 'RATE_LIMITED',
+        message: 'Too many login attempts. Please try again later.',
+        retry_after: Math.ceil(rateLimit.resetIn / 1000),
+      });
+    }
+
+    // Validate credentials with tenant-service
+    // SECURITY: Pass auth_context: 'staff' to validate staff credentials
+    // This endpoint is for admin portal, where staff members authenticate
+    const result = await tenantServiceClient.validateCredentials(
+      { email, password, tenant_slug, tenant_id, auth_context: 'staff' },
+      clientIP,
+      userAgent
+    );
+
+    if (!result.success) {
+      logger.error({ email: maskEmail(email), tenant_slug }, 'Tenant service validation failed for staff');
+      return reply.code(503).send({
+        success: false,
+        error: 'SERVICE_UNAVAILABLE',
+        message: 'Authentication service is temporarily unavailable. Please try again.',
+      });
+    }
+
+    const data = result.data!;
+
+    // Handle invalid credentials
+    if (!data.valid) {
+      logger.info({
+        email: maskEmail(email),
+        tenant_slug,
+        error_code: data.error_code,
+        account_locked: data.account_locked,
+      }, 'Admin login failed');
+
+      // Account locked
+      if (data.account_locked) {
+        return reply.code(423).send({
+          success: false,
+          error: 'ACCOUNT_LOCKED',
+          message: 'Your account has been temporarily locked due to multiple failed login attempts.',
+          locked_until: data.locked_until,
+        });
+      }
+
+      // Invalid credentials
+      return reply.code(401).send({
+        success: false,
+        error: data.error_code || 'INVALID_CREDENTIALS',
+        message: data.message || 'Invalid email or password.',
+        remaining_attempts: data.remaining_attempts,
+      });
+    }
+
+    // Handle MFA requirement (step-up authentication)
+    if (data.mfa_required) {
+      // Create a temporary MFA session
+      const mfaSessionId = uuidv4();
+      await sessionStore.saveMfaSession(mfaSessionId, {
+        userId: data.user_id!,
+        email: data.email,
+        tenantId: data.tenant_id,
+        tenantSlug: data.tenant_slug,
+        mfaEnabled: data.mfa_enabled,
+        createdAt: Date.now(),
+      });
+
+      return reply.send({
+        success: true,
+        mfa_required: true,
+        mfa_session: mfaSessionId,
+        mfa_methods: data.mfa_enabled ? ['totp', 'email'] : ['email'],
+        message: 'Multi-factor authentication required.',
+      });
+    }
+
+    // Check if we received tokens from tenant-service
+    if (!data.access_token) {
+      logger.error({ email: maskEmail(email), tenant_slug }, 'No tokens received from tenant-service for staff');
+      return reply.code(500).send({
+        success: false,
+        error: 'TOKEN_ERROR',
+        message: 'Failed to complete authentication. Please try again.',
+      });
+    }
+
+    // Create session with tokens
+    // Use 24 hours for session expiry (not token expiry) to avoid frequent refresh attempts
+    const sessionExpirySeconds = 86400; // 24 hours
+    const session = await sessionStore.createSession({
+      userId: data.user_id!,
+      tenantId: data.tenant_id,
+      tenantSlug: data.tenant_slug,
+      clientType: 'customer', // Staff still use customer realm
+      accessToken: data.access_token,
+      idToken: data.id_token,
+      refreshToken: data.refresh_token,
+      expiresAt: Math.floor(Date.now() / 1000) + sessionExpirySeconds,
+      userInfo: {
+        sub: data.keycloak_user_id || data.user_id,
+        email: data.email,
+        given_name: data.first_name,
+        family_name: data.last_name,
+        name: data.first_name && data.last_name
+          ? `${data.first_name} ${data.last_name}`
+          : data.email,
+        tenant_id: data.tenant_id,
+        tenant_slug: data.tenant_slug,
+        role: data.role,
+        is_staff: true, // Mark session as staff
+      },
+    });
+
+    // Set session cookie
+    setSessionCookie(reply, session.id, remember_me);
+
+    logger.info({
+      userId: session.userId,
+      sessionId: session.id,
+      tenant_slug,
+    }, 'Admin/Staff direct login successful');
+
+    return reply.send({
+      success: true,
+      authenticated: true,
+      user: {
+        id: data.user_id,
+        email: data.email,
+        first_name: data.first_name,
+        last_name: data.last_name,
+        tenant_id: data.tenant_id,
+        tenant_slug: data.tenant_slug,
+        role: data.role,
+        is_staff: true,
+      },
+      session: {
+        expires_at: session.expiresAt,
+        csrf_token: session.csrfToken,
+      },
+    });
+  });
+
+  // ==========================================================================
   // POST /auth/direct/account-status
   // Checks if an account is locked before password entry
   // ==========================================================================
