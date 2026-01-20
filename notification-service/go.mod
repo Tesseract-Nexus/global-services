@@ -5,7 +5,7 @@ go 1.25.5
 require (
 	cloud.google.com/go/pubsub v1.36.1
 	firebase.google.com/go/v4 v4.14.0
-	github.com/Tesseract-Nexus/go-shared v0.0.0-20260116025029-bf676bd77644
+	github.com/Tesseract-Nexus/go-shared v0.0.2-0.20260120131633-df542d485082
 	github.com/aws/aws-sdk-go-v2 v1.41.0
 	github.com/aws/aws-sdk-go-v2/config v1.32.6
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.6
@@ -14,6 +14,7 @@ require (
 	github.com/gin-gonic/gin v1.11.0
 	github.com/google/uuid v1.6.0
 	github.com/nats-io/nats.go v1.31.0
+	github.com/redis/go-redis/v9 v9.17.2
 	github.com/sendgrid/sendgrid-go v3.14.0+incompatible
 	github.com/sirupsen/logrus v1.9.3
 	google.golang.org/api v0.170.0
@@ -88,7 +89,6 @@ require (
 	github.com/prometheus/procfs v0.12.0 // indirect
 	github.com/quic-go/qpack v0.5.1 // indirect
 	github.com/quic-go/quic-go v0.54.0 // indirect
-	github.com/redis/go-redis/v9 v9.17.2 // indirect
 	github.com/sendgrid/rest v2.6.9+incompatible // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.3.0 // indirect
