@@ -177,10 +177,17 @@ func initializeDatabase(dbConfig config.DatabaseConfig) (*gorm.DB, error) {
 func runMigrations(db *gorm.DB) error {
 	log.Println("🔄 Running database migrations...")
 
-	// Run AutoMigrate to add any new columns (e.g., content_pages)
+	// Run AutoMigrate for all models
 	if err := db.AutoMigrate(
+		// Core settings models
+		&models.Settings{},
+		&models.SettingsPreset{},
+		&models.SettingsHistory{},
+		&models.SettingsValidation{},
+		// Storefront theme models
 		&models.StorefrontThemeSettings{},
 		&models.StorefrontThemeHistory{},
+		// Currency models
 		&models.ExchangeRate{},
 	); err != nil {
 		log.Printf("⚠️  AutoMigrate warning: %v", err)
