@@ -232,9 +232,29 @@ func setupRouter(settingsHandler *handlers.SettingsHandler, storefrontThemeHandl
 	router.Use(gosharedmw.SecurityHeaders())
 
 	// Rate limiting middleware (uses Redis for distributed rate limiting)
+	// Custom config to exclude storefront-theme endpoints from rate limiting
+	// These are high-frequency endpoints used by admin dashboard for theme customization
 	if redisClient != nil {
-		router.Use(gosharedmw.RedisRateLimitMiddlewareWithProfile(redisClient, "standard"))
-		log.Println("✓ Redis-based rate limiting enabled")
+		rateLimitConfig := gosharedmw.RedisRateLimitConfig{
+			RequestsPerSecond: 100,
+			BurstSize:         200,
+			WindowDuration:    time.Second, // 1 second
+			KeyPrefix:         "ratelimit:settings:",
+			ExcludedPaths: []string{
+				"/health",
+				"/ready",
+				"/metrics",
+				"/livez",
+				"/readyz",
+				"/api/v1/storefront-theme",       // Exclude all storefront-theme endpoints
+				"/api/v1/public/storefront-theme", // Public theme endpoints
+			},
+			ByTenant: true,
+			ByIP:     true,
+			ByUser:   false,
+		}
+		router.Use(gosharedmw.RedisRateLimitMiddlewareWithConfig(redisClient, rateLimitConfig))
+		log.Println("✓ Redis-based rate limiting enabled (storefront-theme excluded)")
 	} else {
 		router.Use(gosharedmw.RateLimit())
 		log.Println("✓ In-memory rate limiting enabled (Redis unavailable)")
