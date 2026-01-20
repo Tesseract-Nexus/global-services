@@ -214,9 +214,9 @@ func initKeycloakClient() (*auth.KeycloakAdminClient, *KeycloakOnboardingConfig)
 	}
 
 	// Admin portal client ID for registering tenant-specific redirect URIs
-	adminClientID := os.Getenv("KEYCLOAK_ADMIN_PORTAL_CLIENT_ID")
-	if adminClientID == "" {
-		adminClientID = "marketplace-dashboard"
+	adminPortalClientID := os.Getenv("KEYCLOAK_ADMIN_PORTAL_CLIENT_ID")
+	if adminPortalClientID == "" {
+		adminPortalClientID = "marketplace-dashboard"
 	}
 
 	// Base domain for constructing redirect URIs
@@ -229,7 +229,7 @@ func initKeycloakClient() (*auth.KeycloakAdminClient, *KeycloakOnboardingConfig)
 		ClientID:      publicClientID,
 		ClientSecret:  publicClientSecret,
 		DefaultRole:   defaultRole,
-		AdminClientID: adminClientID,
+		AdminClientID: adminPortalClientID,
 		BaseDomain:    baseDomain,
 	}
 
