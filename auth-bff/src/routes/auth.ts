@@ -345,12 +345,6 @@ export async function authRoutes(fastify: FastifyInstance) {
     }
 
     const roles = (session.userInfo?.realm_access as { roles?: string[] })?.roles || [];
-    logger.info({
-      sessionId: session.id,
-      userId: session.userId,
-      roles,
-      realm_access: session.userInfo?.realm_access,
-    }, 'Session check - returning roles');
 
     return reply.send({
       authenticated: true,
