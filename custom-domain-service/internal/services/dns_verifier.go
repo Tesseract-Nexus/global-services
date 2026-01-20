@@ -1,0 +1,307 @@
+package services
+
+import (
+	"context"
+	"fmt"
+	"net"
+	"strings"
+	"time"
+
+	"custom-domain-service/internal/config"
+	"custom-domain-service/internal/models"
+
+	"github.com/rs/zerolog/log"
+)
+
+// DNSVerifier handles DNS record verification
+type DNSVerifier struct {
+	cfg      *config.Config
+	resolver *net.Resolver
+}
+
+// NewDNSVerifier creates a new DNS verifier
+func NewDNSVerifier(cfg *config.Config) *DNSVerifier {
+	return &DNSVerifier{
+		cfg: cfg,
+		resolver: &net.Resolver{
+			PreferGo: true,
+			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+				d := net.Dialer{
+					Timeout: 10 * time.Second,
+				}
+				// Use Google and Cloudflare DNS servers for reliable resolution
+				return d.DialContext(ctx, "udp", "8.8.8.8:53")
+			},
+		},
+	}
+}
+
+// VerificationResult contains the result of DNS verification
+type VerificationResult struct {
+	IsVerified     bool
+	RecordFound    string
+	ExpectedRecord string
+	Message        string
+	CheckedAt      time.Time
+}
+
+// VerifyDomain verifies DNS configuration for a domain
+func (v *DNSVerifier) VerifyDomain(ctx context.Context, domain *models.CustomDomain) (*VerificationResult, error) {
+	result := &VerificationResult{
+		CheckedAt: time.Now(),
+	}
+
+	switch domain.VerificationMethod {
+	case models.VerificationMethodTXT:
+		return v.verifyTXTRecord(ctx, domain, result)
+	case models.VerificationMethodCNAME:
+		return v.verifyCNAMERecord(ctx, domain, result)
+	default:
+		return v.verifyTXTRecord(ctx, domain, result)
+	}
+}
+
+// verifyTXTRecord verifies TXT record for domain ownership
+func (v *DNSVerifier) verifyTXTRecord(ctx context.Context, domain *models.CustomDomain, result *VerificationResult) (*VerificationResult, error) {
+	// Expected TXT record format: _tesserix-verification.example.com TXT "tesserix-verify=<token>"
+	verificationHost := "_tesserix-verification." + domain.Domain
+	expectedValue := "tesserix-verify=" + domain.VerificationToken
+
+	result.ExpectedRecord = expectedValue
+
+	txtRecords, err := v.resolver.LookupTXT(ctx, verificationHost)
+	if err != nil {
+		if dnsErr, ok := err.(*net.DNSError); ok {
+			if dnsErr.IsNotFound {
+				result.Message = fmt.Sprintf("TXT record not found at %s. Please add the verification record.", verificationHost)
+				return result, nil
+			}
+		}
+		log.Warn().Err(err).Str("host", verificationHost).Msg("DNS lookup failed")
+		result.Message = "DNS lookup failed. Please try again later."
+		return result, nil
+	}
+
+	for _, txt := range txtRecords {
+		if strings.TrimSpace(txt) == expectedValue {
+			result.IsVerified = true
+			result.RecordFound = txt
+			result.Message = "Domain ownership verified successfully"
+			return result, nil
+		}
+	}
+
+	if len(txtRecords) > 0 {
+		result.RecordFound = txtRecords[0]
+		result.Message = fmt.Sprintf("TXT record found but value doesn't match. Expected: %s", expectedValue)
+	} else {
+		result.Message = "No TXT records found at verification host"
+	}
+
+	return result, nil
+}
+
+// verifyCNAMERecord verifies CNAME record pointing to proxy domain
+func (v *DNSVerifier) verifyCNAMERecord(ctx context.Context, domain *models.CustomDomain, result *VerificationResult) (*VerificationResult, error) {
+	expectedCNAME := v.cfg.DNS.ProxyDomain
+	result.ExpectedRecord = expectedCNAME
+
+	cname, err := v.resolver.LookupCNAME(ctx, domain.Domain)
+	if err != nil {
+		if dnsErr, ok := err.(*net.DNSError); ok {
+			if dnsErr.IsNotFound {
+				result.Message = fmt.Sprintf("CNAME record not found. Please add CNAME pointing to %s", expectedCNAME)
+				return result, nil
+			}
+		}
+		log.Warn().Err(err).Str("domain", domain.Domain).Msg("CNAME lookup failed")
+		result.Message = "DNS lookup failed. Please try again later."
+		return result, nil
+	}
+
+	// Remove trailing dot from CNAME
+	cname = strings.TrimSuffix(cname, ".")
+	result.RecordFound = cname
+
+	if strings.EqualFold(cname, expectedCNAME) || strings.EqualFold(cname, expectedCNAME+".") {
+		result.IsVerified = true
+		result.Message = "CNAME record verified successfully"
+		return result, nil
+	}
+
+	result.Message = fmt.Sprintf("CNAME record found (%s) but doesn't point to %s", cname, expectedCNAME)
+	return result, nil
+}
+
+// CheckARecord checks if an A record points to our proxy IP
+func (v *DNSVerifier) CheckARecord(ctx context.Context, domain string) (bool, []string, error) {
+	ips, err := v.resolver.LookupIP(ctx, "ip4", domain)
+	if err != nil {
+		if dnsErr, ok := err.(*net.DNSError); ok && dnsErr.IsNotFound {
+			return false, nil, nil
+		}
+		return false, nil, err
+	}
+
+	var ipStrings []string
+	for _, ip := range ips {
+		ipStrings = append(ipStrings, ip.String())
+	}
+
+	expectedIP := v.cfg.DNS.ProxyIP
+	if expectedIP == "" {
+		return len(ips) > 0, ipStrings, nil
+	}
+
+	for _, ip := range ips {
+		if ip.String() == expectedIP {
+			return true, ipStrings, nil
+		}
+	}
+
+	return false, ipStrings, nil
+}
+
+// GetRequiredDNSRecords returns the DNS records needed for domain setup
+func (v *DNSVerifier) GetRequiredDNSRecords(domain *models.CustomDomain) []models.DNSRecord {
+	records := []models.DNSRecord{}
+
+	// Verification record
+	if domain.VerificationMethod == models.VerificationMethodTXT {
+		records = append(records, models.DNSRecord{
+			RecordType: "TXT",
+			Host:       "_tesserix-verification." + domain.Domain,
+			Value:      "tesserix-verify=" + domain.VerificationToken,
+			TTL:        300,
+			Purpose:    "verification",
+			IsVerified: domain.DNSVerified,
+		})
+	}
+
+	// Routing record - CNAME for subdomains, A for apex
+	if domain.DomainType == models.DomainTypeApex {
+		// Apex domains need A record
+		records = append(records, models.DNSRecord{
+			RecordType: "A",
+			Host:       domain.Domain,
+			Value:      v.cfg.DNS.ProxyIP,
+			TTL:        300,
+			Purpose:    "routing",
+			IsVerified: false,
+		})
+	} else {
+		// Subdomains can use CNAME
+		records = append(records, models.DNSRecord{
+			RecordType: "CNAME",
+			Host:       domain.Domain,
+			Value:      v.cfg.DNS.ProxyDomain,
+			TTL:        300,
+			Purpose:    "routing",
+			IsVerified: false,
+		})
+	}
+
+	// WWW record if enabled
+	if domain.IncludeWWW && domain.DomainType == models.DomainTypeApex {
+		records = append(records, models.DNSRecord{
+			RecordType: "CNAME",
+			Host:       "www." + domain.Domain,
+			Value:      v.cfg.DNS.ProxyDomain,
+			TTL:        300,
+			Purpose:    "routing",
+			IsVerified: false,
+		})
+	}
+
+	return records
+}
+
+// DetectDomainType determines if domain is apex or subdomain
+func (v *DNSVerifier) DetectDomainType(domain string) models.DomainType {
+	parts := strings.Split(domain, ".")
+	// If domain has more than 2 parts (e.g., shop.example.com), it's a subdomain
+	// Exception for common TLDs like co.uk, com.au, etc.
+	if len(parts) > 2 {
+		// Check for common two-part TLDs
+		twoPartTLDs := map[string]bool{
+			"co.uk": true, "com.au": true, "co.in": true, "co.nz": true,
+			"com.br": true, "com.mx": true, "co.za": true, "com.sg": true,
+		}
+		lastTwo := parts[len(parts)-2] + "." + parts[len(parts)-1]
+		if twoPartTLDs[lastTwo] && len(parts) == 3 {
+			return models.DomainTypeApex
+		}
+		return models.DomainTypeSubdomain
+	}
+	return models.DomainTypeApex
+}
+
+// ValidateDomainFormat validates domain name format
+func (v *DNSVerifier) ValidateDomainFormat(domain string) error {
+	if len(domain) == 0 {
+		return fmt.Errorf("domain cannot be empty")
+	}
+
+	if len(domain) > 253 {
+		return fmt.Errorf("domain exceeds maximum length of 253 characters")
+	}
+
+	// Check for valid characters
+	domain = strings.ToLower(domain)
+	for i, r := range domain {
+		if !((r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' || r == '.') {
+			return fmt.Errorf("invalid character '%c' at position %d", r, i)
+		}
+	}
+
+	// Check parts
+	parts := strings.Split(domain, ".")
+	if len(parts) < 2 {
+		return fmt.Errorf("domain must have at least two parts")
+	}
+
+	for _, part := range parts {
+		if len(part) == 0 {
+			return fmt.Errorf("domain parts cannot be empty")
+		}
+		if len(part) > 63 {
+			return fmt.Errorf("domain label exceeds maximum length of 63 characters")
+		}
+		if strings.HasPrefix(part, "-") || strings.HasSuffix(part, "-") {
+			return fmt.Errorf("domain labels cannot start or end with hyphen")
+		}
+	}
+
+	// Check it's not our platform domain
+	if strings.HasSuffix(domain, ".tesserix.app") || domain == "tesserix.app" {
+		return fmt.Errorf("cannot use platform domain")
+	}
+
+	return nil
+}
+
+// IsRoutingConfigured checks if DNS is properly configured for routing
+func (v *DNSVerifier) IsRoutingConfigured(ctx context.Context, domain *models.CustomDomain) (bool, string, error) {
+	if domain.DomainType == models.DomainTypeApex {
+		// Check A record
+		valid, ips, err := v.CheckARecord(ctx, domain.Domain)
+		if err != nil {
+			return false, "", err
+		}
+		if !valid {
+			return false, fmt.Sprintf("A record not pointing to %s. Found: %v", v.cfg.DNS.ProxyIP, ips), nil
+		}
+	} else {
+		// Check CNAME
+		result := &VerificationResult{}
+		_, err := v.verifyCNAMERecord(ctx, domain, result)
+		if err != nil {
+			return false, "", err
+		}
+		if !result.IsVerified {
+			return false, result.Message, nil
+		}
+	}
+
+	return true, "Routing DNS is configured correctly", nil
+}
