@@ -344,6 +344,10 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
           : data.email,
         tenant_id: data.tenant_id,
         tenant_slug: data.tenant_slug,
+        // Include role in realm_access for frontend authorization check
+        realm_access: {
+          roles: data.role ? [data.role] : [],
+        },
       },
     });
 
