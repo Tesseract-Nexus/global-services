@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -233,12 +234,29 @@ func setupRouter(cfg *config.Config, domainHandlers *handlers.DomainHandlers, in
 	router.Use(gin.Recovery())
 	router.Use(requestLogger())
 
-	// CORS middleware
+	// CORS middleware - configured for internal service communication
+	// When running behind Istio, CORS is typically handled at the gateway level
+	// For internal APIs, we restrict origins to known services
+	allowedOrigins := []string{
+		"https://admin.devtest.tesserix.app",
+		"https://onboarding.devtest.tesserix.app",
+		"https://admin.tesserix.app",
+		"https://onboarding.tesserix.app",
+	}
+	// Allow additional origins from environment
+	if extraOrigins := os.Getenv("CORS_ALLOWED_ORIGINS"); extraOrigins != "" {
+		for _, origin := range splitAndTrim(extraOrigins, ",") {
+			if origin != "" {
+				allowedOrigins = append(allowedOrigins, origin)
+			}
+		}
+	}
+
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"*"},
+		AllowOrigins:     allowedOrigins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Tenant-ID", "X-User-ID"},
-		ExposeHeaders:    []string{"Content-Length"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Tenant-ID", "X-User-ID", "X-Request-ID"},
+		ExposeHeaders:    []string{"Content-Length", "X-Request-ID"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
@@ -326,4 +344,17 @@ func startWorkers(
 	go cleanupWorker.Start(ctx)
 
 	log.Info().Msg("Background workers started")
+}
+
+// splitAndTrim splits a string by separator and trims whitespace from each element
+func splitAndTrim(s, sep string) []string {
+	parts := strings.Split(s, sep)
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
 }

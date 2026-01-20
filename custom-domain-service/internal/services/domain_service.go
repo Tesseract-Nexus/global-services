@@ -325,8 +325,9 @@ func (s *DomainService) provisionDomain(ctx context.Context, domain *models.Cust
 	certResult, err := s.k8sClient.CreateCertificate(ctx, domain)
 	if err != nil {
 		log.Error().Err(err).Str("domain", domain.Domain).Msg("Failed to create certificate")
-		s.repo.UpdateStatus(ctx, domain.ID, models.DomainStatusFailed, "SSL certificate creation failed: "+err.Error())
-		s.logActivity(ctx, domain, "ssl_provisioning", "failed", err.Error())
+		// Use generic message for user-facing status - detailed error logged above
+		s.repo.UpdateStatus(ctx, domain.ID, models.DomainStatusFailed, "SSL certificate creation failed. Please contact support if the issue persists.")
+		s.logActivity(ctx, domain, "ssl_provisioning", "failed", "Certificate creation failed")
 		return
 	}
 
@@ -361,9 +362,11 @@ func (s *DomainService) provisionDomain(ctx context.Context, domain *models.Cust
 			}
 
 			if certStatus.Status == models.SSLStatusFailed {
-				s.repo.UpdateSSLStatus(ctx, domain.ID, models.SSLStatusFailed, certStatus.SecretName, nil, certStatus.Error)
-				s.repo.UpdateStatus(ctx, domain.ID, models.DomainStatusFailed, "SSL certificate failed: "+certStatus.Error)
-				s.logActivity(ctx, domain, "ssl_provisioning", "failed", certStatus.Error)
+				// Log detailed error server-side only
+				log.Error().Str("domain", domain.Domain).Str("cert_error", certStatus.Error).Msg("Certificate provisioning failed")
+				s.repo.UpdateSSLStatus(ctx, domain.ID, models.SSLStatusFailed, certStatus.SecretName, nil, "Certificate validation failed")
+				s.repo.UpdateStatus(ctx, domain.ID, models.DomainStatusFailed, "SSL certificate provisioning failed. Please verify your DNS configuration.")
+				s.logActivity(ctx, domain, "ssl_provisioning", "failed", "Certificate provisioning failed")
 				return
 			}
 		}
@@ -374,15 +377,17 @@ configureRouting:
 	vsResult, err := s.k8sClient.CreateVirtualService(ctx, domain)
 	if err != nil {
 		log.Error().Err(err).Str("domain", domain.Domain).Msg("Failed to create VirtualService")
-		s.repo.UpdateStatus(ctx, domain.ID, models.DomainStatusFailed, "Routing configuration failed: "+err.Error())
-		s.logActivity(ctx, domain, "routing", "failed", err.Error())
+		// Use generic message for user-facing status - detailed error logged above
+		s.repo.UpdateStatus(ctx, domain.ID, models.DomainStatusFailed, "Routing configuration failed. Please contact support.")
+		s.logActivity(ctx, domain, "routing", "failed", "VirtualService creation failed")
 		return
 	}
 
 	if err := s.k8sClient.PatchGateway(ctx, domain); err != nil {
 		log.Error().Err(err).Str("domain", domain.Domain).Msg("Failed to patch gateway")
-		s.repo.UpdateStatus(ctx, domain.ID, models.DomainStatusFailed, "Gateway configuration failed: "+err.Error())
-		s.logActivity(ctx, domain, "routing", "failed", err.Error())
+		// Use generic message for user-facing status - detailed error logged above
+		s.repo.UpdateStatus(ctx, domain.ID, models.DomainStatusFailed, "Gateway configuration failed. Please contact support.")
+		s.logActivity(ctx, domain, "routing", "failed", "Gateway configuration failed")
 		return
 	}
 
@@ -392,8 +397,8 @@ configureRouting:
 	// Step 4: Update Keycloak redirect URIs
 	if err := s.keycloak.AddDomainRedirectURIs(ctx, domain); err != nil {
 		log.Error().Err(err).Str("domain", domain.Domain).Msg("Failed to update Keycloak")
-		// Non-critical, don't fail the whole process
-		s.logActivity(ctx, domain, "keycloak", "failed", err.Error())
+		// Non-critical, don't fail the whole process - use generic message
+		s.logActivity(ctx, domain, "keycloak", "failed", "Authentication configuration update failed")
 	} else {
 		s.repo.UpdateKeycloakStatus(ctx, domain.ID, true)
 		s.logActivity(ctx, domain, "keycloak", "success", "Keycloak redirect URIs updated")

@@ -53,7 +53,7 @@ func (h *DomainHandlers) CreateDomain(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Error:   "invalid request",
 			Code:    "INVALID_REQUEST",
-			Message: err.Error(),
+			Message: "Please check your request data and try again",
 		})
 		return
 	}
@@ -71,7 +71,7 @@ func (h *DomainHandlers) CreateDomain(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, models.ErrorResponse{
 				Error:   "domain limit exceeded",
 				Code:    "LIMIT_EXCEEDED",
-				Message: err.Error(),
+				Message: "You have reached the maximum number of domains allowed for your account",
 			})
 		default:
 			log.Error().Err(err).Msg("Failed to create domain")
@@ -211,7 +211,7 @@ func (h *DomainHandlers) UpdateDomain(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Error:   "invalid request",
 			Code:    "INVALID_REQUEST",
-			Message: err.Error(),
+			Message: "Please check your request data and try again",
 		})
 		return
 	}
