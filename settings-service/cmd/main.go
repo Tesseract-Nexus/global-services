@@ -234,30 +234,41 @@ func setupRouter(settingsHandler *handlers.SettingsHandler, storefrontThemeHandl
 	// Rate limiting middleware (uses Redis for distributed rate limiting)
 	// Custom config to exclude storefront-theme endpoints from rate limiting
 	// These are high-frequency endpoints used by admin dashboard for theme customization
+	excludedPaths := []string{
+		"/health",
+		"/ready",
+		"/metrics",
+		"/livez",
+		"/readyz",
+		"/api/v1/storefront-theme",        // Exclude all storefront-theme endpoints
+		"/api/v1/public/storefront-theme", // Public theme endpoints
+	}
+
 	if redisClient != nil {
 		rateLimitConfig := gosharedmw.RedisRateLimitConfig{
 			RequestsPerSecond: 100,
 			BurstSize:         200,
 			WindowDuration:    time.Second, // 1 second
 			KeyPrefix:         "ratelimit:settings:",
-			ExcludedPaths: []string{
-				"/health",
-				"/ready",
-				"/metrics",
-				"/livez",
-				"/readyz",
-				"/api/v1/storefront-theme",       // Exclude all storefront-theme endpoints
-				"/api/v1/public/storefront-theme", // Public theme endpoints
-			},
-			ByTenant: true,
-			ByIP:     true,
-			ByUser:   false,
+			ExcludedPaths:     excludedPaths,
+			ByTenant:          true,
+			ByIP:              true,
+			ByUser:            false,
 		}
 		router.Use(gosharedmw.RedisRateLimitMiddlewareWithConfig(redisClient, rateLimitConfig))
 		log.Println("✓ Redis-based rate limiting enabled (storefront-theme excluded)")
 	} else {
-		router.Use(gosharedmw.RateLimit())
-		log.Println("✓ In-memory rate limiting enabled (Redis unavailable)")
+		// Use custom in-memory rate limit config with same exclusions as Redis config
+		inMemoryConfig := gosharedmw.RateLimitConfig{
+			RequestsPerSecond: 10,
+			BurstSize:         20,
+			ExcludePaths:      excludedPaths,
+			CleanupInterval:   5 * time.Minute,
+			TTL:               10 * time.Minute,
+		}
+		limiter := gosharedmw.NewRateLimiter(inMemoryConfig)
+		router.Use(limiter.Middleware())
+		log.Println("✓ In-memory rate limiting enabled (storefront-theme excluded, Redis unavailable)")
 	}
 
 	router.Use(middleware.SetupCORS())

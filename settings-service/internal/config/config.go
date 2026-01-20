@@ -35,7 +35,11 @@ type AppConfig struct {
 }
 
 type RedisConfig struct {
-	URL string `json:"url"`
+	Host     string `json:"host"`
+	Port     string `json:"port"`
+	Password string `json:"password"`
+	DB       string `json:"db"`
+	URL      string `json:"url"` // Built from components or can be overridden
 }
 
 // NewConfig creates a new configuration instance with environment variables
@@ -59,9 +63,37 @@ func NewConfig() *Config {
 			Debug:       getBoolEnv("DEBUG", true),
 			Version:     getEnv("VERSION", "1.0.0"),
 		},
-		Redis: RedisConfig{
-			URL: getEnv("REDIS_URL", "redis://redis.redis-marketplace.svc.cluster.local:6379/0"),
-		},
+		Redis: buildRedisConfig(),
+	}
+}
+
+// buildRedisConfig builds the Redis configuration from environment variables
+func buildRedisConfig() RedisConfig {
+	// First check for explicit REDIS_URL override
+	if url := os.Getenv("REDIS_URL"); url != "" {
+		return RedisConfig{URL: url}
+	}
+
+	// Build URL from separate components
+	host := getEnv("REDIS_HOST", "redis.redis-marketplace.svc.cluster.local")
+	port := getEnv("REDIS_PORT", "6379")
+	password := os.Getenv("REDIS_PASSWORD")
+	db := getEnv("REDIS_DB", "0")
+
+	// Build Redis URL with or without password
+	var url string
+	if password != "" {
+		url = "redis://:" + password + "@" + host + ":" + port + "/" + db
+	} else {
+		url = "redis://" + host + ":" + port + "/" + db
+	}
+
+	return RedisConfig{
+		Host:     host,
+		Port:     port,
+		Password: password,
+		DB:       db,
+		URL:      url,
 	}
 }
 
