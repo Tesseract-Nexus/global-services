@@ -53,6 +53,13 @@ func (h *SettingsHandler) CreateSettings(c *gin.Context) {
 		Layout          *models.LayoutSettings       `json:"layout,omitempty"`
 		Animations      *models.AnimationSettings    `json:"animations,omitempty"`
 		Localization    *models.LocalizationSettings `json:"localization,omitempty"`
+		Ecommerce       map[string]interface{}       `json:"ecommerce,omitempty"`
+		Security        map[string]interface{}       `json:"security,omitempty"`
+		Notifications   map[string]interface{}       `json:"notifications,omitempty"`
+		Marketing       map[string]interface{}       `json:"marketing,omitempty"`
+		Integrations    map[string]interface{}       `json:"integrations,omitempty"`
+		Performance     map[string]interface{}       `json:"performance,omitempty"`
+		Compliance      map[string]interface{}       `json:"compliance,omitempty"`
 		Features        *models.FeatureSettings      `json:"features,omitempty"`
 		UserPreferences *models.UserPreferences      `json:"userPreferences,omitempty"`
 		Application     *models.ApplicationSettings  `json:"application,omitempty"`
@@ -133,6 +140,13 @@ func (h *SettingsHandler) CreateSettings(c *gin.Context) {
 		Layout:          rawReq.Layout,
 		Animations:      rawReq.Animations,
 		Localization:    rawReq.Localization,
+		Ecommerce:       rawReq.Ecommerce,
+		Security:        rawReq.Security,
+		Notifications:   rawReq.Notifications,
+		Marketing:       rawReq.Marketing,
+		Integrations:    rawReq.Integrations,
+		Performance:     rawReq.Performance,
+		Compliance:      rawReq.Compliance,
 		Features:        rawReq.Features,
 		UserPreferences: rawReq.UserPreferences,
 		Application:     rawReq.Application,
@@ -204,8 +218,8 @@ func (h *SettingsHandler) GetSettings(c *gin.Context) {
 // @Description Retrieve settings by tenant, application, user, and scope
 // @Tags settings
 // @Produce json
-// @Param X-Tenant-ID header string true "Tenant ID"
 // @Param applicationId query string true "Application ID"
+// @Param tenantId query string false "Tenant ID (optional, uses JWT claim if not provided)"
 // @Param userId query string false "User ID"
 // @Param scope query string true "Settings scope"
 // @Success 200 {object} models.SettingsResponse
@@ -213,11 +227,17 @@ func (h *SettingsHandler) GetSettings(c *gin.Context) {
 // @Failure 404 {object} models.SettingsResponse
 // @Router /api/v1/settings/context [get]
 func (h *SettingsHandler) GetSettingsByContext(c *gin.Context) {
-	tenantIDStr := c.GetHeader("X-Tenant-ID")
+	// Get tenant ID from gin context (set by IstioAuth middleware from JWT claims)
+	// Falls back to query parameter for flexibility (e.g., storefront-specific settings)
+	tenantIDStr := c.GetString("tenant_id")
+	if tenantIDStr == "" {
+		// Try query parameter as fallback (for storefront-specific context)
+		tenantIDStr = c.Query("tenantId")
+	}
 	if tenantIDStr == "" {
 		c.JSON(http.StatusBadRequest, models.SettingsResponse{
 			Success: false,
-			Message: "X-Tenant-ID header is required",
+			Message: "Tenant ID is required (from JWT claim or tenantId query parameter)",
 		})
 		return
 	}
@@ -297,8 +317,8 @@ func (h *SettingsHandler) GetSettingsByContext(c *gin.Context) {
 // @Description Retrieve settings with inheritance fallback
 // @Tags settings
 // @Produce json
-// @Param X-Tenant-ID header string true "Tenant ID"
 // @Param applicationId query string true "Application ID"
+// @Param tenantId query string false "Tenant ID (optional, uses JWT claim if not provided)"
 // @Param userId query string false "User ID"
 // @Param scope query string true "Settings scope"
 // @Success 200 {object} models.SettingsResponse
@@ -306,11 +326,16 @@ func (h *SettingsHandler) GetSettingsByContext(c *gin.Context) {
 // @Failure 404 {object} models.SettingsResponse
 // @Router /api/v1/settings/inherited [get]
 func (h *SettingsHandler) GetInheritedSettings(c *gin.Context) {
-	tenantIDStr := c.GetHeader("X-Tenant-ID")
+	// Get tenant ID from gin context (set by IstioAuth middleware from JWT claims)
+	// Falls back to query parameter for flexibility
+	tenantIDStr := c.GetString("tenant_id")
+	if tenantIDStr == "" {
+		tenantIDStr = c.Query("tenantId")
+	}
 	if tenantIDStr == "" {
 		c.JSON(http.StatusBadRequest, models.SettingsResponse{
 			Success: false,
-			Message: "X-Tenant-ID header is required",
+			Message: "Tenant ID is required (from JWT claim or tenantId query parameter)",
 		})
 		return
 	}
@@ -496,7 +521,6 @@ func (h *SettingsHandler) DeleteSettings(c *gin.Context) {
 // @Description List settings with optional filtering
 // @Tags settings
 // @Produce json
-// @Param X-Tenant-ID header string true "Tenant ID"
 // @Param applicationId query string false "Application ID filter"
 // @Param userId query string false "User ID filter"
 // @Param scope query string false "Scope filter"
@@ -509,18 +533,17 @@ func (h *SettingsHandler) DeleteSettings(c *gin.Context) {
 // @Failure 500 {object} models.SettingsResponse
 // @Router /api/v1/settings [get]
 func (h *SettingsHandler) ListSettings(c *gin.Context) {
-	// Parse tenant ID from header
-	tenantIDStr := c.GetHeader("X-Tenant-ID")
+	// Parse tenant ID from gin context (set by IstioAuth middleware from JWT claims)
+	tenantIDStr := c.GetString("tenant_id")
 	var tenantID *uuid.UUID
 	if tenantIDStr != "" {
 		if id, err := uuid.Parse(tenantIDStr); err == nil {
 			tenantID = &id
 		} else {
-			c.JSON(http.StatusBadRequest, models.SettingsResponse{
-				Success: false,
-				Message: "Invalid tenant ID format",
-			})
-			return
+			// Try to generate deterministic UUID from string tenant ID
+			namespace := uuid.MustParse("6ba7b811-9dad-11d1-80b4-00c04fd430c8")
+			parsed := uuid.NewSHA1(namespace, []byte(tenantIDStr))
+			tenantID = &parsed
 		}
 	}
 	

@@ -20,11 +20,13 @@ func NewStorefrontThemeHandler(service services.StorefrontThemeService) *Storefr
 	return &StorefrontThemeHandler{service: service}
 }
 
-// parseTenantID parses tenant ID from path parameter or header, supporting both UUID and string formats
+// parseTenantID parses tenant ID from path parameter or gin context (set by IstioAuth)
+// Priority: path param > gin context (JWT claim)
 func parseTenantID(c *gin.Context) (uuid.UUID, error) {
 	tenantIDStr := c.Param("tenantId")
 	if tenantIDStr == "" {
-		tenantIDStr = c.GetHeader("X-Tenant-ID")
+		// Get from gin context (set by IstioAuth middleware from JWT claims)
+		tenantIDStr = c.GetString("tenant_id")
 	}
 
 	if tenantIDStr == "" {
