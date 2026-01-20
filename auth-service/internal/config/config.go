@@ -3,6 +3,7 @@ package config
 import (
 	"log"
 	"os"
+	"time"
 
 	"github.com/spf13/viper"
 	"github.com/Tesseract-Nexus/go-shared/secrets"
@@ -14,8 +15,45 @@ type Config struct {
 	Redis                  RedisConfig    `mapstructure:"redis"`
 	JWT                    JWTConfig      `mapstructure:"jwt"`
 	Azure                  AzureConfig    `mapstructure:"azure"`
+	Security               SecurityConfig `mapstructure:"security"`
 	NotificationServiceURL string         `mapstructure:"notification_service_url"`
 	TenantServiceURL       string         `mapstructure:"tenant_service_url"`
+}
+
+// SecurityConfig holds security-related settings for account lockout
+type SecurityConfig struct {
+	// MaxLoginAttempts is the number of failed attempts before lockout (per tier)
+	MaxLoginAttempts int `mapstructure:"max_login_attempts"`
+	// Tier1LockoutMinutes is the lockout duration for tier 1 (5 failed attempts)
+	Tier1LockoutMinutes int `mapstructure:"tier1_lockout_minutes"`
+	// Tier2LockoutMinutes is the lockout duration for tier 2 (10 failed attempts)
+	Tier2LockoutMinutes int `mapstructure:"tier2_lockout_minutes"`
+	// Tier3LockoutMinutes is the lockout duration for tier 3 (15 failed attempts)
+	Tier3LockoutMinutes int `mapstructure:"tier3_lockout_minutes"`
+	// PermanentLockoutThreshold is the total attempts before permanent lockout
+	PermanentLockoutThreshold int `mapstructure:"permanent_lockout_threshold"`
+	// LockoutResetHours is how long until failed attempts are reset (if no lockouts)
+	LockoutResetHours int `mapstructure:"lockout_reset_hours"`
+}
+
+// GetTier1Duration returns the tier 1 lockout duration
+func (c *SecurityConfig) GetTier1Duration() time.Duration {
+	return time.Duration(c.Tier1LockoutMinutes) * time.Minute
+}
+
+// GetTier2Duration returns the tier 2 lockout duration
+func (c *SecurityConfig) GetTier2Duration() time.Duration {
+	return time.Duration(c.Tier2LockoutMinutes) * time.Minute
+}
+
+// GetTier3Duration returns the tier 3 lockout duration
+func (c *SecurityConfig) GetTier3Duration() time.Duration {
+	return time.Duration(c.Tier3LockoutMinutes) * time.Minute
+}
+
+// GetLockoutResetDuration returns the lockout reset duration
+func (c *SecurityConfig) GetLockoutResetDuration() time.Duration {
+	return time.Duration(c.LockoutResetHours) * time.Hour
 }
 
 type ServerConfig struct {
@@ -78,6 +116,14 @@ func LoadConfig() *Config {
 	viper.SetDefault("jwt.refresh_secret", "")
 	viper.SetDefault("jwt.access_expiry_hours", 8)
 	viper.SetDefault("jwt.refresh_expiry_days", 30)
+
+	// Security / Account Lockout defaults
+	viper.SetDefault("security.max_login_attempts", 5)
+	viper.SetDefault("security.tier1_lockout_minutes", 30)   // 30 minutes
+	viper.SetDefault("security.tier2_lockout_minutes", 60)   // 1 hour
+	viper.SetDefault("security.tier3_lockout_minutes", 120)  // 2 hours
+	viper.SetDefault("security.permanent_lockout_threshold", 20) // 4 tiers x 5 attempts
+	viper.SetDefault("security.lockout_reset_hours", 24)     // 24 hours
 
 	// Read from environment variables
 	viper.AutomaticEnv()
@@ -156,6 +202,26 @@ func LoadConfig() *Config {
 	}
 	if tenantURL := os.Getenv("TENANT_SERVICE_URL"); tenantURL != "" {
 		viper.Set("tenant_service_url", tenantURL)
+	}
+
+	// Security / Account Lockout environment variables
+	if maxAttempts := os.Getenv("MAX_LOGIN_ATTEMPTS"); maxAttempts != "" {
+		viper.Set("security.max_login_attempts", maxAttempts)
+	}
+	if tier1 := os.Getenv("TIER1_LOCKOUT_MINUTES"); tier1 != "" {
+		viper.Set("security.tier1_lockout_minutes", tier1)
+	}
+	if tier2 := os.Getenv("TIER2_LOCKOUT_MINUTES"); tier2 != "" {
+		viper.Set("security.tier2_lockout_minutes", tier2)
+	}
+	if tier3 := os.Getenv("TIER3_LOCKOUT_MINUTES"); tier3 != "" {
+		viper.Set("security.tier3_lockout_minutes", tier3)
+	}
+	if threshold := os.Getenv("PERMANENT_LOCKOUT_THRESHOLD"); threshold != "" {
+		viper.Set("security.permanent_lockout_threshold", threshold)
+	}
+	if resetHours := os.Getenv("LOCKOUT_RESET_HOURS"); resetHours != "" {
+		viper.Set("security.lockout_reset_hours", resetHours)
 	}
 
 	// Unmarshal into config struct

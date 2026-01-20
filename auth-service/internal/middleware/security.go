@@ -20,26 +20,40 @@ import (
 
 // SecurityConfig holds configuration for security middleware
 type SecurityConfig struct {
-	// MaxLoginAttempts before account lockout
+	// MaxLoginAttempts before account lockout (per tier)
 	MaxLoginAttempts int
-	// LockoutDuration is the initial lockout duration
-	LockoutDuration time.Duration
-	// MaxLockoutDuration is the maximum lockout duration with exponential backoff
-	MaxLockoutDuration time.Duration
-	// LockoutResetAfter is how long until failed attempts are reset
+	// LockoutTiers defines progressive lockout durations
+	LockoutTiers []LockoutTier
+	// PermanentLockoutThreshold is the total attempts before permanent lockout
+	PermanentLockoutThreshold int
+	// LockoutResetAfter is how long until failed attempts are reset (if no lockouts)
 	LockoutResetAfter time.Duration
 	// RedisKeyPrefix for storing lockout data
 	RedisKeyPrefix string
+	// RedisKeyPrefixEmail for email-only lockout lookups (admin features)
+	RedisKeyPrefixEmail string
+}
+
+// LockoutTier defines a lockout tier with duration
+type LockoutTier struct {
+	Tier     int
+	Duration time.Duration
 }
 
 // DefaultSecurityConfig returns sensible defaults
 func DefaultSecurityConfig() SecurityConfig {
 	return SecurityConfig{
-		MaxLoginAttempts:   5,
-		LockoutDuration:    30 * time.Second,
-		MaxLockoutDuration: 1 * time.Hour,
-		LockoutResetAfter:  15 * time.Minute,
-		RedisKeyPrefix:     "auth:lockout:",
+		MaxLoginAttempts: 5,
+		LockoutTiers: []LockoutTier{
+			{Tier: 1, Duration: 30 * time.Minute},  // Tier 1: 5 attempts -> 30 min lockout
+			{Tier: 2, Duration: 60 * time.Minute},  // Tier 2: 10 attempts -> 1 hour lockout
+			{Tier: 3, Duration: 120 * time.Minute}, // Tier 3: 15 attempts -> 2 hour lockout
+			{Tier: 4, Duration: 0},                 // Tier 4: 20 attempts -> Permanent (0 = permanent)
+		},
+		PermanentLockoutThreshold: 20,
+		LockoutResetAfter:         24 * time.Hour, // Reset counters after 24 hours of no failed attempts
+		RedisKeyPrefix:            "auth:lockout:",
+		RedisKeyPrefixEmail:       "auth:lockout:email:",
 	}
 }
 
@@ -55,10 +69,17 @@ type SecurityMiddleware struct {
 
 // lockoutState tracks login attempts and lockout status
 type lockoutState struct {
-	FailedAttempts int       `json:"failed_attempts"`
-	LastFailedAt   time.Time `json:"last_failed_at"`
-	LockedUntil    time.Time `json:"locked_until"`
-	LockoutCount   int       `json:"lockout_count"` // For exponential backoff
+	FailedAttempts    int       `json:"failed_attempts"`
+	LastFailedAt      time.Time `json:"last_failed_at"`
+	LockedUntil       time.Time `json:"locked_until"`
+	LockoutCount      int       `json:"lockout_count"`       // Number of lockouts triggered
+	CurrentTier       int       `json:"current_tier"`        // Current lockout tier (1-4)
+	PermanentlyLocked bool      `json:"permanently_locked"`  // True if permanently locked
+	PermanentLockedAt time.Time `json:"permanent_locked_at"` // When permanent lock was triggered
+	UnlockedBy        string    `json:"unlocked_by"`         // Admin user ID who unlocked
+	UnlockedAt        time.Time `json:"unlocked_at"`         // When account was unlocked
+	Email             string    `json:"email"`               // Email for admin lookup
+	TenantID          string    `json:"tenant_id"`           // Tenant ID for the lockout
 }
 
 // NewSecurityMiddleware creates a new security middleware instance
@@ -89,6 +110,12 @@ func (sm *SecurityMiddleware) generateLockoutKey(ip, email string) string {
 	data := fmt.Sprintf("%s:%s", ip, strings.ToLower(email))
 	hash := sha256.Sum256([]byte(data))
 	return sm.config.RedisKeyPrefix + hex.EncodeToString(hash[:16])
+}
+
+// generateEmailLockoutKey creates a key for email-only lockout (for admin lookup)
+func (sm *SecurityMiddleware) generateEmailLockoutKey(email string) string {
+	hash := sha256.Sum256([]byte(strings.ToLower(email)))
+	return sm.config.RedisKeyPrefixEmail + hex.EncodeToString(hash[:16])
 }
 
 // getLockoutState retrieves lockout state from Redis or local cache
@@ -132,18 +159,41 @@ func (sm *SecurityMiddleware) setLockoutState(ctx context.Context, key string, s
 			return err
 		}
 
-		ttl := sm.config.LockoutResetAfter
-		if state.LockedUntil.After(time.Now()) {
-			// Extend TTL if currently locked
-			remaining := time.Until(state.LockedUntil)
-			if remaining > ttl {
-				ttl = remaining + time.Minute
+		// Permanent lockouts don't expire
+		var ttl time.Duration
+		if state.PermanentlyLocked {
+			ttl = 0 // No expiration for permanent lockouts
+		} else {
+			ttl = sm.config.LockoutResetAfter
+			if state.LockedUntil.After(time.Now()) {
+				// Extend TTL if currently locked
+				remaining := time.Until(state.LockedUntil)
+				if remaining > ttl {
+					ttl = remaining + time.Minute
+				}
 			}
 		}
 
-		if err := sm.redisClient.Set(ctx, key, data, ttl).Err(); err != nil {
-			sm.logger.WithError(err).Warn("Failed to set lockout state in Redis")
+		var err2 error
+		if ttl == 0 {
+			// No expiration for permanent lockouts
+			err2 = sm.redisClient.Set(ctx, key, data, 0).Err()
+		} else {
+			err2 = sm.redisClient.Set(ctx, key, data, ttl).Err()
+		}
+		if err2 != nil {
+			sm.logger.WithError(err2).Warn("Failed to set lockout state in Redis")
 			// Don't return error - local cache is already updated
+		}
+
+		// Also store by email key for admin lookup (if email is set)
+		if state.Email != "" {
+			emailKey := sm.generateEmailLockoutKey(state.Email)
+			if ttl == 0 {
+				sm.redisClient.Set(ctx, emailKey, data, 0)
+			} else {
+				sm.redisClient.Set(ctx, emailKey, data, ttl)
+			}
 		}
 	}
 
@@ -165,58 +215,135 @@ func (sm *SecurityMiddleware) clearLockoutState(ctx context.Context, key string)
 	}
 }
 
-// calculateLockoutDuration calculates lockout duration with exponential backoff
-func (sm *SecurityMiddleware) calculateLockoutDuration(lockoutCount int) time.Duration {
-	if lockoutCount <= 0 {
-		return sm.config.LockoutDuration
+// calculateLockoutTier calculates the current lockout tier based on total failed attempts
+func (sm *SecurityMiddleware) calculateLockoutTier(totalAttempts int) int {
+	tier := (totalAttempts + sm.config.MaxLoginAttempts - 1) / sm.config.MaxLoginAttempts
+	if tier > len(sm.config.LockoutTiers) {
+		tier = len(sm.config.LockoutTiers)
 	}
-
-	// Exponential backoff: duration * 2^(lockoutCount-1)
-	duration := sm.config.LockoutDuration * time.Duration(1<<(lockoutCount-1))
-
-	if duration > sm.config.MaxLockoutDuration {
-		duration = sm.config.MaxLockoutDuration
+	if tier < 1 {
+		tier = 1
 	}
+	return tier
+}
 
-	return duration
+// getLockoutDurationForTier returns the lockout duration for a given tier
+// Returns 0 for permanent lockout
+func (sm *SecurityMiddleware) getLockoutDurationForTier(tier int) time.Duration {
+	if tier <= 0 || tier > len(sm.config.LockoutTiers) {
+		// Default to last tier for out of range
+		if len(sm.config.LockoutTiers) > 0 {
+			return sm.config.LockoutTiers[len(sm.config.LockoutTiers)-1].Duration
+		}
+		return 30 * time.Minute // Fallback
+	}
+	return sm.config.LockoutTiers[tier-1].Duration
+}
+
+// isPermanentLockoutTier checks if the given tier results in permanent lockout
+func (sm *SecurityMiddleware) isPermanentLockoutTier(tier int) bool {
+	duration := sm.getLockoutDurationForTier(tier)
+	return duration == 0 // 0 duration means permanent
 }
 
 // RecordFailedLogin records a failed login attempt
+// Returns (attemptsRemaining, lockedUntil, isPermanent)
 func (sm *SecurityMiddleware) RecordFailedLogin(ctx context.Context, ip, email string) (attemptsRemaining int, lockedUntil time.Time) {
+	return sm.RecordFailedLoginWithTenant(ctx, ip, email, "")
+}
+
+// RecordFailedLoginWithTenant records a failed login attempt with tenant info
+func (sm *SecurityMiddleware) RecordFailedLoginWithTenant(ctx context.Context, ip, email, tenantID string) (attemptsRemaining int, lockedUntil time.Time) {
 	key := sm.generateLockoutKey(ip, email)
 
 	state, _ := sm.getLockoutState(ctx, key)
 
-	// Check if we should reset the counter (attempts too old)
-	if state.FailedAttempts > 0 && time.Since(state.LastFailedAt) > sm.config.LockoutResetAfter {
+	// Don't process if already permanently locked
+	if state.PermanentlyLocked {
+		sm.logSecurityEvent("locked_login_attempt_permanent", ip, email, map[string]interface{}{
+			"permanently_locked_at": state.PermanentLockedAt,
+		})
+		return 0, time.Time{}
+	}
+
+	// Check if we should reset the counter (attempts too old and not in active lockout)
+	if state.FailedAttempts > 0 &&
+		!state.LockedUntil.After(time.Now()) &&
+		time.Since(state.LastFailedAt) > sm.config.LockoutResetAfter {
 		state = &lockoutState{}
 	}
 
 	state.FailedAttempts++
 	state.LastFailedAt = time.Now()
+	state.Email = email
+	state.TenantID = tenantID
 
-	// Check if we should lock the account
-	if state.FailedAttempts >= sm.config.MaxLoginAttempts {
+	// Calculate which tier we're in based on total attempts
+	currentTier := sm.calculateLockoutTier(state.FailedAttempts)
+
+	// Check if attempts within current tier have exceeded the limit
+	attemptsInCurrentTier := state.FailedAttempts % sm.config.MaxLoginAttempts
+	if attemptsInCurrentTier == 0 {
+		attemptsInCurrentTier = sm.config.MaxLoginAttempts
+	}
+
+	// Trigger lockout when we hit the max attempts for this tier
+	if attemptsInCurrentTier >= sm.config.MaxLoginAttempts {
 		state.LockoutCount++
-		lockoutDuration := sm.calculateLockoutDuration(state.LockoutCount)
-		state.LockedUntil = time.Now().Add(lockoutDuration)
+		state.CurrentTier = currentTier
 
-		sm.logSecurityEvent("account_locked", ip, email, map[string]interface{}{
-			"failed_attempts": state.FailedAttempts,
-			"lockout_count":   state.LockoutCount,
-			"locked_until":    state.LockedUntil,
-			"lockout_duration": lockoutDuration.String(),
-		})
+		// Check if this triggers permanent lockout
+		if state.FailedAttempts >= sm.config.PermanentLockoutThreshold || sm.isPermanentLockoutTier(currentTier) {
+			state.PermanentlyLocked = true
+			state.PermanentLockedAt = time.Now()
+
+			sm.logSecurityEvent("account_locked_permanent", ip, email, map[string]interface{}{
+				"failed_attempts":     state.FailedAttempts,
+				"lockout_count":       state.LockoutCount,
+				"current_tier":        currentTier,
+				"permanently_locked":  true,
+				"tenant_id":           tenantID,
+			})
+		} else {
+			// Regular tier lockout
+			lockoutDuration := sm.getLockoutDurationForTier(currentTier)
+			state.LockedUntil = time.Now().Add(lockoutDuration)
+
+			sm.logSecurityEvent("account_locked_temporary", ip, email, map[string]interface{}{
+				"failed_attempts":   state.FailedAttempts,
+				"lockout_count":     state.LockoutCount,
+				"current_tier":      currentTier,
+				"locked_until":      state.LockedUntil,
+				"lockout_duration":  lockoutDuration.String(),
+				"tenant_id":         tenantID,
+			})
+		}
 	} else {
+		// Calculate remaining attempts in current tier
+		tierStartAttempts := (currentTier - 1) * sm.config.MaxLoginAttempts
+		attemptsInTier := state.FailedAttempts - tierStartAttempts
+		remainingInTier := sm.config.MaxLoginAttempts - attemptsInTier
+
 		sm.logSecurityEvent("failed_login_attempt", ip, email, map[string]interface{}{
-			"failed_attempts":    state.FailedAttempts,
-			"attempts_remaining": sm.config.MaxLoginAttempts - state.FailedAttempts,
+			"failed_attempts":     state.FailedAttempts,
+			"current_tier":        currentTier,
+			"attempts_in_tier":    attemptsInTier,
+			"attempts_remaining":  remainingInTier,
+			"tenant_id":           tenantID,
 		})
 	}
 
 	sm.setLockoutState(ctx, key, state)
 
-	return sm.config.MaxLoginAttempts - state.FailedAttempts, state.LockedUntil
+	// Calculate remaining attempts until next lockout
+	tierStartAttempts := (currentTier - 1) * sm.config.MaxLoginAttempts
+	attemptsInTier := state.FailedAttempts - tierStartAttempts
+	remainingInTier := sm.config.MaxLoginAttempts - attemptsInTier
+	if remainingInTier < 0 {
+		remainingInTier = 0
+	}
+
+	return remainingInTier, state.LockedUntil
 }
 
 // RecordSuccessfulLogin clears failed login attempts on successful login
@@ -228,16 +355,30 @@ func (sm *SecurityMiddleware) RecordSuccessfulLogin(ctx context.Context, ip, ema
 }
 
 // IsLocked checks if an IP+email combination is currently locked out
+// Returns (isLocked, remainingDuration, isPermanent)
 func (sm *SecurityMiddleware) IsLocked(ctx context.Context, ip, email string) (bool, time.Duration) {
+	locked, remaining, _ := sm.IsLockedWithDetails(ctx, ip, email)
+	return locked, remaining
+}
+
+// IsLockedWithDetails checks if an IP+email combination is currently locked out
+// Returns (isLocked, remainingDuration, isPermanent)
+func (sm *SecurityMiddleware) IsLockedWithDetails(ctx context.Context, ip, email string) (bool, time.Duration, bool) {
 	key := sm.generateLockoutKey(ip, email)
 
 	state, _ := sm.getLockoutState(ctx, key)
 
-	if state.LockedUntil.After(time.Now()) {
-		return true, time.Until(state.LockedUntil)
+	// Check for permanent lockout first
+	if state.PermanentlyLocked {
+		return true, 0, true
 	}
 
-	return false, 0
+	// Check for temporary lockout
+	if state.LockedUntil.After(time.Now()) {
+		return true, time.Until(state.LockedUntil), false
+	}
+
+	return false, 0, false
 }
 
 // GetFailedAttempts returns the current number of failed attempts
@@ -322,9 +463,23 @@ func (sm *SecurityMiddleware) AccountLockoutMiddleware() gin.HandlerFunc {
 		ip := c.ClientIP()
 		ctx := c.Request.Context()
 
-		// Check if the account is locked
-		locked, remaining := sm.IsLocked(ctx, ip, email)
+		// Check if the account is locked (including permanent lockouts)
+		locked, remaining, isPermanent := sm.IsLockedWithDetails(ctx, ip, email)
 		if locked {
+			if isPermanent {
+				sm.logSecurityEvent("locked_login_attempt_permanent", ip, email, map[string]interface{}{
+					"permanently_locked": true,
+				})
+
+				c.JSON(http.StatusTooManyRequests, gin.H{
+					"error":   "Account permanently locked due to repeated failed login attempts",
+					"code":    "ACCOUNT_LOCKED_PERMANENT",
+					"message": "Your account has been permanently locked. Please contact support to unlock your account.",
+				})
+				c.Abort()
+				return
+			}
+
 			sm.logSecurityEvent("locked_login_attempt", ip, email, map[string]interface{}{
 				"remaining_lockout": remaining.String(),
 			})
@@ -526,4 +681,227 @@ func (sm *SecurityMiddleware) GetRemainingAttempts(ctx context.Context, ip, emai
 		return 0
 	}
 	return remaining
+}
+
+// ==================== Admin Functions ====================
+
+// LockoutStatus represents the lockout status for admin viewing
+type LockoutStatus struct {
+	Email             string    `json:"email"`
+	FailedAttempts    int       `json:"failed_attempts"`
+	CurrentTier       int       `json:"current_tier"`
+	LockoutCount      int       `json:"lockout_count"`
+	IsLocked          bool      `json:"is_locked"`
+	PermanentlyLocked bool      `json:"permanently_locked"`
+	LockedUntil       time.Time `json:"locked_until,omitempty"`
+	PermanentLockedAt time.Time `json:"permanent_locked_at,omitempty"`
+	LastFailedAt      time.Time `json:"last_failed_at,omitempty"`
+	UnlockedBy        string    `json:"unlocked_by,omitempty"`
+	UnlockedAt        time.Time `json:"unlocked_at,omitempty"`
+	TenantID          string    `json:"tenant_id,omitempty"`
+}
+
+// UnlockAccount unlocks a permanently locked account (admin function)
+func (sm *SecurityMiddleware) UnlockAccount(ctx context.Context, email, adminUserID string) error {
+	emailKey := sm.generateEmailLockoutKey(email)
+
+	state, err := sm.getLockoutState(ctx, emailKey)
+	if err != nil {
+		return fmt.Errorf("failed to get lockout state: %w", err)
+	}
+
+	if !state.PermanentlyLocked && !state.LockedUntil.After(time.Now()) {
+		return fmt.Errorf("account is not locked")
+	}
+
+	// Clear the lockout state but keep audit trail
+	state.PermanentlyLocked = false
+	state.LockedUntil = time.Time{}
+	state.FailedAttempts = 0
+	state.LockoutCount = 0
+	state.CurrentTier = 0
+	state.UnlockedBy = adminUserID
+	state.UnlockedAt = time.Now()
+
+	if err := sm.setLockoutState(ctx, emailKey, state); err != nil {
+		return fmt.Errorf("failed to update lockout state: %w", err)
+	}
+
+	sm.logSecurityEvent("account_unlocked", "", email, map[string]interface{}{
+		"unlocked_by": adminUserID,
+		"tenant_id":   state.TenantID,
+	})
+
+	return nil
+}
+
+// UnlockAccountByIPAndEmail unlocks an account for a specific IP+email combination
+func (sm *SecurityMiddleware) UnlockAccountByIPAndEmail(ctx context.Context, ip, email, adminUserID string) error {
+	key := sm.generateLockoutKey(ip, email)
+
+	state, err := sm.getLockoutState(ctx, key)
+	if err != nil {
+		return fmt.Errorf("failed to get lockout state: %w", err)
+	}
+
+	if !state.PermanentlyLocked && !state.LockedUntil.After(time.Now()) {
+		return fmt.Errorf("account is not locked for this IP")
+	}
+
+	// Clear the lockout state but keep audit trail
+	state.PermanentlyLocked = false
+	state.LockedUntil = time.Time{}
+	state.FailedAttempts = 0
+	state.LockoutCount = 0
+	state.CurrentTier = 0
+	state.UnlockedBy = adminUserID
+	state.UnlockedAt = time.Now()
+
+	if err := sm.setLockoutState(ctx, key, state); err != nil {
+		return fmt.Errorf("failed to update lockout state: %w", err)
+	}
+
+	sm.logSecurityEvent("account_unlocked_ip", ip, email, map[string]interface{}{
+		"unlocked_by": adminUserID,
+		"tenant_id":   state.TenantID,
+	})
+
+	return nil
+}
+
+// GetLockoutStatusByEmail returns lockout status for an email address (admin function)
+func (sm *SecurityMiddleware) GetLockoutStatusByEmail(ctx context.Context, email string) (*LockoutStatus, error) {
+	emailKey := sm.generateEmailLockoutKey(email)
+
+	state, err := sm.getLockoutState(ctx, emailKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get lockout state: %w", err)
+	}
+
+	isLocked := state.PermanentlyLocked || state.LockedUntil.After(time.Now())
+
+	return &LockoutStatus{
+		Email:             email,
+		FailedAttempts:    state.FailedAttempts,
+		CurrentTier:       state.CurrentTier,
+		LockoutCount:      state.LockoutCount,
+		IsLocked:          isLocked,
+		PermanentlyLocked: state.PermanentlyLocked,
+		LockedUntil:       state.LockedUntil,
+		PermanentLockedAt: state.PermanentLockedAt,
+		LastFailedAt:      state.LastFailedAt,
+		UnlockedBy:        state.UnlockedBy,
+		UnlockedAt:        state.UnlockedAt,
+		TenantID:          state.TenantID,
+	}, nil
+}
+
+// GetLockoutStatusByIPAndEmail returns lockout status for a specific IP+email (admin function)
+func (sm *SecurityMiddleware) GetLockoutStatusByIPAndEmail(ctx context.Context, ip, email string) (*LockoutStatus, error) {
+	key := sm.generateLockoutKey(ip, email)
+
+	state, err := sm.getLockoutState(ctx, key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get lockout state: %w", err)
+	}
+
+	isLocked := state.PermanentlyLocked || state.LockedUntil.After(time.Now())
+
+	return &LockoutStatus{
+		Email:             email,
+		FailedAttempts:    state.FailedAttempts,
+		CurrentTier:       state.CurrentTier,
+		LockoutCount:      state.LockoutCount,
+		IsLocked:          isLocked,
+		PermanentlyLocked: state.PermanentlyLocked,
+		LockedUntil:       state.LockedUntil,
+		PermanentLockedAt: state.PermanentLockedAt,
+		LastFailedAt:      state.LastFailedAt,
+		UnlockedBy:        state.UnlockedBy,
+		UnlockedAt:        state.UnlockedAt,
+		TenantID:          state.TenantID,
+	}, nil
+}
+
+// ListPermanentlyLockedAccounts returns all permanently locked accounts (admin function)
+// Note: This requires Redis SCAN which can be slow for large datasets
+func (sm *SecurityMiddleware) ListPermanentlyLockedAccounts(ctx context.Context, limit int) ([]LockoutStatus, error) {
+	if sm.redisClient == nil {
+		// Fallback to local cache
+		sm.localMu.RLock()
+		defer sm.localMu.RUnlock()
+
+		var results []LockoutStatus
+		for _, state := range sm.localLockouts {
+			if state.PermanentlyLocked && len(results) < limit {
+				results = append(results, LockoutStatus{
+					Email:             state.Email,
+					FailedAttempts:    state.FailedAttempts,
+					CurrentTier:       state.CurrentTier,
+					LockoutCount:      state.LockoutCount,
+					IsLocked:          true,
+					PermanentlyLocked: true,
+					PermanentLockedAt: state.PermanentLockedAt,
+					LastFailedAt:      state.LastFailedAt,
+					TenantID:          state.TenantID,
+				})
+			}
+		}
+		return results, nil
+	}
+
+	// Use Redis SCAN to find permanently locked accounts
+	var results []LockoutStatus
+	var cursor uint64
+	pattern := sm.config.RedisKeyPrefixEmail + "*"
+
+	for {
+		var keys []string
+		var err error
+		keys, cursor, err = sm.redisClient.Scan(ctx, cursor, pattern, 100).Result()
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan Redis keys: %w", err)
+		}
+
+		for _, key := range keys {
+			data, err := sm.redisClient.Get(ctx, key).Result()
+			if err != nil {
+				continue
+			}
+
+			var state lockoutState
+			if err := json.Unmarshal([]byte(data), &state); err != nil {
+				continue
+			}
+
+			if state.PermanentlyLocked {
+				results = append(results, LockoutStatus{
+					Email:             state.Email,
+					FailedAttempts:    state.FailedAttempts,
+					CurrentTier:       state.CurrentTier,
+					LockoutCount:      state.LockoutCount,
+					IsLocked:          true,
+					PermanentlyLocked: true,
+					PermanentLockedAt: state.PermanentLockedAt,
+					LastFailedAt:      state.LastFailedAt,
+					TenantID:          state.TenantID,
+				})
+
+				if len(results) >= limit {
+					return results, nil
+				}
+			}
+		}
+
+		if cursor == 0 {
+			break
+		}
+	}
+
+	return results, nil
+}
+
+// GetSecurityConfig returns the current security configuration (for admin/debugging)
+func (sm *SecurityMiddleware) GetSecurityConfig() SecurityConfig {
+	return sm.config
 }

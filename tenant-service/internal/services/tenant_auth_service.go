@@ -736,15 +736,23 @@ type TenantAuthInfo struct {
 	IsDefault   bool      `json:"is_default"`
 }
 
-// UnlockAccount manually unlocks a locked account
+// UnlockAccount manually unlocks a locked account (including permanent locks)
+// This resets all progressive lockout tracking fields
 func (s *TenantAuthService) UnlockAccount(ctx context.Context, userID, tenantID uuid.UUID, unlockedBy uuid.UUID) error {
-	// Reset login attempts and unlock
+	// Reset login attempts, progressive lockout state, and unlock
 	now := time.Now()
 	updates := map[string]interface{}{
-		"login_attempts": 0,
-		"locked_until":   nil,
-		"updated_at":     now,
-		"updated_by":     unlockedBy,
+		"login_attempts":        0,
+		"locked_until":          nil,
+		"permanently_locked":    false,
+		"permanent_locked_at":   nil,
+		"current_tier":          0,
+		"total_failed_attempts": 0,
+		"lockout_count":         0,
+		"unlocked_by":           unlockedBy,
+		"unlocked_at":           now,
+		"updated_at":            now,
+		"updated_by":            unlockedBy,
 	}
 
 	if err := s.db.WithContext(ctx).
@@ -1174,4 +1182,97 @@ func (s *TenantAuthService) AcceptInvitationPublic(ctx context.Context, req *Acc
 	// 3. Create local user record
 	// 4. Accept the invitation
 	return nil, fmt.Errorf("AcceptInvitationPublic not yet implemented")
+}
+
+// ============================================================================
+// Progressive Lockout Admin Methods
+// ============================================================================
+
+// ListLockedAccounts returns all locked accounts for a tenant
+func (s *TenantAuthService) ListLockedAccounts(ctx context.Context, tenantID uuid.UUID, permanentOnly bool) ([]repository.LockedAccountInfo, error) {
+	return s.credentialRepo.ListLockedAccounts(ctx, tenantID, permanentOnly)
+}
+
+// GetLockoutStatus returns detailed lockout status for a user
+func (s *TenantAuthService) GetLockoutStatus(ctx context.Context, userID, tenantID uuid.UUID) (*repository.LockoutStatus, error) {
+	return s.credentialRepo.GetLockoutStatus(ctx, userID, tenantID)
+}
+
+// SecurityPolicyResponse represents the security policy for a tenant
+type SecurityPolicyResponse struct {
+	// Password policy
+	PasswordMinLength           int  `json:"password_min_length"`
+	PasswordMaxLength           int  `json:"password_max_length"`
+	PasswordRequireUppercase    bool `json:"password_require_uppercase"`
+	PasswordRequireLowercase    bool `json:"password_require_lowercase"`
+	PasswordRequireNumbers      bool `json:"password_require_numbers"`
+	PasswordRequireSpecialChars bool `json:"password_require_special_chars"`
+	PasswordHistoryCount        int  `json:"password_history_count"`
+
+	// Login policy
+	MaxLoginAttempts       int `json:"max_login_attempts"`
+	LockoutDurationMinutes int `json:"lockout_duration_minutes"`
+	SessionTimeoutMinutes  int `json:"session_timeout_minutes"`
+	MaxConcurrentSessions  int `json:"max_concurrent_sessions"`
+
+	// Progressive lockout policy (strict 2-tier)
+	// Tier 1 (5 attempts): 30 min temporary lockout
+	// Tier 2 (7 attempts): Permanent lockout - requires admin unlock or password reset
+	EnableProgressiveLockout  bool `json:"enable_progressive_lockout"`
+	Tier1LockoutMinutes       int  `json:"tier1_lockout_minutes"`
+	PermanentLockoutThreshold int  `json:"permanent_lockout_threshold"`
+	LockoutResetHours         int  `json:"lockout_reset_hours"`
+
+	// MFA policy
+	MFARequired bool `json:"mfa_required"`
+}
+
+// GetSecurityPolicy returns the security policy for a tenant
+func (s *TenantAuthService) GetSecurityPolicy(ctx context.Context, tenantID uuid.UUID) (*SecurityPolicyResponse, error) {
+	policy, err := s.credentialRepo.GetAuthPolicy(ctx, tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get auth policy: %w", err)
+	}
+
+	// Return default values if no policy exists
+	// Strict 2-tier: 5 attempts = 30 min lock, 7 attempts = permanent lock
+	if policy == nil {
+		return &SecurityPolicyResponse{
+			PasswordMinLength:           8,
+			PasswordMaxLength:           128,
+			PasswordRequireUppercase:    true,
+			PasswordRequireLowercase:    true,
+			PasswordRequireNumbers:      true,
+			PasswordRequireSpecialChars: false,
+			PasswordHistoryCount:        5,
+			MaxLoginAttempts:            5,
+			LockoutDurationMinutes:      30,
+			SessionTimeoutMinutes:       480,
+			MaxConcurrentSessions:       5,
+			EnableProgressiveLockout:    true,
+			Tier1LockoutMinutes:         30,
+			PermanentLockoutThreshold:   7, // Permanent lock after 7 total attempts
+			LockoutResetHours:           24,
+			MFARequired:                 false,
+		}, nil
+	}
+
+	return &SecurityPolicyResponse{
+		PasswordMinLength:           policy.PasswordMinLength,
+		PasswordMaxLength:           policy.PasswordMaxLength,
+		PasswordRequireUppercase:    policy.PasswordRequireUppercase,
+		PasswordRequireLowercase:    policy.PasswordRequireLowercase,
+		PasswordRequireNumbers:      policy.PasswordRequireNumbers,
+		PasswordRequireSpecialChars: policy.PasswordRequireSpecialChars,
+		PasswordHistoryCount:        policy.PasswordHistoryCount,
+		MaxLoginAttempts:            policy.MaxLoginAttempts,
+		LockoutDurationMinutes:      policy.LockoutDurationMinutes,
+		SessionTimeoutMinutes:       policy.SessionTimeoutMinutes,
+		MaxConcurrentSessions:       policy.MaxConcurrentSessions,
+		EnableProgressiveLockout:    policy.EnableProgressiveLockout,
+		Tier1LockoutMinutes:         policy.Tier1LockoutMinutes,
+		PermanentLockoutThreshold:   policy.PermanentLockoutThreshold,
+		LockoutResetHours:           policy.LockoutResetHours,
+		MFARequired:                 policy.MFARequired,
+	}, nil
 }

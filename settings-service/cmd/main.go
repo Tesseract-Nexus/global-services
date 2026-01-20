@@ -1,15 +1,18 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -17,9 +20,9 @@ import (
 	"gorm.io/gorm"
 
 	"settings-service/internal/cache"
-	"settings-service/internal/events"
 	"settings-service/internal/clients/frankfurter"
 	"settings-service/internal/config"
+	"settings-service/internal/events"
 	"settings-service/internal/handlers"
 	"settings-service/internal/health"
 	"settings-service/internal/middleware"
@@ -88,6 +91,25 @@ func main() {
 		}
 	}()
 
+	// Initialize Redis client (graceful degradation if unavailable)
+	var redisClient *redis.Client
+	if cfg.Redis.URL != "" {
+		opt, err := redis.ParseURL(cfg.Redis.URL)
+		if err != nil {
+			log.Printf("WARNING: Failed to parse Redis URL: %v (caching disabled)", err)
+		} else {
+			redisClient = redis.NewClient(opt)
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := redisClient.Ping(ctx).Err(); err != nil {
+				log.Printf("WARNING: Failed to connect to Redis: %v (caching disabled)", err)
+				redisClient = nil
+			} else {
+				log.Println("✓ Redis connection established")
+			}
+		}
+	}
+
 	// Initialize dependencies
 	settingsRepo := repository.NewSettingsRepository(db)
 	settingsService := services.NewSettingsService(settingsRepo)
@@ -98,10 +120,10 @@ func main() {
 	storefrontThemeService := services.NewStorefrontThemeService(storefrontThemeRepo)
 	storefrontThemeHandler := handlers.NewStorefrontThemeHandler(storefrontThemeService)
 
-	// Initialize currency dependencies
+	// Initialize currency dependencies with Redis caching
 	frankfurterClient := frankfurter.NewDefaultClient()
 	exchangeRateRepo := repository.NewExchangeRateRepository(db)
-	currencyCache := cache.NewCurrencyCacheWithoutRedis() // TODO: Add Redis support
+	currencyCache := cache.NewCurrencyCache(redisClient) // Redis caching enabled
 	currencyService := services.NewCurrencyService(frankfurterClient, exchangeRateRepo, currencyCache)
 	rateUpdater := workers.NewRateUpdater(currencyService, workers.DefaultUpdateInterval)
 	currencyHandler := handlers.NewCurrencyHandler(currencyService, rateUpdater)
@@ -121,7 +143,7 @@ func main() {
 	log.Println("✓ RBAC middleware initialized")
 
 	// Initialize Gin router
-	router := setupRouter(settingsHandler, storefrontThemeHandler, currencyHandler, healthChecker, rbacMiddleware, cfg, eventLogger)
+	router := setupRouter(settingsHandler, storefrontThemeHandler, currencyHandler, healthChecker, rbacMiddleware, cfg, eventLogger, redisClient)
 
 	// Mark service as ready
 	healthChecker.SetReady(true)
@@ -199,12 +221,25 @@ func runMigrations(db *gorm.DB) error {
 }
 
 // setupRouter configures the Gin router with middleware and routes
-func setupRouter(settingsHandler *handlers.SettingsHandler, storefrontThemeHandler *handlers.StorefrontThemeHandler, currencyHandler *handlers.CurrencyHandler, healthChecker *health.HealthChecker, rbacMiddleware *rbac.Middleware, cfg *config.Config, logger *logrus.Logger) *gin.Engine {
+func setupRouter(settingsHandler *handlers.SettingsHandler, storefrontThemeHandler *handlers.StorefrontThemeHandler, currencyHandler *handlers.CurrencyHandler, healthChecker *health.HealthChecker, rbacMiddleware *rbac.Middleware, cfg *config.Config, logger *logrus.Logger, redisClient *redis.Client) *gin.Engine {
 	router := gin.New()
 
 	// Global middleware
 	router.Use(middleware.RequestLogger())
 	router.Use(middleware.Recovery())
+
+	// Security headers middleware
+	router.Use(gosharedmw.SecurityHeaders())
+
+	// Rate limiting middleware (uses Redis for distributed rate limiting)
+	if redisClient != nil {
+		router.Use(gosharedmw.RedisRateLimitMiddlewareWithProfile(redisClient, "standard"))
+		log.Println("✓ Redis-based rate limiting enabled")
+	} else {
+		router.Use(gosharedmw.RateLimit())
+		log.Println("✓ In-memory rate limiting enabled (Redis unavailable)")
+	}
+
 	router.Use(middleware.SetupCORS())
 	router.Use(health.MetricsMiddleware()) // Prometheus metrics middleware
 

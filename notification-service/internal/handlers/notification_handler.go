@@ -11,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"notification-service/internal/middleware"
 	"notification-service/internal/models"
 	"notification-service/internal/repository"
 	"notification-service/internal/services"
@@ -25,6 +26,7 @@ type NotificationHandler struct {
 	prefRepo     repository.PreferenceRepository
 	sender       *NotificationSender
 	templateEng  *template.Engine
+	rateLimiter  *middleware.EmailRateLimiter
 }
 
 // NotificationSender sends notifications via different channels
@@ -54,6 +56,35 @@ func NewNotificationHandler(
 		},
 		templateEng: template.NewEngine(),
 	}
+}
+
+// NewNotificationHandlerWithRateLimiter creates a new notification handler with rate limiting
+func NewNotificationHandlerWithRateLimiter(
+	notifRepo repository.NotificationRepository,
+	templateRepo repository.TemplateRepository,
+	prefRepo repository.PreferenceRepository,
+	emailProvider services.Provider,
+	smsProvider services.Provider,
+	pushProvider services.Provider,
+	rateLimiter *middleware.EmailRateLimiter,
+) *NotificationHandler {
+	return &NotificationHandler{
+		notifRepo:    notifRepo,
+		templateRepo: templateRepo,
+		prefRepo:     prefRepo,
+		sender: &NotificationSender{
+			emailProvider: emailProvider,
+			smsProvider:   smsProvider,
+			pushProvider:  pushProvider,
+		},
+		templateEng: template.NewEngine(),
+		rateLimiter: rateLimiter,
+	}
+}
+
+// SetRateLimiter sets the email rate limiter (for optional initialization)
+func (h *NotificationHandler) SetRateLimiter(rateLimiter *middleware.EmailRateLimiter) {
+	h.rateLimiter = rateLimiter
 }
 
 // SendRequest represents a send notification request
@@ -116,6 +147,27 @@ func (h *NotificationHandler) Send(c *gin.Context) {
 	case models.ChannelPush:
 		if req.RecipientToken == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "recipientToken required for PUSH channel"})
+			return
+		}
+	}
+
+	// Check email rate limits for EMAIL channel
+	if models.NotificationChannel(req.Channel) == models.ChannelEmail && h.rateLimiter != nil {
+		// Determine the action type based on template name or metadata
+		action := h.getEmailAction(req.TemplateName, req.Metadata)
+
+		result, err := h.rateLimiter.CheckLimit(c.Request.Context(), tenantID, req.RecipientEmail, action)
+		if err != nil {
+			log.Printf("[NotificationHandler] Rate limit check error: %v", err)
+			// Continue even if rate limit check fails (fail-open for availability)
+		} else if !result.Allowed {
+			c.JSON(http.StatusTooManyRequests, gin.H{
+				"error":          "Email rate limit exceeded",
+				"code":           "EMAIL_RATE_LIMITED",
+				"limit_type":     result.LimitType,
+				"remaining":      result.Remaining,
+				"retry_after_sec": result.RetryAfterSec,
+			})
 			return
 		}
 	}
@@ -328,6 +380,15 @@ func (h *NotificationHandler) sendNotificationSync(ctx context.Context, notifica
 
 	if result.Success {
 		h.notifRepo.UpdateStatus(ctx, notification.ID, models.StatusSent, result.ProviderID, "")
+
+		// Record successful email send for rate limiting
+		if notification.Channel == models.ChannelEmail && h.rateLimiter != nil {
+			action := h.getEmailAction(notification.TemplateName, nil)
+			if err := h.rateLimiter.RecordSend(ctx, notification.TenantID, notification.RecipientEmail, action); err != nil {
+				log.Printf("[NotificationHandler] Failed to record email send for rate limiting: %v", err)
+			}
+		}
+
 		return nil
 	}
 
@@ -392,6 +453,14 @@ func (h *NotificationHandler) sendNotification(ctx context.Context, notification
 
 	if result.Success {
 		h.notifRepo.UpdateStatus(ctx, notification.ID, models.StatusSent, result.ProviderID, "")
+
+		// Record successful email send for rate limiting
+		if notification.Channel == models.ChannelEmail && h.rateLimiter != nil {
+			action := h.getEmailAction(notification.TemplateName, nil)
+			if err := h.rateLimiter.RecordSend(ctx, notification.TenantID, notification.RecipientEmail, action); err != nil {
+				log.Printf("[NotificationHandler] Failed to record email send for rate limiting: %v", err)
+			}
+		}
 	} else {
 		errorMsg := "Send failed"
 		if result.Error != nil {
@@ -656,4 +725,58 @@ func buildEmailDataFromVariables(variables map[string]interface{}, subject, reci
 	data.ActivationLink = getString("activationLink")
 
 	return data
+}
+
+// getEmailAction determines the email action type based on template name or metadata
+func (h *NotificationHandler) getEmailAction(templateName string, metadata map[string]interface{}) middleware.EmailAction {
+	// Normalize template name to lowercase for comparison
+	name := strings.ToLower(templateName)
+
+	// Password reset related templates
+	if strings.Contains(name, "password_reset") || strings.Contains(name, "password-reset") ||
+		strings.Contains(name, "reset_password") || strings.Contains(name, "reset-password") {
+		return middleware.ActionPasswordReset
+	}
+
+	// Email verification templates
+	if strings.Contains(name, "verification") || strings.Contains(name, "verify") ||
+		strings.Contains(name, "confirm_email") || strings.Contains(name, "confirm-email") ||
+		strings.Contains(name, "email_confirm") || strings.Contains(name, "email-confirm") {
+		return middleware.ActionVerification
+	}
+
+	// OTP templates
+	if strings.Contains(name, "otp") || strings.Contains(name, "one_time") || strings.Contains(name, "one-time") {
+		return middleware.ActionOTP
+	}
+
+	// Security alert templates
+	if strings.Contains(name, "security") || strings.Contains(name, "alert") ||
+		strings.Contains(name, "suspicious") || strings.Contains(name, "lockout") {
+		return middleware.ActionSecurityAlert
+	}
+
+	// Account lockout templates
+	if strings.Contains(name, "account_locked") || strings.Contains(name, "account-locked") {
+		return middleware.ActionAccountLockout
+	}
+
+	// Check metadata for action type hint
+	if metadata != nil {
+		if action, ok := metadata["email_action"].(string); ok {
+			switch strings.ToLower(action) {
+			case "password_reset":
+				return middleware.ActionPasswordReset
+			case "verification":
+				return middleware.ActionVerification
+			case "otp":
+				return middleware.ActionOTP
+			case "security_alert":
+				return middleware.ActionSecurityAlert
+			}
+		}
+	}
+
+	// Default to general email
+	return middleware.ActionGeneral
 }

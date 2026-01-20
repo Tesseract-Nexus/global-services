@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -55,6 +56,43 @@ func main() {
 	templateRepo := repository.NewTemplateRepository(db)
 	prefRepo := repository.NewPreferenceRepository(db)
 
+	// Initialize Redis client for email rate limiting (optional)
+	var redisClient *redis.Client
+	if cfg.Redis.Host != "" {
+		redisClient = redis.NewClient(&redis.Options{
+			Addr:     fmt.Sprintf("%s:%d", cfg.Redis.Host, cfg.Redis.Port),
+			Password: cfg.Redis.Password,
+			DB:       cfg.Redis.DB,
+		})
+		// Test connection
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := redisClient.Ping(ctx).Err(); err != nil {
+			log.Printf("Warning: Failed to connect to Redis: %v - email rate limiting will use in-memory fallback", err)
+			redisClient = nil
+		} else {
+			log.Println("✓ Redis connected for email rate limiting")
+		}
+	}
+
+	// Initialize email rate limiter (if enabled)
+	var emailRateLimiter *middleware.EmailRateLimiter
+	if cfg.EmailRateLimit.Enabled {
+		emailRateLimitConfig := middleware.EmailRateLimitConfig{
+			TenantHourlyLimit:    cfg.EmailRateLimit.TenantHourlyLimit,
+			TenantDailyLimit:     cfg.EmailRateLimit.TenantDailyLimit,
+			RecipientHourlyLimit: cfg.EmailRateLimit.RecipientHourlyLimit,
+			PasswordResetLimit:   cfg.EmailRateLimit.PasswordResetHourlyMax,
+			VerificationLimit:    cfg.EmailRateLimit.VerificationHourlyMax,
+			PasswordResetWindow:  time.Hour,
+			VerificationWindow:   time.Hour,
+			RedisKeyPrefix:       "email:ratelimit:",
+		}
+		emailRateLimiter = middleware.NewEmailRateLimiterWithConfig(redisClient, logrus.StandardLogger(), emailRateLimitConfig)
+		log.Printf("✓ Email rate limiting enabled (tenant: %d/hour, %d/day; recipient: %d/hour)",
+			cfg.EmailRateLimit.TenantHourlyLimit, cfg.EmailRateLimit.TenantDailyLimit, cfg.EmailRateLimit.RecipientHourlyLimit)
+	}
+
 	// Initialize verify service (optional - for OTP/account verification)
 	var verifyService *services.VerifyService
 	if cfg.Verify.TwilioVerifyServiceSID != "" {
@@ -79,6 +117,10 @@ func main() {
 		smsProvider,
 		pushProvider,
 	)
+	// Set rate limiter if enabled
+	if emailRateLimiter != nil {
+		notifHandler.SetRateLimiter(emailRateLimiter)
+	}
 	templateHandler := handlers.NewTemplateHandler(templateRepo)
 	prefHandler := handlers.NewPreferenceHandler(prefRepo)
 	var verifyHandler *handlers.VerifyHandler

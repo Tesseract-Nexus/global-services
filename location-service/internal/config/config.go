@@ -11,6 +11,7 @@ type Config struct {
 	Port     string
 	Database DatabaseConfig
 	Services ServicesConfig
+	RedisURL string
 }
 
 // DatabaseConfig holds database configuration
@@ -63,6 +64,7 @@ func Load() *Config {
 			LocationIQAPIKey:    secrets.GetSecretOrEnv("LOCATIONIQ_API_KEY_SECRET_NAME", "LOCATIONIQ_API_KEY", ""),
 			PhotonURL:           getEnv("PHOTON_URL", "https://photon.komoot.io"), // Default to Komoot's public instance
 		},
+		RedisURL: getEnv("REDIS_URL", "redis://redis.redis-marketplace.svc.cluster.local:6379/0"),
 	}
 }
 

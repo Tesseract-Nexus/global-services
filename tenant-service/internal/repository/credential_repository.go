@@ -164,7 +164,10 @@ func (r *CredentialRepository) UpdatePassword(ctx context.Context, userID, tenan
 	return nil
 }
 
-// RecordLoginAttempt records a login attempt and handles lockout logic
+// RecordLoginAttempt records a login attempt and handles progressive lockout logic
+// Strict 2-tier progressive lockout:
+// - Tier 1 (5 attempts): 30 minutes lockout
+// - Tier 2 (7 attempts): Permanent lockout (requires admin unlock or password reset)
 func (r *CredentialRepository) RecordLoginAttempt(ctx context.Context, userID, tenantID uuid.UUID, success bool, ipAddress, userAgent string) error {
 	credential, err := r.GetCredential(ctx, userID, tenantID)
 	if err != nil {
@@ -174,17 +177,36 @@ func (r *CredentialRepository) RecordLoginAttempt(ctx context.Context, userID, t
 		return nil // No credential to update
 	}
 
+	// Don't process if permanently locked
+	if credential.PermanentlyLocked {
+		return nil
+	}
+
 	// Get tenant's auth policy
 	policy, err := r.GetAuthPolicy(ctx, tenantID)
 	if err != nil {
 		return err
 	}
 
-	maxAttempts := 5
-	lockoutMins := 30
+	// Default policy values - strict 2-tier system
+	maxAttempts := 5         // First lockout at 5 attempts
+	enableProgressive := true
+	tier1Minutes := 30       // 30 minute temporary lockout
+	permanentThreshold := 7  // Permanent lockout at 7 attempts (5 + 2 more after unlock)
+	lockoutResetHours := 24
+
 	if policy != nil {
 		maxAttempts = policy.MaxLoginAttempts
-		lockoutMins = policy.LockoutDurationMinutes
+		enableProgressive = policy.EnableProgressiveLockout
+		if policy.Tier1LockoutMinutes > 0 {
+			tier1Minutes = policy.Tier1LockoutMinutes
+		}
+		if policy.PermanentLockoutThreshold > 0 {
+			permanentThreshold = policy.PermanentLockoutThreshold
+		}
+		if policy.LockoutResetHours > 0 {
+			lockoutResetHours = policy.LockoutResetHours
+		}
 	}
 
 	now := time.Now()
@@ -196,18 +218,47 @@ func (r *CredentialRepository) RecordLoginAttempt(ctx context.Context, userID, t
 		// Reset on successful login
 		updates["login_attempts"] = 0
 		updates["locked_until"] = nil
+		updates["current_tier"] = 0
 		updates["last_successful_login_at"] = now
 		updates["last_login_ip"] = ipAddress
 		updates["last_login_user_agent"] = userAgent
+		// Note: We don't reset total_failed_attempts or lockout_count on success
+		// This allows progressive escalation across lockout cycles
 	} else {
+		// Check if we should reset tier based on time since last failure
+		totalFailed := credential.TotalFailedAttempts
+		if credential.LastLoginAttemptAt != nil {
+			hoursSinceLastFailure := now.Sub(*credential.LastLoginAttemptAt).Hours()
+			if hoursSinceLastFailure >= float64(lockoutResetHours) {
+				// Reset progressive tracking after configured hours of inactivity
+				totalFailed = 0
+				updates["lockout_count"] = 0
+				updates["current_tier"] = 0
+			}
+		}
+
 		// Increment attempts on failure
 		newAttempts := credential.LoginAttempts + 1
+		totalFailed++
 		updates["login_attempts"] = newAttempts
+		updates["total_failed_attempts"] = totalFailed
 		updates["last_login_attempt_at"] = now
 
-		// Lock account if max attempts exceeded
-		if newAttempts >= maxAttempts {
-			lockedUntil := now.Add(time.Duration(lockoutMins) * time.Minute)
+		// Check for permanent lockout first (total attempts >= threshold)
+		if enableProgressive && totalFailed >= permanentThreshold {
+			// Permanent lockout - customer must create support ticket or reset password
+			updates["lockout_count"] = credential.LockoutCount + 1
+			updates["current_tier"] = 2
+			updates["permanently_locked"] = true
+			updates["permanent_locked_at"] = now
+			updates["locked_until"] = nil // Not time-based
+		} else if newAttempts >= maxAttempts {
+			// Tier 1: Temporary lockout
+			lockoutCount := credential.LockoutCount + 1
+			updates["lockout_count"] = lockoutCount
+			updates["current_tier"] = 1
+
+			lockedUntil := now.Add(time.Duration(tier1Minutes) * time.Minute)
 			updates["locked_until"] = lockedUntil
 		}
 	}
@@ -222,20 +273,46 @@ func (r *CredentialRepository) RecordLoginAttempt(ctx context.Context, userID, t
 	return nil
 }
 
+// LockoutStatus contains detailed information about an account's lockout state
+type LockoutStatus struct {
+	IsLocked            bool       `json:"is_locked"`
+	IsPermanentlyLocked bool       `json:"is_permanently_locked"`
+	LockedUntil         *time.Time `json:"locked_until,omitempty"`
+	CurrentTier         int        `json:"current_tier"`
+	LockoutCount        int        `json:"lockout_count"`
+	RemainingAttempts   int        `json:"remaining_attempts"`
+	TotalFailedAttempts int        `json:"total_failed_attempts"`
+	PermanentLockedAt   *time.Time `json:"permanent_locked_at,omitempty"`
+	UnlockedBy          *uuid.UUID `json:"unlocked_by,omitempty"`
+	UnlockedAt          *time.Time `json:"unlocked_at,omitempty"`
+}
+
 // CheckAccountLockout checks if an account is currently locked
 func (r *CredentialRepository) CheckAccountLockout(ctx context.Context, userID, tenantID uuid.UUID) (bool, *time.Time, int, error) {
-	credential, err := r.GetCredential(ctx, userID, tenantID)
+	status, err := r.GetLockoutStatus(ctx, userID, tenantID)
 	if err != nil {
 		return false, nil, 0, err
 	}
+	return status.IsLocked || status.IsPermanentlyLocked, status.LockedUntil, status.RemainingAttempts, nil
+}
+
+// GetLockoutStatus returns detailed lockout status for an account
+func (r *CredentialRepository) GetLockoutStatus(ctx context.Context, userID, tenantID uuid.UUID) (*LockoutStatus, error) {
+	credential, err := r.GetCredential(ctx, userID, tenantID)
+	if err != nil {
+		return nil, err
+	}
 	if credential == nil {
-		return false, nil, 5, nil // Default max attempts
+		return &LockoutStatus{
+			IsLocked:          false,
+			RemainingAttempts: 5, // Default max attempts
+		}, nil
 	}
 
 	// Get tenant's auth policy
 	policy, err := r.GetAuthPolicy(ctx, tenantID)
 	if err != nil {
-		return false, nil, 0, err
+		return nil, err
 	}
 
 	maxAttempts := 5
@@ -243,18 +320,135 @@ func (r *CredentialRepository) CheckAccountLockout(ctx context.Context, userID, 
 		maxAttempts = policy.MaxLoginAttempts
 	}
 
-	// Check if currently locked
-	if credential.LockedUntil != nil && credential.LockedUntil.After(time.Now()) {
-		return true, credential.LockedUntil, 0, nil
+	status := &LockoutStatus{
+		CurrentTier:         credential.CurrentTier,
+		LockoutCount:        credential.LockoutCount,
+		TotalFailedAttempts: credential.TotalFailedAttempts,
+		IsPermanentlyLocked: credential.PermanentlyLocked,
+		PermanentLockedAt:   credential.PermanentLockedAt,
+		UnlockedBy:          credential.UnlockedBy,
+		UnlockedAt:          credential.UnlockedAt,
 	}
 
-	// Return remaining attempts
+	// Check if permanently locked
+	if credential.PermanentlyLocked {
+		status.IsLocked = true
+		status.RemainingAttempts = 0
+		return status, nil
+	}
+
+	// Check if currently locked (time-based)
+	if credential.LockedUntil != nil && credential.LockedUntil.After(time.Now()) {
+		status.IsLocked = true
+		status.LockedUntil = credential.LockedUntil
+		status.RemainingAttempts = 0
+		return status, nil
+	}
+
+	// Not locked - calculate remaining attempts
 	remaining := maxAttempts - credential.LoginAttempts
 	if remaining < 0 {
 		remaining = 0
 	}
+	status.RemainingAttempts = remaining
 
-	return false, nil, remaining, nil
+	return status, nil
+}
+
+// UnlockAccount unlocks a locked account (admin operation)
+// This resets the lockout state but preserves audit trail
+func (r *CredentialRepository) UnlockAccount(ctx context.Context, userID, tenantID, adminUserID uuid.UUID) error {
+	credential, err := r.GetCredential(ctx, userID, tenantID)
+	if err != nil {
+		return err
+	}
+	if credential == nil {
+		return fmt.Errorf("credential not found for user %s in tenant %s", userID, tenantID)
+	}
+
+	now := time.Now()
+	updates := map[string]interface{}{
+		"login_attempts":        0,
+		"locked_until":          nil,
+		"permanently_locked":    false,
+		"permanent_locked_at":   nil,
+		"current_tier":          0,
+		"total_failed_attempts": 0,
+		"lockout_count":         0,
+		"unlocked_by":           adminUserID,
+		"unlocked_at":           now,
+		"updated_at":            now,
+	}
+
+	if err := r.db.WithContext(ctx).
+		Model(&models.TenantCredential{}).
+		Where("user_id = ? AND tenant_id = ?", userID, tenantID).
+		Updates(updates).Error; err != nil {
+		return fmt.Errorf("failed to unlock account: %w", err)
+	}
+
+	return nil
+}
+
+// LockedAccountInfo contains information about a locked account for admin listing
+type LockedAccountInfo struct {
+	UserID              uuid.UUID  `json:"user_id"`
+	TenantID            uuid.UUID  `json:"tenant_id"`
+	Email               string     `json:"email"`
+	FirstName           string     `json:"first_name"`
+	LastName            string     `json:"last_name"`
+	IsPermanentlyLocked bool       `json:"is_permanently_locked"`
+	LockedUntil         *time.Time `json:"locked_until,omitempty"`
+	CurrentTier         int        `json:"current_tier"`
+	LockoutCount        int        `json:"lockout_count"`
+	TotalFailedAttempts int        `json:"total_failed_attempts"`
+	PermanentLockedAt   *time.Time `json:"permanent_locked_at,omitempty"`
+	LastLoginAttemptAt  *time.Time `json:"last_login_attempt_at,omitempty"`
+	LastLoginIP         string     `json:"last_login_ip,omitempty"`
+}
+
+// ListLockedAccounts returns all locked accounts for a tenant
+func (r *CredentialRepository) ListLockedAccounts(ctx context.Context, tenantID uuid.UUID, permanentOnly bool) ([]LockedAccountInfo, error) {
+	var results []LockedAccountInfo
+
+	query := r.db.WithContext(ctx).
+		Table("tenant_credentials tc").
+		Select(`
+			tc.user_id,
+			tc.tenant_id,
+			u.email,
+			u.first_name,
+			u.last_name,
+			tc.permanently_locked as is_permanently_locked,
+			tc.locked_until,
+			tc.current_tier,
+			tc.lockout_count,
+			tc.total_failed_attempts,
+			tc.permanent_locked_at,
+			tc.last_login_attempt_at,
+			tc.last_login_ip
+		`).
+		Joins("JOIN tenant_users u ON tc.user_id = u.id").
+		Where("tc.tenant_id = ?", tenantID)
+
+	if permanentOnly {
+		query = query.Where("tc.permanently_locked = ?", true)
+	} else {
+		// Include both permanent and time-based locks
+		query = query.Where("tc.permanently_locked = ? OR (tc.locked_until IS NOT NULL AND tc.locked_until > ?)", true, time.Now())
+	}
+
+	if err := query.Order("tc.permanent_locked_at DESC NULLS LAST, tc.locked_until DESC").
+		Scan(&results).Error; err != nil {
+		return nil, fmt.Errorf("failed to list locked accounts: %w", err)
+	}
+
+	return results, nil
+}
+
+// ListPermanentlyLockedAccounts returns all permanently locked accounts for a tenant
+func (r *CredentialRepository) ListPermanentlyLockedAccounts(ctx context.Context, tenantID uuid.UUID) ([]LockedAccountInfo, error) {
+	return r.ListLockedAccounts(ctx, tenantID, true)
 }
 
 // ============================================================================

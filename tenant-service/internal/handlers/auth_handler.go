@@ -808,3 +808,172 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 		"message": result.Message,
 	})
 }
+
+// ============================================================================
+// Progressive Lockout Admin Endpoints
+// ============================================================================
+
+// ListLockedAccountsRequest represents a request to list locked accounts
+type ListLockedAccountsRequest struct {
+	TenantID     string `json:"tenant_id" binding:"required"`
+	PermanentOnly bool   `json:"permanent_only"` // If true, only show permanently locked accounts
+}
+
+// ListLockedAccounts returns all locked accounts for a tenant (admin operation)
+// POST /api/v1/auth/admin/locked-accounts
+func (h *AuthHandler) ListLockedAccounts(c *gin.Context) {
+	var req ListLockedAccountsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+
+	// Get admin user ID from context
+	adminUserIDStr := c.GetHeader("X-User-ID")
+	if adminUserIDStr == "" {
+		ErrorResponse(c, http.StatusUnauthorized, "User not authenticated", nil)
+		return
+	}
+
+	adminUserID, err := uuid.Parse(adminUserIDStr)
+	if err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid admin user ID", nil)
+		return
+	}
+
+	tenantID, err := uuid.Parse(req.TenantID)
+	if err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid tenant ID", nil)
+		return
+	}
+
+	// Verify admin has permission
+	canUnlock, err := h.authSvc.CanUnlockAccount(c.Request.Context(), adminUserID, tenantID)
+	if err != nil || !canUnlock {
+		ErrorResponse(c, http.StatusForbidden, "Insufficient permissions to view locked accounts", err)
+		return
+	}
+
+	// Get locked accounts
+	accounts, err := h.authSvc.ListLockedAccounts(c.Request.Context(), tenantID, req.PermanentOnly)
+	if err != nil {
+		log.Printf("[AuthHandler] Failed to list locked accounts: %v", err)
+		ErrorResponse(c, http.StatusInternalServerError, "Failed to list locked accounts", err)
+		return
+	}
+
+	SuccessResponse(c, http.StatusOK, "Locked accounts retrieved", gin.H{
+		"accounts":       accounts,
+		"count":          len(accounts),
+		"permanent_only": req.PermanentOnly,
+	})
+}
+
+// GetLockoutStatusRequest represents a request to get detailed lockout status
+type GetLockoutStatusRequest struct {
+	UserID   string `json:"user_id" binding:"required"`
+	TenantID string `json:"tenant_id" binding:"required"`
+}
+
+// GetLockoutStatus returns detailed lockout status for a user (admin operation)
+// POST /api/v1/auth/admin/lockout-status
+func (h *AuthHandler) GetLockoutStatus(c *gin.Context) {
+	var req GetLockoutStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+
+	// Get admin user ID from context
+	adminUserIDStr := c.GetHeader("X-User-ID")
+	if adminUserIDStr == "" {
+		ErrorResponse(c, http.StatusUnauthorized, "User not authenticated", nil)
+		return
+	}
+
+	adminUserID, err := uuid.Parse(adminUserIDStr)
+	if err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid admin user ID", nil)
+		return
+	}
+
+	userID, err := uuid.Parse(req.UserID)
+	if err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid user ID", nil)
+		return
+	}
+
+	tenantID, err := uuid.Parse(req.TenantID)
+	if err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid tenant ID", nil)
+		return
+	}
+
+	// Verify admin has permission
+	canUnlock, err := h.authSvc.CanUnlockAccount(c.Request.Context(), adminUserID, tenantID)
+	if err != nil || !canUnlock {
+		ErrorResponse(c, http.StatusForbidden, "Insufficient permissions to view lockout status", err)
+		return
+	}
+
+	// Get detailed lockout status
+	status, err := h.authSvc.GetLockoutStatus(c.Request.Context(), userID, tenantID)
+	if err != nil {
+		log.Printf("[AuthHandler] Failed to get lockout status: %v", err)
+		ErrorResponse(c, http.StatusInternalServerError, "Failed to get lockout status", err)
+		return
+	}
+
+	SuccessResponse(c, http.StatusOK, "Lockout status retrieved", status)
+}
+
+// GetSecurityPolicyRequest represents a request to get tenant security policy
+type GetSecurityPolicyRequest struct {
+	TenantID string `json:"tenant_id" binding:"required"`
+}
+
+// GetSecurityPolicy returns the security policy for a tenant (admin operation)
+// POST /api/v1/auth/admin/security-policy
+func (h *AuthHandler) GetSecurityPolicy(c *gin.Context) {
+	var req GetSecurityPolicyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+
+	// Get admin user ID from context
+	adminUserIDStr := c.GetHeader("X-User-ID")
+	if adminUserIDStr == "" {
+		ErrorResponse(c, http.StatusUnauthorized, "User not authenticated", nil)
+		return
+	}
+
+	adminUserID, err := uuid.Parse(adminUserIDStr)
+	if err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid admin user ID", nil)
+		return
+	}
+
+	tenantID, err := uuid.Parse(req.TenantID)
+	if err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid tenant ID", nil)
+		return
+	}
+
+	// Verify admin has permission (owner or admin role)
+	canUnlock, err := h.authSvc.CanUnlockAccount(c.Request.Context(), adminUserID, tenantID)
+	if err != nil || !canUnlock {
+		ErrorResponse(c, http.StatusForbidden, "Insufficient permissions to view security policy", err)
+		return
+	}
+
+	// Get security policy
+	policy, err := h.authSvc.GetSecurityPolicy(c.Request.Context(), tenantID)
+	if err != nil {
+		log.Printf("[AuthHandler] Failed to get security policy: %v", err)
+		ErrorResponse(c, http.StatusInternalServerError, "Failed to get security policy", err)
+		return
+	}
+
+	SuccessResponse(c, http.StatusOK, "Security policy retrieved", policy)
+}

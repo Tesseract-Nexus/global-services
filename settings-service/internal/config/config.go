@@ -10,6 +10,7 @@ type Config struct {
 	Server   ServerConfig   `json:"server"`
 	Database DatabaseConfig `json:"database"`
 	App      AppConfig      `json:"app"`
+	Redis    RedisConfig    `json:"redis"`
 }
 
 type ServerConfig struct {
@@ -33,6 +34,10 @@ type AppConfig struct {
 	Version     string `json:"version"`
 }
 
+type RedisConfig struct {
+	URL string `json:"url"`
+}
+
 // NewConfig creates a new configuration instance with environment variables
 func NewConfig() *Config {
 	return &Config{
@@ -53,6 +58,9 @@ func NewConfig() *Config {
 			Environment: getEnv("ENVIRONMENT", "development"),
 			Debug:       getBoolEnv("DEBUG", true),
 			Version:     getEnv("VERSION", "1.0.0"),
+		},
+		Redis: RedisConfig{
+			URL: getEnv("REDIS_URL", "redis://redis.redis-marketplace.svc.cluster.local:6379/0"),
 		},
 	}
 }

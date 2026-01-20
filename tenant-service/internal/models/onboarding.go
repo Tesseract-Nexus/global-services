@@ -728,10 +728,10 @@ type TenantCredential struct {
 	PasswordHash string `json:"-" gorm:"not null"`
 
 	// Password metadata
-	PasswordSetAt          time.Time  `json:"password_set_at" gorm:"default:now()"`
-	PasswordExpiresAt      *time.Time `json:"password_expires_at"`
-	PasswordRotationRequired bool      `json:"password_rotation_required" gorm:"default:false"`
-	LastPasswordChangeAt   *time.Time `json:"last_password_change_at"`
+	PasswordSetAt            time.Time  `json:"password_set_at" gorm:"default:now()"`
+	PasswordExpiresAt        *time.Time `json:"password_expires_at"`
+	PasswordRotationRequired bool       `json:"password_rotation_required" gorm:"default:false"`
+	LastPasswordChangeAt     *time.Time `json:"last_password_change_at"`
 
 	// MFA settings per tenant
 	MFAEnabled     bool       `json:"mfa_enabled" gorm:"default:false"`
@@ -741,12 +741,22 @@ type TenantCredential struct {
 	MFALastUsedAt  *time.Time `json:"mfa_last_used_at"`
 
 	// Login security
-	LoginAttempts       int        `json:"login_attempts" gorm:"default:0"`
-	LastLoginAttemptAt  *time.Time `json:"last_login_attempt_at"`
-	LockedUntil         *time.Time `json:"locked_until"`
+	LoginAttempts         int        `json:"login_attempts" gorm:"default:0"`
+	LastLoginAttemptAt    *time.Time `json:"last_login_attempt_at"`
+	LockedUntil           *time.Time `json:"locked_until"`
 	LastSuccessfulLoginAt *time.Time `json:"last_successful_login_at"`
-	LastLoginIP         string     `json:"last_login_ip" gorm:"size:45"` // IPv6 max length
-	LastLoginUserAgent  string     `json:"last_login_user_agent"`
+	LastLoginIP           string     `json:"last_login_ip" gorm:"size:45"` // IPv6 max length
+	LastLoginUserAgent    string     `json:"last_login_user_agent"`
+
+	// Progressive lockout fields
+	// Tracks lockout escalation across multiple lockout cycles
+	LockoutCount        int        `json:"lockout_count" gorm:"default:0"`         // Number of times account has been locked
+	CurrentTier         int        `json:"current_tier" gorm:"default:0"`          // Current lockout tier (1-4, 0=not locked)
+	PermanentlyLocked   bool       `json:"permanently_locked" gorm:"default:false"` // True if permanently locked (tier 4)
+	PermanentLockedAt   *time.Time `json:"permanent_locked_at"`                    // When permanently locked
+	UnlockedBy          *uuid.UUID `json:"unlocked_by" gorm:"type:uuid"`           // Admin who unlocked
+	UnlockedAt          *time.Time `json:"unlocked_at"`                            // When admin unlocked
+	TotalFailedAttempts int        `json:"total_failed_attempts" gorm:"default:0"` // Cumulative failed attempts (for tier calculation)
 
 	// Session management
 	ActiveSessions int `json:"active_sessions" gorm:"default:0"`
@@ -785,21 +795,30 @@ type TenantAuthPolicy struct {
 	TenantID uuid.UUID `json:"tenant_id" gorm:"type:uuid;not null;unique;index"`
 
 	// Password policy
-	PasswordMinLength          int    `json:"password_min_length" gorm:"default:8"`
-	PasswordMaxLength          int    `json:"password_max_length" gorm:"default:128"`
-	PasswordRequireUppercase   bool   `json:"password_require_uppercase" gorm:"default:true"`
-	PasswordRequireLowercase   bool   `json:"password_require_lowercase" gorm:"default:true"`
-	PasswordRequireNumbers     bool   `json:"password_require_numbers" gorm:"default:true"`
-	PasswordRequireSpecialChars bool  `json:"password_require_special_chars" gorm:"default:false"`
-	PasswordSpecialChars       string `json:"password_special_chars" gorm:"size:100"`
-	PasswordExpiryDays         *int   `json:"password_expiry_days"`                  // NULL = no expiry
-	PasswordHistoryCount       int    `json:"password_history_count" gorm:"default:5"` // Prevent reuse of last N passwords
+	PasswordMinLength           int    `json:"password_min_length" gorm:"default:8"`
+	PasswordMaxLength           int    `json:"password_max_length" gorm:"default:128"`
+	PasswordRequireUppercase    bool   `json:"password_require_uppercase" gorm:"default:true"`
+	PasswordRequireLowercase    bool   `json:"password_require_lowercase" gorm:"default:true"`
+	PasswordRequireNumbers      bool   `json:"password_require_numbers" gorm:"default:true"`
+	PasswordRequireSpecialChars bool   `json:"password_require_special_chars" gorm:"default:false"`
+	PasswordSpecialChars        string `json:"password_special_chars" gorm:"size:100"`
+	PasswordExpiryDays          *int   `json:"password_expiry_days"`                   // NULL = no expiry
+	PasswordHistoryCount        int    `json:"password_history_count" gorm:"default:5"` // Prevent reuse of last N passwords
 
 	// Login policy
-	MaxLoginAttempts        int `json:"max_login_attempts" gorm:"default:5"`
-	LockoutDurationMinutes  int `json:"lockout_duration_minutes" gorm:"default:30"`
-	SessionTimeoutMinutes   int `json:"session_timeout_minutes" gorm:"default:480"` // 8 hours default
-	MaxConcurrentSessions   int `json:"max_concurrent_sessions" gorm:"default:5"`
+	MaxLoginAttempts       int `json:"max_login_attempts" gorm:"default:5"`
+	LockoutDurationMinutes int `json:"lockout_duration_minutes" gorm:"default:30"`
+	SessionTimeoutMinutes  int `json:"session_timeout_minutes" gorm:"default:480"` // 8 hours default
+	MaxConcurrentSessions  int `json:"max_concurrent_sessions" gorm:"default:5"`
+
+	// Progressive lockout policy
+	// Strict 2-tier lockout: first lockout is temporary, second is permanent
+	// Tier 1 (5 attempts): 30 minutes lockout
+	// Tier 2 (7 attempts): Permanent lockout - requires admin unlock or password reset
+	EnableProgressiveLockout  bool `json:"enable_progressive_lockout" gorm:"default:true"`
+	Tier1LockoutMinutes       int  `json:"tier1_lockout_minutes" gorm:"default:30"`  // 5 failed attempts = 30 min lock
+	PermanentLockoutThreshold int  `json:"permanent_lockout_threshold" gorm:"default:7"` // 7 failed attempts = permanent lock
+	LockoutResetHours         int  `json:"lockout_reset_hours" gorm:"default:24"` // Reset tier after N hours of no failures
 
 	// MFA policy
 	MFARequired        bool  `json:"mfa_required" gorm:"default:false"`

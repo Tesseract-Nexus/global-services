@@ -17,6 +17,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 	"location-service/internal/config"
 	"location-service/internal/events"
@@ -29,6 +30,7 @@ import (
 	"location-service/internal/services"
 	"location-service/internal/worker"
 	"github.com/Tesseract-Nexus/go-shared/metrics"
+	gosharedmw "github.com/Tesseract-Nexus/go-shared/middleware"
 	"github.com/Tesseract-Nexus/go-shared/rbac"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -53,6 +55,32 @@ func main() {
 		}
 	}
 
+	// Initialize Redis client (optional - graceful degradation if Redis unavailable)
+	var redisClient *redis.Client
+	if cfg.RedisURL != "" {
+		opt, err := redis.ParseURL(cfg.RedisURL)
+		if err != nil {
+			log.Printf("Warning: Failed to parse Redis URL: %v", err)
+			log.Println("Continuing without Redis caching...")
+		} else {
+			redisClient = redis.NewClient(opt)
+
+			// Test Redis connection
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			if err := redisClient.Ping(ctx).Err(); err != nil {
+				log.Printf("Warning: Failed to connect to Redis: %v", err)
+				log.Println("Continuing without Redis caching...")
+				redisClient = nil
+			} else {
+				log.Println("✓ Connected to Redis for caching")
+			}
+		}
+	} else {
+		log.Println("REDIS_URL not configured, caching disabled")
+	}
+
 	// Initialize repositories (with nil handling for mock mode)
 	var countryRepo repository.CountryRepository
 	var stateRepo repository.StateRepository
@@ -63,10 +91,10 @@ func main() {
 	var placesRepo repository.PlacesRepository
 
 	if db != nil {
-		countryRepo = repository.NewCountryRepository(db)
-		stateRepo = repository.NewStateRepository(db)
-		currencyRepo = repository.NewCurrencyRepository(db)
-		timezoneRepo = repository.NewTimezoneRepository(db)
+		countryRepo = repository.NewCountryRepository(db, redisClient)
+		stateRepo = repository.NewStateRepository(db, redisClient)
+		currencyRepo = repository.NewCurrencyRepository(db, redisClient)
+		timezoneRepo = repository.NewTimezoneRepository(db, redisClient)
 		cacheRepo = repository.NewLocationCacheRepository(db)
 		addressCacheRepo = repository.NewAddressCacheRepository(db)
 		placesRepo = repository.NewPlacesRepository(db)
@@ -178,7 +206,7 @@ func main() {
 	log.Println("✓ RBAC middleware initialized")
 
 	// Setup router
-	router := setupRouter(healthHandler, locationHandler, addressHandler, geotagHandler, metricsCollector, rbacMiddleware)
+	router := setupRouter(healthHandler, locationHandler, addressHandler, geotagHandler, metricsCollector, rbacMiddleware, redisClient)
 
 	// Setup server
 	server := &http.Server{
@@ -223,6 +251,7 @@ func setupRouter(
 	geotagHandler *handler.GeoTagHandler,
 	metricsCollector *metrics.Metrics,
 	rbacMiddleware *rbac.Middleware,
+	redisClient *redis.Client,
 ) *gin.Engine {
 	// Set Gin mode
 	if os.Getenv("GIN_MODE") == "release" {
@@ -234,6 +263,19 @@ func setupRouter(
 	// Global middleware
 	router.Use(gin.Logger())
 	router.Use(gin.Recovery())
+
+	// Security headers middleware
+	router.Use(gosharedmw.SecurityHeaders())
+
+	// Rate limiting middleware (uses Redis for distributed rate limiting)
+	if redisClient != nil {
+		router.Use(gosharedmw.RedisRateLimitMiddlewareWithProfile(redisClient, "standard"))
+		log.Println("✓ Redis-based rate limiting enabled")
+	} else {
+		router.Use(gosharedmw.RateLimit())
+		log.Println("✓ In-memory rate limiting enabled (Redis unavailable)")
+	}
+
 	router.Use(metricsCollector.Middleware())
 	router.Use(middleware.CORS())
 

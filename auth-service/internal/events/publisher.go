@@ -181,6 +181,32 @@ func (p *Publisher) PublishAccountLocked(ctx context.Context, tenantID, userID, 
 	return nil
 }
 
+// PublishAccountUnlocked publishes an account unlocked event (admin action)
+func (p *Publisher) PublishAccountUnlocked(ctx context.Context, tenantID, userID, email, adminUserID string) error {
+	event := events.NewAuthEvent(events.AccountUnlocked, tenantID)
+	event.UserID = userID
+	event.Email = email
+	event.Metadata = map[string]interface{}{
+		"unlocked_by": adminUserID,
+	}
+
+	if err := p.publisher.PublishAuth(ctx, event); err != nil {
+		p.logger.WithError(err).WithFields(logrus.Fields{
+			"tenant_id":   tenantID,
+			"user_id":     userID,
+			"unlocked_by": adminUserID,
+		}).Error("Failed to publish account unlocked event")
+		return err
+	}
+
+	p.logger.WithFields(logrus.Fields{
+		"tenant_id":   tenantID,
+		"user_id":     userID,
+		"unlocked_by": adminUserID,
+	}).Info("Account unlocked event published")
+	return nil
+}
+
 // IsConnected returns true if connected to NATS
 func (p *Publisher) IsConnected() bool {
 	return p.publisher.IsConnected()

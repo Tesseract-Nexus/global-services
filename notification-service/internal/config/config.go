@@ -10,15 +10,41 @@ import (
 
 // Config holds all configuration
 type Config struct {
-	Server   ServerConfig
-	Database DatabaseConfig
-	App      AppConfig
-	NATS     NATSConfig
-	AWS      AWSConfig
-	Email    EmailConfig
-	SMS      SMSConfig
-	Push     PushConfig
-	Verify   VerifyConfig
+	Server         ServerConfig
+	Database       DatabaseConfig
+	Redis          RedisConfig
+	App            AppConfig
+	NATS           NATSConfig
+	AWS            AWSConfig
+	Email          EmailConfig
+	SMS            SMSConfig
+	Push           PushConfig
+	Verify         VerifyConfig
+	EmailRateLimit EmailRateLimitConfig
+}
+
+// RedisConfig holds Redis settings for rate limiting
+type RedisConfig struct {
+	Host     string
+	Port     int
+	Password string
+	DB       int
+}
+
+// EmailRateLimitConfig holds email rate limiting settings
+type EmailRateLimitConfig struct {
+	// Enabled enables/disables email rate limiting
+	Enabled bool
+	// TenantHourlyLimit is the max emails per hour per tenant
+	TenantHourlyLimit int
+	// TenantDailyLimit is the max emails per day per tenant
+	TenantDailyLimit int
+	// RecipientHourlyLimit is the max emails per hour to same recipient
+	RecipientHourlyLimit int
+	// PasswordResetHourlyMax is the max password reset emails per hour per user
+	PasswordResetHourlyMax int
+	// VerificationHourlyMax is the max verification emails per hour per user
+	VerificationHourlyMax int
 }
 
 // ServerConfig holds server settings
@@ -159,6 +185,12 @@ func Load() (*Config, error) {
 			DBName:   getEnv("DB_NAME", "tesseract_hub"),
 			SSLMode:  getEnv("DB_SSLMODE", "disable"),
 		},
+		Redis: RedisConfig{
+			Host:     getEnv("REDIS_HOST", "localhost"),
+			Port:     getEnvInt("REDIS_PORT", 6379),
+			Password: getEnv("REDIS_PASSWORD", ""),
+			DB:       getEnvInt("REDIS_DB", 0),
+		},
 		App: AppConfig{
 			Environment:       getEnv("ENVIRONMENT", "development"),
 			MaxRetryAttempts:  getEnvInt("MAX_RETRY_ATTEMPTS", 3),
@@ -231,6 +263,14 @@ func Load() (*Config, error) {
 			OTPExpiryMinutes:       getEnvInt("TWILIO_OTP_EXPIRY_MINUTES", 10),
 			OTPLength:              getEnvInt("TWILIO_OTP_LENGTH", 6),
 			DevtestEnabled:         getEnvBool("TWILIO_DEVTEST_ENABLED", false),
+		},
+		EmailRateLimit: EmailRateLimitConfig{
+			Enabled:                getEnvBool("EMAIL_RATE_LIMIT_ENABLED", true),
+			TenantHourlyLimit:      getEnvInt("EMAIL_TENANT_HOURLY_LIMIT", 1000),
+			TenantDailyLimit:       getEnvInt("EMAIL_TENANT_DAILY_LIMIT", 10000),
+			RecipientHourlyLimit:   getEnvInt("EMAIL_RECIPIENT_HOURLY_LIMIT", 10),
+			PasswordResetHourlyMax: getEnvInt("PASSWORD_RESET_HOURLY_MAX", 3),
+			VerificationHourlyMax:  getEnvInt("VERIFICATION_HOURLY_MAX", 5),
 		},
 	}
 

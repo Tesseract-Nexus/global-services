@@ -180,6 +180,9 @@ const (
 	// Dashboard access
 	PermissionDashboardView = "dashboard:view"
 	PermissionAnalyticsView = "analytics:view"
+
+	// Security management
+	PermissionSecurityManage = "security:manage" // Unlock accounts, view lockout status
 )
 
 // SystemPermissions returns all system permissions
@@ -225,6 +228,8 @@ func SystemPermissions() []Permission {
 
 		{Name: PermissionDashboardView, Resource: "dashboard", Action: "view", Description: "View dashboard", IsSystem: true},
 		{Name: PermissionAnalyticsView, Resource: "analytics", Action: "view", Description: "View analytics", IsSystem: true},
+
+		{Name: PermissionSecurityManage, Resource: "security", Action: "manage", Description: "Manage security settings and unlock accounts", IsSystem: true},
 	}
 }
 
@@ -241,6 +246,7 @@ func SystemRoles() map[string][]string {
 			PermissionOrderCreate, PermissionOrderRead, PermissionOrderUpdate, PermissionOrderDelete, PermissionOrderCancel, PermissionOrderRefund,
 			PermissionSettingsRead, PermissionSettingsUpdate,
 			PermissionDashboardView, PermissionAnalyticsView,
+			PermissionSecurityManage,
 		},
 		RoleTenantAdmin: {
 			// Tenant-level admin permissions
@@ -252,6 +258,7 @@ func SystemRoles() map[string][]string {
 			PermissionOrderRead, PermissionOrderUpdate, PermissionOrderCancel, PermissionOrderRefund,
 			PermissionSettingsRead, PermissionSettingsUpdate,
 			PermissionDashboardView, PermissionAnalyticsView,
+			PermissionSecurityManage,
 		},
 		RoleCategoryManager: {
 			PermissionCategoryCreate, PermissionCategoryRead, PermissionCategoryUpdate, PermissionCategoryDelete, PermissionCategoryApprove,

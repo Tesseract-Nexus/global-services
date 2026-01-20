@@ -107,12 +107,33 @@ func main() {
 	passwordHandlers := handlers.NewPasswordHandlers(authService, passwordService, emailService, notificationClient, tenantClient, eventsPublisher)
 	rbacHandlers := handlers.NewRBACHandlers(db)
 
+	// Security handlers will be initialized after security middleware is created
+	var securityHandlers *handlers.SecurityHandlers
+
 	// Initialize middleware
 	authMiddleware := middleware.NewAuthMiddleware(authService)
 
 	// Initialize security middleware for rate limiting and account lockout
-	securityMiddleware := middleware.NewSecurityMiddleware(redisClient, logger)
-	log.Println("✓ Security middleware initialized (rate limiting and account lockout enabled)")
+	// Build security config from environment/config
+	securityConfig := middleware.SecurityConfig{
+		MaxLoginAttempts: cfg.Security.MaxLoginAttempts,
+		LockoutTiers: []middleware.LockoutTier{
+			{Tier: 1, Duration: cfg.Security.GetTier1Duration()},
+			{Tier: 2, Duration: cfg.Security.GetTier2Duration()},
+			{Tier: 3, Duration: cfg.Security.GetTier3Duration()},
+			{Tier: 4, Duration: 0}, // Permanent lockout (0 = permanent)
+		},
+		PermanentLockoutThreshold: cfg.Security.PermanentLockoutThreshold,
+		LockoutResetAfter:         cfg.Security.GetLockoutResetDuration(),
+		RedisKeyPrefix:            "auth:lockout:",
+		RedisKeyPrefixEmail:       "auth:lockout:email:",
+	}
+	securityMiddleware := middleware.NewSecurityMiddlewareWithConfig(redisClient, logger, securityConfig)
+	log.Printf("✓ Security middleware initialized (progressive lockout: %d attempts/tier, permanent after %d attempts)",
+		cfg.Security.MaxLoginAttempts, cfg.Security.PermanentLockoutThreshold)
+
+	// Initialize security handlers for admin unlock endpoints
+	securityHandlers = handlers.NewSecurityHandlers(securityMiddleware, authRepo, eventsPublisher)
 
 	// Setup Gin router
 	if cfg.Server.Mode == "release" {
@@ -219,6 +240,10 @@ func main() {
 				users.GET("/:user_id/roles", rbacHandlers.GetUserRoles)
 				users.POST("/:user_id/roles", authHandlers.AssignRole)
 				users.DELETE("/:user_id/roles", authHandlers.RemoveRole)
+
+				// User lockout management (requires security:manage permission)
+				users.GET("/:user_id/lockout-status", securityHandlers.GetLockoutStatus)
+				users.POST("/:user_id/unlock", securityHandlers.UnlockAccount)
 			}
 
 			// Role management
@@ -238,6 +263,14 @@ func main() {
 			permissions := admin.Group("/permissions")
 			{
 				permissions.GET("/", rbacHandlers.ListPermissions)
+			}
+
+			// Security management
+			security := admin.Group("/security")
+			{
+				security.GET("/locked-accounts", securityHandlers.ListLockedAccounts)
+				security.POST("/unlock-by-email", securityHandlers.UnlockAccountByEmail)
+				security.GET("/config", securityHandlers.GetSecurityConfig)
 			}
 		}
 	}
