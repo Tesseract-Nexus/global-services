@@ -116,6 +116,7 @@ func (h *AuthHandler) ValidateCredentials(c *gin.Context) {
 	}
 
 	// Return successful authentication
+	log.Printf("[AuthHandler] ValidateCredentials success - UserID: %v, TenantID: %v, Role: %v", result.UserID, result.TenantID, result.Role)
 	response := gin.H{
 		"valid":        true,
 		"user_id":      result.UserID,
