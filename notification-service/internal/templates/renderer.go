@@ -225,6 +225,29 @@ type EmailData struct {
 	EscalatedFromID    string
 	EscalatedFromName  string
 	EscalationLevel    int
+
+	// Domain lifecycle fields
+	DomainID             string
+	Domain               string
+	DomainType           string // storefront, api, webhook
+	DomainStatus         string // pending_verification, verifying, verified, provisioning, active, failed, inactive
+	DomainPreviousStatus string
+	DNSRecordType        string // CNAME, A, TXT
+	DNSRecordName        string // Record name (e.g., _acme-challenge.example.com)
+	DNSRecordValue       string // Record value
+	SSLStatus            string // pending, provisioning, issued, failed
+	SSLExpiresAt         string
+	SSLProvider          string // letsencrypt, cloudflare
+	RoutingTarget        string // Target service/endpoint
+	RoutingPath          string // Path prefix if any
+	MigratedFrom         string // Previous infrastructure
+	MigratedTo           string // New infrastructure
+	MigrationReason      string // Why migration occurred
+	DomainFailureReason  string // Why domain setup failed
+	DomainFailureCode    string // Error code for troubleshooting
+	DomainSettingsURL    string // URL to manage domain settings
+	OwnerEmail           string // Domain owner's email
+	OwnerName            string // Domain owner's name
 }
 
 // NewRenderer creates a new template renderer
@@ -276,6 +299,8 @@ func NewRenderer() (*Renderer, error) {
 		"approval_requester",
 		// Staff templates
 		"staff_invitation",
+		// Domain lifecycle templates
+		"domain_customer",
 	}
 
 	for _, name := range templateNames {

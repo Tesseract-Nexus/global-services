@@ -1,0 +1,795 @@
+{{define "header"}}
+<!-- Logo -->
+<tr>
+    <td style="text-align: center; padding-bottom: 24px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+            <tr>
+                {{if eq .DomainStatus "ACTIVATED"}}
+                <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
+                {{else if eq .DomainStatus "FAILED"}}
+                <td style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
+                {{else if or (eq .DomainStatus "SSL_EXPIRING") (eq .DomainStatus "HEALTH_FAILED")}}
+                <td style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
+                {{else if eq .DomainStatus "REMOVED"}}
+                <td style="background: linear-gradient(135deg, #71717a 0%, #52525b 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
+                {{else}}
+                <td style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
+                {{end}}
+                    <span style="color: #ffffff; font-size: 24px; font-weight: 700;">{{if .BusinessInitial}}{{.BusinessInitial}}{{else}}T{{end}}</span>
+                </td>
+            </tr>
+        </table>
+        {{if .BusinessName}}
+        <p style="margin: 12px 0 0 0; font-size: 18px; font-weight: 600; color: #18181b; letter-spacing: -0.3px;">{{.BusinessName}}</p>
+        {{end}}
+    </td>
+</tr>
+{{end}}
+
+{{define "content"}}
+<!-- Main Card -->
+<tr>
+    <td>
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1); overflow: hidden;">
+
+            <!-- Dynamic Header based on DomainStatus -->
+            <tr>
+                {{if eq .DomainStatus "ADDED"}}
+                <td style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); padding: 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="width: 64px; height: 64px; background-color: rgba(255,255,255,0.2); border-radius: 50%; text-align: center; vertical-align: middle;">
+                                <span style="font-size: 32px;">&#127760;</span>
+                            </td>
+                        </tr>
+                    </table>
+                    <h1 style="margin: 16px 0 0 0; font-size: 24px; font-weight: 700; color: #ffffff; line-height: 1.3;">
+                        Domain Added
+                    </h1>
+                    <p style="margin: 8px 0 0 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                        Complete DNS verification to activate {{.Domain}}
+                    </p>
+                </td>
+                {{else if eq .DomainStatus "VERIFIED"}}
+                <td style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); padding: 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="width: 64px; height: 64px; background-color: rgba(255,255,255,0.2); border-radius: 50%; text-align: center; vertical-align: middle;">
+                                <span style="font-size: 32px;">&#10003;</span>
+                            </td>
+                        </tr>
+                    </table>
+                    <h1 style="margin: 16px 0 0 0; font-size: 24px; font-weight: 700; color: #ffffff; line-height: 1.3;">
+                        DNS Verified
+                    </h1>
+                    <p style="margin: 8px 0 0 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                        {{.Domain}} verification complete
+                    </p>
+                </td>
+                {{else if eq .DomainStatus "SSL_READY"}}
+                <td style="background: linear-gradient(135deg, #059669 0%, #047857 100%); padding: 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="width: 64px; height: 64px; background-color: rgba(255,255,255,0.2); border-radius: 50%; text-align: center; vertical-align: middle;">
+                                <span style="font-size: 32px;">&#128274;</span>
+                            </td>
+                        </tr>
+                    </table>
+                    <h1 style="margin: 16px 0 0 0; font-size: 24px; font-weight: 700; color: #ffffff; line-height: 1.3;">
+                        SSL Certificate Ready
+                    </h1>
+                    <p style="margin: 8px 0 0 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                        {{.Domain}} is now secure
+                    </p>
+                </td>
+                {{else if eq .DomainStatus "ACTIVATED"}}
+                <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="width: 64px; height: 64px; background-color: rgba(255,255,255,0.2); border-radius: 50%; text-align: center; vertical-align: middle;">
+                                <span style="font-size: 32px;">&#127881;</span>
+                            </td>
+                        </tr>
+                    </table>
+                    <h1 style="margin: 16px 0 0 0; font-size: 24px; font-weight: 700; color: #ffffff; line-height: 1.3;">
+                        Domain Active!
+                    </h1>
+                    <p style="margin: 8px 0 0 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                        {{.Domain}} is now live
+                    </p>
+                </td>
+                {{else if eq .DomainStatus "FAILED"}}
+                <td style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); padding: 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="width: 64px; height: 64px; background-color: rgba(255,255,255,0.2); border-radius: 50%; text-align: center; vertical-align: middle;">
+                                <span style="font-size: 32px;">&#10006;</span>
+                            </td>
+                        </tr>
+                    </table>
+                    <h1 style="margin: 16px 0 0 0; font-size: 24px; font-weight: 700; color: #ffffff; line-height: 1.3;">
+                        Domain Setup Issue
+                    </h1>
+                    <p style="margin: 8px 0 0 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                        Action required for {{.Domain}}
+                    </p>
+                </td>
+                {{else if eq .DomainStatus "REMOVED"}}
+                <td style="background: linear-gradient(135deg, #71717a 0%, #52525b 100%); padding: 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="width: 64px; height: 64px; background-color: rgba(255,255,255,0.2); border-radius: 50%; text-align: center; vertical-align: middle;">
+                                <span style="font-size: 32px;">&#128465;</span>
+                            </td>
+                        </tr>
+                    </table>
+                    <h1 style="margin: 16px 0 0 0; font-size: 24px; font-weight: 700; color: #ffffff; line-height: 1.3;">
+                        Domain Removed
+                    </h1>
+                    <p style="margin: 8px 0 0 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                        {{.Domain}} has been disconnected
+                    </p>
+                </td>
+                {{else if eq .DomainStatus "MIGRATED"}}
+                <td style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); padding: 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="width: 64px; height: 64px; background-color: rgba(255,255,255,0.2); border-radius: 50%; text-align: center; vertical-align: middle;">
+                                <span style="font-size: 32px;">&#128640;</span>
+                            </td>
+                        </tr>
+                    </table>
+                    <h1 style="margin: 16px 0 0 0; font-size: 24px; font-weight: 700; color: #ffffff; line-height: 1.3;">
+                        Domain Migrated
+                    </h1>
+                    <p style="margin: 8px 0 0 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                        {{.Domain}} has been upgraded
+                    </p>
+                </td>
+                {{else if eq .DomainStatus "SSL_EXPIRING"}}
+                <td style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding: 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="width: 64px; height: 64px; background-color: rgba(255,255,255,0.2); border-radius: 50%; text-align: center; vertical-align: middle;">
+                                <span style="font-size: 32px;">&#9888;</span>
+                            </td>
+                        </tr>
+                    </table>
+                    <h1 style="margin: 16px 0 0 0; font-size: 24px; font-weight: 700; color: #ffffff; line-height: 1.3;">
+                        SSL Certificate Expiring
+                    </h1>
+                    <p style="margin: 8px 0 0 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                        Action may be required for {{.Domain}}
+                    </p>
+                </td>
+                {{else if eq .DomainStatus "HEALTH_FAILED"}}
+                <td style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding: 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="width: 64px; height: 64px; background-color: rgba(255,255,255,0.2); border-radius: 50%; text-align: center; vertical-align: middle;">
+                                <span style="font-size: 32px;">&#128276;</span>
+                            </td>
+                        </tr>
+                    </table>
+                    <h1 style="margin: 16px 0 0 0; font-size: 24px; font-weight: 700; color: #ffffff; line-height: 1.3;">
+                        Domain Health Alert
+                    </h1>
+                    <p style="margin: 8px 0 0 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                        Issue detected with {{.Domain}}
+                    </p>
+                </td>
+                {{else}}
+                <td style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); padding: 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="width: 64px; height: 64px; background-color: rgba(255,255,255,0.2); border-radius: 50%; text-align: center; vertical-align: middle;">
+                                <span style="font-size: 32px;">&#127760;</span>
+                            </td>
+                        </tr>
+                    </table>
+                    <h1 style="margin: 16px 0 0 0; font-size: 24px; font-weight: 700; color: #ffffff; line-height: 1.3;">
+                        Domain Update
+                    </h1>
+                    <p style="margin: 8px 0 0 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                        Updates for {{.Domain}}
+                    </p>
+                </td>
+                {{end}}
+            </tr>
+
+            {{if eq .DomainStatus "ADDED"}}
+            <!-- Domain Added Content -->
+            <tr>
+                <td style="padding: 32px 40px 0 40px;" class="mobile-padding">
+                    <p style="margin: 0; font-size: 15px; color: #3f3f46; line-height: 1.6;">
+                        Your custom domain <strong>{{.Domain}}</strong> has been added to your store. To activate it, you need to configure DNS records with your domain registrar.
+                    </p>
+                </td>
+            </tr>
+
+            <!-- DNS Configuration Box -->
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #fef3c7; border-radius: 12px; border: 1px solid #fde68a;">
+                        <tr>
+                            <td style="padding: 20px;">
+                                <p style="margin: 0 0 12px 0; font-size: 14px; font-weight: 600; color: #92400e;">DNS Configuration Required</p>
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+                                    <tr>
+                                        <td style="padding: 12px; border-bottom: 1px solid #f4f4f5;">
+                                            <p style="margin: 0; font-size: 12px; color: #71717a;">Record Type</p>
+                                            <p style="margin: 4px 0 0 0; font-size: 14px; font-weight: 600; color: #18181b; font-family: monospace;">{{.DNSRecordType}}</p>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 12px; border-bottom: 1px solid #f4f4f5;">
+                                            <p style="margin: 0; font-size: 12px; color: #71717a;">Name / Host</p>
+                                            <p style="margin: 4px 0 0 0; font-size: 14px; font-weight: 600; color: #18181b; font-family: monospace;">{{.DNSRecordName}}</p>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 12px;">
+                                            <p style="margin: 0; font-size: 12px; color: #71717a;">Value / Target</p>
+                                            <p style="margin: 4px 0 0 0; font-size: 14px; font-weight: 600; color: #18181b; font-family: monospace; word-break: break-all;">{{.DNSRecordValue}}</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- Next Steps -->
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <p style="margin: 0 0 16px 0; font-size: 14px; font-weight: 600; color: #18181b;">Next Steps:</p>
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                        <tr>
+                            <td style="padding: 12px 0; border-bottom: 1px solid #f4f4f5;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 32px; height: 32px; background-color: #f0fdf4; border-radius: 50%; text-align: center; vertical-align: middle;">
+                                            <span style="color: #16a34a; font-weight: 700;">1</span>
+                                        </td>
+                                        <td style="padding-left: 12px;">
+                                            <p style="margin: 0; font-size: 14px; font-weight: 500; color: #18181b;">Configure DNS</p>
+                                            <p style="margin: 4px 0 0 0; font-size: 13px; color: #71717a;">Add the DNS record above at your domain registrar.</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px 0; border-bottom: 1px solid #f4f4f5;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 32px; height: 32px; background-color: #f0fdf4; border-radius: 50%; text-align: center; vertical-align: middle;">
+                                            <span style="color: #16a34a; font-weight: 700;">2</span>
+                                        </td>
+                                        <td style="padding-left: 12px;">
+                                            <p style="margin: 0; font-size: 14px; font-weight: 500; color: #18181b;">Wait for DNS Propagation</p>
+                                            <p style="margin: 4px 0 0 0; font-size: 13px; color: #71717a;">DNS changes can take up to 48 hours to propagate.</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px 0;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 32px; height: 32px; background-color: #f0fdf4; border-radius: 50%; text-align: center; vertical-align: middle;">
+                                            <span style="color: #16a34a; font-weight: 700;">3</span>
+                                        </td>
+                                        <td style="padding-left: 12px;">
+                                            <p style="margin: 0; font-size: 14px; font-weight: 500; color: #18181b;">Automatic Verification</p>
+                                            <p style="margin: 4px 0 0 0; font-size: 13px; color: #71717a;">We'll automatically verify and activate your domain.</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- CTA -->
+            <tr>
+                <td style="padding: 24px 40px 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); border-radius: 10px;">
+                                <a href="{{.DomainSettingsURL}}" style="display: inline-block; padding: 14px 32px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
+                                    View Domain Settings &#8594;
+                                </a>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+            {{end}}
+
+            {{if eq .DomainStatus "VERIFIED"}}
+            <!-- DNS Verified Content -->
+            <tr>
+                <td style="padding: 32px 40px 0 40px;" class="mobile-padding">
+                    <p style="margin: 0; font-size: 15px; color: #3f3f46; line-height: 1.6;">
+                        Great news! The DNS records for <strong>{{.Domain}}</strong> have been successfully verified. We're now provisioning your SSL certificate.
+                    </p>
+                </td>
+            </tr>
+
+            <!-- Status Box -->
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f0f9ff; border-radius: 12px; border: 1px solid #bae6fd;">
+                        <tr>
+                            <td style="padding: 20px; text-align: center;">
+                                <span style="display: inline-block; padding: 8px 24px; font-size: 14px; font-weight: 700; color: #0369a1; background-color: #e0f2fe; border-radius: 24px;">
+                                    &#10004; DNS Verified &nbsp;&bull;&nbsp; &#128274; SSL Provisioning...
+                                </span>
+                                <p style="margin: 16px 0 0 0; font-size: 13px; color: #0c4a6e;">
+                                    Your domain will be fully active within a few minutes.
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <tr>
+                <td style="padding: 24px 40px 32px 40px;" class="mobile-padding">
+                    <p style="margin: 0; font-size: 14px; color: #71717a; line-height: 1.6;">
+                        You'll receive another email once your domain is fully activated and ready to use.
+                    </p>
+                </td>
+            </tr>
+            {{end}}
+
+            {{if eq .DomainStatus "SSL_READY"}}
+            <!-- SSL Ready Content -->
+            <tr>
+                <td style="padding: 32px 40px 0 40px;" class="mobile-padding">
+                    <p style="margin: 0; font-size: 15px; color: #3f3f46; line-height: 1.6;">
+                        Your SSL certificate for <strong>{{.Domain}}</strong> has been successfully provisioned. Your visitors will now see the secure padlock icon.
+                    </p>
+                </td>
+            </tr>
+
+            <!-- SSL Info -->
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f0fdf4; border-radius: 12px; border: 1px solid #bbf7d0;">
+                        <tr>
+                            <td style="padding: 20px;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 40px; vertical-align: top;">
+                                            <span style="font-size: 24px;">&#128274;</span>
+                                        </td>
+                                        <td style="padding-left: 12px;">
+                                            <p style="margin: 0; font-size: 14px; font-weight: 600; color: #166534;">SSL Certificate Active</p>
+                                            <p style="margin: 8px 0 0 0; font-size: 13px; color: #15803d; line-height: 1.5;">
+                                                Provider: {{if .SSLProvider}}{{.SSLProvider}}{{else}}Let's Encrypt{{end}}<br/>
+                                                {{if .SSLExpiresAt}}Expires: {{.SSLExpiresAt}}{{end}}
+                                            </p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <tr>
+                <td style="padding: 24px 40px 32px 40px;" class="mobile-padding">
+                    <p style="margin: 0; font-size: 14px; color: #71717a; line-height: 1.6;">
+                        Your domain is almost ready. Final routing configuration is in progress.
+                    </p>
+                </td>
+            </tr>
+            {{end}}
+
+            {{if eq .DomainStatus "ACTIVATED"}}
+            <!-- Domain Activated Content -->
+            <tr>
+                <td style="padding: 32px 40px 0 40px;" class="mobile-padding">
+                    <p style="margin: 0; font-size: 15px; color: #3f3f46; line-height: 1.6;">
+                        Congratulations! Your custom domain <strong>{{.Domain}}</strong> is now fully active and serving your store.
+                    </p>
+                </td>
+            </tr>
+
+            <!-- Success Badge -->
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f0fdf4; border-radius: 12px; border: 1px solid #bbf7d0;">
+                        <tr>
+                            <td style="padding: 20px; text-align: center;">
+                                <span style="display: inline-block; padding: 8px 24px; font-size: 14px; font-weight: 700; color: #15803d; background-color: #dcfce7; border-radius: 24px;">
+                                    &#10004; Domain Active
+                                </span>
+                                <p style="margin: 16px 0 0 0; font-size: 15px; color: #166534;">
+                                    <a href="https://{{.Domain}}" style="color: #166534; text-decoration: none; font-weight: 600;">
+                                        https://{{.Domain}} &#8599;
+                                    </a>
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- What's Working -->
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <p style="margin: 0 0 16px 0; font-size: 14px; font-weight: 600; color: #18181b;">What's active:</p>
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                        <tr>
+                            <td style="padding: 8px 0;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 24px; vertical-align: top;">
+                                            <span style="color: #16a34a;">&#10004;</span>
+                                        </td>
+                                        <td style="padding-left: 8px;">
+                                            <p style="margin: 0; font-size: 14px; color: #3f3f46;">Custom domain pointing to your store</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 24px; vertical-align: top;">
+                                            <span style="color: #16a34a;">&#10004;</span>
+                                        </td>
+                                        <td style="padding-left: 8px;">
+                                            <p style="margin: 0; font-size: 14px; color: #3f3f46;">SSL/TLS encryption enabled</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 24px; vertical-align: top;">
+                                            <span style="color: #16a34a;">&#10004;</span>
+                                        </td>
+                                        <td style="padding-left: 8px;">
+                                            <p style="margin: 0; font-size: 14px; color: #3f3f46;">Automatic certificate renewal</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- CTA -->
+            <tr>
+                <td style="padding: 24px 40px 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 10px;">
+                                <a href="https://{{.Domain}}" style="display: inline-block; padding: 14px 32px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
+                                    Visit Your Store &#8594;
+                                </a>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+            {{end}}
+
+            {{if eq .DomainStatus "FAILED"}}
+            <!-- Domain Failed Content -->
+            <tr>
+                <td style="padding: 32px 40px 0 40px;" class="mobile-padding">
+                    <p style="margin: 0; font-size: 15px; color: #3f3f46; line-height: 1.6;">
+                        We encountered an issue while setting up your custom domain <strong>{{.Domain}}</strong>. Please review the error details below and take action.
+                    </p>
+                </td>
+            </tr>
+
+            <!-- Error Box -->
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #fef2f2; border-radius: 12px; border: 1px solid #fecaca;">
+                        <tr>
+                            <td style="padding: 20px;">
+                                <p style="margin: 0 0 8px 0; font-size: 11px; font-weight: 600; color: #991b1b; text-transform: uppercase; letter-spacing: 0.5px;">Error Details</p>
+                                {{if .DomainFailureCode}}
+                                <p style="margin: 0 0 4px 0; font-size: 12px; color: #7f1d1d;">Code: <strong>{{.DomainFailureCode}}</strong></p>
+                                {{end}}
+                                <p style="margin: 0; font-size: 14px; color: #7f1d1d; line-height: 1.5;">{{if .DomainFailureReason}}{{.DomainFailureReason}}{{else}}DNS verification failed. Please check your DNS settings.{{end}}</p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- Troubleshooting -->
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <p style="margin: 0 0 16px 0; font-size: 14px; font-weight: 600; color: #18181b;">Common fixes:</p>
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                        <tr>
+                            <td style="padding: 8px 0;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 24px; vertical-align: top;">
+                                            <span style="color: #6366f1; font-weight: 700;">&#8226;</span>
+                                        </td>
+                                        <td style="padding-left: 8px;">
+                                            <p style="margin: 0; font-size: 14px; color: #3f3f46;">Verify DNS records are configured correctly at your domain registrar.</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 24px; vertical-align: top;">
+                                            <span style="color: #6366f1; font-weight: 700;">&#8226;</span>
+                                        </td>
+                                        <td style="padding-left: 8px;">
+                                            <p style="margin: 0; font-size: 14px; color: #3f3f46;">Wait for DNS propagation (can take up to 48 hours).</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 24px; vertical-align: top;">
+                                            <span style="color: #6366f1; font-weight: 700;">&#8226;</span>
+                                        </td>
+                                        <td style="padding-left: 8px;">
+                                            <p style="margin: 0; font-size: 14px; color: #3f3f46;">Remove any conflicting A or AAAA records for this domain.</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- CTA -->
+            <tr>
+                <td style="padding: 24px 40px 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="background: linear-gradient(135deg, #18181b 0%, #27272a 100%); border-radius: 10px;">
+                                <a href="{{.DomainSettingsURL}}" style="display: inline-block; padding: 14px 32px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
+                                    Review Domain Settings &#8594;
+                                </a>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+            {{end}}
+
+            {{if eq .DomainStatus "REMOVED"}}
+            <!-- Domain Removed Content -->
+            <tr>
+                <td style="padding: 32px 40px 0 40px;" class="mobile-padding">
+                    <p style="margin: 0; font-size: 15px; color: #3f3f46; line-height: 1.6;">
+                        Your custom domain <strong>{{.Domain}}</strong> has been removed from your store.
+                    </p>
+                </td>
+            </tr>
+
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5; border-radius: 12px; border: 1px solid #e4e4e7;">
+                        <tr>
+                            <td style="padding: 20px;">
+                                <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #52525b;">What happens now:</p>
+                                <ul style="margin: 0; padding: 0 0 0 20px; font-size: 13px; color: #71717a; line-height: 1.6;">
+                                    <li>Traffic to this domain will no longer reach your store.</li>
+                                    <li>Your store is still accessible via its default URL.</li>
+                                    <li>You can add a new custom domain at any time.</li>
+                                </ul>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <tr>
+                <td style="padding: 24px 40px 32px 40px;" class="mobile-padding">
+                    <p style="margin: 0; font-size: 14px; color: #71717a; line-height: 1.6;">
+                        If this was unintentional, you can add the domain again from your domain settings.
+                    </p>
+                </td>
+            </tr>
+            {{end}}
+
+            {{if eq .DomainStatus "MIGRATED"}}
+            <!-- Domain Migrated Content -->
+            <tr>
+                <td style="padding: 32px 40px 0 40px;" class="mobile-padding">
+                    <p style="margin: 0; font-size: 15px; color: #3f3f46; line-height: 1.6;">
+                        Your domain <strong>{{.Domain}}</strong> has been successfully migrated to our upgraded infrastructure.
+                    </p>
+                </td>
+            </tr>
+
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f5f3ff; border-radius: 12px; border: 1px solid #ddd6fe;">
+                        <tr>
+                            <td style="padding: 20px; text-align: center;">
+                                <span style="display: inline-block; padding: 8px 24px; font-size: 14px; font-weight: 700; color: #5b21b6; background-color: #ede9fe; border-radius: 24px;">
+                                    &#10004; Migration Complete
+                                </span>
+                                {{if .MigrationReason}}
+                                <p style="margin: 16px 0 0 0; font-size: 13px; color: #6d28d9; line-height: 1.5;">
+                                    {{.MigrationReason}}
+                                </p>
+                                {{end}}
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <tr>
+                <td style="padding: 24px 40px 32px 40px;" class="mobile-padding">
+                    <p style="margin: 0; font-size: 14px; color: #71717a; line-height: 1.6;">
+                        No action is required on your part. Your domain continues to work as expected with improved performance and reliability.
+                    </p>
+                </td>
+            </tr>
+            {{end}}
+
+            {{if eq .DomainStatus "SSL_EXPIRING"}}
+            <!-- SSL Expiring Content -->
+            <tr>
+                <td style="padding: 32px 40px 0 40px;" class="mobile-padding">
+                    <p style="margin: 0; font-size: 15px; color: #3f3f46; line-height: 1.6;">
+                        The SSL certificate for <strong>{{.Domain}}</strong> is expiring soon.
+                    </p>
+                </td>
+            </tr>
+
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #fffbeb; border-radius: 12px; border: 1px solid #fde68a;">
+                        <tr>
+                            <td style="padding: 20px;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 40px; vertical-align: top;">
+                                            <span style="font-size: 24px;">&#9888;</span>
+                                        </td>
+                                        <td style="padding-left: 12px;">
+                                            <p style="margin: 0; font-size: 14px; font-weight: 600; color: #92400e;">Certificate Expiration Warning</p>
+                                            {{if .SSLExpiresAt}}
+                                            <p style="margin: 8px 0 0 0; font-size: 13px; color: #78350f; line-height: 1.5;">
+                                                Expires: <strong>{{.SSLExpiresAt}}</strong>
+                                            </p>
+                                            {{end}}
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <tr>
+                <td style="padding: 24px 40px 32px 40px;" class="mobile-padding">
+                    <p style="margin: 0; font-size: 14px; color: #71717a; line-height: 1.6;">
+                        We will attempt to auto-renew your certificate. If renewal fails, you'll receive another notification with next steps.
+                    </p>
+                </td>
+            </tr>
+            {{end}}
+
+            {{if eq .DomainStatus "HEALTH_FAILED"}}
+            <!-- Health Check Failed Content -->
+            <tr>
+                <td style="padding: 32px 40px 0 40px;" class="mobile-padding">
+                    <p style="margin: 0; font-size: 15px; color: #3f3f46; line-height: 1.6;">
+                        We detected an issue with your domain <strong>{{.Domain}}</strong>. Your store may be inaccessible via this domain.
+                    </p>
+                </td>
+            </tr>
+
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #fffbeb; border-radius: 12px; border: 1px solid #fde68a;">
+                        <tr>
+                            <td style="padding: 20px;">
+                                <p style="margin: 0 0 8px 0; font-size: 11px; font-weight: 600; color: #92400e; text-transform: uppercase; letter-spacing: 0.5px;">Issue Detected</p>
+                                <p style="margin: 0; font-size: 14px; color: #78350f; line-height: 1.5;">{{if .DomainFailureReason}}{{.DomainFailureReason}}{{else}}Domain health check failed. DNS records may have been modified.{{end}}</p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <p style="margin: 0 0 16px 0; font-size: 14px; font-weight: 600; color: #18181b;">Please check:</p>
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                        <tr>
+                            <td style="padding: 8px 0;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 24px; vertical-align: top;">
+                                            <span style="color: #f59e0b; font-weight: 700;">&#8226;</span>
+                                        </td>
+                                        <td style="padding-left: 8px;">
+                                            <p style="margin: 0; font-size: 14px; color: #3f3f46;">DNS records haven't been accidentally modified or deleted.</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 24px; vertical-align: top;">
+                                            <span style="color: #f59e0b; font-weight: 700;">&#8226;</span>
+                                        </td>
+                                        <td style="padding-left: 8px;">
+                                            <p style="margin: 0; font-size: 14px; color: #3f3f46;">Your domain hasn't expired at your registrar.</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <tr>
+                <td style="padding: 24px 40px 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 10px;">
+                                <a href="{{.DomainSettingsURL}}" style="display: inline-block; padding: 14px 32px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
+                                    Check Domain Status &#8594;
+                                </a>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+            {{end}}
+        </table>
+    </td>
+</tr>
+{{end}}
+
+{{define "footer"}}
+<!-- Footer -->
+<tr>
+    <td style="padding: 32px 20px; text-align: center;">
+        <p style="margin: 0 0 8px 0; font-size: 13px; color: #71717a;">
+            Questions? Contact us at <a href="mailto:{{.SupportEmail}}" style="color: {{if eq .DomainStatus "ACTIVATED"}}#10b981{{else if eq .DomainStatus "FAILED"}}#ef4444{{else if or (eq .DomainStatus "SSL_EXPIRING") (eq .DomainStatus "HEALTH_FAILED")}}#f59e0b{{else}}#6366f1{{end}}; text-decoration: none; font-weight: 500;">{{.SupportEmail}}</a>
+        </p>
+        <p style="margin: 0; font-size: 12px; color: #a1a1aa;">
+            &copy; {{.Year}} {{.BusinessName}}. All rights reserved.
+        </p>
+    </td>
+</tr>
+{{end}}

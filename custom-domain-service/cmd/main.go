@@ -18,11 +18,13 @@ import (
 	"custom-domain-service/internal/services"
 	"custom-domain-service/internal/workers"
 
+	"github.com/Tesseract-Nexus/go-shared/events"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/sirupsen/logrus"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -74,6 +76,37 @@ func main() {
 	// Initialize tenant client
 	tenantClient := clients.NewTenantClient(cfg)
 
+	// Initialize NATS event publisher
+	var eventPublisher *events.Publisher
+	if cfg.NATS.URL != "" {
+		publisherCfg := events.DefaultPublisherConfig(cfg.NATS.URL)
+		publisherCfg.Name = "custom-domain-service"
+
+		logrusLogger := logrus.New()
+		if os.Getenv("GIN_MODE") == "release" {
+			logrusLogger.SetLevel(logrus.InfoLevel)
+		} else {
+			logrusLogger.SetLevel(logrus.DebugLevel)
+		}
+
+		var err error
+		eventPublisher, err = events.NewPublisher(publisherCfg, logrusLogger)
+		if err != nil {
+			log.Warn().Err(err).Msg("Failed to initialize NATS publisher, events will not be published")
+		} else {
+			log.Info().Str("url", cfg.NATS.URL).Msg("NATS event publisher initialized")
+
+			// Ensure the domain events stream exists
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			if err := eventPublisher.EnsureStream(ctx, events.StreamDomains, []string{"domain.>"}); err != nil {
+				log.Warn().Err(err).Msg("Failed to ensure domain events stream")
+			}
+			cancel()
+		}
+	} else {
+		log.Warn().Msg("NATS URL not configured, event publishing disabled")
+	}
+
 	// Initialize domain service
 	domainService := services.NewDomainService(
 		cfg,
@@ -83,6 +116,7 @@ func main() {
 		keycloakClient,
 		tenantClient,
 		redisClient,
+		eventPublisher,
 	)
 
 	// Initialize handlers
@@ -142,6 +176,11 @@ func main() {
 	// Close Redis connection
 	if redisClient != nil {
 		redisClient.Close()
+	}
+
+	// Close NATS event publisher
+	if eventPublisher != nil {
+		eventPublisher.Close()
 	}
 
 	log.Info().Msg("Server exited")

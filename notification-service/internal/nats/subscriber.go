@@ -63,6 +63,16 @@ var eventCategoryMap = map[string]string{
 	events.ApprovalCancelled: "orders",
 	events.ApprovalExpired:   "orders",
 	events.ApprovalEscalated: "orders",
+
+	// Domain events (admin/security)
+	events.DomainAdded:           "security",
+	events.DomainVerified:        "security",
+	events.DomainSSLProvisioned:  "security",
+	events.DomainActivated:       "security",
+	events.DomainFailed:          "security",
+	events.DomainRemoved:         "security",
+	events.DomainMigrated:        "security",
+	events.DomainSSLExpiringSoon: "security",
 }
 
 // Subscriber handles NATS event subscriptions for sending external notifications
@@ -173,6 +183,7 @@ func (s *Subscriber) Start(ctx context.Context) error {
 		{"COUPON_EVENTS", "coupon.>", "Coupon lifecycle events"},
 		{"TENANT_EVENTS", "tenant.>", "Tenant lifecycle events"},
 		{"APPROVAL_EVENTS", "approval.>", "Approval workflow events"},
+		{"DOMAIN_EVENTS", "domain.>", "Domain lifecycle events"},
 	}
 
 	for _, stream := range streams {
@@ -390,6 +401,25 @@ func (s *Subscriber) Start(ctx context.Context) error {
 	} else {
 		s.subs = append(s.subs, approvalSub)
 		log.Println("[NATS] Subscribed to approval.> events")
+	}
+
+	// Subscribe to domain events (custom domain lifecycle)
+	domainSub, err := js.QueueSubscribe(
+		"domain.>",
+		"notification-service-workers",
+		s.handleDomainEvent,
+		nats.BindStream("DOMAIN_EVENTS"),
+		nats.Durable("notification-service-domains"),
+		nats.DeliverNew(),
+		nats.ManualAck(),
+		nats.AckWait(30*time.Second),
+		nats.MaxDeliver(3),
+	)
+	if err != nil {
+		log.Printf("[NATS] Warning: failed to subscribe to domain events: %v", err)
+	} else {
+		s.subs = append(s.subs, domainSub)
+		log.Println("[NATS] Subscribed to domain.> events")
 	}
 
 	log.Printf("[NATS] Subscriber started with %d subscriptions", len(s.subs))
@@ -1239,6 +1269,124 @@ func (s *Subscriber) handleApprovalEvent(msg *nats.Msg) {
 	log.Printf("[NATS] Processed approval event: %s for request %s", event.EventType, event.ApprovalRequestID)
 }
 
+// handleDomainEvent processes custom domain lifecycle events
+func (s *Subscriber) handleDomainEvent(msg *nats.Msg) {
+	var event events.DomainEvent
+	if err := json.Unmarshal(msg.Data, &event); err != nil {
+		log.Printf("[NATS] Failed to unmarshal domain event: %v", err)
+		msg.Ack()
+		return
+	}
+
+	log.Printf("[NATS] Processing domain event: %s for domain %s", event.EventType, event.Domain)
+
+	ctx := context.Background()
+
+	// Validate required fields
+	if event.OwnerEmail == "" {
+		log.Printf("[NATS] Skipping domain event: no owner email provided")
+		msg.Ack()
+		return
+	}
+
+	// Get tenant-specific URLs
+	tenantInfo, _ := s.tenantClient.GetTenantInfo(event.TenantID)
+	businessName := tenantInfo.BusinessName
+	if businessName == "" {
+		businessName = tenantInfo.Name
+	}
+
+	// Build domain management URL
+	domainSettingsURL := fmt.Sprintf("%s/settings/domains", tenantInfo.AdminURL)
+	if event.DomainID != "" {
+		domainSettingsURL = fmt.Sprintf("%s/settings/domains/%s", tenantInfo.AdminURL, event.DomainID)
+	}
+
+	// Prepare common template variables
+	variables := map[string]interface{}{
+		"domainId":          event.DomainID,
+		"domain":            event.Domain,
+		"domainType":        event.DomainType,
+		"tenantId":          event.TenantID,
+		"tenantSlug":        event.TenantSlug,
+		"ownerEmail":        event.OwnerEmail,
+		"ownerName":         event.OwnerName,
+		"status":            event.Status,
+		"previousStatus":    event.PreviousStatus,
+		"verificationToken": event.VerificationToken,
+		"dnsRecordType":     event.DNSRecordType,
+		"dnsRecordName":     event.DNSRecordName,
+		"dnsRecordValue":    event.DNSRecordValue,
+		"sslStatus":         event.SSLStatus,
+		"sslExpiresAt":      event.SSLExpiresAt,
+		"sslProvider":       event.SSLProvider,
+		"routingTarget":     event.RoutingTarget,
+		"routingPath":       event.RoutingPath,
+		"migratedFrom":      event.MigratedFrom,
+		"migratedTo":        event.MigratedTo,
+		"migrationReason":   event.MigrationReason,
+		"failureReason":     event.FailureReason,
+		"failureCode":       event.FailureCode,
+		"businessName":      businessName,
+		"domainSettingsUrl": domainSettingsURL,
+		"adminUrl":          tenantInfo.AdminURL,
+		"storefrontUrl":     tenantInfo.StorefrontURL,
+	}
+
+	switch event.EventType {
+	case events.DomainAdded:
+		// Send notification that domain was added and verification is pending
+		log.Printf("[EMAIL] Sending domain-added to %s for %s", event.OwnerEmail, event.Domain)
+		s.sendTemplatedEmail(ctx, event.TenantID, "domain-added", event.OwnerEmail, variables)
+
+	case events.DomainVerified:
+		// Send notification that domain DNS verification succeeded
+		log.Printf("[EMAIL] Sending domain-verified to %s for %s", event.OwnerEmail, event.Domain)
+		s.sendTemplatedEmail(ctx, event.TenantID, "domain-verified", event.OwnerEmail, variables)
+
+	case events.DomainSSLProvisioned:
+		// Send notification that SSL certificate was provisioned
+		log.Printf("[EMAIL] Sending domain-ssl-ready to %s for %s", event.OwnerEmail, event.Domain)
+		s.sendTemplatedEmail(ctx, event.TenantID, "domain-ssl-ready", event.OwnerEmail, variables)
+
+	case events.DomainActivated:
+		// Send notification that domain is now fully active and live
+		log.Printf("[EMAIL] Sending domain-activated to %s for %s", event.OwnerEmail, event.Domain)
+		s.sendTemplatedEmail(ctx, event.TenantID, "domain-activated", event.OwnerEmail, variables)
+
+	case events.DomainFailed:
+		// Send notification about domain setup failure with actionable info
+		log.Printf("[EMAIL] Sending domain-failed to %s for %s (reason: %s)", event.OwnerEmail, event.Domain, event.FailureReason)
+		s.sendTemplatedEmail(ctx, event.TenantID, "domain-failed", event.OwnerEmail, variables)
+
+	case events.DomainRemoved:
+		// Send confirmation that domain was removed
+		log.Printf("[EMAIL] Sending domain-removed to %s for %s", event.OwnerEmail, event.Domain)
+		s.sendTemplatedEmail(ctx, event.TenantID, "domain-removed", event.OwnerEmail, variables)
+
+	case events.DomainMigrated:
+		// Send notification that domain was migrated to new infrastructure
+		log.Printf("[EMAIL] Sending domain-migrated to %s for %s", event.OwnerEmail, event.Domain)
+		s.sendTemplatedEmail(ctx, event.TenantID, "domain-migrated", event.OwnerEmail, variables)
+
+	case events.DomainSSLExpiringSoon:
+		// Send warning about SSL certificate expiring soon
+		log.Printf("[EMAIL] Sending domain-ssl-expiring to %s for %s", event.OwnerEmail, event.Domain)
+		s.sendTemplatedEmail(ctx, event.TenantID, "domain-ssl-expiring", event.OwnerEmail, variables)
+
+	case events.DomainHealthCheckFailed:
+		// Send alert about domain health check failure
+		log.Printf("[EMAIL] Sending domain-health-failed to %s for %s", event.OwnerEmail, event.Domain)
+		s.sendTemplatedEmail(ctx, event.TenantID, "domain-health-failed", event.OwnerEmail, variables)
+
+	default:
+		log.Printf("[NATS] Skipping unhandled domain event type: %s", event.EventType)
+	}
+
+	msg.Ack()
+	log.Printf("[NATS] Processed domain event: %s for domain %s", event.EventType, event.Domain)
+}
+
 // formatActionTypeForDisplay converts action_type to human-readable format
 func formatActionTypeForDisplay(actionType string) string {
 	if actionType == "" {
@@ -1679,6 +1827,25 @@ func (s *Subscriber) renderEmbeddedTemplate(templateName string, variables map[s
 		return renderer.RenderApprovalApprover(data)
 	case "approval_requester":
 		return renderer.RenderApprovalRequester(data)
+	// Domain lifecycle templates
+	case "domain_added":
+		return renderer.RenderDomainAdded(data)
+	case "domain_verified":
+		return renderer.RenderDomainVerified(data)
+	case "domain_ssl_ready":
+		return renderer.RenderDomainSSLReady(data)
+	case "domain_activated":
+		return renderer.RenderDomainActivated(data)
+	case "domain_failed":
+		return renderer.RenderDomainFailed(data)
+	case "domain_removed":
+		return renderer.RenderDomainRemoved(data)
+	case "domain_migrated":
+		return renderer.RenderDomainMigrated(data)
+	case "domain_ssl_expiring":
+		return renderer.RenderDomainSSLExpiring(data)
+	case "domain_health_failed":
+		return renderer.RenderDomainHealthFailed(data)
 	default:
 		return "", "", fmt.Errorf("no embedded template found for: %s", templateName)
 	}
@@ -1735,6 +1902,16 @@ func (s *Subscriber) mapTemplateNameToEmbedded(templateName string) string {
 		"approval-rejected":         "approval_requester",
 		"approval-cancelled":        "approval_requester",
 		"approval-expired":          "approval_requester",
+		// Domain lifecycle templates
+		"domain-added":        "domain_added",
+		"domain-verified":     "domain_verified",
+		"domain-ssl-ready":    "domain_ssl_ready",
+		"domain-activated":    "domain_activated",
+		"domain-failed":       "domain_failed",
+		"domain-removed":      "domain_removed",
+		"domain-migrated":     "domain_migrated",
+		"domain-ssl-expiring": "domain_ssl_expiring",
+		"domain-health-failed": "domain_health_failed",
 	}
 
 	if mapped, ok := mapping[templateName]; ok {
@@ -2079,6 +2256,29 @@ func (s *Subscriber) buildEmailData(variables map[string]interface{}) *templates
 	data.UserAgent = getString("userAgent")
 	data.LoginMethod = getString("loginMethod")
 	data.ResetPasswordURL = getString("resetPasswordURL")
+
+	// Domain lifecycle fields
+	data.DomainID = getString("domainId")
+	data.Domain = getString("domain")
+	data.DomainType = getString("domainType")
+	data.DomainStatus = getString("status")
+	data.DomainPreviousStatus = getString("previousStatus")
+	data.DNSRecordType = getString("dnsRecordType")
+	data.DNSRecordName = getString("dnsRecordName")
+	data.DNSRecordValue = getString("dnsRecordValue")
+	data.SSLStatus = getString("sslStatus")
+	data.SSLExpiresAt = getString("sslExpiresAt")
+	data.SSLProvider = getString("sslProvider")
+	data.RoutingTarget = getString("routingTarget")
+	data.RoutingPath = getString("routingPath")
+	data.MigratedFrom = getString("migratedFrom")
+	data.MigratedTo = getString("migratedTo")
+	data.MigrationReason = getString("migrationReason")
+	data.DomainFailureReason = getString("failureReason")
+	data.DomainFailureCode = getString("failureCode")
+	data.DomainSettingsURL = getString("domainSettingsUrl")
+	data.OwnerEmail = getString("ownerEmail")
+	data.OwnerName = getString("ownerName")
 
 	return data
 }

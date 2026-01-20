@@ -11,6 +11,7 @@ import (
 	"custom-domain-service/internal/models"
 	"custom-domain-service/internal/repository"
 
+	"github.com/Tesseract-Nexus/go-shared/events"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
@@ -18,13 +19,14 @@ import (
 
 // DomainService handles domain business logic
 type DomainService struct {
-	cfg          *config.Config
-	repo         *repository.DomainRepository
-	dnsVerifier  *DNSVerifier
-	k8sClient    *clients.KubernetesClient
-	keycloak     *clients.KeycloakClient
-	tenantClient *clients.TenantClient
-	redisClient  *redis.Client
+	cfg           *config.Config
+	repo          *repository.DomainRepository
+	dnsVerifier   *DNSVerifier
+	k8sClient     *clients.KubernetesClient
+	keycloak      *clients.KeycloakClient
+	tenantClient  *clients.TenantClient
+	redisClient   *redis.Client
+	eventPublisher *events.Publisher
 }
 
 // NewDomainService creates a new domain service
@@ -36,15 +38,17 @@ func NewDomainService(
 	keycloak *clients.KeycloakClient,
 	tenantClient *clients.TenantClient,
 	redisClient *redis.Client,
+	eventPublisher *events.Publisher,
 ) *DomainService {
 	return &DomainService{
-		cfg:          cfg,
-		repo:         repo,
-		dnsVerifier:  dnsVerifier,
-		k8sClient:    k8sClient,
-		keycloak:     keycloak,
-		tenantClient: tenantClient,
-		redisClient:  redisClient,
+		cfg:            cfg,
+		repo:           repo,
+		dnsVerifier:    dnsVerifier,
+		k8sClient:      k8sClient,
+		keycloak:       keycloak,
+		tenantClient:   tenantClient,
+		redisClient:    redisClient,
+		eventPublisher: eventPublisher,
 	}
 }
 
@@ -117,6 +121,9 @@ func (s *DomainService) CreateDomain(ctx context.Context, tenantID uuid.UUID, re
 
 	// Log activity
 	s.logActivity(ctx, domain, "created", "success", "Domain created, awaiting DNS verification")
+
+	// Publish domain added event
+	s.publishDomainEvent(ctx, events.DomainAdded, domain, "")
 
 	// If set as primary, update it
 	if req.SetPrimary {
@@ -266,12 +273,20 @@ func (s *DomainService) DeleteDomain(ctx context.Context, tenantID, domainID uui
 	// Invalidate cache
 	s.invalidateDomainCache(ctx, domain.Domain)
 
+	// Capture domain info before deletion for event
+	domainCopy := *domain
+
 	// Delete domain record
 	if err := s.repo.Delete(ctx, domainID); err != nil {
 		return fmt.Errorf("failed to delete domain: %w", err)
 	}
 
 	s.logActivity(ctx, domain, "deleted", "success", "Domain and all resources deleted")
+
+	// Publish domain removed event
+	domainCopy.Status = models.DomainStatusDeleting
+	domainCopy.StatusMessage = "Domain has been deleted"
+	s.publishDomainEvent(ctx, events.DomainRemoved, &domainCopy, string(domain.Status))
 
 	return nil
 }
@@ -310,6 +325,8 @@ func (s *DomainService) VerifyDomain(ctx context.Context, tenantID, domainID uui
 	if result.IsVerified {
 		go s.provisionDomain(context.Background(), domain)
 		s.logActivity(ctx, domain, "verified", "success", "DNS verification successful, starting provisioning")
+		// Publish DNS verified event
+		s.publishDomainEvent(ctx, events.DomainVerified, domain, string(models.DomainStatusPending))
 	} else {
 		s.logActivity(ctx, domain, "verification_attempted", "pending", result.Message)
 	}
@@ -328,6 +345,10 @@ func (s *DomainService) provisionDomain(ctx context.Context, domain *models.Cust
 		// Use generic message for user-facing status - detailed error logged above
 		s.repo.UpdateStatus(ctx, domain.ID, models.DomainStatusFailed, "SSL certificate creation failed. Please contact support if the issue persists.")
 		s.logActivity(ctx, domain, "ssl_provisioning", "failed", "Certificate creation failed")
+		// Publish domain failed event
+		domain.Status = models.DomainStatusFailed
+		domain.StatusMessage = "SSL certificate creation failed"
+		s.publishDomainEvent(ctx, events.DomainFailed, domain, string(models.DomainStatusPending))
 		return
 	}
 
@@ -347,6 +368,10 @@ func (s *DomainService) provisionDomain(ctx context.Context, domain *models.Cust
 			log.Warn().Str("domain", domain.Domain).Msg("Certificate provisioning timed out")
 			s.repo.UpdateSSLStatus(ctx, domain.ID, models.SSLStatusFailed, certResult.SecretName, nil, "Certificate provisioning timed out")
 			s.repo.UpdateStatus(ctx, domain.ID, models.DomainStatusFailed, "SSL certificate provisioning timed out")
+			// Publish domain failed event
+			domain.Status = models.DomainStatusFailed
+			domain.StatusMessage = "SSL certificate provisioning timed out"
+			s.publishDomainEvent(ctx, events.DomainFailed, domain, string(models.DomainStatusPending))
 			return
 		case <-ticker.C:
 			certStatus, err := s.k8sClient.GetCertificateStatus(ctx, domain)
@@ -358,6 +383,10 @@ func (s *DomainService) provisionDomain(ctx context.Context, domain *models.Cust
 			if certStatus.IsReady {
 				s.repo.UpdateSSLStatus(ctx, domain.ID, models.SSLStatusActive, certStatus.SecretName, certStatus.ExpiresAt, "")
 				s.logActivity(ctx, domain, "ssl_provisioning", "success", "SSL certificate issued and active")
+				// Publish SSL provisioned event
+				domain.SSLStatus = models.SSLStatusActive
+				domain.SSLExpiresAt = certStatus.ExpiresAt
+				s.publishDomainEvent(ctx, events.DomainSSLProvisioned, domain, string(models.SSLStatusProvisioning))
 				goto configureRouting
 			}
 
@@ -367,6 +396,10 @@ func (s *DomainService) provisionDomain(ctx context.Context, domain *models.Cust
 				s.repo.UpdateSSLStatus(ctx, domain.ID, models.SSLStatusFailed, certStatus.SecretName, nil, "Certificate validation failed")
 				s.repo.UpdateStatus(ctx, domain.ID, models.DomainStatusFailed, "SSL certificate provisioning failed. Please verify your DNS configuration.")
 				s.logActivity(ctx, domain, "ssl_provisioning", "failed", "Certificate provisioning failed")
+				// Publish domain failed event
+				domain.Status = models.DomainStatusFailed
+				domain.StatusMessage = "SSL certificate provisioning failed"
+				s.publishDomainEvent(ctx, events.DomainFailed, domain, string(models.DomainStatusPending))
 				return
 			}
 		}
@@ -380,6 +413,10 @@ configureRouting:
 		// Use generic message for user-facing status - detailed error logged above
 		s.repo.UpdateStatus(ctx, domain.ID, models.DomainStatusFailed, "Routing configuration failed. Please contact support.")
 		s.logActivity(ctx, domain, "routing", "failed", "VirtualService creation failed")
+		// Publish domain failed event
+		domain.Status = models.DomainStatusFailed
+		domain.StatusMessage = "Routing configuration failed"
+		s.publishDomainEvent(ctx, events.DomainFailed, domain, string(models.DomainStatusPending))
 		return
 	}
 
@@ -388,6 +425,10 @@ configureRouting:
 		// Use generic message for user-facing status - detailed error logged above
 		s.repo.UpdateStatus(ctx, domain.ID, models.DomainStatusFailed, "Gateway configuration failed. Please contact support.")
 		s.logActivity(ctx, domain, "routing", "failed", "Gateway configuration failed")
+		// Publish domain failed event
+		domain.Status = models.DomainStatusFailed
+		domain.StatusMessage = "Gateway configuration failed"
+		s.publishDomainEvent(ctx, events.DomainFailed, domain, string(models.DomainStatusPending))
 		return
 	}
 
@@ -405,6 +446,7 @@ configureRouting:
 	}
 
 	// Step 5: Activate domain
+	previousStatus := string(domain.Status)
 	if err := s.repo.UpdateStatus(ctx, domain.ID, models.DomainStatusActive, "Domain is active and ready to use"); err != nil {
 		log.Error().Err(err).Str("domain", domain.Domain).Msg("Failed to activate domain")
 		return
@@ -415,6 +457,12 @@ configureRouting:
 
 	log.Info().Str("domain", domain.Domain).Msg("Domain provisioning completed successfully")
 	s.logActivity(ctx, domain, "activated", "success", "Domain is now active and serving traffic")
+
+	// Publish domain activated event
+	domain.Status = models.DomainStatusActive
+	domain.StatusMessage = "Domain is active and ready to use"
+	domain.RoutingStatus = models.RoutingStatusActive
+	s.publishDomainEvent(ctx, events.DomainActivated, domain, previousStatus)
 
 	// Notify tenant service
 	s.tenantClient.NotifyDomainStatusChange(ctx, domain.TenantID, domain.Domain, "active")
@@ -703,4 +751,54 @@ func (s *DomainService) invalidateDomainCache(ctx context.Context, domainName st
 
 	key := fmt.Sprintf("domain:resolve:%s", domainName)
 	s.redisClient.Del(ctx, key)
+}
+
+// publishDomainEvent publishes a domain event to NATS
+func (s *DomainService) publishDomainEvent(ctx context.Context, eventType string, domain *models.CustomDomain, previousStatus string) {
+	if s.eventPublisher == nil {
+		log.Debug().Str("event", eventType).Msg("Event publisher not configured, skipping event")
+		return
+	}
+
+	event := events.NewDomainEvent(eventType, domain.TenantID.String())
+	event.DomainID = domain.ID.String()
+	event.Domain = domain.Domain
+	event.DomainType = string(domain.DomainType)
+	event.TenantSlug = domain.TenantSlug
+	event.Status = string(domain.Status)
+	event.PreviousStatus = previousStatus
+	event.StatusMessage = domain.StatusMessage
+	event.DNSVerified = domain.DNSVerified
+	event.SSLStatus = string(domain.SSLStatus)
+	event.RoutingStatus = string(domain.RoutingStatus)
+	event.IsPrimary = domain.PrimaryDomain
+	event.TargetType = string(domain.TargetType)
+	event.DomainURL = fmt.Sprintf("https://%s", domain.Domain)
+	event.AdminURL = fmt.Sprintf("https://%s-admin.tesserix.app", domain.TenantSlug)
+
+	if domain.DNSVerifiedAt != nil {
+		event.DNSVerifiedAt = domain.DNSVerifiedAt.Format(time.RFC3339)
+	}
+	if domain.SSLExpiresAt != nil {
+		event.SSLExpiresAt = domain.SSLExpiresAt.Format(time.RFC3339)
+	}
+
+	// Publish asynchronously to avoid blocking the main flow
+	go func() {
+		publishCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		if err := s.eventPublisher.PublishDomain(publishCtx, event); err != nil {
+			log.Error().Err(err).
+				Str("event_type", eventType).
+				Str("domain", domain.Domain).
+				Msg("Failed to publish domain event")
+		} else {
+			log.Info().
+				Str("event_type", eventType).
+				Str("domain", domain.Domain).
+				Str("tenant_id", domain.TenantID.String()).
+				Msg("Domain event published")
+		}
+	}()
 }
