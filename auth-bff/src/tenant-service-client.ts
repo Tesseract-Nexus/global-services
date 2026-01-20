@@ -370,6 +370,8 @@ class TenantServiceClient {
         user_id: responseData?.user_id,
         mfa_required: responseData?.mfa_required,
         has_tokens: !!responseData?.access_token,
+        role: responseData?.role,
+        raw_data: JSON.stringify(data),
       }, 'Credentials validated successfully');
 
       return {
