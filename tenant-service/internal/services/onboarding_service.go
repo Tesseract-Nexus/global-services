@@ -95,9 +95,11 @@ type OnboardingService struct {
 
 // KeycloakOnboardingConfig holds Keycloak configuration for onboarding
 type KeycloakOnboardingConfig struct {
-	ClientID     string // Public client ID for password grant (e.g., "tesserix-onboarding")
-	ClientSecret string // Client secret (empty for public clients)
-	DefaultRole  string // Default role to assign (e.g., "store_owner")
+	ClientID         string // Public client ID for password grant (e.g., "tesserix-onboarding")
+	ClientSecret     string // Client secret (empty for public clients)
+	DefaultRole      string // Default role to assign (e.g., "store_owner")
+	AdminClientID    string // Client ID for admin portal redirect URIs (e.g., "marketplace-dashboard")
+	BaseDomain       string // Base domain for redirect URIs (e.g., "tesserix.app")
 }
 
 // NewOnboardingService creates a new onboarding service
@@ -211,10 +213,24 @@ func initKeycloakClient() (*auth.KeycloakAdminClient, *KeycloakOnboardingConfig)
 		defaultRole = "store_owner"
 	}
 
+	// Admin portal client ID for registering tenant-specific redirect URIs
+	adminClientID := os.Getenv("KEYCLOAK_ADMIN_PORTAL_CLIENT_ID")
+	if adminClientID == "" {
+		adminClientID = "marketplace-dashboard"
+	}
+
+	// Base domain for constructing redirect URIs
+	baseDomain := os.Getenv("BASE_DOMAIN")
+	if baseDomain == "" {
+		baseDomain = "tesserix.app"
+	}
+
 	config := &KeycloakOnboardingConfig{
-		ClientID:     publicClientID,
-		ClientSecret: publicClientSecret,
-		DefaultRole:  defaultRole,
+		ClientID:      publicClientID,
+		ClientSecret:  publicClientSecret,
+		DefaultRole:   defaultRole,
+		AdminClientID: adminClientID,
+		BaseDomain:    baseDomain,
 	}
 
 	return keycloakClient, config
@@ -1149,6 +1165,31 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 					log.Printf("[OnboardingService] Updated tenant %s with keycloak_org_id: %s", tenantID, orgID)
 				}
 			}
+		}
+	}
+
+	// ============================================================================
+	// KEYCLOAK REDIRECT URIs: Register tenant-specific redirect URIs
+	// This allows OAuth login to work for the new tenant's admin portal and storefront
+	// ============================================================================
+	if s.keycloakClient != nil && s.keycloakConfig != nil && s.keycloakConfig.AdminClientID != "" {
+		baseDomain := s.keycloakConfig.BaseDomain
+		if baseDomain == "" {
+			baseDomain = "tesserix.app"
+		}
+
+		// Build redirect URIs for this tenant
+		redirectURIs := []string{
+			fmt.Sprintf("https://%s-admin.%s/*", slug, baseDomain),
+			fmt.Sprintf("https://%s.%s/*", slug, baseDomain),
+		}
+
+		log.Printf("[OnboardingService] Registering Keycloak redirect URIs for tenant %s: %v", tenantID, redirectURIs)
+		if err := s.keycloakClient.AddClientRedirectURIs(ctx, s.keycloakConfig.AdminClientID, redirectURIs); err != nil {
+			// Log error but don't fail onboarding - redirect URIs can be added manually if needed
+			log.Printf("[OnboardingService] Warning: Failed to register Keycloak redirect URIs for tenant %s: %v", tenantID, err)
+		} else {
+			log.Printf("[OnboardingService] Successfully registered Keycloak redirect URIs for tenant %s", tenantID)
 		}
 	}
 
