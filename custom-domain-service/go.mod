@@ -3,7 +3,7 @@ module custom-domain-service
 go 1.25
 
 require (
-	github.com/Tesseract-Nexus/go-shared v0.0.0
+	github.com/Tesseract-Nexus/go-shared v0.0.2-0.20260120131633-df542d485082
 	github.com/cert-manager/cert-manager v1.14.0
 	github.com/gin-contrib/cors v1.5.0
 	github.com/gin-gonic/gin v1.10.0
@@ -12,7 +12,6 @@ require (
 	github.com/rs/zerolog v1.32.0
 	github.com/stretchr/testify v1.9.0
 	gorm.io/driver/postgres v1.5.6
-	gorm.io/driver/sqlite v1.6.0
 	gorm.io/gorm v1.30.0
 	istio.io/api v1.20.0
 	istio.io/client-go v1.20.0
@@ -65,7 +64,6 @@ require (
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/mattn/go-sqlite3 v1.14.22 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
@@ -108,5 +106,3 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
-
-replace github.com/Tesseract-Nexus/go-shared => ../../go-shared
