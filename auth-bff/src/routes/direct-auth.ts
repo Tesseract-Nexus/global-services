@@ -519,6 +519,10 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
         tenant_slug: data.tenant_slug,
         role: data.role,
         is_staff: true, // Mark session as staff
+        // Include role in realm_access for frontend authorization check
+        realm_access: {
+          roles: data.role ? [data.role] : [],
+        },
       },
     });
 
@@ -529,6 +533,8 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
       userId: session.userId,
       sessionId: session.id,
       tenant_slug,
+      role: data.role,
+      realm_access_roles: data.role ? [data.role] : [],
     }, 'Admin/Staff direct login successful');
 
     return reply.send({
