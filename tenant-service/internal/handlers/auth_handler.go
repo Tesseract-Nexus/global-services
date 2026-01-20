@@ -162,6 +162,8 @@ func (h *AuthHandler) GetUserTenantsForAuth(c *gin.Context) {
 
 	// Also get tenants from staff table (employees)
 	// This allows staff members to login even if they're not in tenant_users
+	// Staff-service now returns enriched tenant data (slug, name, logo_url) and
+	// filters out orphaned records where tenants have been deleted
 	if h.staffClient != nil {
 		staffTenants, err := h.staffClient.GetStaffTenants(c.Request.Context(), req.Email)
 		if err != nil {
@@ -176,26 +178,16 @@ func (h *AuthHandler) GetUserTenantsForAuth(c *gin.Context) {
 
 			for _, st := range staffTenants {
 				if !existingTenantIDs[st.ID] {
-					// Enrich staff tenant with tenant details (slug, name)
-					tenantInfo, err := h.authSvc.GetTenantBasicInfo(c.Request.Context(), st.ID)
-					if err != nil {
-						log.Printf("[AuthHandler] Error getting tenant info for %s: %v", st.ID, err)
-						// Still add with what we have
-						tenants = append(tenants, services.TenantAuthInfo{
-							ID:          st.ID,
-							Role:        st.Role,
-							DisplayName: st.DisplayName,
-						})
-					} else {
-						tenants = append(tenants, services.TenantAuthInfo{
-							ID:          st.ID,
-							Slug:        tenantInfo.Slug,
-							Name:        tenantInfo.Name,
-							DisplayName: tenantInfo.DisplayName,
-							LogoURL:     tenantInfo.LogoURL,
-							Role:        st.Role,
-						})
-					}
+					// Staff-service now returns enriched tenant data directly
+					// including slug, name, display_name, logo_url
+					tenants = append(tenants, services.TenantAuthInfo{
+						ID:          st.ID,
+						Slug:        st.Slug,
+						Name:        st.Name,
+						DisplayName: st.DisplayName,
+						LogoURL:     st.LogoURL,
+						Role:        st.Role,
+					})
 				}
 			}
 		}

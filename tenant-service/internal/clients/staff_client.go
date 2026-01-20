@@ -107,12 +107,16 @@ func (c *StaffClient) BootstrapOwner(ctx context.Context, tenantID uuid.UUID, us
 }
 
 // StaffTenantInfo represents tenant info from staff service
+// Now includes enriched tenant data (slug, name, logo_url) fetched from tenant-service
 type StaffTenantInfo struct {
 	ID          uuid.UUID  `json:"id"`
+	Slug        string     `json:"slug,omitempty"`
+	Name        string     `json:"name,omitempty"`
+	DisplayName string     `json:"display_name,omitempty"`
+	LogoURL     string     `json:"logo_url,omitempty"`
 	StaffID     uuid.UUID  `json:"staff_id"`
 	Role        string     `json:"role"`
 	VendorID    *uuid.UUID `json:"vendor_id,omitempty"`
-	DisplayName string     `json:"display_name,omitempty"`
 }
 
 // GetStaffTenantsResponse represents the response from getting staff tenants
