@@ -344,6 +344,14 @@ export async function authRoutes(fastify: FastifyInstance) {
       return reply.code(401).send({ authenticated: false, error: 'session_expired' });
     }
 
+    const roles = (session.userInfo?.realm_access as { roles?: string[] })?.roles || [];
+    logger.info({
+      sessionId: session.id,
+      userId: session.userId,
+      roles,
+      realm_access: session.userInfo?.realm_access,
+    }, 'Session check - returning roles');
+
     return reply.send({
       authenticated: true,
       user: {
@@ -354,7 +362,7 @@ export async function authRoutes(fastify: FastifyInstance) {
         lastName: session.userInfo?.family_name,
         tenantId: session.tenantId,
         tenantSlug: session.tenantSlug,
-        roles: (session.userInfo?.realm_access as { roles?: string[] })?.roles || [],
+        roles,
       },
       expiresAt: session.expiresAt,
       csrfToken: session.csrfToken,

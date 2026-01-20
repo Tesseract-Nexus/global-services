@@ -358,7 +358,9 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
       userId: session.userId,
       sessionId: session.id,
       tenant_slug,
-    }, 'Direct login successful');
+      role: data.role,
+      realm_access_roles: data.role ? [data.role] : [],
+    }, 'Admin/Staff direct login successful');
 
     return reply.send({
       success: true,
