@@ -280,6 +280,62 @@ func (v *DNSVerifier) ValidateDomainFormat(domain string) error {
 	return nil
 }
 
+// CheckDomainExists verifies if a domain is registered by checking for NS records
+// This is a quick check with a short timeout to avoid hanging
+func (v *DNSVerifier) CheckDomainExists(ctx context.Context, domainName string) (bool, error) {
+	// Use a short timeout for this check
+	checkCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	// Extract the base domain (apex) for NS lookup
+	// e.g., "shop.example.com" -> "example.com"
+	baseDomain := v.getBaseDomain(domainName)
+
+	// Look up NS records for the base domain
+	ns, err := v.resolver.LookupNS(checkCtx, baseDomain)
+	if err != nil {
+		if dnsErr, ok := err.(*net.DNSError); ok {
+			if dnsErr.IsNotFound || dnsErr.IsTemporary {
+				// No NS records found - domain likely doesn't exist
+				return false, nil
+			}
+		}
+		// For timeout or other errors, we can't determine - assume exists to avoid blocking
+		log.Warn().Err(err).Str("domain", baseDomain).Msg("NS lookup failed, assuming domain exists")
+		return true, nil
+	}
+
+	// Domain exists if it has NS records
+	return len(ns) > 0, nil
+}
+
+// getBaseDomain extracts the registrable domain from a full domain name
+func (v *DNSVerifier) getBaseDomain(domain string) string {
+	parts := strings.Split(domain, ".")
+	if len(parts) <= 2 {
+		return domain
+	}
+
+	// Handle common two-part TLDs
+	twoPartTLDs := map[string]bool{
+		"co.uk": true, "com.au": true, "co.in": true, "co.nz": true,
+		"com.br": true, "com.mx": true, "co.za": true, "com.sg": true,
+		"org.uk": true, "net.au": true, "com.cn": true, "co.jp": true,
+	}
+
+	lastTwo := parts[len(parts)-2] + "." + parts[len(parts)-1]
+	if twoPartTLDs[lastTwo] {
+		// For two-part TLDs, include the third part
+		if len(parts) >= 3 {
+			return parts[len(parts)-3] + "." + lastTwo
+		}
+		return domain
+	}
+
+	// For standard TLDs, return last two parts
+	return parts[len(parts)-2] + "." + parts[len(parts)-1]
+}
+
 // IsRoutingConfigured checks if DNS is properly configured for routing
 func (v *DNSVerifier) IsRoutingConfigured(ctx context.Context, domain *models.CustomDomain) (bool, string, error) {
 	if domain.DomainType == models.DomainTypeApex {

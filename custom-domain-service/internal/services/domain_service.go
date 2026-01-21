@@ -146,6 +146,7 @@ type ValidateDomainRequest struct {
 type ValidateDomainResponse struct {
 	Valid               bool                `json:"valid"`
 	Available           bool                `json:"available"`
+	DomainExists        bool                `json:"domain_exists"`
 	DNSConfigured       bool                `json:"dns_configured"`
 	Message             string              `json:"message,omitempty"`
 	VerificationRecord  *models.DNSRecord   `json:"verification_record,omitempty"`
@@ -156,8 +157,9 @@ type ValidateDomainResponse struct {
 // ValidateDomain validates a domain without creating it
 func (s *DomainService) ValidateDomain(ctx context.Context, req *ValidateDomainRequest) (*ValidateDomainResponse, error) {
 	response := &ValidateDomainResponse{
-		Valid:     false,
-		Available: false,
+		Valid:        false,
+		Available:    false,
+		DomainExists: false,
 	}
 
 	// Validate domain format
@@ -169,7 +171,21 @@ func (s *DomainService) ValidateDomain(ctx context.Context, req *ValidateDomainR
 
 	response.Valid = true
 
-	// Check if domain already exists
+	// Check if domain actually exists (is registered) by looking up NS records
+	// This is a quick check with a 3-second timeout
+	domainExists, err := s.dnsVerifier.CheckDomainExists(ctx, domainName)
+	if err != nil {
+		log.Warn().Err(err).Str("domain", domainName).Msg("Failed to check domain existence, continuing anyway")
+		domainExists = true // Assume exists on error to avoid blocking
+	}
+	response.DomainExists = domainExists
+
+	if !domainExists {
+		response.Message = "This domain does not appear to be registered. Please verify you own this domain and try again."
+		return response, nil
+	}
+
+	// Check if domain already exists in our system
 	exists, err := s.repo.DomainExists(ctx, domainName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check domain existence: %w", err)
@@ -177,7 +193,7 @@ func (s *DomainService) ValidateDomain(ctx context.Context, req *ValidateDomainR
 
 	if exists {
 		response.Available = false
-		response.Message = "This domain is already registered"
+		response.Message = "This domain is already registered with another store"
 		return response, nil
 	}
 
