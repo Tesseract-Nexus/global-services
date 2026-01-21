@@ -1,6 +1,7 @@
 package clients
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -53,6 +54,7 @@ func (t *TenantClient) GetTenant(ctx context.Context, tenantID uuid.UUID) (*Tena
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
+	req.Header.Set("X-Internal-Service", "custom-domain-service")
 
 	resp, err := t.httpClient.Do(req)
 	if err != nil {
@@ -85,6 +87,7 @@ func (t *TenantClient) GetTenantBySlug(ctx context.Context, slug string) (*Tenan
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
+	req.Header.Set("X-Internal-Service", "custom-domain-service")
 
 	resp, err := t.httpClient.Do(req)
 	if err != nil {
@@ -158,11 +161,12 @@ func (t *TenantClient) NotifyDomainStatusChange(ctx context.Context, tenantID uu
 		return fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(payloadBytes))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Internal-Service", "custom-domain-service")
 
 	// Use a short timeout for notifications
 	client := &http.Client{Timeout: 5 * time.Second}
