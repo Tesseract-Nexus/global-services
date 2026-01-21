@@ -793,6 +793,20 @@ func (s *OnboardingService) CompleteEmailVerificationTask(ctx context.Context, s
 		// Continue anyway - the task might not exist or already be completed
 	}
 
+	// Store verification status in Redis so SetupAccount can verify the email was verified
+	// This is critical for the account-setup step to succeed
+	if s.verificationSvc != nil {
+		// Get the session to retrieve the email
+		sessionForEmail, err := s.onboardingRepo.GetSessionByID(ctx, sessionID, []string{"contact_information"})
+		if err == nil && len(sessionForEmail.ContactInformation) > 0 && sessionForEmail.ContactInformation[0].Email != "" {
+			email := sessionForEmail.ContactInformation[0].Email
+			// Save verification status via verificationSvc which has access to Redis
+			if err := s.verificationSvc.SaveVerificationStatusToRedis(ctx, email, sessionID.String()); err != nil {
+				log.Printf("[OnboardingService] Warning: Failed to save verification status to Redis: %v", err)
+			}
+		}
+	}
+
 	// Also mark all other required tasks as completed (in case they weren't marked during form submission)
 	// This ensures backward compatibility and handles edge cases
 	for _, taskID := range []string{"business_info", "contact_info", "business_address"} {

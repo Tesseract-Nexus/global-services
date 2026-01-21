@@ -527,6 +527,25 @@ func (s *VerificationService) CleanupExpiredVerifications(ctx context.Context) e
 	return nil
 }
 
+// SaveVerificationStatusToRedis saves email verification status to Redis
+// This is a public method that can be called by OnboardingService to mark email as verified
+// after completing the email verification task
+func (s *VerificationService) SaveVerificationStatusToRedis(ctx context.Context, email, sessionID string) error {
+	if s.redisClient == nil {
+		log.Printf("[VerificationService] Warning: Redis client not available, cannot save verification status")
+		return nil // Don't fail if Redis is not available
+	}
+
+	// Store for 24 hours - enough time for account setup to complete
+	if err := s.redisClient.SaveEmailVerificationStatus(ctx, email, sessionID, true, 24*time.Hour); err != nil {
+		log.Printf("[VerificationService] Warning: Failed to save verification status to Redis for %s: %v", email, err)
+		return err
+	}
+
+	log.Printf("[VerificationService] Saved email verification status to Redis for %s (session %s)", email, sessionID)
+	return nil
+}
+
 // Private helper methods
 
 // maskSensitiveValue masks sensitive values for display
