@@ -295,13 +295,16 @@ func (v *DNSVerifier) CheckDomainExists(ctx context.Context, domainName string) 
 	ns, err := v.resolver.LookupNS(checkCtx, baseDomain)
 	if err != nil {
 		if dnsErr, ok := err.(*net.DNSError); ok {
-			if dnsErr.IsNotFound || dnsErr.IsTemporary {
-				// No NS records found - domain likely doesn't exist
+			// Only return false for definitive "not found" (NXDOMAIN) errors
+			// For network errors, timeouts, or temporary issues, assume domain exists
+			if dnsErr.IsNotFound && !dnsErr.IsTemporary && !dnsErr.IsTimeout {
+				log.Info().Str("domain", baseDomain).Msg("Domain not found (NXDOMAIN)")
 				return false, nil
 			}
 		}
-		// For timeout or other errors, we can't determine - assume exists to avoid blocking
-		log.Warn().Err(err).Str("domain", baseDomain).Msg("NS lookup failed, assuming domain exists")
+		// For all other errors (network issues, timeouts, etc.), assume domain exists
+		// This prevents blocking users when DNS lookup fails due to network policies
+		log.Debug().Err(err).Str("domain", baseDomain).Msg("NS lookup failed, assuming domain exists")
 		return true, nil
 	}
 
