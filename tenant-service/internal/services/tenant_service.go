@@ -518,13 +518,17 @@ type OnboardingAddress struct {
 
 // OnboardingStoreSetup represents store configuration from onboarding
 type OnboardingStoreSetup struct {
-	Subdomain      string `json:"subdomain"`
-	Currency       string `json:"currency"`
-	Timezone       string `json:"timezone"`
-	Language       string `json:"language"`
-	LogoURL        string `json:"logo_url,omitempty"`
-	PrimaryColor   string `json:"primary_color,omitempty"`
-	SecondaryColor string `json:"secondary_color,omitempty"`
+	Subdomain       string `json:"subdomain"`
+	StorefrontSlug  string `json:"storefront_slug,omitempty"`
+	Currency        string `json:"currency"`
+	Timezone        string `json:"timezone"`
+	Language        string `json:"language"`
+	BusinessModel   string `json:"business_model,omitempty"`
+	LogoURL         string `json:"logo_url,omitempty"`
+	PrimaryColor    string `json:"primary_color,omitempty"`
+	SecondaryColor  string `json:"secondary_color,omitempty"`
+	UseCustomDomain bool   `json:"use_custom_domain,omitempty"`
+	CustomDomain    string `json:"custom_domain,omitempty"`
 }
 
 // GetTenantOnboardingData retrieves onboarding data for a tenant with proper access control

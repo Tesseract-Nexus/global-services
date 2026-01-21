@@ -14,15 +14,17 @@ import (
 
 // StoreSetup represents store configuration extracted from application_configurations
 type StoreSetup struct {
-	Subdomain      string `json:"subdomain,omitempty"`
-	StorefrontSlug string `json:"storefront_slug,omitempty"`
-	Currency       string `json:"currency,omitempty"`
-	Timezone       string `json:"timezone,omitempty"`
-	Language       string `json:"language,omitempty"`
-	BusinessModel  string `json:"business_model,omitempty"`
-	LogoURL        string `json:"logo_url,omitempty"`
-	PrimaryColor   string `json:"primary_color,omitempty"`
-	SecondaryColor string `json:"secondary_color,omitempty"`
+	Subdomain       string `json:"subdomain,omitempty"`
+	StorefrontSlug  string `json:"storefront_slug,omitempty"`
+	Currency        string `json:"currency,omitempty"`
+	Timezone        string `json:"timezone,omitempty"`
+	Language        string `json:"language,omitempty"`
+	BusinessModel   string `json:"business_model,omitempty"`
+	LogoURL         string `json:"logo_url,omitempty"`
+	PrimaryColor    string `json:"primary_color,omitempty"`
+	SecondaryColor  string `json:"secondary_color,omitempty"`
+	UseCustomDomain bool   `json:"use_custom_domain,omitempty"`
+	CustomDomain    string `json:"custom_domain,omitempty"`
 }
 
 // SessionResponseWithStoreSetup wraps the session with extracted store_setup
