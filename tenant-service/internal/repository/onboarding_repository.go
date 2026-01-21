@@ -59,6 +59,8 @@ func (r *OnboardingRepository) GetSessionByID(ctx context.Context, id uuid.UUID,
 			query = query.Preload("PaymentInformation")
 		case "tasks":
 			query = query.Preload("Tasks")
+		case "application_configurations":
+			query = query.Preload("ApplicationConfigurations")
 		}
 	}
 
