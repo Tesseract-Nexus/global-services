@@ -97,34 +97,30 @@ func (v *DNSVerifier) verifyTXTRecord(ctx context.Context, domain *models.Custom
 	return result, nil
 }
 
-// verifyCNAMERecord verifies CNAME record pointing to proxy domain, tenant subdomain, or Cloudflare tunnel
+// verifyCNAMERecord verifies CNAME record with unique verification token in subdomain
+// Format: _tesserix-<token>.<domain> → verify.tesserix.app
 func (v *DNSVerifier) verifyCNAMERecord(ctx context.Context, domain *models.CustomDomain, result *VerificationResult) (*VerificationResult, error) {
-	// Build list of acceptable CNAME targets
-	acceptableTargets := []string{v.cfg.DNS.ProxyDomain}
-
-	// Also accept CNAME to tenant subdomain (e.g., oh-my-god.tesserix.app)
-	if domain.TenantSlug != "" && v.cfg.DNS.PlatformDomain != "" {
-		tenantSubdomain := domain.TenantSlug + "." + v.cfg.DNS.PlatformDomain
-		acceptableTargets = append(acceptableTargets, tenantSubdomain)
+	// Short token for CNAME verification (first 8 chars of verification token)
+	shortToken := ""
+	if len(domain.VerificationToken) >= 8 {
+		shortToken = domain.VerificationToken[:8]
 	}
 
-	// Also accept CNAME to Cloudflare Tunnel (if configured)
-	if v.cfg.Cloudflare.Enabled && v.cfg.Cloudflare.TunnelID != "" {
-		tunnelCNAME := fmt.Sprintf("%s.cfargotunnel.com", v.cfg.Cloudflare.TunnelID)
-		acceptableTargets = append(acceptableTargets, tunnelCNAME)
-	}
+	// Verification CNAME subdomain with unique token
+	verificationHost := "_tesserix-" + shortToken + "." + domain.Domain
+	expectedTarget := "verify.tesserix.app"
 
-	result.ExpectedRecord = strings.Join(acceptableTargets, " or ")
+	result.ExpectedRecord = fmt.Sprintf("%s CNAME %s", verificationHost, expectedTarget)
 
-	cname, err := v.resolver.LookupCNAME(ctx, domain.Domain)
+	cname, err := v.resolver.LookupCNAME(ctx, verificationHost)
 	if err != nil {
 		if dnsErr, ok := err.(*net.DNSError); ok {
 			if dnsErr.IsNotFound {
-				result.Message = fmt.Sprintf("CNAME record not found. Please add CNAME pointing to %s", acceptableTargets[0])
+				result.Message = fmt.Sprintf("CNAME record not found at %s. Please add: %s CNAME %s", verificationHost, verificationHost, expectedTarget)
 				return result, nil
 			}
 		}
-		log.Warn().Err(err).Str("domain", domain.Domain).Msg("CNAME lookup failed")
+		log.Warn().Err(err).Str("host", verificationHost).Msg("CNAME lookup failed")
 		result.Message = "DNS lookup failed. Please try again later."
 		return result, nil
 	}
@@ -133,16 +129,29 @@ func (v *DNSVerifier) verifyCNAMERecord(ctx context.Context, domain *models.Cust
 	cname = strings.TrimSuffix(cname, ".")
 	result.RecordFound = cname
 
-	// Check if CNAME matches any acceptable target
-	for _, target := range acceptableTargets {
+	// Check if CNAME points to our verification endpoint
+	if strings.EqualFold(cname, expectedTarget) || strings.EqualFold(cname, expectedTarget+".") {
+		result.IsVerified = true
+		result.Message = "Domain ownership verified successfully via CNAME"
+		return result, nil
+	}
+
+	// Also accept legacy format pointing to proxy domain (for backward compatibility)
+	legacyTargets := []string{v.cfg.DNS.ProxyDomain}
+	if v.cfg.Cloudflare.Enabled && v.cfg.Cloudflare.TunnelID != "" {
+		tunnelCNAME := fmt.Sprintf("%s.cfargotunnel.com", v.cfg.Cloudflare.TunnelID)
+		legacyTargets = append(legacyTargets, tunnelCNAME)
+	}
+
+	for _, target := range legacyTargets {
 		if strings.EqualFold(cname, target) || strings.EqualFold(cname, target+".") {
 			result.IsVerified = true
-			result.Message = "CNAME record verified successfully"
+			result.Message = "Domain ownership verified successfully via CNAME"
 			return result, nil
 		}
 	}
 
-	result.Message = fmt.Sprintf("CNAME record found (%s) but doesn't point to an accepted target: %s", cname, strings.Join(acceptableTargets, " or "))
+	result.Message = fmt.Sprintf("CNAME record found at %s but points to %s instead of %s", verificationHost, cname, expectedTarget)
 	return result, nil
 }
 
@@ -214,20 +223,34 @@ func (v *DNSVerifier) GetRequiredDNSRecords(domain *models.CustomDomain) []model
 		cnameDescription = "tenant subdomain"
 	}
 
-	// For Cloudflare Tunnel mode, we only need CNAME records (no TXT verification)
-	// The CNAME pointing to tunnel IS the verification
-	if !v.cfg.Cloudflare.Enabled {
-		// Legacy mode: Verification record needed
-		if domain.VerificationMethod == models.VerificationMethodTXT {
-			records = append(records, models.DNSRecord{
-				RecordType: "TXT",
-				Host:       "_tesserix-verification." + domain.Domain,
-				Value:      "tesserix-verify=" + domain.VerificationToken,
-				TTL:        300,
-				Purpose:    "verification",
-				IsVerified: domain.DNSVerified,
-			})
-		}
+	// Short token for CNAME verification (first 8 chars)
+	shortToken := ""
+	if len(domain.VerificationToken) >= 8 {
+		shortToken = domain.VerificationToken[:8]
+	}
+
+	// Verification record needed for ownership proof
+	// CNAME method: _tesserix-<token>.<domain> → verify.tesserix.app
+	// TXT method: _tesserix.<domain> TXT "tesserix-verify=<full-token>"
+	if domain.VerificationMethod == models.VerificationMethodCNAME {
+		records = append(records, models.DNSRecord{
+			RecordType: "CNAME",
+			Host:       "_tesserix-" + shortToken + "." + domain.Domain,
+			Value:      "verify.tesserix.app",
+			TTL:        300,
+			Purpose:    "verification",
+			IsVerified: domain.DNSVerified,
+		})
+	} else {
+		// TXT verification
+		records = append(records, models.DNSRecord{
+			RecordType: "TXT",
+			Host:       "_tesserix." + domain.Domain,
+			Value:      "tesserix-verify=" + domain.VerificationToken,
+			TTL:        300,
+			Purpose:    "verification",
+			IsVerified: domain.DNSVerified,
+		})
 	}
 
 	// Routing record - CNAME preferred for all domain types

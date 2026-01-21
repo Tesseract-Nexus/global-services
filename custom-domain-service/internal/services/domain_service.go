@@ -141,8 +141,9 @@ func (s *DomainService) CreateDomain(ctx context.Context, tenantID uuid.UUID, re
 
 // ValidateDomainRequest contains the domain to validate
 type ValidateDomainRequest struct {
-	Domain   string `json:"domain"`
-	CheckDNS bool   `json:"check_dns"`
+	Domain    string `json:"domain"`
+	CheckDNS  bool   `json:"check_dns"`
+	SessionID string `json:"session_id,omitempty"` // Onboarding session ID for token persistence
 }
 
 // ValidateDomainResponse contains validation results
@@ -155,9 +156,12 @@ type ValidateDomainResponse struct {
 	VerificationRecord  *models.DNSRecord   `json:"verification_record,omitempty"`
 	VerificationRecords []models.DNSRecord  `json:"verification_records,omitempty"`
 	DomainType          string              `json:"domain_type,omitempty"`
+	VerificationToken   string              `json:"verification_token,omitempty"` // Token for verifying ownership
+	VerificationID      string              `json:"verification_id,omitempty"`    // Pending verification record ID
 }
 
-// ValidateDomain validates a domain without creating it
+// ValidateDomain validates a domain and creates/retrieves a pending verification record
+// This ensures the verification token is stored and can be verified later
 func (s *DomainService) ValidateDomain(ctx context.Context, req *ValidateDomainRequest) (*ValidateDomainResponse, error) {
 	response := &ValidateDomainResponse{
 		Valid:        false,
@@ -188,16 +192,17 @@ func (s *DomainService) ValidateDomain(ctx context.Context, req *ValidateDomainR
 		return response, nil
 	}
 
-	// Check if domain already exists in our system
-	exists, err := s.repo.DomainExists(ctx, domainName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check domain existence: %w", err)
-	}
-
-	if exists {
-		response.Available = false
-		response.Message = "This domain is already registered with another store"
-		return response, nil
+	// Check if domain already exists in our system (fully registered, not pending)
+	existingDomain, err := s.repo.GetByDomain(ctx, domainName)
+	if err == nil && existingDomain != nil {
+		// Domain exists - check if it's just pending verification or fully registered
+		if existingDomain.Status != models.DomainStatusPending && existingDomain.Status != models.DomainStatusVerifying {
+			response.Available = false
+			response.Message = "This domain is already registered with another store"
+			return response, nil
+		}
+		// Domain exists but is pending - reuse its verification token
+		log.Info().Str("domain", domainName).Str("id", existingDomain.ID.String()).Msg("Reusing existing pending domain record")
 	}
 
 	response.Available = true
@@ -206,19 +211,38 @@ func (s *DomainService) ValidateDomain(ctx context.Context, req *ValidateDomainR
 	domainType := s.dnsVerifier.DetectDomainType(domainName)
 	response.DomainType = string(domainType)
 
-	// Generate verification records (both CNAME and TXT options)
-	verificationToken := uuid.New().String()[:32]
+	// Get or create verification token
+	var verificationToken string
+	var verificationID string
 
-	// Primary option: CNAME record (recommended - simpler)
+	if existingDomain != nil && existingDomain.VerificationToken != "" {
+		// Reuse existing token from pending record
+		verificationToken = existingDomain.VerificationToken
+		verificationID = existingDomain.ID.String()
+	} else {
+		// Generate new token - this will be stored when CreateDomain is called
+		verificationToken = uuid.New().String()[:32]
+	}
+
+	// Store the verification token for later use
+	response.VerificationToken = verificationToken
+	response.VerificationID = verificationID
+
+	// Short token for CNAME subdomain (first 8 chars) - makes it unique but readable
+	shortToken := verificationToken[:8]
+
+	// Primary option: CNAME record with unique token in subdomain
+	// Format: _tesserix-<token>.<domain> → verify.tesserix.app
 	cnameRecord := models.DNSRecord{
 		RecordType: "CNAME",
-		Host:       "_tesserix." + domainName,
+		Host:       "_tesserix-" + shortToken + "." + domainName,
 		Value:      "verify.tesserix.app",
 		TTL:        3600,
 		Purpose:    "verification",
 	}
 
-	// Alternative option: TXT record (for DNS providers that don't support CNAME on subdomains)
+	// Alternative option: TXT record with full token
+	// Format: _tesserix.<domain> TXT "tesserix-verify=<full-token>"
 	txtRecord := models.DNSRecord{
 		RecordType: "TXT",
 		Host:       "_tesserix." + domainName,
