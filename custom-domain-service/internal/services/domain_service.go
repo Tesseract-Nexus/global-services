@@ -144,12 +144,13 @@ type ValidateDomainRequest struct {
 
 // ValidateDomainResponse contains validation results
 type ValidateDomainResponse struct {
-	Valid              bool              `json:"valid"`
-	Available          bool              `json:"available"`
-	DNSConfigured      bool              `json:"dns_configured"`
-	Message            string            `json:"message,omitempty"`
-	VerificationRecord *models.DNSRecord `json:"verification_record,omitempty"`
-	DomainType         string            `json:"domain_type,omitempty"`
+	Valid               bool                `json:"valid"`
+	Available           bool                `json:"available"`
+	DNSConfigured       bool                `json:"dns_configured"`
+	Message             string              `json:"message,omitempty"`
+	VerificationRecord  *models.DNSRecord   `json:"verification_record,omitempty"`
+	VerificationRecords []models.DNSRecord  `json:"verification_records,omitempty"`
+	DomainType          string              `json:"domain_type,omitempty"`
 }
 
 // ValidateDomain validates a domain without creating it
@@ -186,15 +187,32 @@ func (s *DomainService) ValidateDomain(ctx context.Context, req *ValidateDomainR
 	domainType := s.dnsVerifier.DetectDomainType(domainName)
 	response.DomainType = string(domainType)
 
-	// Generate verification record
+	// Generate verification records (both CNAME and TXT options)
 	verificationToken := uuid.New().String()[:32]
-	response.VerificationRecord = &models.DNSRecord{
+
+	// Primary option: CNAME record (recommended - simpler)
+	cnameRecord := models.DNSRecord{
 		RecordType: "CNAME",
 		Host:       "_tesserix." + domainName,
 		Value:      "verify.tesserix.app",
 		TTL:        3600,
 		Purpose:    "verification",
 	}
+
+	// Alternative option: TXT record (for DNS providers that don't support CNAME on subdomains)
+	txtRecord := models.DNSRecord{
+		RecordType: "TXT",
+		Host:       "_tesserix." + domainName,
+		Value:      "tesserix-verify=" + verificationToken,
+		TTL:        3600,
+		Purpose:    "verification",
+	}
+
+	// Return primary as VerificationRecord (for backward compatibility)
+	response.VerificationRecord = &cnameRecord
+
+	// Return both options in VerificationRecords
+	response.VerificationRecords = []models.DNSRecord{cnameRecord, txtRecord}
 
 	response.Message = "Domain is valid and available"
 
