@@ -40,10 +40,11 @@ type DraftConfig struct {
 
 // VerificationConfig holds email verification configuration
 type VerificationConfig struct {
-	Method           string // "otp" or "link" (default: "link")
-	TokenExpiryHours int    // Verification token expiry in hours (default: 24)
-	OnboardingAppURL string // Base URL for onboarding app (for verification links)
-	BaseDomain       string // Base domain for tenant URLs (e.g., "tesserix.app")
+	Method             string // "otp" or "link" (default: "link")
+	TokenExpiryHours   int    // Verification token expiry in hours (default: 24)
+	OnboardingAppURL   string // Base URL for onboarding app (for verification links)
+	BaseDomain         string // Base domain for tenant URLs (e.g., "tesserix.app")
+	CloudflareTunnelID string // Cloudflare Tunnel ID for custom domain CNAME target
 }
 
 // ServerConfig holds server configuration
@@ -175,10 +176,11 @@ func New() *Config {
 			CleanupInterval:  getEnvAsIntWithDefault("DRAFT_CLEANUP_INTERVAL_MINS", 60),
 		},
 		Verification: VerificationConfig{
-			Method:           getEnvWithDefault("VERIFICATION_METHOD", "link"),
-			TokenExpiryHours: getEnvAsIntWithDefault("VERIFICATION_TOKEN_EXPIRY_HOURS", 24),
-			OnboardingAppURL: getEnvWithDefault("ONBOARDING_APP_URL", "http://localhost:3000"),
-			BaseDomain:       getEnvWithDefault("BASE_DOMAIN", "tesserix.app"),
+			Method:             getEnvWithDefault("VERIFICATION_METHOD", "link"),
+			TokenExpiryHours:   getEnvAsIntWithDefault("VERIFICATION_TOKEN_EXPIRY_HOURS", 24),
+			OnboardingAppURL:   getEnvWithDefault("ONBOARDING_APP_URL", "http://localhost:3000"),
+			BaseDomain:         getEnvWithDefault("BASE_DOMAIN", "tesserix.app"),
+			CloudflareTunnelID: getEnvWithDefault("CLOUDFLARE_TUNNEL_ID", ""), // Get from cluster secret or env
 		},
 		URL: URLConfig{
 			// Base domain for subdomain-based tenant URLs

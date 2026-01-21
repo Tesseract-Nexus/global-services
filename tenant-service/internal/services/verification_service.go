@@ -163,11 +163,17 @@ func (s *VerificationService) startEmailVerificationWithLinkAndBusinessName(ctx 
 	// Build verification link
 	verificationLink := s.buildVerificationLink(token)
 
-	// Get business name from session if not provided
-	if businessName == "" && s.onboardingRepo != nil {
-		session, err := s.onboardingRepo.GetSessionByID(ctx, sessionID, []string{"business_information"})
-		if err == nil && session != nil && session.BusinessInformation != nil {
-			businessName = session.BusinessInformation.BusinessName
+	// Get business name and domain reservations from session
+	var dnsConfig *clients.CustomDomainDNSConfig
+	if s.onboardingRepo != nil {
+		session, err := s.onboardingRepo.GetSessionByID(ctx, sessionID, []string{"business_information", "domain_reservations"})
+		if err == nil && session != nil {
+			if session.BusinessInformation != nil && businessName == "" {
+				businessName = session.BusinessInformation.BusinessName
+			}
+
+			// Check if there's a custom domain reservation
+			dnsConfig = s.buildDNSConfigFromSession(session)
 		}
 	}
 	if businessName == "" {
@@ -177,11 +183,18 @@ func (s *VerificationService) startEmailVerificationWithLinkAndBusinessName(ctx 
 	// Send verification email directly via notification-service API
 	// Simple, synchronous, reliable - no NATS complexity
 	log.Printf("[VerificationService] Sending verification email to %s for session %s", security.MaskEmail(email), sessionID)
-	if err := s.notificationClient.SendVerificationLinkEmail(ctx, email, verificationLink, businessName); err != nil {
+
+	// Use DNS-aware email sending if we have custom domain config
+	if err := s.notificationClient.SendVerificationLinkEmailWithDNS(ctx, email, verificationLink, businessName, dnsConfig); err != nil {
 		_ = s.redisClient.DeleteVerificationToken(ctx, token)
 		return nil, fmt.Errorf("failed to send verification email: %w", err)
 	}
-	log.Printf("[VerificationService] Verification email sent successfully for session %s", sessionID)
+
+	if dnsConfig != nil && dnsConfig.IsCustomDomain {
+		log.Printf("[VerificationService] Verification email sent with DNS instructions for custom domain %s", dnsConfig.CustomDomain)
+	} else {
+		log.Printf("[VerificationService] Verification email sent successfully for session %s", sessionID)
+	}
 
 	// Create verification record
 	record := &models.VerificationRecord{
@@ -196,6 +209,47 @@ func (s *VerificationService) startEmailVerificationWithLinkAndBusinessName(ctx 
 	}
 
 	return record, nil
+}
+
+// buildDNSConfigFromSession checks if the session has a custom domain and builds DNS config
+func (s *VerificationService) buildDNSConfigFromSession(session *models.OnboardingSession) *clients.CustomDomainDNSConfig {
+	if session == nil || len(session.DomainReservations) == 0 {
+		return nil
+	}
+
+	// Find custom domain reservation
+	var customDomain *models.DomainReservation
+	for i := range session.DomainReservations {
+		if session.DomainReservations[i].DomainType == "custom_domain" {
+			customDomain = &session.DomainReservations[i]
+			break
+		}
+	}
+
+	if customDomain == nil {
+		return nil
+	}
+
+	// Get Cloudflare Tunnel ID from config
+	tunnelID := s.verificationConfig.CloudflareTunnelID
+	if tunnelID == "" {
+		log.Printf("[VerificationService] Warning: CLOUDFLARE_TUNNEL_ID not configured, skipping DNS instructions")
+		return nil
+	}
+
+	// Build the CNAME target (e.g., "30a5a0e4-f621-4082-9dde-34f1eed8e8ab.cfargotunnel.com")
+	tunnelCNAME := fmt.Sprintf("%s.cfargotunnel.com", tunnelID)
+
+	// Build host URLs from the custom domain
+	domain := customDomain.DomainValue
+	return &clients.CustomDomainDNSConfig{
+		IsCustomDomain:    true,
+		CustomDomain:      domain,
+		StorefrontHost:    domain,
+		AdminHost:         fmt.Sprintf("admin.%s", domain),
+		APIHost:           fmt.Sprintf("api.%s", domain),
+		TunnelCNAMETarget: tunnelCNAME,
+	}
 }
 
 // generateSecureToken generates a cryptographically secure token

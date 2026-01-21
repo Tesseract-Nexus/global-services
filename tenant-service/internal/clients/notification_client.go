@@ -53,18 +53,38 @@ type SendEmailResponse struct {
 	Message string `json:"message,omitempty"`
 }
 
+// CustomDomainDNSConfig holds DNS configuration for custom domain verification emails
+type CustomDomainDNSConfig struct {
+	IsCustomDomain    bool   // If true, show DNS instructions in the email
+	CustomDomain      string // The custom domain (e.g., "customdomain.com")
+	AdminHost         string // Admin panel host (e.g., "admin.customdomain.com")
+	StorefrontHost    string // Storefront host (e.g., "customdomain.com")
+	APIHost           string // API host (e.g., "api.customdomain.com")
+	TunnelCNAMETarget string // Cloudflare tunnel CNAME target (e.g., "xxx.cfargotunnel.com")
+}
+
 // SendVerificationLinkEmail sends an email with a verification link via notification-service
 func (c *NotificationClient) SendVerificationLinkEmail(ctx context.Context, email, verificationLink, businessName string) error {
-	// Generate the beautiful HTML email
-	htmlBody, err := renderVerificationEmailTemplate(verificationLink, businessName, email)
+	return c.SendVerificationLinkEmailWithDNS(ctx, email, verificationLink, businessName, nil)
+}
+
+// SendVerificationLinkEmailWithDNS sends a verification email with optional DNS configuration for custom domains
+func (c *NotificationClient) SendVerificationLinkEmailWithDNS(ctx context.Context, email, verificationLink, businessName string, dnsConfig *CustomDomainDNSConfig) error {
+	// Generate the beautiful HTML email with optional DNS instructions
+	htmlBody, err := renderVerificationEmailTemplate(verificationLink, businessName, email, dnsConfig)
 	if err != nil {
 		return fmt.Errorf("failed to render email template: %w", err)
+	}
+
+	subject := fmt.Sprintf("Verify your email for %s", businessName)
+	if dnsConfig != nil && dnsConfig.IsCustomDomain {
+		subject = fmt.Sprintf("Verify your email & configure DNS for %s", businessName)
 	}
 
 	req := &NotificationSendRequest{
 		Channel:        "EMAIL",
 		RecipientEmail: email,
-		Subject:        fmt.Sprintf("Verify your email for %s", businessName),
+		Subject:        subject,
 		Body:           fmt.Sprintf("Click this link to verify your email: %s", verificationLink),
 		BodyHTML:       htmlBody,
 		Priority:       "high",
@@ -87,8 +107,8 @@ func (c *NotificationClient) SendVerificationLinkEmail(ctx context.Context, emai
 	return nil
 }
 
-// renderVerificationEmailTemplate generates the verification email HTML
-func renderVerificationEmailTemplate(verificationLink, businessName, email string) (string, error) {
+// renderVerificationEmailTemplate generates the verification email HTML with optional DNS instructions
+func renderVerificationEmailTemplate(verificationLink, businessName, email string, dnsConfig *CustomDomainDNSConfig) (string, error) {
 	const emailTemplate = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -144,6 +164,111 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
                                 </p>
                             </div>
 
+                            {{if .IsCustomDomain}}
+                            <!-- Custom Domain DNS Instructions - IMPORTANT -->
+                            <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 12px; padding: 24px; margin-bottom: 24px; border: 2px solid #f59e0b;">
+                                <h2 style="color: #92400e; font-size: 20px; font-weight: 700; margin: 0 0 16px;">
+                                    🌐 ACTION REQUIRED: Set Up Your DNS Records
+                                </h2>
+                                <p style="color: #78350f; font-size: 15px; line-height: 1.6; margin: 0 0 20px;">
+                                    To use your custom domain <strong style="font-size: 16px;">{{.CustomDomain}}</strong>, you need to add DNS records. <strong>You can do this now while your email is being verified!</strong>
+                                </p>
+
+                                <!-- Step-by-step Instructions -->
+                                <div style="background-color: #ffffff; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
+                                    <p style="color: #1f2937; font-size: 14px; font-weight: 600; margin: 0 0 16px;">
+                                        📝 Follow these steps at your domain registrar (GoDaddy, Namecheap, Cloudflare, etc.):
+                                    </p>
+
+                                    <!-- Step 1 -->
+                                    <div style="margin-bottom: 16px; padding-left: 12px; border-left: 3px solid #6366f1;">
+                                        <p style="color: #6366f1; font-size: 12px; font-weight: 600; margin: 0 0 4px; text-transform: uppercase;">Step 1 - Main Domain (Storefront)</p>
+                                        <p style="color: #374151; font-size: 13px; margin: 0 0 8px;">Add a CNAME record for your root domain:</p>
+                                        <table style="width: 100%; border-collapse: collapse; background-color: #f9fafb; border-radius: 6px;">
+                                            <tr>
+                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280; width: 70px;">Name:</td>
+                                                <td style="padding: 10px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">@</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280;">Value:</td>
+                                                <td style="padding: 10px 12px; font-size: 13px; font-family: monospace; color: #6366f1; word-break: break-all; background-color: #eef2ff; border-radius: 4px;"><strong>{{.TunnelCNAMETarget}}</strong></td>
+                                            </tr>
+                                        </table>
+                                        <p style="color: #6b7280; font-size: 11px; margin: 6px 0 0;">This enables: <strong>{{.StorefrontHost}}</strong></p>
+                                    </div>
+
+                                    <!-- Step 2 -->
+                                    <div style="margin-bottom: 16px; padding-left: 12px; border-left: 3px solid #8b5cf6;">
+                                        <p style="color: #8b5cf6; font-size: 12px; font-weight: 600; margin: 0 0 4px; text-transform: uppercase;">Step 2 - WWW Subdomain</p>
+                                        <p style="color: #374151; font-size: 13px; margin: 0 0 8px;">Add a CNAME record for www:</p>
+                                        <table style="width: 100%; border-collapse: collapse; background-color: #f9fafb; border-radius: 6px;">
+                                            <tr>
+                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280; width: 70px;">Name:</td>
+                                                <td style="padding: 10px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">www</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280;">Value:</td>
+                                                <td style="padding: 10px 12px; font-size: 13px; font-family: monospace; color: #6366f1; word-break: break-all; background-color: #eef2ff; border-radius: 4px;"><strong>{{.TunnelCNAMETarget}}</strong></td>
+                                            </tr>
+                                        </table>
+                                        <p style="color: #6b7280; font-size: 11px; margin: 6px 0 0;">This enables: <strong>www.{{.CustomDomain}}</strong></p>
+                                    </div>
+
+                                    <!-- Step 3 -->
+                                    <div style="margin-bottom: 16px; padding-left: 12px; border-left: 3px solid #10b981;">
+                                        <p style="color: #10b981; font-size: 12px; font-weight: 600; margin: 0 0 4px; text-transform: uppercase;">Step 3 - Admin Panel</p>
+                                        <p style="color: #374151; font-size: 13px; margin: 0 0 8px;">Add a CNAME record for your admin dashboard:</p>
+                                        <table style="width: 100%; border-collapse: collapse; background-color: #f9fafb; border-radius: 6px;">
+                                            <tr>
+                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280; width: 70px;">Name:</td>
+                                                <td style="padding: 10px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">admin</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280;">Value:</td>
+                                                <td style="padding: 10px 12px; font-size: 13px; font-family: monospace; color: #6366f1; word-break: break-all; background-color: #eef2ff; border-radius: 4px;"><strong>{{.TunnelCNAMETarget}}</strong></td>
+                                            </tr>
+                                        </table>
+                                        <p style="color: #6b7280; font-size: 11px; margin: 6px 0 0;">This enables: <strong>{{.AdminHost}}</strong></p>
+                                    </div>
+
+                                    <!-- Step 4 -->
+                                    <div style="padding-left: 12px; border-left: 3px solid #f59e0b;">
+                                        <p style="color: #f59e0b; font-size: 12px; font-weight: 600; margin: 0 0 4px; text-transform: uppercase;">Step 4 - API Access (Mobile Apps)</p>
+                                        <p style="color: #374151; font-size: 13px; margin: 0 0 8px;">Add a CNAME record for API access:</p>
+                                        <table style="width: 100%; border-collapse: collapse; background-color: #f9fafb; border-radius: 6px;">
+                                            <tr>
+                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280; width: 70px;">Name:</td>
+                                                <td style="padding: 10px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">api</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280;">Value:</td>
+                                                <td style="padding: 10px 12px; font-size: 13px; font-family: monospace; color: #6366f1; word-break: break-all; background-color: #eef2ff; border-radius: 4px;"><strong>{{.TunnelCNAMETarget}}</strong></td>
+                                            </tr>
+                                        </table>
+                                        <p style="color: #6b7280; font-size: 11px; margin: 6px 0 0;">This enables: <strong>{{.APIHost}}</strong></p>
+                                    </div>
+                                </div>
+
+                                <!-- Copy-friendly value box -->
+                                <div style="background-color: #ffffff; border-radius: 8px; padding: 16px; margin-bottom: 16px; border: 1px dashed #d1d5db;">
+                                    <p style="color: #374151; font-size: 13px; font-weight: 600; margin: 0 0 8px;">📋 CNAME Value (same for all records - copy this):</p>
+                                    <div style="background-color: #1f2937; border-radius: 6px; padding: 12px; text-align: center;">
+                                        <code style="color: #22d3ee; font-size: 14px; word-break: break-all;">{{.TunnelCNAMETarget}}</code>
+                                    </div>
+                                </div>
+
+                                <!-- Tips -->
+                                <div style="background-color: #ffffff; border-radius: 8px; padding: 12px; border-left: 4px solid #3b82f6;">
+                                    <p style="color: #1e40af; font-size: 13px; margin: 0; line-height: 1.6;">
+                                        💡 <strong>Tips:</strong><br>
+                                        • If using <strong>Cloudflare</strong> as your DNS provider, enable the <strong>orange cloud (Proxy)</strong> for each record<br>
+                                        • DNS changes usually take <strong>5-30 minutes</strong> to propagate (max 48 hours)<br>
+                                        • All 4 records use the <strong>same CNAME value</strong> shown above
+                                    </p>
+                                </div>
+                            </div>
+                            {{end}}
+
                             <!-- Security notice -->
                             <div style="border-left: 4px solid #f59e0b; background-color: #fffbeb; padding: 16px; border-radius: 0 8px 8px 0;">
                                 <p style="color: #92400e; font-size: 14px; margin: 0;">
@@ -177,13 +302,29 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
 	}
 
 	data := struct {
-		VerificationLink string
-		BusinessName     string
-		Email            string
+		VerificationLink  string
+		BusinessName      string
+		Email             string
+		IsCustomDomain    bool
+		CustomDomain      string
+		AdminHost         string
+		StorefrontHost    string
+		APIHost           string
+		TunnelCNAMETarget string
 	}{
 		VerificationLink: verificationLink,
 		BusinessName:     businessName,
 		Email:            email,
+	}
+
+	// Add DNS config if provided
+	if dnsConfig != nil && dnsConfig.IsCustomDomain {
+		data.IsCustomDomain = true
+		data.CustomDomain = dnsConfig.CustomDomain
+		data.AdminHost = dnsConfig.AdminHost
+		data.StorefrontHost = dnsConfig.StorefrontHost
+		data.APIHost = dnsConfig.APIHost
+		data.TunnelCNAMETarget = dnsConfig.TunnelCNAMETarget
 	}
 
 	var buf strings.Builder
