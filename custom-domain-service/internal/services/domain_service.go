@@ -141,11 +141,12 @@ func (s *DomainService) CreateDomain(ctx context.Context, tenantID uuid.UUID, re
 
 // ValidateDomainRequest contains the domain to validate
 type ValidateDomainRequest struct {
-	Domain     string `json:"domain"`
-	CheckDNS   bool   `json:"check_dns"`
-	SessionID  string `json:"session_id,omitempty"`  // Onboarding session ID for token persistence
-	TenantID   string `json:"tenant_id,omitempty"`   // Optional tenant ID - if provided, creates pending domain record
-	TenantSlug string `json:"tenant_slug,omitempty"` // Optional tenant slug for denormalization
+	Domain            string `json:"domain"`
+	CheckDNS          bool   `json:"check_dns"`
+	SessionID         string `json:"session_id,omitempty"`         // Onboarding session ID for token persistence
+	TenantID          string `json:"tenant_id,omitempty"`          // Optional tenant ID - if provided, creates pending domain record
+	TenantSlug        string `json:"tenant_slug,omitempty"`        // Optional tenant slug for denormalization
+	VerificationToken string `json:"verification_token,omitempty"` // Pass existing token to reuse
 }
 
 // ValidateDomainResponse contains validation results
@@ -221,6 +222,10 @@ func (s *DomainService) ValidateDomain(ctx context.Context, req *ValidateDomainR
 		// Reuse existing token from pending record
 		verificationToken = existingDomain.VerificationToken
 		verificationID = existingDomain.ID.String()
+	} else if req.VerificationToken != "" && len(req.VerificationToken) >= 8 {
+		// Reuse the token passed from frontend (session persistence)
+		verificationToken = req.VerificationToken
+		log.Info().Str("domain", domainName).Msg("Reusing verification token from request")
 	} else {
 		// Generate new token
 		verificationToken = uuid.New().String()[:32]
