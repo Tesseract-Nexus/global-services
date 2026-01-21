@@ -204,34 +204,19 @@ type VirtualServiceResult struct {
 	GatewayPatched bool
 }
 
-// CreateVirtualService creates or updates an Istio VirtualService for the domain
-// It first tries to add the custom domain to the existing tenant VirtualService.
-// If no existing VS is found, it creates a new one.
+// CreateVirtualService creates or updates an Istio VirtualService for the domain.
+// Custom domains always get their own dedicated VirtualService to keep tenant
+// default domain VirtualServices clean and isolated.
 func (k *KubernetesClient) CreateVirtualService(ctx context.Context, domain *models.CustomDomain) (*VirtualServiceResult, error) {
-	result := &VirtualServiceResult{}
-
 	// Build hosts list for the custom domain
 	customHosts := []string{domain.Domain}
 	if domain.IncludeWWW && domain.DomainType == models.DomainTypeApex {
 		customHosts = append(customHosts, "www."+domain.Domain)
 	}
 
-	// Try to add hosts to existing tenant VirtualService first
-	// This allows CNAME-based routing where custom domain CNAMEs to tenant subdomain
-	if domain.TenantSlug != "" {
-		existingVSName := k.getTenantVSName(domain.TenantSlug, domain.TargetType)
-		added, err := k.addHostsToExistingVS(ctx, existingVSName, customHosts, domain)
-		if err != nil {
-			log.Warn().Err(err).Str("vs", existingVSName).Msg("Failed to add hosts to existing VS, will create new one")
-		} else if added {
-			result.Name = existingVSName
-			result.Status = models.RoutingStatusActive
-			log.Info().Str("vs", existingVSName).Strs("hosts", customHosts).Msg("Added custom domain hosts to existing tenant VirtualService")
-			return result, nil
-		}
-	}
-
-	// Fall back to creating a new VirtualService for this custom domain
+	// Always create a dedicated VirtualService for custom domains
+	// This keeps tenant's default domain VS (e.g., oh-my-god-storefront-vs) clean
+	// and custom domain routing isolated
 	return k.createNewVirtualService(ctx, domain, customHosts)
 }
 
@@ -543,27 +528,9 @@ func (k *KubernetesClient) RemoveFromGateway(ctx context.Context, domain *models
 	return nil
 }
 
-// DeleteVirtualService deletes the VirtualService or removes hosts from existing tenant VS
+// DeleteVirtualService deletes the dedicated VirtualService for a custom domain
 func (k *KubernetesClient) DeleteVirtualService(ctx context.Context, domain *models.CustomDomain) error {
-	// Build hosts to remove
-	hostsToRemove := map[string]bool{domain.Domain: true}
-	if domain.IncludeWWW && domain.DomainType == models.DomainTypeApex {
-		hostsToRemove["www."+domain.Domain] = true
-	}
-
-	// Try to remove hosts from existing tenant VirtualService first
-	if domain.TenantSlug != "" {
-		existingVSName := k.getTenantVSName(domain.TenantSlug, domain.TargetType)
-		removed, err := k.removeHostsFromExistingVS(ctx, existingVSName, hostsToRemove, domain.Domain)
-		if err != nil {
-			log.Warn().Err(err).Str("vs", existingVSName).Msg("Failed to remove hosts from existing VS")
-		} else if removed {
-			log.Info().Str("vs", existingVSName).Str("domain", domain.Domain).Msg("Removed custom domain hosts from existing tenant VirtualService")
-			return nil
-		}
-	}
-
-	// Fall back to deleting the dedicated VirtualService
+	// Delete the dedicated VirtualService for this custom domain
 	vsName := generateResourceName(domain.Domain, "vs")
 	err := k.istioClient.NetworkingV1beta1().VirtualServices(k.cfg.Istio.VSNamespace).Delete(ctx, vsName, metav1.DeleteOptions{})
 	if err != nil {
