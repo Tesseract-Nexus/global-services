@@ -564,13 +564,13 @@ func (s *DomainService) provisionDomainWithCloudflare(ctx context.Context, domai
 	// Cache the domain resolution
 	s.cacheDomainResolution(ctx, domain)
 
-	tunnelCNAME := s.cloudflare.GetTunnelCNAME()
+	maskedTunnelCNAME := s.cloudflare.GetMaskedTunnelCNAME()
 	log.Info().
 		Str("domain", domain.Domain).
-		Str("tunnel_cname", tunnelCNAME).
+		Str("tunnel_cname", maskedTunnelCNAME).
 		Bool("dns_configured", domain.CloudflareDNSConfigured).
 		Msg("Domain provisioning via Cloudflare Tunnel completed successfully")
-	s.logActivity(ctx, domain, "activated", "success", fmt.Sprintf("Domain is now active via Cloudflare Tunnel (%s)", tunnelCNAME))
+	s.logActivity(ctx, domain, "activated", "success", fmt.Sprintf("Domain is now active via Cloudflare Tunnel (%s)", maskedTunnelCNAME))
 
 	// Publish domain activated event
 	domain.Status = models.DomainStatusActive

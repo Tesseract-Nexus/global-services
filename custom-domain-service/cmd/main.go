@@ -81,7 +81,7 @@ func main() {
 	if cfg.Cloudflare.Enabled {
 		cloudflareClient = clients.NewCloudflareClient(&cfg.Cloudflare)
 		log.Info().
-			Str("tunnel_id", cfg.Cloudflare.TunnelID).
+			Str("tunnel_id", clients.MaskSensitiveID(cfg.Cloudflare.TunnelID)).
 			Msg("Cloudflare Tunnel client initialized")
 	} else {
 		log.Info().Msg("Cloudflare Tunnel disabled, using cert-manager for custom domains")

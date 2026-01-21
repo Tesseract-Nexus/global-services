@@ -291,6 +291,19 @@ func (c *CloudflareClient) GetTunnelCNAME() string {
 	return fmt.Sprintf("%s.cfargotunnel.com", c.cfg.TunnelID)
 }
 
+// GetMaskedTunnelCNAME returns a masked version of the tunnel CNAME for logging
+func (c *CloudflareClient) GetMaskedTunnelCNAME() string {
+	return MaskSensitiveID(c.cfg.TunnelID) + ".cfargotunnel.com"
+}
+
+// MaskSensitiveID masks a sensitive ID for logging (shows first 4 and last 4 chars)
+func MaskSensitiveID(id string) string {
+	if len(id) <= 8 {
+		return "****"
+	}
+	return id[:4] + "****" + id[len(id)-4:]
+}
+
 // isWWWDomain checks if the domain already starts with www.
 func isWWWDomain(domain string) bool {
 	return len(domain) > 4 && domain[:4] == "www."
@@ -424,7 +437,7 @@ func (c *CloudflareClient) CreateOrUpdateCNAME(ctx context.Context, domain *mode
 		}
 	}
 
-	log.Info().Str("domain", domain.Domain).Str("target", tunnelCNAME).Msg("DNS CNAME records configured in Cloudflare")
+	log.Info().Str("domain", domain.Domain).Str("target", c.GetMaskedTunnelCNAME()).Msg("DNS CNAME records configured in Cloudflare")
 	return nil
 }
 
