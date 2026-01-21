@@ -141,9 +141,11 @@ func (s *DomainService) CreateDomain(ctx context.Context, tenantID uuid.UUID, re
 
 // ValidateDomainRequest contains the domain to validate
 type ValidateDomainRequest struct {
-	Domain    string `json:"domain"`
-	CheckDNS  bool   `json:"check_dns"`
-	SessionID string `json:"session_id,omitempty"` // Onboarding session ID for token persistence
+	Domain     string `json:"domain"`
+	CheckDNS   bool   `json:"check_dns"`
+	SessionID  string `json:"session_id,omitempty"`  // Onboarding session ID for token persistence
+	TenantID   string `json:"tenant_id,omitempty"`   // Optional tenant ID - if provided, creates pending domain record
+	TenantSlug string `json:"tenant_slug,omitempty"` // Optional tenant slug for denormalization
 }
 
 // ValidateDomainResponse contains validation results
@@ -220,8 +222,41 @@ func (s *DomainService) ValidateDomain(ctx context.Context, req *ValidateDomainR
 		verificationToken = existingDomain.VerificationToken
 		verificationID = existingDomain.ID.String()
 	} else {
-		// Generate new token - this will be stored when CreateDomain is called
+		// Generate new token
 		verificationToken = uuid.New().String()[:32]
+
+		// If tenant_id is provided, create a pending domain record to store the token
+		if req.TenantID != "" {
+			tenantUUID, parseErr := uuid.Parse(req.TenantID)
+			if parseErr == nil {
+				// Create pending domain record
+				pendingDomain := &models.CustomDomain{
+					TenantID:           tenantUUID,
+					TenantSlug:         req.TenantSlug,
+					Domain:             domainName,
+					DomainType:         domainType,
+					TargetType:         models.TargetTypeStorefront,
+					VerificationMethod: models.VerificationMethodCNAME,
+					VerificationToken:  verificationToken,
+					Status:             models.DomainStatusPending,
+					StatusMessage:      "Waiting for DNS verification",
+				}
+
+				if createErr := s.repo.Create(ctx, pendingDomain); createErr != nil {
+					log.Warn().Err(createErr).Str("domain", domainName).Msg("Failed to create pending domain record, continuing with validation")
+				} else {
+					log.Info().
+						Str("domain", domainName).
+						Str("id", pendingDomain.ID.String()).
+						Str("tenant_id", req.TenantID).
+						Msg("Created pending domain record for verification")
+					verificationID = pendingDomain.ID.String()
+
+					// Log activity
+					s.logActivity(ctx, pendingDomain, "created_pending", "pending", "Domain created pending DNS verification")
+				}
+			}
+		}
 	}
 
 	// Store the verification token for later use
@@ -273,6 +308,97 @@ func (s *DomainService) ValidateDomain(ctx context.Context, req *ValidateDomainR
 			response.DNSConfigured = true
 			response.Message = "Domain is valid and DNS is configured"
 		}
+	}
+
+	return response, nil
+}
+
+// VerifyDomainByNameRequest contains the request to verify a domain by name
+type VerifyDomainByNameRequest struct {
+	Domain            string `json:"domain"`
+	VerificationHost  string `json:"verification_host"`   // e.g., _tesserix-abc12345.example.com
+	VerificationValue string `json:"verification_value"`  // e.g., verify.tesserix.app
+	VerificationToken string `json:"verification_token"`  // The full 32-char token (used to lookup pending record)
+}
+
+// VerifyDomainByNameResponse contains the verification result
+type VerifyDomainByNameResponse struct {
+	DNSVerified     bool   `json:"dns_verified"`
+	DNSRecordFound  bool   `json:"dns_record_found"`
+	DNSRecordValue  string `json:"dns_record_value,omitempty"`
+	ExpectedValue   string `json:"expected_value"`
+	SSLProvisioning bool   `json:"ssl_provisioning"`
+	SSLStatus       string `json:"ssl_status"`
+	Message         string `json:"message"`
+	CanProceed      bool   `json:"can_proceed"`
+	DomainID        string `json:"domain_id,omitempty"` // ID of the pending domain record if exists
+}
+
+// VerifyDomainByName verifies DNS for a domain by name (used during onboarding)
+// This checks if the DNS record is configured and updates the pending domain record if it exists
+func (s *DomainService) VerifyDomainByName(ctx context.Context, req *VerifyDomainByNameRequest) (*VerifyDomainByNameResponse, error) {
+	response := &VerifyDomainByNameResponse{
+		DNSVerified:    false,
+		DNSRecordFound: false,
+		SSLStatus:      "pending",
+		Message:        "Checking DNS configuration...",
+		CanProceed:     false,
+	}
+
+	domainName := strings.ToLower(strings.TrimSpace(req.Domain))
+	verificationHost := strings.ToLower(strings.TrimSpace(req.VerificationHost))
+	expectedValue := strings.ToLower(strings.TrimSpace(req.VerificationValue))
+
+	response.ExpectedValue = expectedValue
+
+	log.Info().
+		Str("domain", domainName).
+		Str("verification_host", verificationHost).
+		Str("expected_value", expectedValue).
+		Msg("Verifying domain by name")
+
+	// Try to find existing pending domain record
+	existingDomain, err := s.repo.GetByDomain(ctx, domainName)
+	if err == nil && existingDomain != nil {
+		response.DomainID = existingDomain.ID.String()
+	}
+
+	// Create a temporary domain object for verification
+	tempDomain := &models.CustomDomain{
+		Domain:             domainName,
+		VerificationMethod: models.VerificationMethodCNAME,
+		VerificationToken:  req.VerificationToken,
+	}
+
+	// Use the DNS verifier to check the record
+	result, err := s.dnsVerifier.VerifyDomain(ctx, tempDomain)
+	if err != nil {
+		log.Error().Err(err).Str("domain", domainName).Msg("DNS verification failed")
+		response.Message = "DNS verification failed. Please try again later."
+		return response, nil
+	}
+
+	response.DNSRecordFound = result.RecordFound != ""
+	response.DNSRecordValue = result.RecordFound
+
+	if result.IsVerified {
+		response.DNSVerified = true
+		response.SSLProvisioning = true
+		response.SSLStatus = "provisioning"
+		response.Message = "DNS verified! SSL certificate will be provisioned automatically when onboarding completes."
+		response.CanProceed = true
+
+		// If we have a pending domain record, update its DNS verification status
+		if existingDomain != nil && !existingDomain.DNSVerified {
+			if updateErr := s.repo.UpdateDNSVerification(ctx, existingDomain.ID, true, existingDomain.DNSCheckAttempts+1); updateErr != nil {
+				log.Warn().Err(updateErr).Str("domain", domainName).Msg("Failed to update DNS verification status")
+			} else {
+				log.Info().Str("domain", domainName).Msg("Updated DNS verification status to verified")
+				s.logActivity(ctx, existingDomain, "dns_verified", "success", "DNS verification successful")
+			}
+		}
+	} else {
+		response.Message = result.Message
 	}
 
 	return response, nil

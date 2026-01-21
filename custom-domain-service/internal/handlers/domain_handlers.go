@@ -561,11 +561,12 @@ func (h *DomainHandlers) GetActivities(c *gin.Context) {
 
 // ValidateDomain handles POST /api/v1/domains/validate
 // @Summary Validate a domain before creating
-// @Description Validate domain format and availability without creating it
+// @Description Validate domain format and availability. If tenant_id is provided (in body or X-Tenant-ID header), creates a pending domain record.
 // @Tags domains
 // @Accept json
 // @Produce json
 // @Param request body services.ValidateDomainRequest true "Domain validation request"
+// @Param X-Tenant-ID header string false "Tenant ID for creating pending domain record"
 // @Success 200 {object} services.ValidateDomainResponse
 // @Failure 400 {object} models.ErrorResponse
 // @Router /api/v1/domains/validate [post]
@@ -589,6 +590,24 @@ func (h *DomainHandlers) ValidateDomain(c *gin.Context) {
 		return
 	}
 
+	// If tenant_id not in body, try to get from headers
+	if req.TenantID == "" {
+		if tenantID := c.GetHeader("X-Tenant-ID"); tenantID != "" {
+			req.TenantID = tenantID
+		} else if tenantID := c.GetHeader("x-tenant-id"); tenantID != "" {
+			req.TenantID = tenantID
+		}
+	}
+
+	// Also try to get tenant_slug from headers if not in body
+	if req.TenantSlug == "" {
+		if tenantSlug := c.GetHeader("X-Tenant-Slug"); tenantSlug != "" {
+			req.TenantSlug = tenantSlug
+		} else if tenantSlug := c.GetHeader("x-tenant-slug"); tenantSlug != "" {
+			req.TenantSlug = tenantSlug
+		}
+	}
+
 	response, err := h.domainService.ValidateDomain(c.Request.Context(), &req)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to validate domain")
@@ -599,7 +618,51 @@ func (h *DomainHandlers) ValidateDomain(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, response)
+	// Wrap response in data field for consistency
+	c.JSON(http.StatusOK, gin.H{"data": response})
+}
+
+// VerifyDomainByName handles POST /api/v1/domains/verify-by-name
+// @Summary Verify domain DNS by domain name
+// @Description Verify DNS configuration for a domain without requiring a domain ID (used during onboarding)
+// @Tags domains
+// @Accept json
+// @Produce json
+// @Param request body services.VerifyDomainByNameRequest true "Verification request"
+// @Success 200 {object} services.VerifyDomainByNameResponse
+// @Failure 400 {object} models.ErrorResponse
+// @Router /api/v1/domains/verify-by-name [post]
+func (h *DomainHandlers) VerifyDomainByName(c *gin.Context) {
+	var req services.VerifyDomainByNameRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error:   "invalid request",
+			Code:    "INVALID_REQUEST",
+			Message: "Please provide domain and verification details",
+		})
+		return
+	}
+
+	if req.Domain == "" || req.VerificationHost == "" || req.VerificationValue == "" {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error:   "missing required fields",
+			Code:    "MISSING_FIELDS",
+			Message: "domain, verification_host, and verification_value are required",
+		})
+		return
+	}
+
+	response, err := h.domainService.VerifyDomainByName(c.Request.Context(), &req)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to verify domain by name")
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error: "failed to verify domain",
+			Code:  "INTERNAL_ERROR",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": response})
 }
 
 // Helper function to extract tenant ID and user ID from context
