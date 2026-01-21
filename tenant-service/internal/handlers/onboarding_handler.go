@@ -148,6 +148,17 @@ func (h *OnboardingHandler) UpdateBusinessInformation(c *gin.Context) {
 
 	updatedBusinessInfo, err := h.onboardingService.UpdateBusinessInformation(c.Request.Context(), sessionID, &businessInfo)
 	if err != nil {
+		// Check if it's a validation error (e.g., business name already taken)
+		if validationErr, ok := services.IsValidationError(err); ok {
+			c.JSON(http.StatusConflict, gin.H{
+				"success": false,
+				"error":   validationErr.Message,
+				"code":    "VALIDATION_ERROR",
+				"field":   validationErr.Field,
+				"suggestions": validationErr.Suggestions,
+			})
+			return
+		}
 		ErrorResponse(c, http.StatusInternalServerError, "Failed to update business information", err)
 		return
 	}

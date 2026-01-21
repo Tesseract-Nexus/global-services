@@ -349,11 +349,11 @@ func (s *OnboardingService) UpdateBusinessInformation(ctx context.Context, sessi
 		}
 		if !validationResult.Available {
 			// Return validation error with suggestions
-			suggestionsStr := ""
-			if len(validationResult.Suggestions) > 0 {
-				suggestionsStr = fmt.Sprintf(" Suggestions: %s", strings.Join(validationResult.Suggestions, ", "))
-			}
-			return nil, fmt.Errorf("business name '%s' is already taken.%s", businessInfo.BusinessName, suggestionsStr)
+			return nil, NewValidationError(
+				"business_name",
+				fmt.Sprintf("'%s' is already taken", businessInfo.BusinessName),
+				validationResult.Suggestions,
+			)
 		}
 	}
 
