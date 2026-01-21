@@ -99,8 +99,10 @@ type PaymentConfig struct {
 
 // IntegrationConfig holds configuration for external service integrations
 type IntegrationConfig struct {
-	SettingsServiceURL     string
-	NotificationServiceURL string
+	SettingsServiceURL      string
+	NotificationServiceURL  string
+	CustomDomainServiceURL  string
+	TenantRouterServiceURL  string
 }
 
 // URLConfig holds URL generation configuration for tenant subdomains
@@ -155,8 +157,10 @@ func New() *Config {
 			RazorPayKeySecret:    getEnvWithDefault("RAZORPAY_KEY_SECRET", ""),
 		},
 		Integration: IntegrationConfig{
-			SettingsServiceURL:     getEnvWithDefault("SETTINGS_SERVICE_URL", "http://localhost:8104"),
-			NotificationServiceURL: getEnvWithDefault("NOTIFICATION_SERVICE_URL", "http://localhost:8087"),
+			SettingsServiceURL:      getEnvWithDefault("SETTINGS_SERVICE_URL", "http://localhost:8104"),
+			NotificationServiceURL:  getEnvWithDefault("NOTIFICATION_SERVICE_URL", "http://localhost:8087"),
+			CustomDomainServiceURL:  getEnvWithDefault("CUSTOM_DOMAIN_SERVICE_URL", "http://custom-domain-service.marketplace.svc.cluster.local:8093"),
+			TenantRouterServiceURL:  getEnvWithDefault("TENANT_ROUTER_SERVICE_URL", "http://tenant-router-service.marketplace.svc.cluster.local:8089"),
 		},
 		Redis: RedisConfig{
 			Host:     getEnvWithDefault("REDIS_HOST", "localhost"),

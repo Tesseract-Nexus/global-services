@@ -75,22 +75,23 @@ func retryWithBackoff[T any](ctx context.Context, cfg retryConfig, operation str
 
 // OnboardingService handles onboarding business logic
 type OnboardingService struct {
-	onboardingRepo     *repository.OnboardingRepository
-	taskRepo           *repository.TaskRepository
-	businessRepo       *repository.BusinessInformationRepository
-	contactRepo        *repository.ContactInformationRepository
-	credentialRepo     *repository.CredentialRepository
-	verificationSvc    *VerificationService
-	paymentSvc         *PaymentService
-	notificationSvc    *NotificationService
-	membershipSvc      *MembershipService
-	vendorClient       *clients.VendorClient
-	staffClient        *clients.StaffClient
-	tenantRouterClient *clients.TenantRouterClient
-	natsClient         *natsClient.Client
-	keycloakClient     *auth.KeycloakAdminClient
-	keycloakConfig     *KeycloakOnboardingConfig
-	db                 *gorm.DB
+	onboardingRepo       *repository.OnboardingRepository
+	taskRepo             *repository.TaskRepository
+	businessRepo         *repository.BusinessInformationRepository
+	contactRepo          *repository.ContactInformationRepository
+	credentialRepo       *repository.CredentialRepository
+	verificationSvc      *VerificationService
+	paymentSvc           *PaymentService
+	notificationSvc      *NotificationService
+	membershipSvc        *MembershipService
+	vendorClient         *clients.VendorClient
+	staffClient          *clients.StaffClient
+	tenantRouterClient   *clients.TenantRouterClient
+	customDomainClient   *clients.CustomDomainClient
+	natsClient           *natsClient.Client
+	keycloakClient       *auth.KeycloakAdminClient
+	keycloakConfig       *KeycloakOnboardingConfig
+	db                   *gorm.DB
 }
 
 // KeycloakOnboardingConfig holds Keycloak configuration for onboarding
@@ -133,26 +134,34 @@ func NewOnboardingService(
 	}
 	tenantRouterClient := clients.NewTenantRouterClient(tenantRouterServiceURL)
 
+	// Initialize custom-domain-service client for custom domain provisioning
+	customDomainServiceURL := os.Getenv("CUSTOM_DOMAIN_SERVICE_URL")
+	if customDomainServiceURL == "" {
+		customDomainServiceURL = "http://custom-domain-service.marketplace.svc.cluster.local:8093"
+	}
+	customDomainClient := clients.NewCustomDomainClient(customDomainServiceURL)
+
 	// Initialize Keycloak admin client for user registration
 	keycloakClient, keycloakConfig := initKeycloakClient()
 
 	return &OnboardingService{
-		onboardingRepo:     onboardingRepo,
-		taskRepo:           taskRepo,
-		businessRepo:       repository.NewBusinessInformationRepository(db),
-		contactRepo:        repository.NewContactInformationRepository(db),
-		credentialRepo:     repository.NewCredentialRepository(db),
-		verificationSvc:    verificationSvc,
-		paymentSvc:         paymentSvc,
-		notificationSvc:    NewNotificationService(),
-		membershipSvc:      membershipSvc,
-		vendorClient:       vendorClient,
-		staffClient:        staffClient,
-		tenantRouterClient: tenantRouterClient,
-		natsClient:         nc,
-		keycloakClient:     keycloakClient,
-		keycloakConfig:     keycloakConfig,
-		db:                 db,
+		onboardingRepo:       onboardingRepo,
+		taskRepo:             taskRepo,
+		businessRepo:         repository.NewBusinessInformationRepository(db),
+		contactRepo:          repository.NewContactInformationRepository(db),
+		credentialRepo:       repository.NewCredentialRepository(db),
+		verificationSvc:      verificationSvc,
+		paymentSvc:           paymentSvc,
+		notificationSvc:      NewNotificationService(),
+		membershipSvc:        membershipSvc,
+		vendorClient:         vendorClient,
+		staffClient:          staffClient,
+		tenantRouterClient:   tenantRouterClient,
+		customDomainClient:   customDomainClient,
+		natsClient:           nc,
+		keycloakClient:       keycloakClient,
+		keycloakConfig:       keycloakConfig,
+		db:                   db,
 	}
 }
 
@@ -1778,6 +1787,52 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 		}
 	} else {
 		log.Printf("[OnboardingService] WARNING: Tenant router client not initialized")
+	}
+
+	// Create custom domain if user specified one during onboarding
+	// Extract custom domain from store_setup application configuration
+	var useCustomDomain bool
+	var customDomain string
+	for _, config := range session.ApplicationConfigurations {
+		if config.ApplicationType == "store_setup" {
+			var configData map[string]interface{}
+			if err := json.Unmarshal(config.ConfigurationData, &configData); err == nil {
+				if useCD, exists := configData["use_custom_domain"]; exists {
+					if v, ok := useCD.(bool); ok {
+						useCustomDomain = v
+					}
+				}
+				if cd, exists := configData["custom_domain"]; exists {
+					if v, ok := cd.(string); ok {
+						customDomain = v
+					}
+				}
+			}
+			break
+		}
+	}
+
+	// If custom domain was specified, create it in custom-domain-service
+	if useCustomDomain && customDomain != "" && s.customDomainClient != nil {
+		log.Printf("[OnboardingService] Creating custom domain %s for tenant %s", customDomain, tenantID)
+		domainReq := &clients.CreateDomainRequest{
+			Domain:      customDomain,
+			TargetType:  "storefront",
+			RedirectWWW: true,
+			ForceHTTPS:  true,
+			IsPrimary:   true,
+		}
+		domainCtx, domainCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		domainResp, domainErr := s.customDomainClient.CreateDomain(domainCtx, tenantID.String(), domainReq)
+		domainCancel()
+		if domainErr != nil {
+			// Log but don't fail - custom domain is not critical for basic tenant operation
+			log.Printf("[OnboardingService] WARNING: Failed to create custom domain %s for tenant %s: %v", customDomain, tenantID, domainErr)
+		} else {
+			log.Printf("[OnboardingService] Created custom domain %s for tenant %s (status: %s)", customDomain, tenantID, domainResp.Status)
+		}
+	} else if useCustomDomain && customDomain != "" && s.customDomainClient == nil {
+		log.Printf("[OnboardingService] WARNING: Custom domain requested but custom-domain-service client not initialized")
 	}
 
 	return response, nil

@@ -250,15 +250,17 @@ func (h *OnboardingHandler) UpdateBusinessAddress(c *gin.Context) {
 
 // UpdateStoreSetupRequest represents the store setup form data
 type UpdateStoreSetupRequest struct {
-	Subdomain      string `json:"subdomain"`
-	StorefrontSlug string `json:"storefront_slug"`
-	Currency       string `json:"currency"`
-	Timezone       string `json:"timezone"`
-	Language       string `json:"language"`
-	BusinessModel  string `json:"business_model"`
-	LogoURL        string `json:"logo_url"`
-	PrimaryColor   string `json:"primary_color"`
-	SecondaryColor string `json:"secondary_color"`
+	Subdomain       string `json:"subdomain"`
+	StorefrontSlug  string `json:"storefront_slug"`
+	Currency        string `json:"currency"`
+	Timezone        string `json:"timezone"`
+	Language        string `json:"language"`
+	BusinessModel   string `json:"business_model"`
+	LogoURL         string `json:"logo_url"`
+	PrimaryColor    string `json:"primary_color"`
+	SecondaryColor  string `json:"secondary_color"`
+	UseCustomDomain bool   `json:"use_custom_domain"`
+	CustomDomain    string `json:"custom_domain"`
 }
 
 // UpdateStoreSetup saves store setup to application_configurations
