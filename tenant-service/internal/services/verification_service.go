@@ -319,6 +319,19 @@ func (s *VerificationService) VerifyCodeWithRecipient(ctx context.Context, sessi
 		return nil, fmt.Errorf("%s", resp.Message)
 	}
 
+	// Store verification status in Redis so IsEmailVerifiedByRecipient can find it later
+	// This is critical for OTP-based verification where the verification-service may not
+	// persist the status after verification
+	if s.redisClient != nil && (purpose == "email_verification" || purpose == "email") {
+		// Store for 24 hours - enough time for account setup to complete
+		if err := s.redisClient.SaveEmailVerificationStatus(ctx, recipient, sessionID.String(), true, 24*time.Hour); err != nil {
+			log.Printf("[VerificationService] Warning: Failed to save verification status to Redis: %v", err)
+			// Don't fail - this is just a cache for faster lookups
+		} else {
+			log.Printf("[VerificationService] Saved email verification status to Redis for %s", recipient)
+		}
+	}
+
 	// Map response to VerificationRecord
 	verificationType := "email"
 	if purpose == "phone_verification" {
