@@ -47,7 +47,7 @@ type TenantInfo struct {
 
 // GetTenant retrieves tenant information by ID
 func (t *TenantClient) GetTenant(ctx context.Context, tenantID uuid.UUID) (*TenantInfo, error) {
-	url := fmt.Sprintf("%s/api/v1/internal/tenants/%s", t.cfg.Tenant.ServiceURL, tenantID.String())
+	url := fmt.Sprintf("%s/internal/tenants/%s", t.cfg.Tenant.ServiceURL, tenantID.String())
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -79,7 +79,7 @@ func (t *TenantClient) GetTenant(ctx context.Context, tenantID uuid.UUID) (*Tena
 
 // GetTenantBySlug retrieves tenant information by slug
 func (t *TenantClient) GetTenantBySlug(ctx context.Context, slug string) (*TenantInfo, error) {
-	url := fmt.Sprintf("%s/api/v1/internal/tenants/by-slug/%s", t.cfg.Tenant.ServiceURL, slug)
+	url := fmt.Sprintf("%s/internal/tenants/by-slug/%s", t.cfg.Tenant.ServiceURL, slug)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -146,7 +146,7 @@ func (t *TenantClient) ValidateTenantStatus(ctx context.Context, tenantID uuid.U
 
 // NotifyDomainStatusChange notifies tenant service of domain status changes
 func (t *TenantClient) NotifyDomainStatusChange(ctx context.Context, tenantID uuid.UUID, domain string, status string) error {
-	url := fmt.Sprintf("%s/api/v1/internal/tenants/%s/domain-status", t.cfg.Tenant.ServiceURL, tenantID.String())
+	url := fmt.Sprintf("%s/internal/tenants/%s/domain-status", t.cfg.Tenant.ServiceURL, tenantID.String())
 
 	payload := map[string]string{
 		"domain": domain,
