@@ -87,6 +87,10 @@ type CustomDomain struct {
 	DNSLastCheckedAt   *time.Time         `json:"dns_last_checked_at"`
 	DNSCheckAttempts   int                `json:"dns_check_attempts" gorm:"default:0"`
 
+	// Session tracking for security - each onboarding session gets a unique verification token
+	// This prevents cross-tenant token reuse and verification hijacking
+	SessionID string `json:"session_id" gorm:"size:100;index"`
+
 	// SSL/TLS
 	SSLStatus         SSLStatus  `json:"ssl_status" gorm:"size:20;default:'pending'"`
 	SSLProvider       string     `json:"ssl_provider" gorm:"size:50;default:'letsencrypt'"`

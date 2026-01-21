@@ -204,8 +204,24 @@ func (s *DomainService) ValidateDomain(ctx context.Context, req *ValidateDomainR
 			response.Message = "This domain is already registered with another store"
 			return response, nil
 		}
-		// Domain exists but is pending - reuse its verification token
-		log.Info().Str("domain", domainName).Str("id", existingDomain.ID.String()).Msg("Reusing existing pending domain record")
+		// Domain exists but is pending - check if same session
+		// SECURITY: Only reuse token if session_id matches to prevent cross-tenant token reuse
+		if req.SessionID != "" && existingDomain.SessionID == req.SessionID {
+			log.Info().
+				Str("domain", domainName).
+				Str("id", existingDomain.ID.String()).
+				Str("session_id", req.SessionID).
+				Msg("Reusing existing pending domain record for same session")
+		} else {
+			// Different session trying to claim same domain - log warning and generate new token
+			log.Warn().
+				Str("domain", domainName).
+				Str("existing_session", existingDomain.SessionID).
+				Str("new_session", req.SessionID).
+				Msg("Different session attempting to claim pending domain, will generate new token")
+			// Clear existingDomain so we don't reuse its token
+			existingDomain = nil
+		}
 	}
 
 	response.Available = true
@@ -215,26 +231,39 @@ func (s *DomainService) ValidateDomain(ctx context.Context, req *ValidateDomainR
 	response.DomainType = string(domainType)
 
 	// Get or create verification token
+	// SECURITY: Each session gets a unique token to prevent verification hijacking
 	var verificationToken string
 	var verificationID string
 
-	if existingDomain != nil && existingDomain.VerificationToken != "" {
-		// Reuse existing token from pending record
+	if existingDomain != nil && existingDomain.VerificationToken != "" && existingDomain.SessionID == req.SessionID {
+		// Reuse existing token ONLY if session matches (security check)
 		verificationToken = existingDomain.VerificationToken
 		verificationID = existingDomain.ID.String()
-	} else if req.VerificationToken != "" && len(req.VerificationToken) >= 8 {
-		// Reuse the token passed from frontend (session persistence)
+		log.Info().
+			Str("domain", domainName).
+			Str("session_id", req.SessionID).
+			Msg("Reusing verification token for same session")
+	} else if req.VerificationToken != "" && len(req.VerificationToken) >= 8 && req.SessionID != "" {
+		// Reuse the token passed from frontend ONLY if session is provided (for session persistence)
 		verificationToken = req.VerificationToken
-		log.Info().Str("domain", domainName).Msg("Reusing verification token from request")
+		log.Info().
+			Str("domain", domainName).
+			Str("session_id", req.SessionID).
+			Msg("Reusing verification token from request for session")
 	} else {
-		// Generate new token
+		// Generate new unique token for this session
 		verificationToken = uuid.New().String()[:32]
+		log.Info().
+			Str("domain", domainName).
+			Str("session_id", req.SessionID).
+			Str("token_prefix", verificationToken[:8]).
+			Msg("Generated new unique verification token")
 
 		// If tenant_id is provided, create a pending domain record to store the token
 		if req.TenantID != "" {
 			tenantUUID, parseErr := uuid.Parse(req.TenantID)
 			if parseErr == nil {
-				// Create pending domain record
+				// Create pending domain record with session_id for security
 				pendingDomain := &models.CustomDomain{
 					TenantID:           tenantUUID,
 					TenantSlug:         req.TenantSlug,
@@ -243,6 +272,7 @@ func (s *DomainService) ValidateDomain(ctx context.Context, req *ValidateDomainR
 					TargetType:         models.TargetTypeStorefront,
 					VerificationMethod: models.VerificationMethodCNAME,
 					VerificationToken:  verificationToken,
+					SessionID:          req.SessionID, // SECURITY: Track session for token isolation
 					Status:             models.DomainStatusPending,
 					StatusMessage:      "Waiting for DNS verification",
 				}
@@ -254,7 +284,8 @@ func (s *DomainService) ValidateDomain(ctx context.Context, req *ValidateDomainR
 						Str("domain", domainName).
 						Str("id", pendingDomain.ID.String()).
 						Str("tenant_id", req.TenantID).
-						Msg("Created pending domain record for verification")
+						Str("session_id", req.SessionID).
+						Msg("Created pending domain record for verification with session tracking")
 					verificationID = pendingDomain.ID.String()
 
 					// Log activity
