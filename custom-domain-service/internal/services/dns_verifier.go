@@ -284,27 +284,37 @@ func (v *DNSVerifier) ValidateDomainFormat(domain string) error {
 // This is a quick check with a short timeout to avoid hanging
 func (v *DNSVerifier) CheckDomainExists(ctx context.Context, domainName string) (bool, error) {
 	// Use a short timeout for this check
-	checkCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	checkCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	// Extract the base domain (apex) for NS lookup
 	// e.g., "shop.example.com" -> "example.com"
 	baseDomain := v.getBaseDomain(domainName)
 
+	// Use the system's default DNS resolver (CoreDNS in Kubernetes)
+	// instead of the custom resolver which uses hardcoded Google DNS
+	// This allows the lookup to work within cluster network policies
+	systemResolver := &net.Resolver{
+		PreferGo: true,
+	}
+
 	// Look up NS records for the base domain
-	ns, err := v.resolver.LookupNS(checkCtx, baseDomain)
+	ns, err := systemResolver.LookupNS(checkCtx, baseDomain)
 	if err != nil {
 		if dnsErr, ok := err.(*net.DNSError); ok {
-			// Only return false for definitive "not found" (NXDOMAIN) errors
-			// For network errors, timeouts, or temporary issues, assume domain exists
-			if dnsErr.IsNotFound && !dnsErr.IsTemporary && !dnsErr.IsTimeout {
+			// NXDOMAIN means domain definitely doesn't exist
+			if dnsErr.IsNotFound {
 				log.Info().Str("domain", baseDomain).Msg("Domain not found (NXDOMAIN)")
 				return false, nil
 			}
+			// Timeout - could be network issue, log but don't fail user
+			if dnsErr.IsTimeout {
+				log.Warn().Str("domain", baseDomain).Msg("DNS lookup timed out, assuming domain exists")
+				return true, nil
+			}
 		}
-		// For all other errors (network issues, timeouts, etc.), assume domain exists
-		// This prevents blocking users when DNS lookup fails due to network policies
-		log.Debug().Err(err).Str("domain", baseDomain).Msg("NS lookup failed, assuming domain exists")
+		// For other errors, log and assume exists to not block user
+		log.Warn().Err(err).Str("domain", baseDomain).Msg("NS lookup failed, assuming domain exists")
 		return true, nil
 	}
 
