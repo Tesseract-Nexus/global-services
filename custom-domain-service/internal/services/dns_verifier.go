@@ -155,6 +155,15 @@ func (v *DNSVerifier) verifyCNAMERecord(ctx context.Context, domain *models.Cust
 	return result, nil
 }
 
+// LookupCNAME performs a CNAME lookup for a given host
+func (v *DNSVerifier) LookupCNAME(ctx context.Context, host string) (string, error) {
+	cname, err := v.resolver.LookupCNAME(ctx, host)
+	if err != nil {
+		return "", err
+	}
+	return cname, nil
+}
+
 // VerifyTunnelCNAME verifies that the domain's CNAME points to the Cloudflare tunnel
 func (v *DNSVerifier) VerifyTunnelCNAME(ctx context.Context, domain string) (bool, string, error) {
 	if !v.cfg.Cloudflare.Enabled || v.cfg.Cloudflare.TunnelID == "" {

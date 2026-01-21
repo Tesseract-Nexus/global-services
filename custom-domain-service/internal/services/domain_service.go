@@ -368,25 +368,23 @@ func (s *DomainService) VerifyDomainByName(ctx context.Context, req *VerifyDomai
 		response.DomainID = existingDomain.ID.String()
 	}
 
-	// Create a temporary domain object for verification
-	tempDomain := &models.CustomDomain{
-		Domain:             domainName,
-		VerificationMethod: models.VerificationMethodCNAME,
-		VerificationToken:  req.VerificationToken,
-	}
-
-	// Use the DNS verifier to check the record
-	result, err := s.dnsVerifier.VerifyDomain(ctx, tempDomain)
-	if err != nil {
-		log.Error().Err(err).Str("domain", domainName).Msg("DNS verification failed")
-		response.Message = "DNS verification failed. Please try again later."
+	// Directly verify CNAME using the verification_host from request
+	// This is more reliable than reconstructing from token
+	cname, lookupErr := s.dnsVerifier.LookupCNAME(ctx, verificationHost)
+	if lookupErr != nil {
+		log.Warn().Err(lookupErr).Str("host", verificationHost).Msg("CNAME lookup failed")
+		response.Message = fmt.Sprintf("CNAME record not found at %s. Please add: %s CNAME %s", verificationHost, verificationHost, expectedValue)
 		return response, nil
 	}
 
-	response.DNSRecordFound = result.RecordFound != ""
-	response.DNSRecordValue = result.RecordFound
+	// Normalize CNAME result
+	cname = strings.TrimSuffix(strings.ToLower(cname), ".")
+	response.DNSRecordFound = cname != ""
+	response.DNSRecordValue = cname
 
-	if result.IsVerified {
+	// Check if CNAME points to expected value
+	isVerified := cname == expectedValue || cname == expectedValue+"."
+	if isVerified {
 		response.DNSVerified = true
 		response.SSLProvisioning = true
 		response.SSLStatus = "provisioning"
@@ -403,7 +401,7 @@ func (s *DomainService) VerifyDomainByName(ctx context.Context, req *VerifyDomai
 			}
 		}
 	} else {
-		response.Message = result.Message
+		response.Message = fmt.Sprintf("CNAME record found but points to %s instead of %s", cname, expectedValue)
 	}
 
 	return response, nil
