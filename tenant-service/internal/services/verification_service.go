@@ -126,6 +126,15 @@ func (s *VerificationService) startEmailVerificationWithLink(ctx context.Context
 
 // startEmailVerificationWithLinkAndBusinessName generates token and sends verification link with business name
 func (s *VerificationService) startEmailVerificationWithLinkAndBusinessName(ctx context.Context, sessionID uuid.UUID, email, businessName string) (*models.VerificationRecord, error) {
+	// SECURITY: Invalidate any previous tokens for this session
+	// This prevents old tokens (potentially with different emails) from being used
+	if err := s.redisClient.InvalidateSessionTokens(ctx, sessionID.String()); err != nil {
+		log.Printf("[VerificationService] Warning: failed to invalidate old tokens for session %s: %v", sessionID, err)
+		// Continue anyway - this is a security enhancement, not a blocker
+	} else {
+		log.Printf("[VerificationService] Invalidated previous verification tokens for session %s", sessionID)
+	}
+
 	// Generate secure token
 	token, err := s.generateSecureToken()
 	if err != nil {
@@ -223,6 +232,24 @@ func (s *VerificationService) VerifyByToken(ctx context.Context, token string) (
 	sessionID, err := uuid.Parse(tokenData.SessionID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid session ID in token: %w", err)
+	}
+
+	// SECURITY: Validate that token email matches the session's current contact email
+	// This prevents using old tokens with different emails after contact info was changed
+	if s.onboardingRepo != nil {
+		session, err := s.onboardingRepo.GetSessionByID(ctx, sessionID, []string{"contact_information"})
+		if err != nil {
+			log.Printf("[VerificationService] Warning: Could not validate token email against session: %v", err)
+			// Continue - session might be in a state where contact info isn't available
+		} else if session != nil && len(session.ContactInformation) > 0 {
+			currentEmail := session.ContactInformation[0].Email
+			if currentEmail != "" && strings.ToLower(currentEmail) != strings.ToLower(tokenData.Email) {
+				log.Printf("[VerificationService] SECURITY: Token email mismatch! Token has %s but session contact is %s",
+					tokenData.Email, currentEmail)
+				return nil, fmt.Errorf("verification token is invalid: email does not match current session contact")
+			}
+			log.Printf("[VerificationService] Token email validated against session contact: %s", tokenData.Email)
+		}
 	}
 
 	// Mark email as verified in Redis

@@ -51,6 +51,7 @@ const (
 	ReminderKeyPrefix        = "draft:reminder:"
 	VerificationTokenPrefix  = "verify:token:"
 	VerificationStatusPrefix = "verify:status:"
+	SessionTokensPrefix      = "session:tokens:" // Tracks active tokens per session
 )
 
 // DraftData represents the cached draft data
@@ -234,7 +235,7 @@ type EmailVerificationStatus struct {
 	VerifiedAt *time.Time `json:"verified_at,omitempty"`
 }
 
-// SaveVerificationToken saves a verification token to Redis
+// SaveVerificationToken saves a verification token to Redis and tracks it under the session
 func (c *Client) SaveVerificationToken(ctx context.Context, token string, data *VerificationTokenData, ttl time.Duration) error {
 	key := VerificationTokenPrefix + token
 	data.CreatedAt = time.Now()
@@ -245,7 +246,52 @@ func (c *Client) SaveVerificationToken(ctx context.Context, token string, data *
 		return fmt.Errorf("failed to marshal verification token data: %w", err)
 	}
 
-	return c.rdb.Set(ctx, key, jsonData, ttl).Err()
+	// Save the token
+	if err := c.rdb.Set(ctx, key, jsonData, ttl).Err(); err != nil {
+		return err
+	}
+
+	// Track this token under the session for invalidation purposes
+	// Store the token in a set associated with the session
+	sessionTokensKey := SessionTokensPrefix + data.SessionID
+	if err := c.rdb.SAdd(ctx, sessionTokensKey, token).Err(); err != nil {
+		// Log but don't fail - token is already saved
+		fmt.Printf("Warning: failed to track token under session: %v\n", err)
+	}
+	// Set expiry on the session tokens set (same as token TTL)
+	c.rdb.Expire(ctx, sessionTokensKey, ttl)
+
+	return nil
+}
+
+// InvalidateSessionTokens invalidates all verification tokens for a session
+// This should be called when a new verification email is sent to prevent old tokens from being used
+func (c *Client) InvalidateSessionTokens(ctx context.Context, sessionID string) error {
+	sessionTokensKey := SessionTokensPrefix + sessionID
+
+	// Get all tokens for this session
+	tokens, err := c.rdb.SMembers(ctx, sessionTokensKey).Result()
+	if err != nil {
+		if err == redis.Nil {
+			return nil // No tokens to invalidate
+		}
+		return fmt.Errorf("failed to get session tokens: %w", err)
+	}
+
+	// Delete each token
+	for _, token := range tokens {
+		tokenKey := VerificationTokenPrefix + token
+		if err := c.rdb.Del(ctx, tokenKey).Err(); err != nil {
+			fmt.Printf("Warning: failed to delete token %s: %v\n", token, err)
+		}
+	}
+
+	// Clear the session tokens set
+	if err := c.rdb.Del(ctx, sessionTokensKey).Err(); err != nil {
+		return fmt.Errorf("failed to delete session tokens set: %w", err)
+	}
+
+	return nil
 }
 
 // GetVerificationToken retrieves verification token data from Redis
