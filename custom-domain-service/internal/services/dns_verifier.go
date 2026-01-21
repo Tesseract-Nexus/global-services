@@ -21,17 +21,13 @@ type DNSVerifier struct {
 
 // NewDNSVerifier creates a new DNS verifier
 func NewDNSVerifier(cfg *config.Config) *DNSVerifier {
+	// Use the system's default DNS resolver (CoreDNS in Kubernetes)
+	// This works within cluster network policies unlike hardcoded external DNS
 	return &DNSVerifier{
 		cfg: cfg,
 		resolver: &net.Resolver{
 			PreferGo: true,
-			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-				d := net.Dialer{
-					Timeout: 10 * time.Second,
-				}
-				// Use Google and Cloudflare DNS servers for reliable resolution
-				return d.DialContext(ctx, "udp", "8.8.8.8:53")
-			},
+			// Use default dialer which respects /etc/resolv.conf (CoreDNS in K8s)
 		},
 	}
 }

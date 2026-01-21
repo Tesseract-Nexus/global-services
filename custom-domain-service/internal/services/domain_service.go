@@ -19,13 +19,14 @@ import (
 
 // DomainService handles domain business logic
 type DomainService struct {
-	cfg           *config.Config
-	repo          *repository.DomainRepository
-	dnsVerifier   *DNSVerifier
-	k8sClient     *clients.KubernetesClient
-	keycloak      *clients.KeycloakClient
-	tenantClient  *clients.TenantClient
-	redisClient   *redis.Client
+	cfg            *config.Config
+	repo           *repository.DomainRepository
+	dnsVerifier    *DNSVerifier
+	k8sClient      *clients.KubernetesClient
+	keycloak       *clients.KeycloakClient
+	tenantClient   *clients.TenantClient
+	cloudflare     *clients.CloudflareClient
+	redisClient    *redis.Client
 	eventPublisher *events.Publisher
 }
 
@@ -37,6 +38,7 @@ func NewDomainService(
 	k8sClient *clients.KubernetesClient,
 	keycloak *clients.KeycloakClient,
 	tenantClient *clients.TenantClient,
+	cloudflare *clients.CloudflareClient,
 	redisClient *redis.Client,
 	eventPublisher *events.Publisher,
 ) *DomainService {
@@ -47,6 +49,7 @@ func NewDomainService(
 		k8sClient:      k8sClient,
 		keycloak:       keycloak,
 		tenantClient:   tenantClient,
+		cloudflare:     cloudflare,
 		redisClient:    redisClient,
 		eventPublisher: eventPublisher,
 	}
@@ -360,19 +363,29 @@ func (s *DomainService) DeleteDomain(ctx context.Context, tenantID, domainID uui
 		log.Warn().Err(err).Msg("Failed to update status to deleting")
 	}
 
+	// Cleanup Cloudflare Tunnel route
+	if s.cfg.Cloudflare.Enabled && s.cloudflare != nil {
+		if err := s.cloudflare.RemoveDomainFromTunnel(ctx, domain); err != nil {
+			log.Warn().Err(err).Str("domain", domain.Domain).Msg("Failed to remove domain from Cloudflare Tunnel")
+		}
+	}
+
 	// Cleanup Kubernetes resources
 	if domain.Status == models.DomainStatusActive || domain.RoutingStatus == models.RoutingStatusActive {
 		if err := s.k8sClient.DeleteVirtualService(ctx, domain); err != nil {
 			log.Warn().Err(err).Str("domain", domain.Domain).Msg("Failed to delete VirtualService")
 		}
 
-		if err := s.k8sClient.RemoveFromGateway(ctx, domain); err != nil {
-			log.Warn().Err(err).Str("domain", domain.Domain).Msg("Failed to remove from gateway")
+		// Only remove from Gateway if not using Cloudflare Tunnel
+		if !s.cfg.Cloudflare.Enabled {
+			if err := s.k8sClient.RemoveFromGateway(ctx, domain); err != nil {
+				log.Warn().Err(err).Str("domain", domain.Domain).Msg("Failed to remove from gateway")
+			}
 		}
 	}
 
-	// Cleanup certificate
-	if domain.SSLStatus != models.SSLStatusPending {
+	// Cleanup certificate (only if not using Cloudflare Tunnel)
+	if !s.cfg.Cloudflare.Enabled && domain.SSLStatus != models.SSLStatusPending {
 		if err := s.k8sClient.DeleteCertificate(ctx, domain); err != nil {
 			log.Warn().Err(err).Str("domain", domain.Domain).Msg("Failed to delete certificate")
 		}
@@ -453,14 +466,95 @@ func (s *DomainService) VerifyDomain(ctx context.Context, tenantID, domainID uui
 func (s *DomainService) provisionDomain(ctx context.Context, domain *models.CustomDomain) {
 	log.Info().Str("domain", domain.Domain).Msg("Starting domain provisioning")
 
+	// Check if Cloudflare Tunnel is enabled
+	if s.cfg.Cloudflare.Enabled && s.cloudflare != nil {
+		s.provisionDomainWithCloudflare(ctx, domain)
+		return
+	}
+
+	// Legacy provisioning with cert-manager
+	s.provisionDomainWithCertManager(ctx, domain)
+}
+
+// provisionDomainWithCloudflare provisions a domain using Cloudflare Tunnel
+// SSL is handled by Cloudflare, no cert-manager needed
+func (s *DomainService) provisionDomainWithCloudflare(ctx context.Context, domain *models.CustomDomain) {
+	log.Info().Str("domain", domain.Domain).Msg("Provisioning domain via Cloudflare Tunnel")
+
+	// Step 1: Add domain to Cloudflare Tunnel
+	if err := s.cloudflare.AddDomainToTunnel(ctx, domain); err != nil {
+		log.Error().Err(err).Str("domain", domain.Domain).Msg("Failed to add domain to Cloudflare Tunnel")
+		s.repo.UpdateStatus(ctx, domain.ID, models.DomainStatusFailed, "Failed to configure Cloudflare Tunnel. Please contact support.")
+		s.logActivity(ctx, domain, "cloudflare_tunnel", "failed", "Failed to add domain to tunnel")
+		domain.Status = models.DomainStatusFailed
+		domain.StatusMessage = "Cloudflare Tunnel configuration failed"
+		s.publishDomainEvent(ctx, events.DomainFailed, domain, string(models.DomainStatusPending))
+		return
+	}
+
+	// Mark SSL as active (Cloudflare handles SSL)
+	s.repo.UpdateSSLStatus(ctx, domain.ID, models.SSLStatusActive, "cloudflare-managed", nil, "")
+	s.logActivity(ctx, domain, "ssl_provisioning", "success", "SSL managed by Cloudflare")
+	domain.SSLStatus = models.SSLStatusActive
+	s.publishDomainEvent(ctx, events.DomainSSLProvisioned, domain, string(models.SSLStatusProvisioning))
+
+	// Step 2: Configure routing (VirtualService only, no Gateway patching needed)
+	vsResult, err := s.k8sClient.CreateVirtualService(ctx, domain)
+	if err != nil {
+		log.Error().Err(err).Str("domain", domain.Domain).Msg("Failed to create VirtualService")
+		s.repo.UpdateStatus(ctx, domain.ID, models.DomainStatusFailed, "Routing configuration failed. Please contact support.")
+		s.logActivity(ctx, domain, "routing", "failed", "VirtualService creation failed")
+		domain.Status = models.DomainStatusFailed
+		domain.StatusMessage = "Routing configuration failed"
+		s.publishDomainEvent(ctx, events.DomainFailed, domain, string(models.DomainStatusPending))
+		return
+	}
+
+	s.repo.UpdateRoutingStatus(ctx, domain.ID, models.RoutingStatusActive, vsResult.Name, true)
+	s.logActivity(ctx, domain, "routing", "success", "VirtualService configured for Cloudflare Tunnel")
+
+	// Step 3: Update Keycloak redirect URIs
+	if err := s.keycloak.AddDomainRedirectURIs(ctx, domain); err != nil {
+		log.Error().Err(err).Str("domain", domain.Domain).Msg("Failed to update Keycloak")
+		s.logActivity(ctx, domain, "keycloak", "failed", "Authentication configuration update failed")
+	} else {
+		s.repo.UpdateKeycloakStatus(ctx, domain.ID, true)
+		s.logActivity(ctx, domain, "keycloak", "success", "Keycloak redirect URIs updated")
+	}
+
+	// Step 4: Activate domain
+	previousStatus := string(domain.Status)
+	if err := s.repo.UpdateStatus(ctx, domain.ID, models.DomainStatusActive, "Domain is active and ready to use"); err != nil {
+		log.Error().Err(err).Str("domain", domain.Domain).Msg("Failed to activate domain")
+		return
+	}
+
+	// Cache the domain resolution
+	s.cacheDomainResolution(ctx, domain)
+
+	log.Info().Str("domain", domain.Domain).Msg("Domain provisioning via Cloudflare Tunnel completed successfully")
+	s.logActivity(ctx, domain, "activated", "success", "Domain is now active via Cloudflare Tunnel")
+
+	// Publish domain activated event
+	domain.Status = models.DomainStatusActive
+	domain.StatusMessage = "Domain is active and ready to use"
+	domain.RoutingStatus = models.RoutingStatusActive
+	s.publishDomainEvent(ctx, events.DomainActivated, domain, previousStatus)
+
+	// Notify tenant service
+	s.tenantClient.NotifyDomainStatusChange(ctx, domain.TenantID, domain.Domain, "active")
+}
+
+// provisionDomainWithCertManager provisions a domain using cert-manager (legacy)
+func (s *DomainService) provisionDomainWithCertManager(ctx context.Context, domain *models.CustomDomain) {
+	log.Info().Str("domain", domain.Domain).Msg("Provisioning domain via cert-manager (legacy)")
+
 	// Step 1: Create SSL certificate
 	certResult, err := s.k8sClient.CreateCertificate(ctx, domain)
 	if err != nil {
 		log.Error().Err(err).Str("domain", domain.Domain).Msg("Failed to create certificate")
-		// Use generic message for user-facing status - detailed error logged above
 		s.repo.UpdateStatus(ctx, domain.ID, models.DomainStatusFailed, "SSL certificate creation failed. Please contact support if the issue persists.")
 		s.logActivity(ctx, domain, "ssl_provisioning", "failed", "Certificate creation failed")
-		// Publish domain failed event
 		domain.Status = models.DomainStatusFailed
 		domain.StatusMessage = "SSL certificate creation failed"
 		s.publishDomainEvent(ctx, events.DomainFailed, domain, string(models.DomainStatusPending))
@@ -483,7 +577,6 @@ func (s *DomainService) provisionDomain(ctx context.Context, domain *models.Cust
 			log.Warn().Str("domain", domain.Domain).Msg("Certificate provisioning timed out")
 			s.repo.UpdateSSLStatus(ctx, domain.ID, models.SSLStatusFailed, certResult.SecretName, nil, "Certificate provisioning timed out")
 			s.repo.UpdateStatus(ctx, domain.ID, models.DomainStatusFailed, "SSL certificate provisioning timed out")
-			// Publish domain failed event
 			domain.Status = models.DomainStatusFailed
 			domain.StatusMessage = "SSL certificate provisioning timed out"
 			s.publishDomainEvent(ctx, events.DomainFailed, domain, string(models.DomainStatusPending))
@@ -498,7 +591,6 @@ func (s *DomainService) provisionDomain(ctx context.Context, domain *models.Cust
 			if certStatus.IsReady {
 				s.repo.UpdateSSLStatus(ctx, domain.ID, models.SSLStatusActive, certStatus.SecretName, certStatus.ExpiresAt, "")
 				s.logActivity(ctx, domain, "ssl_provisioning", "success", "SSL certificate issued and active")
-				// Publish SSL provisioned event
 				domain.SSLStatus = models.SSLStatusActive
 				domain.SSLExpiresAt = certStatus.ExpiresAt
 				s.publishDomainEvent(ctx, events.DomainSSLProvisioned, domain, string(models.SSLStatusProvisioning))
@@ -506,12 +598,10 @@ func (s *DomainService) provisionDomain(ctx context.Context, domain *models.Cust
 			}
 
 			if certStatus.Status == models.SSLStatusFailed {
-				// Log detailed error server-side only
 				log.Error().Str("domain", domain.Domain).Str("cert_error", certStatus.Error).Msg("Certificate provisioning failed")
 				s.repo.UpdateSSLStatus(ctx, domain.ID, models.SSLStatusFailed, certStatus.SecretName, nil, "Certificate validation failed")
 				s.repo.UpdateStatus(ctx, domain.ID, models.DomainStatusFailed, "SSL certificate provisioning failed. Please verify your DNS configuration.")
 				s.logActivity(ctx, domain, "ssl_provisioning", "failed", "Certificate provisioning failed")
-				// Publish domain failed event
 				domain.Status = models.DomainStatusFailed
 				domain.StatusMessage = "SSL certificate provisioning failed"
 				s.publishDomainEvent(ctx, events.DomainFailed, domain, string(models.DomainStatusPending))
@@ -525,10 +615,8 @@ configureRouting:
 	vsResult, err := s.k8sClient.CreateVirtualService(ctx, domain)
 	if err != nil {
 		log.Error().Err(err).Str("domain", domain.Domain).Msg("Failed to create VirtualService")
-		// Use generic message for user-facing status - detailed error logged above
 		s.repo.UpdateStatus(ctx, domain.ID, models.DomainStatusFailed, "Routing configuration failed. Please contact support.")
 		s.logActivity(ctx, domain, "routing", "failed", "VirtualService creation failed")
-		// Publish domain failed event
 		domain.Status = models.DomainStatusFailed
 		domain.StatusMessage = "Routing configuration failed"
 		s.publishDomainEvent(ctx, events.DomainFailed, domain, string(models.DomainStatusPending))
@@ -537,10 +625,8 @@ configureRouting:
 
 	if err := s.k8sClient.PatchGateway(ctx, domain); err != nil {
 		log.Error().Err(err).Str("domain", domain.Domain).Msg("Failed to patch gateway")
-		// Use generic message for user-facing status - detailed error logged above
 		s.repo.UpdateStatus(ctx, domain.ID, models.DomainStatusFailed, "Gateway configuration failed. Please contact support.")
 		s.logActivity(ctx, domain, "routing", "failed", "Gateway configuration failed")
-		// Publish domain failed event
 		domain.Status = models.DomainStatusFailed
 		domain.StatusMessage = "Gateway configuration failed"
 		s.publishDomainEvent(ctx, events.DomainFailed, domain, string(models.DomainStatusPending))
@@ -553,7 +639,6 @@ configureRouting:
 	// Step 4: Update Keycloak redirect URIs
 	if err := s.keycloak.AddDomainRedirectURIs(ctx, domain); err != nil {
 		log.Error().Err(err).Str("domain", domain.Domain).Msg("Failed to update Keycloak")
-		// Non-critical, don't fail the whole process - use generic message
 		s.logActivity(ctx, domain, "keycloak", "failed", "Authentication configuration update failed")
 	} else {
 		s.repo.UpdateKeycloakStatus(ctx, domain.ID, true)

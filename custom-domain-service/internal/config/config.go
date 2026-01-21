@@ -9,17 +9,18 @@ import (
 )
 
 type Config struct {
-	Server    ServerConfig    `json:"server"`
-	Database  DatabaseConfig  `json:"database"`
-	Redis     RedisConfig     `json:"redis"`
-	NATS      NATSConfig      `json:"nats"`
-	Keycloak  KeycloakConfig  `json:"keycloak"`
-	Istio     IstioConfig     `json:"istio"`
-	DNS       DNSConfig       `json:"dns"`
-	SSL       SSLConfig       `json:"ssl"`
-	Limits    LimitsConfig    `json:"limits"`
-	Tenant    TenantConfig    `json:"tenant"`
-	Workers   WorkersConfig   `json:"workers"`
+	Server     ServerConfig     `json:"server"`
+	Database   DatabaseConfig   `json:"database"`
+	Redis      RedisConfig      `json:"redis"`
+	NATS       NATSConfig       `json:"nats"`
+	Keycloak   KeycloakConfig   `json:"keycloak"`
+	Istio      IstioConfig      `json:"istio"`
+	DNS        DNSConfig        `json:"dns"`
+	SSL        SSLConfig        `json:"ssl"`
+	Cloudflare CloudflareConfig `json:"cloudflare"`
+	Limits     LimitsConfig     `json:"limits"`
+	Tenant     TenantConfig     `json:"tenant"`
+	Workers    WorkersConfig    `json:"workers"`
 }
 
 type ServerConfig struct {
@@ -71,9 +72,10 @@ type DNSConfig struct {
 }
 
 type SSLConfig struct {
-	IssuerName          string `json:"issuer_name"`
-	IssuerKind          string `json:"issuer_kind"`
-	RenewalDaysBefore   int    `json:"renewal_days_before"`
+	IssuerName           string `json:"issuer_name"`
+	IssuerKind           string `json:"issuer_kind"`
+	HTTP01IssuerName     string `json:"http01_issuer_name"`     // Issuer for HTTP-01 challenges (custom domains)
+	RenewalDaysBefore    int    `json:"renewal_days_before"`
 	CertificateNamespace string `json:"certificate_namespace"`
 }
 
@@ -92,6 +94,14 @@ type WorkersConfig struct {
 	CertMonitorInterval     time.Duration `json:"cert_monitor_interval"`
 	HealthCheckInterval     time.Duration `json:"health_check_interval"`
 	CleanupInterval         time.Duration `json:"cleanup_interval"`
+}
+
+type CloudflareConfig struct {
+	Enabled       bool   `json:"enabled"`        // Enable Cloudflare Tunnel for custom domains
+	APIToken      string `json:"api_token"`      // Cloudflare API token with Tunnel permissions
+	AccountID     string `json:"account_id"`     // Cloudflare account ID
+	TunnelID      string `json:"tunnel_id"`      // Cloudflare Tunnel ID
+	OriginService string `json:"origin_service"` // Origin service URL (Istio ingress)
 }
 
 func NewConfig() *Config {
@@ -134,8 +144,16 @@ func NewConfig() *Config {
 		SSL: SSLConfig{
 			IssuerName:           getEnv("SSL_ISSUER_NAME", "letsencrypt-prod"),
 			IssuerKind:           getEnv("SSL_ISSUER_KIND", "ClusterIssuer"),
+			HTTP01IssuerName:     getEnv("SSL_HTTP01_ISSUER_NAME", "letsencrypt-prod-http01"),
 			RenewalDaysBefore:    getIntEnv("SSL_RENEWAL_DAYS_BEFORE", 30),
 			CertificateNamespace: getEnv("SSL_CERTIFICATE_NAMESPACE", "istio-system"),
+		},
+		Cloudflare: CloudflareConfig{
+			Enabled:       getBoolEnv("CLOUDFLARE_TUNNEL_ENABLED", true),
+			APIToken:      getEnv("CLOUDFLARE_API_TOKEN", ""),
+			AccountID:     getEnv("CLOUDFLARE_ACCOUNT_ID", ""),
+			TunnelID:      getEnv("CLOUDFLARE_TUNNEL_ID", ""),
+			OriginService: getEnv("CLOUDFLARE_ORIGIN_SERVICE", "http://istio-ingressgateway.istio-ingress.svc.cluster.local:80"),
 		},
 		Limits: LimitsConfig{
 			MaxDomainsPerTenant:            getIntEnv("MAX_DOMAINS_PER_TENANT", 5),
@@ -210,6 +228,13 @@ func getDurationEnv(key string, fallback time.Duration) time.Duration {
 		if parsed, err := time.ParseDuration(value); err == nil {
 			return parsed
 		}
+	}
+	return fallback
+}
+
+func getBoolEnv(key string, fallback bool) bool {
+	if value := os.Getenv(key); value != "" {
+		return value == "true" || value == "1" || value == "yes"
 	}
 	return fallback
 }

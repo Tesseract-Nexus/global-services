@@ -15,7 +15,10 @@ import (
 	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	certmanagerclient "github.com/cert-manager/cert-manager/pkg/client/clientset/versioned"
 	networkingv1beta1 "istio.io/api/networking/v1beta1"
+	securityv1beta1 "istio.io/api/security/v1beta1"
+	typev1beta1 "istio.io/api/type/v1beta1"
 	"istio.io/client-go/pkg/apis/networking/v1beta1"
+	securityclientv1beta1 "istio.io/client-go/pkg/apis/security/v1beta1"
 	istioclient "istio.io/client-go/pkg/clientset/versioned"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -86,6 +89,12 @@ func (k *KubernetesClient) CreateCertificate(ctx context.Context, domain *models
 		dnsNames = append(dnsNames, "www."+domain.Domain)
 	}
 
+	// Use HTTP-01 issuer for custom domains (external domains can't use DNS-01)
+	issuerName := k.cfg.SSL.HTTP01IssuerName
+	if issuerName == "" {
+		issuerName = k.cfg.SSL.IssuerName
+	}
+
 	cert := &certmanagerv1.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      certName,
@@ -104,7 +113,7 @@ func (k *KubernetesClient) CreateCertificate(ctx context.Context, domain *models
 			SecretName: secretName,
 			DNSNames:   dnsNames,
 			IssuerRef: cmmeta.ObjectReference{
-				Name: k.cfg.SSL.IssuerName,
+				Name: issuerName,
 				Kind: k.cfg.SSL.IssuerKind,
 			},
 			PrivateKey: &certmanagerv1.CertificatePrivateKey{
@@ -398,7 +407,7 @@ func (k *KubernetesClient) createNewVirtualService(ctx context.Context, domain *
 	return result, nil
 }
 
-// PatchGateway adds the domain hosts to the Gateway
+// PatchGateway adds dedicated HTTPS server entries for the custom domain
 func (k *KubernetesClient) PatchGateway(ctx context.Context, domain *models.CustomDomain) error {
 	gateway, err := k.istioClient.NetworkingV1beta1().Gateways(k.cfg.Istio.GatewayNamespace).Get(ctx, k.cfg.Istio.GatewayName, metav1.GetOptions{})
 	if err != nil {
@@ -411,13 +420,58 @@ func (k *KubernetesClient) PatchGateway(ctx context.Context, domain *models.Cust
 		hosts = append(hosts, "www."+domain.Domain)
 	}
 
-	// Find or create HTTPS server
 	tlsSecretName := generateResourceName(domain.Domain, "tls")
-	updated := false
+	serverPortName := "https-" + sanitizeDomain(domain.Domain)
 
+	// Check if HTTPS server for this domain already exists
+	serverExists := false
+	for _, server := range gateway.Spec.Servers {
+		if server.Port != nil && server.Port.Name == serverPortName {
+			serverExists = true
+			break
+		}
+	}
+
+	if !serverExists {
+		// Create a new HTTPS server entry for this custom domain
+		newServer := &networkingv1beta1.Server{
+			Port: &networkingv1beta1.Port{
+				Number:   443,
+				Name:     serverPortName,
+				Protocol: "HTTPS",
+			},
+			Hosts: hosts,
+			Tls: &networkingv1beta1.ServerTLSSettings{
+				Mode:               networkingv1beta1.ServerTLSSettings_SIMPLE,
+				CredentialName:     tlsSecretName,
+				MinProtocolVersion: networkingv1beta1.ServerTLSSettings_TLSV1_2,
+				CipherSuites: []string{
+					"ECDHE-RSA-AES256-GCM-SHA384",
+					"ECDHE-RSA-AES128-GCM-SHA256",
+				},
+			},
+		}
+		gateway.Spec.Servers = append(gateway.Spec.Servers, newServer)
+
+		// Also add to HTTP server for ACME challenges and redirects
+		k.addHostsToHTTPServer(gateway, hosts)
+
+		_, err = k.istioClient.NetworkingV1beta1().Gateways(k.cfg.Istio.GatewayNamespace).Update(ctx, gateway, metav1.UpdateOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to update gateway: %w", err)
+		}
+		log.Info().Str("gateway", k.cfg.Istio.GatewayName).Str("domain", domain.Domain).Msg("Gateway HTTPS server created for custom domain")
+	} else {
+		log.Debug().Str("gateway", k.cfg.Istio.GatewayName).Str("domain", domain.Domain).Msg("Gateway server already exists for domain")
+	}
+
+	return nil
+}
+
+// addHostsToHTTPServer adds hosts to the HTTP (port 80) server for ACME challenges
+func (k *KubernetesClient) addHostsToHTTPServer(gateway *v1beta1.Gateway, hosts []string) {
 	for i, server := range gateway.Spec.Servers {
-		if server.Port != nil && server.Port.Number == 443 && server.Port.Protocol == "HTTPS" {
-			// Add hosts to existing HTTPS server
+		if server.Port != nil && server.Port.Number == 80 && server.Port.Protocol == "HTTP" {
 			for _, host := range hosts {
 				found := false
 				for _, h := range server.Hosts {
@@ -428,49 +482,41 @@ func (k *KubernetesClient) PatchGateway(ctx context.Context, domain *models.Cust
 				}
 				if !found {
 					gateway.Spec.Servers[i].Hosts = append(gateway.Spec.Servers[i].Hosts, host)
-					updated = true
-				}
-			}
-
-			// Add TLS credential if using separate cert
-			if server.Tls != nil && server.Tls.Mode == networkingv1beta1.ServerTLSSettings_SIMPLE {
-				// For SDS mode, we need to ensure the certificate is available
-				if server.Tls.CredentialName == "" {
-					server.Tls.CredentialName = tlsSecretName
-					updated = true
 				}
 			}
 			break
 		}
 	}
-
-	if updated {
-		_, err = k.istioClient.NetworkingV1beta1().Gateways(k.cfg.Istio.GatewayNamespace).Update(ctx, gateway, metav1.UpdateOptions{})
-		if err != nil {
-			return fmt.Errorf("failed to update gateway: %w", err)
-		}
-		log.Info().Str("gateway", k.cfg.Istio.GatewayName).Str("domain", domain.Domain).Msg("Gateway patched")
-	}
-
-	return nil
 }
 
-// RemoveFromGateway removes domain hosts from the Gateway
+// RemoveFromGateway removes the custom domain's HTTPS server entry from the Gateway
 func (k *KubernetesClient) RemoveFromGateway(ctx context.Context, domain *models.CustomDomain) error {
 	gateway, err := k.istioClient.NetworkingV1beta1().Gateways(k.cfg.Istio.GatewayNamespace).Get(ctx, k.cfg.Istio.GatewayName, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get gateway: %w", err)
 	}
 
-	// Build hosts list to remove
+	serverPortName := "https-" + sanitizeDomain(domain.Domain)
+
+	// Build hosts list to remove from HTTP server
 	hostsToRemove := map[string]bool{domain.Domain: true}
 	if domain.IncludeWWW && domain.DomainType == models.DomainTypeApex {
 		hostsToRemove["www."+domain.Domain] = true
 	}
 
+	// Remove the dedicated HTTPS server and hosts from HTTP server
+	newServers := []*networkingv1beta1.Server{}
 	updated := false
-	for i, server := range gateway.Spec.Servers {
-		if server.Port != nil && server.Port.Number == 443 {
+
+	for _, server := range gateway.Spec.Servers {
+		// Skip the dedicated HTTPS server for this domain
+		if server.Port != nil && server.Port.Name == serverPortName {
+			updated = true
+			continue
+		}
+
+		// For HTTP server, remove the custom domain hosts
+		if server.Port != nil && server.Port.Number == 80 && server.Port.Protocol == "HTTP" {
 			newHosts := []string{}
 			for _, h := range server.Hosts {
 				if !hostsToRemove[h] {
@@ -479,16 +525,19 @@ func (k *KubernetesClient) RemoveFromGateway(ctx context.Context, domain *models
 					updated = true
 				}
 			}
-			gateway.Spec.Servers[i].Hosts = newHosts
+			server.Hosts = newHosts
 		}
+
+		newServers = append(newServers, server)
 	}
 
 	if updated {
+		gateway.Spec.Servers = newServers
 		_, err = k.istioClient.NetworkingV1beta1().Gateways(k.cfg.Istio.GatewayNamespace).Update(ctx, gateway, metav1.UpdateOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to update gateway: %w", err)
 		}
-		log.Info().Str("gateway", k.cfg.Istio.GatewayName).Str("domain", domain.Domain).Msg("Domain removed from gateway")
+		log.Info().Str("gateway", k.cfg.Istio.GatewayName).Str("domain", domain.Domain).Msg("Custom domain removed from gateway")
 	}
 
 	return nil
@@ -672,4 +721,112 @@ func (k *KubernetesClient) AnnotateDomainResources(ctx context.Context, domain *
 		metav1.PatchOptions{FieldManager: "custom-domain-service"},
 	)
 	return err
+}
+
+// CreateAuthorizationPolicy creates an AuthorizationPolicy to allow traffic to the custom domain
+func (k *KubernetesClient) CreateAuthorizationPolicy(ctx context.Context, domain *models.CustomDomain) error {
+	policyName := generateResourceName(domain.Domain, "authz")
+
+	// Build hosts list
+	hosts := []string{domain.Domain}
+	if domain.IncludeWWW && domain.DomainType == models.DomainTypeApex {
+		hosts = append(hosts, "www."+domain.Domain)
+	}
+
+	policy := &securityclientv1beta1.AuthorizationPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      policyName,
+			Namespace: k.cfg.Istio.GatewayNamespace,
+			Labels: map[string]string{
+				"app.kubernetes.io/managed-by": "custom-domain-service",
+				"tesserix.app/tenant-id":       domain.TenantID.String(),
+				"tesserix.app/domain-id":       domain.ID.String(),
+			},
+			Annotations: map[string]string{
+				"tesserix.app/domain":     domain.Domain,
+				"tesserix.app/created-at": time.Now().UTC().Format(time.RFC3339),
+			},
+		},
+		Spec: securityv1beta1.AuthorizationPolicy{
+			Selector: &typev1beta1.WorkloadSelector{
+				MatchLabels: map[string]string{
+					"istio": "ingressgateway",
+				},
+			},
+			Action: securityv1beta1.AuthorizationPolicy_ALLOW,
+			Rules: []*securityv1beta1.Rule{
+				{
+					To: []*securityv1beta1.Rule_To{
+						{
+							Operation: &securityv1beta1.Operation{
+								Hosts: hosts,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Check if policy already exists
+	existing, err := k.istioClient.SecurityV1beta1().AuthorizationPolicies(k.cfg.Istio.GatewayNamespace).Get(ctx, policyName, metav1.GetOptions{})
+	if err == nil {
+		// Update existing
+		existing.Spec = policy.Spec
+		existing.Labels = policy.Labels
+		existing.Annotations = policy.Annotations
+		_, err = k.istioClient.SecurityV1beta1().AuthorizationPolicies(k.cfg.Istio.GatewayNamespace).Update(ctx, existing, metav1.UpdateOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to update authorization policy: %w", err)
+		}
+		log.Info().Str("policy", policyName).Msg("Authorization policy updated")
+	} else {
+		// Create new
+		_, err = k.istioClient.SecurityV1beta1().AuthorizationPolicies(k.cfg.Istio.GatewayNamespace).Create(ctx, policy, metav1.CreateOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to create authorization policy: %w", err)
+		}
+		log.Info().Str("policy", policyName).Msg("Authorization policy created")
+	}
+
+	return nil
+}
+
+// DeleteAuthorizationPolicy removes the AuthorizationPolicy for the custom domain
+func (k *KubernetesClient) DeleteAuthorizationPolicy(ctx context.Context, domain *models.CustomDomain) error {
+	policyName := generateResourceName(domain.Domain, "authz")
+	err := k.istioClient.SecurityV1beta1().AuthorizationPolicies(k.cfg.Istio.GatewayNamespace).Delete(ctx, policyName, metav1.DeleteOptions{})
+	if err != nil {
+		log.Warn().Err(err).Str("policy", policyName).Msg("Failed to delete authorization policy")
+		return err
+	}
+	log.Info().Str("policy", policyName).Msg("Authorization policy deleted")
+	return nil
+}
+
+// CreateACMEChallengeVirtualService prepares Gateway for ACME HTTP-01 challenges
+// Note: Cert-manager creates its own Ingress resources for challenge routing.
+// This method ensures the Gateway accepts HTTP traffic for the custom domain hosts.
+func (k *KubernetesClient) CreateACMEChallengeVirtualService(ctx context.Context, domain *models.CustomDomain) error {
+	// Build hosts list
+	hosts := []string{domain.Domain}
+	if domain.IncludeWWW && domain.DomainType == models.DomainTypeApex {
+		hosts = append(hosts, "www."+domain.Domain)
+	}
+
+	// Note: Cert-manager handles ACME challenge routing via Ingress resources.
+	// We just ensure the Gateway accepts HTTP traffic for these hosts (done in PatchGateway).
+	log.Info().Str("domain", domain.Domain).Strs("hosts", hosts).Msg("ACME challenge hosts prepared, cert-manager will handle routing")
+	return nil
+}
+
+// DeleteACMEChallengeVirtualService removes the ACME challenge VirtualService
+func (k *KubernetesClient) DeleteACMEChallengeVirtualService(ctx context.Context, domain *models.CustomDomain) error {
+	vsName := generateResourceName(domain.Domain, "acme-vs")
+	err := k.istioClient.NetworkingV1beta1().VirtualServices(k.cfg.Istio.GatewayNamespace).Delete(ctx, vsName, metav1.DeleteOptions{})
+	if err != nil {
+		// Not an error if it doesn't exist
+		log.Debug().Err(err).Str("vs", vsName).Msg("ACME challenge VirtualService not found or already deleted")
+	}
+	return nil
 }

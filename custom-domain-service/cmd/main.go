@@ -76,6 +76,17 @@ func main() {
 	// Initialize tenant client
 	tenantClient := clients.NewTenantClient(cfg)
 
+	// Initialize Cloudflare client
+	var cloudflareClient *clients.CloudflareClient
+	if cfg.Cloudflare.Enabled {
+		cloudflareClient = clients.NewCloudflareClient(&cfg.Cloudflare)
+		log.Info().
+			Str("tunnel_id", cfg.Cloudflare.TunnelID).
+			Msg("Cloudflare Tunnel client initialized")
+	} else {
+		log.Info().Msg("Cloudflare Tunnel disabled, using cert-manager for custom domains")
+	}
+
 	// Initialize NATS event publisher
 	var eventPublisher *events.Publisher
 	if cfg.NATS.URL != "" {
@@ -115,6 +126,7 @@ func main() {
 		k8sClient,
 		keycloakClient,
 		tenantClient,
+		cloudflareClient,
 		redisClient,
 		eventPublisher,
 	)
