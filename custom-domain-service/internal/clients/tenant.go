@@ -71,12 +71,24 @@ func (t *TenantClient) GetTenant(ctx context.Context, tenantID uuid.UUID) (*Tena
 		return nil, fmt.Errorf("failed to get tenant: status %d, body: %s", resp.StatusCode, string(body))
 	}
 
-	var tenant TenantInfo
-	if err := json.NewDecoder(resp.Body).Decode(&tenant); err != nil {
+	// Response is wrapped in {"data": {...}, "success": true, "message": "..."}
+	var response struct {
+		Data    TenantInfo `json:"data"`
+		Success bool       `json:"success"`
+		Message string     `json:"message"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return nil, fmt.Errorf("failed to decode tenant response: %w", err)
 	}
 
-	return &tenant, nil
+	// Apply default plan features if not set (tenant may not have plan info)
+	if response.Data.PlanFeatures.MaxCustomDomains == 0 && !response.Data.PlanFeatures.CustomDomains {
+		// Default: allow 5 custom domains for all tenants
+		response.Data.PlanFeatures.CustomDomains = true
+		response.Data.PlanFeatures.MaxCustomDomains = 5
+	}
+
+	return &response.Data, nil
 }
 
 // GetTenantBySlug retrieves tenant information by slug
@@ -104,12 +116,23 @@ func (t *TenantClient) GetTenantBySlug(ctx context.Context, slug string) (*Tenan
 		return nil, fmt.Errorf("failed to get tenant: status %d, body: %s", resp.StatusCode, string(body))
 	}
 
-	var tenant TenantInfo
-	if err := json.NewDecoder(resp.Body).Decode(&tenant); err != nil {
+	// Response is wrapped in {"data": {...}, "success": true, "message": "..."}
+	var response struct {
+		Data    TenantInfo `json:"data"`
+		Success bool       `json:"success"`
+		Message string     `json:"message"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return nil, fmt.Errorf("failed to decode tenant response: %w", err)
 	}
 
-	return &tenant, nil
+	// Apply default plan features if not set
+	if response.Data.PlanFeatures.MaxCustomDomains == 0 && !response.Data.PlanFeatures.CustomDomains {
+		response.Data.PlanFeatures.CustomDomains = true
+		response.Data.PlanFeatures.MaxCustomDomains = 5
+	}
+
+	return &response.Data, nil
 }
 
 // CanAddCustomDomain checks if a tenant can add more custom domains
