@@ -1745,9 +1745,56 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 		AdminURL:     adminURL,
 	})
 
+	// Extract custom domain config from store_setup if present
+	var useCustomDomain bool
+	var customDomain string
+	var customAdminSubdomain string = "admin"         // Default admin subdomain
+	var customStorefrontSubdomain string = ""         // Default empty (root domain)
+	for _, config := range session.ApplicationConfigurations {
+		if config.ApplicationType == "store_setup" {
+			var configData map[string]interface{}
+			if err := json.Unmarshal(config.ConfigurationData, &configData); err == nil {
+				if useCD, exists := configData["use_custom_domain"]; exists {
+					if v, ok := useCD.(bool); ok {
+						useCustomDomain = v
+					}
+				}
+				if cd, exists := configData["custom_domain"]; exists {
+					if v, ok := cd.(string); ok {
+						customDomain = v
+					}
+				}
+				if cas, exists := configData["custom_admin_subdomain"]; exists {
+					if v, ok := cas.(string); ok && v != "" {
+						customAdminSubdomain = v
+					}
+				}
+				if css, exists := configData["custom_storefront_subdomain"]; exists {
+					if v, ok := css.(string); ok {
+						customStorefrontSubdomain = v
+					}
+				}
+			}
+			break
+		}
+	}
+
 	// Generate host URLs for tenant-router-service
-	adminHost := fmt.Sprintf("%s-admin.%s", slug, baseDomain)
-	storefrontHost := fmt.Sprintf("%s.%s", slug, baseDomain)
+	var adminHost, storefrontHost string
+	if useCustomDomain && customDomain != "" {
+		// For custom domains, use the custom subdomains
+		adminHost = fmt.Sprintf("%s.%s", customAdminSubdomain, customDomain)
+		if customStorefrontSubdomain != "" {
+			storefrontHost = fmt.Sprintf("%s.%s", customStorefrontSubdomain, customDomain)
+		} else {
+			storefrontHost = customDomain // Root domain
+		}
+		log.Printf("[OnboardingService] Using custom domain hosts: admin=%s, storefront=%s", adminHost, storefrontHost)
+	} else {
+		// Default tesserix.app domain
+		adminHost = fmt.Sprintf("%s-admin.%s", slug, baseDomain)
+		storefrontHost = fmt.Sprintf("%s.%s", slug, baseDomain)
+	}
 
 	// Publish tenant.created event for document migration, routing, and other subscribers
 	// This is synchronous to ensure the VS is created before returning success
@@ -1801,29 +1848,6 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 		}
 	} else {
 		log.Printf("[OnboardingService] WARNING: Tenant router client not initialized")
-	}
-
-	// Create custom domain if user specified one during onboarding
-	// Extract custom domain from store_setup application configuration
-	var useCustomDomain bool
-	var customDomain string
-	for _, config := range session.ApplicationConfigurations {
-		if config.ApplicationType == "store_setup" {
-			var configData map[string]interface{}
-			if err := json.Unmarshal(config.ConfigurationData, &configData); err == nil {
-				if useCD, exists := configData["use_custom_domain"]; exists {
-					if v, ok := useCD.(bool); ok {
-						useCustomDomain = v
-					}
-				}
-				if cd, exists := configData["custom_domain"]; exists {
-					if v, ok := cd.(string); ok {
-						customDomain = v
-					}
-				}
-			}
-			break
-		}
 	}
 
 	// If custom domain was specified, create it in custom-domain-service

@@ -14,17 +14,19 @@ import (
 
 // StoreSetup represents store configuration extracted from application_configurations
 type StoreSetup struct {
-	Subdomain       string `json:"subdomain,omitempty"`
-	StorefrontSlug  string `json:"storefront_slug,omitempty"`
-	Currency        string `json:"currency,omitempty"`
-	Timezone        string `json:"timezone,omitempty"`
-	Language        string `json:"language,omitempty"`
-	BusinessModel   string `json:"business_model,omitempty"`
-	LogoURL         string `json:"logo_url,omitempty"`
-	PrimaryColor    string `json:"primary_color,omitempty"`
-	SecondaryColor  string `json:"secondary_color,omitempty"`
-	UseCustomDomain bool   `json:"use_custom_domain,omitempty"`
-	CustomDomain    string `json:"custom_domain,omitempty"`
+	Subdomain                  string `json:"subdomain,omitempty"`
+	StorefrontSlug             string `json:"storefront_slug,omitempty"`
+	Currency                   string `json:"currency,omitempty"`
+	Timezone                   string `json:"timezone,omitempty"`
+	Language                   string `json:"language,omitempty"`
+	BusinessModel              string `json:"business_model,omitempty"`
+	LogoURL                    string `json:"logo_url,omitempty"`
+	PrimaryColor               string `json:"primary_color,omitempty"`
+	SecondaryColor             string `json:"secondary_color,omitempty"`
+	UseCustomDomain            bool   `json:"use_custom_domain,omitempty"`
+	CustomDomain               string `json:"custom_domain,omitempty"`
+	CustomAdminSubdomain       string `json:"custom_admin_subdomain,omitempty"`
+	CustomStorefrontSubdomain  string `json:"custom_storefront_subdomain,omitempty"`
 }
 
 // SessionResponseWithStoreSetup wraps the session with extracted store_setup
@@ -263,17 +265,19 @@ func (h *OnboardingHandler) UpdateBusinessAddress(c *gin.Context) {
 
 // UpdateStoreSetupRequest represents the store setup form data
 type UpdateStoreSetupRequest struct {
-	Subdomain       string `json:"subdomain"`
-	StorefrontSlug  string `json:"storefront_slug"`
-	Currency        string `json:"currency"`
-	Timezone        string `json:"timezone"`
-	Language        string `json:"language"`
-	BusinessModel   string `json:"business_model"`
-	LogoURL         string `json:"logo_url"`
-	PrimaryColor    string `json:"primary_color"`
-	SecondaryColor  string `json:"secondary_color"`
-	UseCustomDomain bool   `json:"use_custom_domain"`
-	CustomDomain    string `json:"custom_domain"`
+	Subdomain                 string `json:"subdomain"`
+	StorefrontSlug            string `json:"storefront_slug"`
+	Currency                  string `json:"currency"`
+	Timezone                  string `json:"timezone"`
+	Language                  string `json:"language"`
+	BusinessModel             string `json:"business_model"`
+	LogoURL                   string `json:"logo_url"`
+	PrimaryColor              string `json:"primary_color"`
+	SecondaryColor            string `json:"secondary_color"`
+	UseCustomDomain           bool   `json:"use_custom_domain"`
+	CustomDomain              string `json:"custom_domain"`
+	CustomAdminSubdomain      string `json:"custom_admin_subdomain"`
+	CustomStorefrontSubdomain string `json:"custom_storefront_subdomain"`
 }
 
 // UpdateStoreSetup saves store setup to application_configurations
