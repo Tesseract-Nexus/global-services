@@ -13,10 +13,13 @@ type TenantCreatedEvent struct {
 	Slug         string    `json:"slug"`
 	Email        string    `json:"email"`
 	// Host URLs provided by tenant-service
-	AdminHost      string `json:"admin_host"`      // e.g., "mystore-admin.tesserix.app"
-	StorefrontHost string `json:"storefront_host"` // e.g., "mystore.tesserix.app"
-	BaseDomain     string `json:"base_domain"`     // e.g., "tesserix.app"
-	Timestamp      time.Time `json:"timestamp"`
+	AdminHost         string `json:"admin_host"`           // e.g., "mystore-admin.tesserix.app" or "admin.customdomain.com"
+	StorefrontHost    string `json:"storefront_host"`      // e.g., "mystore.tesserix.app" or "customdomain.com"
+	StorefrontWwwHost string `json:"storefront_www_host"`  // e.g., "www.customdomain.com" (only for custom domains)
+	APIHost           string `json:"api_host"`             // e.g., "mystore-api.tesserix.app" or "api.customdomain.com"
+	BaseDomain        string `json:"base_domain"`          // e.g., "tesserix.app"
+	IsCustomDomain    bool   `json:"is_custom_domain"`     // true if using custom domain
+	Timestamp         time.Time `json:"timestamp"`
 }
 
 // TenantDeletedEvent represents the event received when a tenant is deleted

@@ -151,13 +151,17 @@ func main() {
 		// Body: {"slug": "...", "tenant_id": "...", "admin_host": "...", "storefront_host": "...", ...}
 		api.POST("/hosts", func(c *gin.Context) {
 			var req struct {
-				Slug           string `json:"slug" binding:"required"`
-				TenantID       string `json:"tenant_id" binding:"required"`
-				AdminHost      string `json:"admin_host"`
-				StorefrontHost string `json:"storefront_host"`
-				Product        string `json:"product"`
-				BusinessName   string `json:"business_name"`
-				Email          string `json:"email"`
+				Slug              string `json:"slug" binding:"required"`
+				TenantID          string `json:"tenant_id" binding:"required"`
+				AdminHost         string `json:"admin_host"`
+				StorefrontHost    string `json:"storefront_host"`
+				StorefrontWwwHost string `json:"storefront_www_host"` // e.g., "www.customdomain.com" (only for custom domains)
+				APIHost           string `json:"api_host"`            // e.g., "api.customdomain.com" or "slug-api.tesserix.app"
+				BaseDomain        string `json:"base_domain"`         // e.g., "tesserix.app"
+				IsCustomDomain    bool   `json:"is_custom_domain"`    // true if using custom domain
+				Product           string `json:"product"`
+				BusinessName      string `json:"business_name"`
+				Email             string `json:"email"`
 			}
 			if err := c.ShouldBindJSON(&req); err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "slug and tenant_id are required"})
@@ -172,16 +176,26 @@ func main() {
 			if req.StorefrontHost == "" {
 				req.StorefrontHost = fmt.Sprintf("%s.%s", req.Slug, domain)
 			}
+			if req.APIHost == "" {
+				req.APIHost = fmt.Sprintf("%s-api.%s", req.Slug, domain)
+			}
+			if req.BaseDomain == "" {
+				req.BaseDomain = domain
+			}
 
 			// Create the tenant host event and enqueue for reconciliation
 			event := &models.TenantCreatedEvent{
-				TenantID:       req.TenantID,
-				Slug:           req.Slug,
-				AdminHost:      req.AdminHost,
-				StorefrontHost: req.StorefrontHost,
-				Product:        req.Product,
-				BusinessName:   req.BusinessName,
-				Email:          req.Email,
+				TenantID:          req.TenantID,
+				Slug:              req.Slug,
+				AdminHost:         req.AdminHost,
+				StorefrontHost:    req.StorefrontHost,
+				StorefrontWwwHost: req.StorefrontWwwHost,
+				APIHost:           req.APIHost,
+				BaseDomain:        req.BaseDomain,
+				IsCustomDomain:    req.IsCustomDomain,
+				Product:           req.Product,
+				BusinessName:      req.BusinessName,
+				Email:             req.Email,
 			}
 
 			if err := tenantReconciler.EnqueueCreate(event); err != nil {
@@ -190,11 +204,14 @@ func main() {
 			}
 
 			c.JSON(http.StatusAccepted, gin.H{
-				"message":         fmt.Sprintf("Tenant host %s queued for provisioning", req.Slug),
-				"slug":            req.Slug,
-				"tenant_id":       req.TenantID,
-				"admin_host":      req.AdminHost,
-				"storefront_host": req.StorefrontHost,
+				"message":            fmt.Sprintf("Tenant host %s queued for provisioning", req.Slug),
+				"slug":               req.Slug,
+				"tenant_id":          req.TenantID,
+				"admin_host":         req.AdminHost,
+				"storefront_host":    req.StorefrontHost,
+				"storefront_www_host": req.StorefrontWwwHost,
+				"api_host":           req.APIHost,
+				"is_custom_domain":   req.IsCustomDomain,
 			})
 		})
 

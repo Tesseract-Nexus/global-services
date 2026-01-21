@@ -1780,8 +1780,9 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 	}
 
 	// Generate host URLs for tenant-router-service
-	var adminHost, storefrontHost string
-	if useCustomDomain && customDomain != "" {
+	var adminHost, storefrontHost, storefrontWwwHost, apiHost string
+	isCustomDomainUsed := useCustomDomain && customDomain != ""
+	if isCustomDomainUsed {
 		// For custom domains, use the custom subdomains
 		adminHost = fmt.Sprintf("%s.%s", customAdminSubdomain, customDomain)
 		if customStorefrontSubdomain != "" {
@@ -1789,11 +1790,18 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 		} else {
 			storefrontHost = customDomain // Root domain
 		}
-		log.Printf("[OnboardingService] Using custom domain hosts: admin=%s, storefront=%s", adminHost, storefrontHost)
+		// Always add www subdomain for custom domains
+		storefrontWwwHost = fmt.Sprintf("www.%s", customDomain)
+		// API host uses api subdomain for custom domains
+		apiHost = fmt.Sprintf("api.%s", customDomain)
+		log.Printf("[OnboardingService] Using custom domain hosts: admin=%s, storefront=%s, www=%s, api=%s", adminHost, storefrontHost, storefrontWwwHost, apiHost)
 	} else {
 		// Default tesserix.app domain
 		adminHost = fmt.Sprintf("%s-admin.%s", slug, baseDomain)
 		storefrontHost = fmt.Sprintf("%s.%s", slug, baseDomain)
+		apiHost = fmt.Sprintf("%s-api.%s", slug, baseDomain)
+		// No www for default domain
+		storefrontWwwHost = ""
 	}
 
 	// Publish tenant.created event for document migration, routing, and other subscribers
@@ -1801,15 +1809,18 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 	natsPublished := false
 	if s.natsClient != nil {
 		event := &natsClient.TenantCreatedEvent{
-			TenantID:       tenantID.String(),
-			SessionID:      sessionID.String(),
-			Product:        session.ApplicationType, // e.g., "marketplace", "ecommerce"
-			BusinessName:   session.BusinessInformation.BusinessName,
-			Slug:           slug,
-			Email:          primaryContact.Email,
-			AdminHost:      adminHost,
-			StorefrontHost: storefrontHost,
-			BaseDomain:     baseDomain,
+			TenantID:          tenantID.String(),
+			SessionID:         sessionID.String(),
+			Product:           session.ApplicationType, // e.g., "marketplace", "ecommerce"
+			BusinessName:      session.BusinessInformation.BusinessName,
+			Slug:              slug,
+			Email:             primaryContact.Email,
+			AdminHost:         adminHost,
+			StorefrontHost:    storefrontHost,
+			StorefrontWwwHost: storefrontWwwHost,
+			APIHost:           apiHost,
+			BaseDomain:        baseDomain,
+			IsCustomDomain:    isCustomDomainUsed,
 		}
 		// Use a context with timeout for event publishing
 		publishCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -1828,13 +1839,17 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 	// This ensures VS is created even if NATS doesn't deliver the message
 	if s.tenantRouterClient != nil {
 		provisionReq := &clients.ProvisionTenantHostRequest{
-			Slug:           slug,
-			TenantID:       tenantID.String(),
-			AdminHost:      adminHost,
-			StorefrontHost: storefrontHost,
-			Product:        session.ApplicationType,
-			BusinessName:   session.BusinessInformation.BusinessName,
-			Email:          primaryContact.Email,
+			Slug:              slug,
+			TenantID:          tenantID.String(),
+			AdminHost:         adminHost,
+			StorefrontHost:    storefrontHost,
+			StorefrontWwwHost: storefrontWwwHost,
+			APIHost:           apiHost,
+			BaseDomain:        baseDomain,
+			IsCustomDomain:    isCustomDomainUsed,
+			Product:           session.ApplicationType,
+			BusinessName:      session.BusinessInformation.BusinessName,
+			Email:             primaryContact.Email,
 		}
 		provisionCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()

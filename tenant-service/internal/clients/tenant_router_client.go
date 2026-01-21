@@ -97,13 +97,17 @@ func (c *TenantRouterClient) IsSlugRecentlyDeleted(ctx context.Context, slug str
 
 // ProvisionTenantHostRequest represents the request to provision a tenant host
 type ProvisionTenantHostRequest struct {
-	Slug           string `json:"slug"`
-	TenantID       string `json:"tenant_id"`
-	AdminHost      string `json:"admin_host,omitempty"`
-	StorefrontHost string `json:"storefront_host,omitempty"`
-	Product        string `json:"product,omitempty"`
-	BusinessName   string `json:"business_name,omitempty"`
-	Email          string `json:"email,omitempty"`
+	Slug              string `json:"slug"`
+	TenantID          string `json:"tenant_id"`
+	AdminHost         string `json:"admin_host,omitempty"`
+	StorefrontHost    string `json:"storefront_host,omitempty"`
+	StorefrontWwwHost string `json:"storefront_www_host,omitempty"` // e.g., "www.customdomain.com" (only for custom domains)
+	APIHost           string `json:"api_host,omitempty"`            // e.g., "api.customdomain.com" or "slug-api.tesserix.app"
+	BaseDomain        string `json:"base_domain,omitempty"`         // e.g., "tesserix.app"
+	IsCustomDomain    bool   `json:"is_custom_domain,omitempty"`    // true if using custom domain
+	Product           string `json:"product,omitempty"`
+	BusinessName      string `json:"business_name,omitempty"`
+	Email             string `json:"email,omitempty"`
 }
 
 // ProvisionTenantHostResponse represents the response from provisioning

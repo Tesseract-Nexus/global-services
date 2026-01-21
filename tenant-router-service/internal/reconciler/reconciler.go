@@ -33,12 +33,13 @@ type Condition struct {
 
 // Conditions constants
 const (
-	ConditionCertificateReady     = "CertificateReady"
-	ConditionGatewayConfigured    = "GatewayConfigured"
-	ConditionAdminVSConfigured    = "AdminVSConfigured"
-	ConditionStorefrontConfigured = "StorefrontVSConfigured"
-	ConditionAPIVSConfigured      = "APIVSConfigured"
-	ConditionReady                = "Ready"
+	ConditionCertificateReady        = "CertificateReady"
+	ConditionGatewayConfigured       = "GatewayConfigured"
+	ConditionAdminVSConfigured       = "AdminVSConfigured"
+	ConditionStorefrontConfigured    = "StorefrontVSConfigured"
+	ConditionStorefrontWwwConfigured = "StorefrontWwwVSConfigured"
+	ConditionAPIVSConfigured         = "APIVSConfigured"
+	ConditionReady                   = "Ready"
 
 	StatusTrue    = "True"
 	StatusFalse   = "False"
@@ -416,11 +417,13 @@ func (r *TenantReconciler) calculateBackoff(attempt int) time.Duration {
 
 // reconcileCreate handles tenant creation with idempotent operations
 func (r *TenantReconciler) reconcileCreate(ctx context.Context, event *models.TenantCreatedEvent) (ReconcileResult, error) {
-	log.Printf("[Reconciler] Reconciling create for %s", event.Slug)
+	log.Printf("[Reconciler] Reconciling create for %s (custom_domain=%v)", event.Slug, event.IsCustomDomain)
 
 	// Use host URLs from event (provided by tenant-service)
 	adminHost := event.AdminHost
 	storefrontHost := event.StorefrontHost
+	storefrontWwwHost := event.StorefrontWwwHost
+	apiHost := event.APIHost
 
 	// Fallback to config-based generation if not provided
 	domain := r.config.Domain.BaseDomain
@@ -429,8 +432,10 @@ func (r *TenantReconciler) reconcileCreate(ctx context.Context, event *models.Te
 		storefrontHost = fmt.Sprintf("%s.%s", event.Slug, domain)
 	}
 
-	// API host for mobile/external access (always generated based on slug)
-	apiHost := fmt.Sprintf("%s-api.%s", event.Slug, domain)
+	// API host for mobile/external access (use provided or generate based on slug)
+	if apiHost == "" {
+		apiHost = fmt.Sprintf("%s-api.%s", event.Slug, domain)
+	}
 
 	certName := fmt.Sprintf("%s-tenant-tls", event.Slug)
 
@@ -451,16 +456,19 @@ func (r *TenantReconciler) reconcileCreate(ctx context.Context, event *models.Te
 	} else {
 		// Create new record
 		record = &models.TenantHostRecord{
-			TenantID:       event.TenantID,
-			Slug:           event.Slug,
-			AdminHost:      adminHost,
-			StorefrontHost: storefrontHost,
-			APIHost:        apiHost,
-			CertName:       certName,
-			Status:         models.HostStatusPending,
-			Product:        event.Product,
-			BusinessName:   event.BusinessName,
-			Email:          event.Email,
+			TenantID:          event.TenantID,
+			Slug:              event.Slug,
+			AdminHost:         adminHost,
+			StorefrontHost:    storefrontHost,
+			StorefrontWwwHost: storefrontWwwHost,
+			APIHost:           apiHost,
+			BaseDomain:        event.BaseDomain,
+			IsCustomDomain:    event.IsCustomDomain,
+			CertName:          certName,
+			Status:            models.HostStatusPending,
+			Product:           event.Product,
+			BusinessName:      event.BusinessName,
+			Email:             event.Email,
 		}
 		if err := r.repo.Create(ctx, record); err != nil {
 			return ReconcileResult{Requeue: true}, fmt.Errorf("failed to create record: %w", err)
@@ -576,7 +584,32 @@ func (r *TenantReconciler) reconcileCreate(ctx context.Context, event *models.Te
 		})
 	}
 
-	// 5. API VirtualService (for mobile/external API access)
+	// 5. Storefront www VirtualService (only for custom domains with www subdomain)
+	if record.StorefrontWwwHost != "" && !record.StorefrontWwwVSPatched {
+		log.Printf("[Reconciler] Creating www VirtualService for %s (host: %s)", record.Slug, record.StorefrontWwwHost)
+		if err := r.reconcileVirtualService(ctx, record, r.config.Kubernetes.StorefrontVSName, record.StorefrontWwwHost, "add"); err != nil {
+			conditions = append(conditions, Condition{
+				Type:               ConditionStorefrontWwwConfigured,
+				Status:             StatusFalse,
+				LastTransitionTime: time.Now(),
+				Reason:             ReasonFailed,
+				Message:            err.Error(),
+			})
+			r.updateConditions(ctx, record, conditions)
+			return ReconcileResult{Requeue: true, RequeueAfter: 30 * time.Second}, err
+		}
+		// Mark as patched - we need to add a separate update for this
+		r.repo.UpdateProvisioningState(ctx, record.Slug, "storefront_www_vs_patched", true, "")
+		conditions = append(conditions, Condition{
+			Type:               ConditionStorefrontWwwConfigured,
+			Status:             StatusTrue,
+			LastTransitionTime: time.Now(),
+			Reason:             ReasonProvisioned,
+			Message:            "Storefront www VirtualService configured successfully",
+		})
+	}
+
+	// 6. API VirtualService (for mobile/external API access)
 	if !record.APIVSPatched {
 		// Use APIHost if set, otherwise generate from slug
 		apiHost := record.APIHost

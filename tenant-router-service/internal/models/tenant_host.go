@@ -21,28 +21,33 @@ const (
 // TenantHostRecord stores metadata about tenant host configurations
 // This is the database model for tracking provisioned tenant subdomains
 type TenantHostRecord struct {
-	ID             uuid.UUID  `gorm:"type:uuid;primary_key;default:uuid_generate_v4()" json:"id"`
-	TenantID       string     `gorm:"type:varchar(255);not null;index:idx_tenant_host_tenant_id" json:"tenant_id"`
-	Slug           string     `gorm:"type:varchar(63);not null;index:idx_tenant_host_slug_lookup" json:"slug"` // Partial unique index created via migration
-	AdminHost      string     `gorm:"type:varchar(255);not null;index:idx_tenant_host_admin" json:"admin_host"`
-	StorefrontHost string     `gorm:"type:varchar(255);not null;index:idx_tenant_host_storefront" json:"storefront_host"`
-	APIHost        string     `gorm:"type:varchar(255);index:idx_tenant_host_api" json:"api_host"` // Mobile/external API host (e.g., awesome-store-api.tesserix.app)
-	CertName       string     `gorm:"type:varchar(255);not null" json:"cert_name"`
-	Status         HostStatus `gorm:"type:varchar(50);not null;default:'pending';index:idx_tenant_host_status" json:"status"`
+	ID                uuid.UUID  `gorm:"type:uuid;primary_key;default:uuid_generate_v4()" json:"id"`
+	TenantID          string     `gorm:"type:varchar(255);not null;index:idx_tenant_host_tenant_id" json:"tenant_id"`
+	Slug              string     `gorm:"type:varchar(63);not null;index:idx_tenant_host_slug_lookup" json:"slug"` // Partial unique index created via migration
+	AdminHost         string     `gorm:"type:varchar(255);not null;index:idx_tenant_host_admin" json:"admin_host"`
+	StorefrontHost    string     `gorm:"type:varchar(255);not null;index:idx_tenant_host_storefront" json:"storefront_host"`
+	StorefrontWwwHost string     `gorm:"type:varchar(255);index:idx_tenant_host_storefront_www" json:"storefront_www_host"` // www subdomain for custom domains (e.g., www.customdomain.com)
+	APIHost           string     `gorm:"type:varchar(255);index:idx_tenant_host_api" json:"api_host"`                       // Mobile/external API host (e.g., awesome-store-api.tesserix.app or api.customdomain.com)
+	BaseDomain        string     `gorm:"type:varchar(255)" json:"base_domain"`                                              // e.g., "tesserix.app"
+	IsCustomDomain    bool       `gorm:"default:false" json:"is_custom_domain"`                                             // true if using custom domain
+	CertName          string     `gorm:"type:varchar(255);not null" json:"cert_name"`
+	Status            HostStatus `gorm:"type:varchar(50);not null;default:'pending';index:idx_tenant_host_status" json:"status"`
 
 	// Resource tracking
-	CertificateCreated   bool `gorm:"default:false" json:"certificate_created"`
-	GatewayPatched       bool `gorm:"default:false" json:"gateway_patched"`
-	AdminVSPatched       bool `gorm:"default:false" json:"admin_vs_patched"`
-	StorefrontVSPatched  bool `gorm:"default:false" json:"storefront_vs_patched"`
-	APIVSPatched         bool `gorm:"default:false" json:"api_vs_patched"` // API VirtualService for mobile/external access
+	CertificateCreated      bool `gorm:"default:false" json:"certificate_created"`
+	GatewayPatched          bool `gorm:"default:false" json:"gateway_patched"`
+	AdminVSPatched          bool `gorm:"default:false" json:"admin_vs_patched"`
+	StorefrontVSPatched     bool `gorm:"default:false" json:"storefront_vs_patched"`
+	StorefrontWwwVSPatched  bool `gorm:"default:false" json:"storefront_www_vs_patched"` // www subdomain VS for custom domains
+	APIVSPatched            bool `gorm:"default:false" json:"api_vs_patched"`            // API VirtualService for mobile/external access
 
 	// Namespace tracking for cross-namespace discovery
-	CertificateNamespace  string `gorm:"type:varchar(255)" json:"certificate_namespace,omitempty"`
-	GatewayNamespace      string `gorm:"type:varchar(255)" json:"gateway_namespace,omitempty"`
-	AdminVSNamespace      string `gorm:"type:varchar(255)" json:"admin_vs_namespace,omitempty"`
-	StorefrontVSNamespace string `gorm:"type:varchar(255)" json:"storefront_vs_namespace,omitempty"`
-	APIVSNamespace        string `gorm:"type:varchar(255)" json:"api_vs_namespace,omitempty"`
+	CertificateNamespace     string `gorm:"type:varchar(255)" json:"certificate_namespace,omitempty"`
+	GatewayNamespace         string `gorm:"type:varchar(255)" json:"gateway_namespace,omitempty"`
+	AdminVSNamespace         string `gorm:"type:varchar(255)" json:"admin_vs_namespace,omitempty"`
+	StorefrontVSNamespace    string `gorm:"type:varchar(255)" json:"storefront_vs_namespace,omitempty"`
+	StorefrontWwwVSNamespace string `gorm:"type:varchar(255)" json:"storefront_www_vs_namespace,omitempty"`
+	APIVSNamespace           string `gorm:"type:varchar(255)" json:"api_vs_namespace,omitempty"`
 
 	// Error tracking
 	LastError    string     `gorm:"type:text" json:"last_error,omitempty"`
@@ -76,6 +81,10 @@ func (t *TenantHostRecord) BeforeCreate(tx *gorm.DB) error {
 
 // IsFullyProvisioned returns true if all resources are provisioned
 func (t *TenantHostRecord) IsFullyProvisioned() bool {
+	// For custom domains, we also need the www VS to be provisioned
+	if t.IsCustomDomain && t.StorefrontWwwHost != "" {
+		return t.CertificateCreated && t.GatewayPatched && t.AdminVSPatched && t.StorefrontVSPatched && t.StorefrontWwwVSPatched && t.APIVSPatched
+	}
 	return t.CertificateCreated && t.GatewayPatched && t.AdminVSPatched && t.StorefrontVSPatched && t.APIVSPatched
 }
 
