@@ -683,3 +683,423 @@ func getBaseDomain(domain string) string {
 	}
 	return joinDomain(parts[len(parts)-2:])
 }
+
+// =====================================================
+// CLOUDFLARE FOR SAAS (CUSTOM HOSTNAMES) API
+// =====================================================
+// This is the correct approach for multi-tenant custom domains.
+// Customers CNAME their domain to your fallback origin (e.g., customers.tesserix.app)
+// You register their domain as a Custom Hostname in Cloudflare
+// Cloudflare issues SSL cert and routes traffic to your origin
+
+// CustomHostname represents a Cloudflare Custom Hostname (for SaaS)
+type CustomHostname struct {
+	ID                        string                   `json:"id,omitempty"`
+	Hostname                  string                   `json:"hostname"`
+	SSL                       *CustomHostnameSSL       `json:"ssl,omitempty"`
+	CustomOriginServer        string                   `json:"custom_origin_server,omitempty"`
+	CustomOriginSNI           string                   `json:"custom_origin_sni,omitempty"`
+	Status                    string                   `json:"status,omitempty"`
+	VerificationErrors        []string                 `json:"verification_errors,omitempty"`
+	OwnershipVerification     *OwnershipVerification   `json:"ownership_verification,omitempty"`
+	OwnershipVerificationHTTP *OwnershipVerificationHTTP `json:"ownership_verification_http,omitempty"`
+	CreatedAt                 string                   `json:"created_at,omitempty"`
+}
+
+// CustomHostnameSSL represents SSL configuration for a custom hostname
+type CustomHostnameSSL struct {
+	ID                   string                 `json:"id,omitempty"`
+	Status               string                 `json:"status,omitempty"`
+	Method               string                 `json:"method,omitempty"`
+	Type                 string                 `json:"type,omitempty"`
+	CertificateAuthority string                 `json:"certificate_authority,omitempty"`
+	ValidationRecords    []SSLValidationRecord  `json:"validation_records,omitempty"`
+	ValidationErrors     []SSLValidationError   `json:"validation_errors,omitempty"`
+	Settings             *CustomHostnameSSLSettings `json:"settings,omitempty"`
+	Wildcard             bool                   `json:"wildcard,omitempty"`
+	BundleMethod         string                 `json:"bundle_method,omitempty"`
+}
+
+// CustomHostnameSSLSettings represents SSL settings for custom hostname
+type CustomHostnameSSLSettings struct {
+	HTTP2         string   `json:"http2,omitempty"`
+	MinTLSVersion string   `json:"min_tls_version,omitempty"`
+	TLS13         string   `json:"tls_1_3,omitempty"`
+	Ciphers       []string `json:"ciphers,omitempty"`
+}
+
+// SSLValidationRecord represents a validation record for custom hostname SSL
+type SSLValidationRecord struct {
+	TXTName  string `json:"txt_name,omitempty"`
+	TXTValue string `json:"txt_value,omitempty"`
+	HTTPUrl  string `json:"http_url,omitempty"`
+	HTTPBody string `json:"http_body,omitempty"`
+	CnameName string `json:"cname_name,omitempty"`
+	CnameTarget string `json:"cname_target,omitempty"`
+}
+
+// SSLValidationError represents a validation error
+type SSLValidationError struct {
+	Message string `json:"message"`
+}
+
+// OwnershipVerification represents DNS TXT verification for custom hostname
+type OwnershipVerification struct {
+	Type  string `json:"type,omitempty"`
+	Name  string `json:"name,omitempty"`
+	Value string `json:"value,omitempty"`
+}
+
+// OwnershipVerificationHTTP represents HTTP verification for custom hostname
+type OwnershipVerificationHTTP struct {
+	HTTPUrl  string `json:"http_url,omitempty"`
+	HTTPBody string `json:"http_body,omitempty"`
+}
+
+// CustomHostnameResponse represents the API response for a single custom hostname
+type CustomHostnameResponse struct {
+	Success  bool              `json:"success"`
+	Errors   []CloudflareError `json:"errors"`
+	Messages []interface{}     `json:"messages"`
+	Result   *CustomHostname   `json:"result,omitempty"`
+}
+
+// CustomHostnamesListResponse represents the API response for listing custom hostnames
+type CustomHostnamesListResponse struct {
+	Success  bool              `json:"success"`
+	Errors   []CloudflareError `json:"errors"`
+	Messages []interface{}     `json:"messages"`
+	Result   []CustomHostname  `json:"result"`
+}
+
+// CreateCustomHostnameRequest represents the request body for creating a custom hostname
+type CreateCustomHostnameRequest struct {
+	Hostname           string             `json:"hostname"`
+	SSL                *CustomHostnameSSL `json:"ssl,omitempty"`
+	CustomOriginServer string             `json:"custom_origin_server,omitempty"`
+}
+
+// GetCustomerCNAMETarget returns the CNAME target that customers should point their domain to
+// This is the fallback origin for Cloudflare for SaaS (e.g., customers.tesserix.app)
+func (c *CloudflareClient) GetCustomerCNAMETarget() string {
+	if c.cfg.FallbackOrigin != "" {
+		return c.cfg.FallbackOrigin
+	}
+	// Fallback to tunnel CNAME if SaaS not configured (for backwards compatibility)
+	return c.GetTunnelCNAME()
+}
+
+// CreateCustomHostname creates a new custom hostname in Cloudflare for SaaS
+// This registers the customer's domain so Cloudflare will issue SSL and route traffic
+func (c *CloudflareClient) CreateCustomHostname(ctx context.Context, domain *models.CustomDomain) (*CustomHostname, error) {
+	if !c.cfg.Enabled {
+		log.Debug().Str("domain", domain.Domain).Msg("Cloudflare disabled, skipping custom hostname creation")
+		return nil, nil
+	}
+
+	if c.cfg.SaaSZoneID == "" {
+		log.Warn().Str("domain", domain.Domain).Msg("SaaS Zone ID not configured, falling back to tunnel ingress")
+		return nil, nil
+	}
+
+	log.Info().Str("domain", domain.Domain).Str("zone_id", c.cfg.SaaSZoneID).Msg("Creating Cloudflare Custom Hostname")
+
+	url := fmt.Sprintf("%s/zones/%s/custom_hostnames", c.baseURL, c.cfg.SaaSZoneID)
+
+	// Create request with SSL settings
+	reqBody := CreateCustomHostnameRequest{
+		Hostname: domain.Domain,
+		SSL: &CustomHostnameSSL{
+			Method:               "http", // Use HTTP validation (via CNAME proxy)
+			Type:                 "dv",   // Domain Validation
+			CertificateAuthority: "digicert", // Or "lets_encrypt"
+			Settings: &CustomHostnameSSLSettings{
+				MinTLSVersion: "1.2",
+				TLS13:         "on",
+			},
+		},
+	}
+
+	// If fallback origin is configured, use it as custom origin
+	if c.cfg.FallbackOrigin != "" {
+		reqBody.CustomOriginServer = c.cfg.FallbackOrigin
+	}
+
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.cfg.APIToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	var result CustomHostnameResponse
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	if !result.Success {
+		if len(result.Errors) > 0 {
+			// Check if hostname already exists
+			for _, cfErr := range result.Errors {
+				if cfErr.Code == 1406 { // Hostname already exists
+					log.Info().Str("domain", domain.Domain).Msg("Custom hostname already exists, fetching existing")
+					return c.GetCustomHostnameByName(ctx, domain.Domain)
+				}
+			}
+			return nil, fmt.Errorf("cloudflare API error: %s (code: %d)", result.Errors[0].Message, result.Errors[0].Code)
+		}
+		return nil, fmt.Errorf("cloudflare API request failed")
+	}
+
+	log.Info().
+		Str("domain", domain.Domain).
+		Str("id", result.Result.ID).
+		Str("status", result.Result.Status).
+		Msg("Successfully created Cloudflare Custom Hostname")
+
+	return result.Result, nil
+}
+
+// GetCustomHostname retrieves a custom hostname by its ID
+func (c *CloudflareClient) GetCustomHostname(ctx context.Context, hostnameID string) (*CustomHostname, error) {
+	if !c.cfg.Enabled || c.cfg.SaaSZoneID == "" {
+		return nil, nil
+	}
+
+	url := fmt.Sprintf("%s/zones/%s/custom_hostnames/%s", c.baseURL, c.cfg.SaaSZoneID, hostnameID)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.cfg.APIToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	var result CustomHostnameResponse
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	if !result.Success {
+		if len(result.Errors) > 0 {
+			return nil, fmt.Errorf("cloudflare API error: %s", result.Errors[0].Message)
+		}
+		return nil, fmt.Errorf("cloudflare API request failed")
+	}
+
+	return result.Result, nil
+}
+
+// GetCustomHostnameByName retrieves a custom hostname by domain name
+func (c *CloudflareClient) GetCustomHostnameByName(ctx context.Context, domain string) (*CustomHostname, error) {
+	if !c.cfg.Enabled || c.cfg.SaaSZoneID == "" {
+		return nil, nil
+	}
+
+	url := fmt.Sprintf("%s/zones/%s/custom_hostnames?hostname=%s", c.baseURL, c.cfg.SaaSZoneID, domain)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.cfg.APIToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	var result CustomHostnamesListResponse
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	if !result.Success {
+		if len(result.Errors) > 0 {
+			return nil, fmt.Errorf("cloudflare API error: %s", result.Errors[0].Message)
+		}
+		return nil, fmt.Errorf("cloudflare API request failed")
+	}
+
+	if len(result.Result) == 0 {
+		return nil, nil
+	}
+
+	return &result.Result[0], nil
+}
+
+// DeleteCustomHostname removes a custom hostname from Cloudflare
+func (c *CloudflareClient) DeleteCustomHostname(ctx context.Context, hostnameID string) error {
+	if !c.cfg.Enabled || c.cfg.SaaSZoneID == "" {
+		return nil
+	}
+
+	log.Info().Str("hostname_id", hostnameID).Msg("Deleting Cloudflare Custom Hostname")
+
+	url := fmt.Sprintf("%s/zones/%s/custom_hostnames/%s", c.baseURL, c.cfg.SaaSZoneID, hostnameID)
+
+	req, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.cfg.APIToken)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response: %w", err)
+	}
+
+	var result struct {
+		Success bool              `json:"success"`
+		Errors  []CloudflareError `json:"errors"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	if !result.Success {
+		if len(result.Errors) > 0 {
+			// Ignore "not found" errors
+			for _, cfErr := range result.Errors {
+				if cfErr.Code == 1404 {
+					log.Debug().Str("hostname_id", hostnameID).Msg("Custom hostname not found, already deleted")
+					return nil
+				}
+			}
+			return fmt.Errorf("cloudflare API error: %s", result.Errors[0].Message)
+		}
+		return fmt.Errorf("cloudflare API request failed")
+	}
+
+	log.Info().Str("hostname_id", hostnameID).Msg("Successfully deleted Cloudflare Custom Hostname")
+	return nil
+}
+
+// DeleteCustomHostnameByName removes a custom hostname by domain name
+func (c *CloudflareClient) DeleteCustomHostnameByName(ctx context.Context, domain string) error {
+	hostname, err := c.GetCustomHostnameByName(ctx, domain)
+	if err != nil {
+		return err
+	}
+	if hostname == nil {
+		log.Debug().Str("domain", domain).Msg("Custom hostname not found, nothing to delete")
+		return nil
+	}
+	return c.DeleteCustomHostname(ctx, hostname.ID)
+}
+
+// GetCustomHostnameStatus returns the status of a custom hostname
+// Possible statuses: pending, active, moved, deleted
+func (c *CloudflareClient) GetCustomHostnameStatus(ctx context.Context, domain string) (string, *CustomHostname, error) {
+	hostname, err := c.GetCustomHostnameByName(ctx, domain)
+	if err != nil {
+		return "", nil, err
+	}
+	if hostname == nil {
+		return "not_found", nil, nil
+	}
+	return hostname.Status, hostname, nil
+}
+
+// RefreshCustomHostnameSSL triggers a re-validation of SSL for a custom hostname
+func (c *CloudflareClient) RefreshCustomHostnameSSL(ctx context.Context, hostnameID string) (*CustomHostname, error) {
+	if !c.cfg.Enabled || c.cfg.SaaSZoneID == "" {
+		return nil, nil
+	}
+
+	url := fmt.Sprintf("%s/zones/%s/custom_hostnames/%s", c.baseURL, c.cfg.SaaSZoneID, hostnameID)
+
+	reqBody := map[string]interface{}{
+		"ssl": map[string]interface{}{
+			"method": "http",
+			"type":   "dv",
+		},
+	}
+
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "PATCH", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.cfg.APIToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	var result CustomHostnameResponse
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	if !result.Success {
+		if len(result.Errors) > 0 {
+			return nil, fmt.Errorf("cloudflare API error: %s", result.Errors[0].Message)
+		}
+		return nil, fmt.Errorf("cloudflare API request failed")
+	}
+
+	return result.Result, nil
+}
+
+// IsSaaSEnabled returns true if Cloudflare for SaaS is configured
+func (c *CloudflareClient) IsSaaSEnabled() bool {
+	return c.cfg.Enabled && c.cfg.SaaSZoneID != "" && c.cfg.FallbackOrigin != ""
+}

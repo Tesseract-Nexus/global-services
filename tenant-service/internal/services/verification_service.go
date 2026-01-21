@@ -219,6 +219,7 @@ type storeSetupConfig struct {
 }
 
 // buildDNSConfigFromSession checks if the session has a custom domain and builds DNS config
+// The CNAME targets point to the tenant's platform subdomains (e.g., awesome-store.tesserix.app)
 func (s *VerificationService) buildDNSConfigFromSession(session *models.OnboardingSession) *clients.CustomDomainDNSConfig {
 	if session == nil || len(session.ApplicationConfigurations) == 0 {
 		return nil
@@ -252,28 +253,101 @@ func (s *VerificationService) buildDNSConfigFromSession(session *models.Onboardi
 		return nil
 	}
 
-	// Get Cloudflare Tunnel ID from config
-	tunnelID := s.verificationConfig.CloudflareTunnelID
-	if tunnelID == "" {
-		log.Printf("[VerificationService] Warning: CLOUDFLARE_TUNNEL_ID not configured, skipping DNS instructions")
-		return nil
+	// Get slug - prefer reserved slug, fall back to generating from business name
+	var slug string
+	var businessName string
+	if session.BusinessInformation != nil {
+		// First, check if there's a reserved slug
+		if session.BusinessInformation.TenantSlug != "" {
+			slug = session.BusinessInformation.TenantSlug
+			log.Printf("[VerificationService] Using reserved slug: %s", slug)
+		}
+		businessName = session.BusinessInformation.BusinessName
 	}
 
-	// Build the CNAME target (e.g., "30a5a0e4-f621-4082-9dde-34f1eed8e8ab.cfargotunnel.com")
-	tunnelCNAME := fmt.Sprintf("%s.cfargotunnel.com", tunnelID)
+	// If no reserved slug, generate from business name
+	if slug == "" {
+		if businessName == "" {
+			log.Printf("[VerificationService] Warning: No business name found, cannot generate slug for CNAME targets")
+			return nil
+		}
+		slug = generateSlugFromBusinessName(businessName)
+		if slug == "" {
+			log.Printf("[VerificationService] Warning: Could not generate slug from business name: %s", businessName)
+			return nil
+		}
+		log.Printf("[VerificationService] Generated slug from business name: %s -> %s", businessName, slug)
+	}
+
+	// Get base domain from config
+	baseDomain := s.verificationConfig.BaseDomain
+	if baseDomain == "" {
+		baseDomain = "tesserix.app" // Default
+	}
 
 	// Build host URLs from the custom domain
 	domain := configData.CustomDomain
-	log.Printf("[VerificationService] Building DNS config for custom domain: %s", domain)
+	log.Printf("[VerificationService] Building DNS config for custom domain: %s (tenant slug: %s)", domain, slug)
 
+	// Build platform subdomain CNAME targets
+	// These are the URLs that customers CNAME their custom domain subdomains to
 	return &clients.CustomDomainDNSConfig{
-		IsCustomDomain:    true,
-		CustomDomain:      domain,
-		StorefrontHost:    domain,
-		AdminHost:         fmt.Sprintf("admin.%s", domain),
-		APIHost:           fmt.Sprintf("api.%s", domain),
-		TunnelCNAMETarget: tunnelCNAME,
+		IsCustomDomain: true,
+		CustomDomain:   domain,
+
+		// Customer's subdomain hosts
+		StorefrontHost: fmt.Sprintf("www.%s", domain),
+		AdminHost:      fmt.Sprintf("admin.%s", domain),
+		APIHost:        fmt.Sprintf("api.%s", domain),
+
+		// Platform CNAME targets (what customers point their DNS to)
+		TenantSlug:            slug,
+		StorefrontCNAMETarget: fmt.Sprintf("%s.%s", slug, baseDomain),       // awesome-store.tesserix.app
+		AdminCNAMETarget:      fmt.Sprintf("%s-admin.%s", slug, baseDomain), // awesome-store-admin.tesserix.app
+		APICNAMETarget:        fmt.Sprintf("%s-api.%s", slug, baseDomain),   // awesome-store-api.tesserix.app
+		BaseDomain:            baseDomain,
+
+		// Deprecated: tunnel CNAME is no longer used
+		TunnelCNAMETarget: "",
 	}
+}
+
+// generateSlugFromBusinessName creates a URL-safe slug from a business name
+// This should match the logic used in tenant creation
+func generateSlugFromBusinessName(businessName string) string {
+	if businessName == "" {
+		return ""
+	}
+
+	// Convert to lowercase
+	slug := strings.ToLower(businessName)
+
+	// Replace spaces and special characters with hyphens
+	slug = strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			return r
+		}
+		if r == ' ' || r == '_' || r == '-' {
+			return '-'
+		}
+		return -1 // Remove other characters
+	}, slug)
+
+	// Remove consecutive hyphens
+	for strings.Contains(slug, "--") {
+		slug = strings.ReplaceAll(slug, "--", "-")
+	}
+
+	// Trim leading/trailing hyphens
+	slug = strings.Trim(slug, "-")
+
+	// Limit length (DNS label max is 63 chars, but we need room for suffixes like -admin)
+	if len(slug) > 40 {
+		slug = slug[:40]
+		slug = strings.TrimRight(slug, "-")
+	}
+
+	return slug
 }
 
 // generateSecureToken generates a cryptographically secure token

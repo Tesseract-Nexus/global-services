@@ -109,6 +109,12 @@ type CloudflareConfig struct {
 
 	// SSL Configuration
 	SSLMode string `json:"ssl_mode"` // "full" (Cloudflare handles SSL) or "flexible" (HTTP to origin)
+
+	// Cloudflare for SaaS (Custom Hostnames)
+	// This is the correct approach for multi-tenant custom domains where customers
+	// use their OWN domain (not in your Cloudflare account)
+	SaaSZoneID     string `json:"saas_zone_id"`     // Zone ID where Custom Hostnames are created (tesserix.app zone)
+	FallbackOrigin string `json:"fallback_origin"`  // CNAME target for customers (e.g., customers.tesserix.app)
 }
 
 func NewConfig() *Config {
@@ -164,6 +170,9 @@ func NewConfig() *Config {
 			AutoConfigureDNS: getBoolEnv("CLOUDFLARE_AUTO_CONFIGURE_DNS", true),
 			DefaultZoneID:    getEnv("CLOUDFLARE_DEFAULT_ZONE_ID", ""),
 			SSLMode:          getEnv("CLOUDFLARE_SSL_MODE", "full"),
+			// Cloudflare for SaaS - required for custom domains from external Cloudflare accounts
+			SaaSZoneID:     getEnv("CLOUDFLARE_SAAS_ZONE_ID", ""),     // Zone ID of tesserix.app
+			FallbackOrigin: getEnv("CLOUDFLARE_FALLBACK_ORIGIN", ""), // e.g., customers.tesserix.app
 		},
 		Limits: LimitsConfig{
 			MaxDomainsPerTenant:            getIntEnv("MAX_DOMAINS_PER_TENANT", 5),
