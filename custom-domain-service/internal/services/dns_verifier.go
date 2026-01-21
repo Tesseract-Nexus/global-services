@@ -101,16 +101,24 @@ func (v *DNSVerifier) verifyTXTRecord(ctx context.Context, domain *models.Custom
 	return result, nil
 }
 
-// verifyCNAMERecord verifies CNAME record pointing to proxy domain
+// verifyCNAMERecord verifies CNAME record pointing to proxy domain or tenant subdomain
 func (v *DNSVerifier) verifyCNAMERecord(ctx context.Context, domain *models.CustomDomain, result *VerificationResult) (*VerificationResult, error) {
-	expectedCNAME := v.cfg.DNS.ProxyDomain
-	result.ExpectedRecord = expectedCNAME
+	// Build list of acceptable CNAME targets
+	acceptableTargets := []string{v.cfg.DNS.ProxyDomain}
+
+	// Also accept CNAME to tenant subdomain (e.g., oh-my-god.tesserix.app)
+	if domain.TenantSlug != "" && v.cfg.DNS.PlatformDomain != "" {
+		tenantSubdomain := domain.TenantSlug + "." + v.cfg.DNS.PlatformDomain
+		acceptableTargets = append(acceptableTargets, tenantSubdomain)
+	}
+
+	result.ExpectedRecord = strings.Join(acceptableTargets, " or ")
 
 	cname, err := v.resolver.LookupCNAME(ctx, domain.Domain)
 	if err != nil {
 		if dnsErr, ok := err.(*net.DNSError); ok {
 			if dnsErr.IsNotFound {
-				result.Message = fmt.Sprintf("CNAME record not found. Please add CNAME pointing to %s", expectedCNAME)
+				result.Message = fmt.Sprintf("CNAME record not found. Please add CNAME pointing to %s", acceptableTargets[0])
 				return result, nil
 			}
 		}
@@ -123,13 +131,16 @@ func (v *DNSVerifier) verifyCNAMERecord(ctx context.Context, domain *models.Cust
 	cname = strings.TrimSuffix(cname, ".")
 	result.RecordFound = cname
 
-	if strings.EqualFold(cname, expectedCNAME) || strings.EqualFold(cname, expectedCNAME+".") {
-		result.IsVerified = true
-		result.Message = "CNAME record verified successfully"
-		return result, nil
+	// Check if CNAME matches any acceptable target
+	for _, target := range acceptableTargets {
+		if strings.EqualFold(cname, target) || strings.EqualFold(cname, target+".") {
+			result.IsVerified = true
+			result.Message = "CNAME record verified successfully"
+			return result, nil
+		}
 	}
 
-	result.Message = fmt.Sprintf("CNAME record found (%s) but doesn't point to %s", cname, expectedCNAME)
+	result.Message = fmt.Sprintf("CNAME record found (%s) but doesn't point to an accepted target: %s", cname, strings.Join(acceptableTargets, " or "))
 	return result, nil
 }
 
@@ -178,35 +189,54 @@ func (v *DNSVerifier) GetRequiredDNSRecords(domain *models.CustomDomain) []model
 		})
 	}
 
-	// Routing record - CNAME for subdomains, A for apex
+	// Determine CNAME target - prefer tenant subdomain if available
+	cnameTarget := v.cfg.DNS.ProxyDomain
+	if domain.TenantSlug != "" && v.cfg.DNS.PlatformDomain != "" {
+		cnameTarget = domain.TenantSlug + "." + v.cfg.DNS.PlatformDomain
+	}
+
+	// Routing record - CNAME preferred for all domain types
+	// Modern DNS providers (Cloudflare, Route53, etc.) support CNAME flattening for apex domains
 	if domain.DomainType == models.DomainTypeApex {
-		// Apex domains need A record
+		// For apex domains: offer CNAME (preferred) with A record as fallback
+		// CNAME to tenant subdomain (recommended - works with Cloudflare, Route53 ALIAS, etc.)
 		records = append(records, models.DNSRecord{
-			RecordType: "A",
+			RecordType: "CNAME",
 			Host:       domain.Domain,
-			Value:      v.cfg.DNS.ProxyIP,
+			Value:      cnameTarget,
 			TTL:        300,
 			Purpose:    "routing",
 			IsVerified: false,
 		})
+		// A record fallback (if DNS provider doesn't support CNAME flattening)
+		if v.cfg.DNS.ProxyIP != "" {
+			records = append(records, models.DNSRecord{
+				RecordType: "A",
+				Host:       domain.Domain,
+				Value:      v.cfg.DNS.ProxyIP,
+				TTL:        300,
+				Purpose:    "routing_fallback",
+				IsVerified: false,
+			})
+		}
 	} else {
-		// Subdomains can use CNAME
+		// Subdomains can always use CNAME
 		records = append(records, models.DNSRecord{
 			RecordType: "CNAME",
 			Host:       domain.Domain,
-			Value:      v.cfg.DNS.ProxyDomain,
+			Value:      cnameTarget,
 			TTL:        300,
 			Purpose:    "routing",
 			IsVerified: false,
 		})
 	}
 
-	// WWW record if enabled
+	// WWW record if enabled (always CNAME)
 	if domain.IncludeWWW && domain.DomainType == models.DomainTypeApex {
 		records = append(records, models.DNSRecord{
 			RecordType: "CNAME",
 			Host:       "www." + domain.Domain,
-			Value:      v.cfg.DNS.ProxyDomain,
+			Value:      cnameTarget,
 			TTL:        300,
 			Purpose:    "routing",
 			IsVerified: false,

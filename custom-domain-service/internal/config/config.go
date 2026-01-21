@@ -67,6 +67,7 @@ type DNSConfig struct {
 	VerificationDomain string `json:"verification_domain"`
 	ProxyDomain        string `json:"proxy_domain"`
 	ProxyIP            string `json:"proxy_ip"`
+	PlatformDomain     string `json:"platform_domain"` // Base domain for tenant subdomains (e.g., tesserix.app)
 }
 
 type SSLConfig struct {
@@ -128,6 +129,7 @@ func NewConfig() *Config {
 			VerificationDomain: getEnv("DNS_VERIFICATION_DOMAIN", "tesserix.app"),
 			ProxyDomain:        getEnv("DNS_PROXY_DOMAIN", "proxy.tesserix.app"),
 			ProxyIP:            getEnv("DNS_PROXY_IP", ""),
+			PlatformDomain:     getEnv("DNS_PLATFORM_DOMAIN", "tesserix.app"),
 		},
 		SSL: SSLConfig{
 			IssuerName:           getEnv("SSL_ISSUER_NAME", "letsencrypt-prod"),
