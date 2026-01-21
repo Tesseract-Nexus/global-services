@@ -559,6 +559,49 @@ func (h *DomainHandlers) GetActivities(c *gin.Context) {
 	c.JSON(http.StatusOK, activities)
 }
 
+// ValidateDomain handles POST /api/v1/domains/validate
+// @Summary Validate a domain before creating
+// @Description Validate domain format and availability without creating it
+// @Tags domains
+// @Accept json
+// @Produce json
+// @Param request body services.ValidateDomainRequest true "Domain validation request"
+// @Success 200 {object} services.ValidateDomainResponse
+// @Failure 400 {object} models.ErrorResponse
+// @Router /api/v1/domains/validate [post]
+func (h *DomainHandlers) ValidateDomain(c *gin.Context) {
+	var req services.ValidateDomainRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error:   "invalid request",
+			Code:    "INVALID_REQUEST",
+			Message: "Please provide a domain to validate",
+		})
+		return
+	}
+
+	if req.Domain == "" {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error:   "domain required",
+			Code:    "DOMAIN_REQUIRED",
+			Message: "Please provide a domain to validate",
+		})
+		return
+	}
+
+	response, err := h.domainService.ValidateDomain(c.Request.Context(), &req)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to validate domain")
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error: "failed to validate domain",
+			Code:  "INTERNAL_ERROR",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
 // Helper function to extract tenant ID and user ID from context
 func getTenantAndUserFromContext(c *gin.Context) (uuid.UUID, uuid.UUID, error) {
 	// Get tenant ID from header (set by Istio/JWT middleware)

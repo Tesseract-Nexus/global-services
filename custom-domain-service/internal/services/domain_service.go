@@ -136,6 +136,87 @@ func (s *DomainService) CreateDomain(ctx context.Context, tenantID uuid.UUID, re
 	return s.toDomainResponse(domain), nil
 }
 
+// ValidateDomainRequest contains the domain to validate
+type ValidateDomainRequest struct {
+	Domain   string `json:"domain"`
+	CheckDNS bool   `json:"check_dns"`
+}
+
+// ValidateDomainResponse contains validation results
+type ValidateDomainResponse struct {
+	Valid              bool              `json:"valid"`
+	Available          bool              `json:"available"`
+	DNSConfigured      bool              `json:"dns_configured"`
+	Message            string            `json:"message,omitempty"`
+	VerificationRecord *models.DNSRecord `json:"verification_record,omitempty"`
+	DomainType         string            `json:"domain_type,omitempty"`
+}
+
+// ValidateDomain validates a domain without creating it
+func (s *DomainService) ValidateDomain(ctx context.Context, req *ValidateDomainRequest) (*ValidateDomainResponse, error) {
+	response := &ValidateDomainResponse{
+		Valid:     false,
+		Available: false,
+	}
+
+	// Validate domain format
+	domainName := strings.ToLower(strings.TrimSpace(req.Domain))
+	if err := s.dnsVerifier.ValidateDomainFormat(domainName); err != nil {
+		response.Message = err.Error()
+		return response, nil
+	}
+
+	response.Valid = true
+
+	// Check if domain already exists
+	exists, err := s.repo.DomainExists(ctx, domainName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check domain existence: %w", err)
+	}
+
+	if exists {
+		response.Available = false
+		response.Message = "This domain is already registered"
+		return response, nil
+	}
+
+	response.Available = true
+
+	// Detect domain type
+	domainType := s.dnsVerifier.DetectDomainType(domainName)
+	response.DomainType = string(domainType)
+
+	// Generate verification record
+	verificationToken := uuid.New().String()[:32]
+	response.VerificationRecord = &models.DNSRecord{
+		RecordType: "CNAME",
+		Host:       "_tesserix." + domainName,
+		Value:      "verify.tesserix.app",
+		TTL:        3600,
+		Purpose:    "verification",
+	}
+
+	response.Message = "Domain is valid and available"
+
+	// Check DNS if requested
+	if req.CheckDNS {
+		// Create a temporary domain object for DNS verification
+		tempDomain := &models.CustomDomain{
+			Domain:             domainName,
+			VerificationMethod: models.VerificationMethodCNAME,
+			VerificationToken:  verificationToken,
+		}
+
+		result, err := s.dnsVerifier.VerifyDomain(ctx, tempDomain)
+		if err == nil && result.IsVerified {
+			response.DNSConfigured = true
+			response.Message = "Domain is valid and DNS is configured"
+		}
+	}
+
+	return response, nil
+}
+
 // GetDomain retrieves a domain by ID
 func (s *DomainService) GetDomain(ctx context.Context, tenantID, domainID uuid.UUID) (*models.DomainResponse, error) {
 	domain, err := s.repo.GetByID(ctx, domainID)

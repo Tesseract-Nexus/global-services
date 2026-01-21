@@ -310,6 +310,7 @@ func setupRouter(cfg *config.Config, domainHandlers *handlers.DomainHandlers, in
 		// Domain routes (authenticated)
 		domains := v1.Group("/domains")
 		{
+			domains.POST("/validate", domainHandlers.ValidateDomain)
 			domains.POST("", domainHandlers.CreateDomain)
 			domains.GET("", domainHandlers.ListDomains)
 			domains.GET("/stats", domainHandlers.GetStats)
