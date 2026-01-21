@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
@@ -163,16 +164,16 @@ func (s *VerificationService) startEmailVerificationWithLinkAndBusinessName(ctx 
 	// Build verification link
 	verificationLink := s.buildVerificationLink(token)
 
-	// Get business name and domain reservations from session
+	// Get business name and custom domain from session
 	var dnsConfig *clients.CustomDomainDNSConfig
 	if s.onboardingRepo != nil {
-		session, err := s.onboardingRepo.GetSessionByID(ctx, sessionID, []string{"business_information", "domain_reservations"})
+		session, err := s.onboardingRepo.GetSessionByID(ctx, sessionID, []string{"business_information", "application_configurations"})
 		if err == nil && session != nil {
 			if session.BusinessInformation != nil && businessName == "" {
 				businessName = session.BusinessInformation.BusinessName
 			}
 
-			// Check if there's a custom domain reservation
+			// Check if there's a custom domain in the store_setup configuration
 			dnsConfig = s.buildDNSConfigFromSession(session)
 		}
 	}
@@ -211,22 +212,43 @@ func (s *VerificationService) startEmailVerificationWithLinkAndBusinessName(ctx 
 	return record, nil
 }
 
+// storeSetupConfig represents the structure of store_setup configuration data
+type storeSetupConfig struct {
+	UseCustomDomain bool   `json:"use_custom_domain"`
+	CustomDomain    string `json:"custom_domain"`
+}
+
 // buildDNSConfigFromSession checks if the session has a custom domain and builds DNS config
 func (s *VerificationService) buildDNSConfigFromSession(session *models.OnboardingSession) *clients.CustomDomainDNSConfig {
-	if session == nil || len(session.DomainReservations) == 0 {
+	if session == nil || len(session.ApplicationConfigurations) == 0 {
 		return nil
 	}
 
-	// Find custom domain reservation
-	var customDomain *models.DomainReservation
-	for i := range session.DomainReservations {
-		if session.DomainReservations[i].DomainType == "custom_domain" {
-			customDomain = &session.DomainReservations[i]
+	// Find the store_setup configuration
+	var storeConfig *models.ApplicationConfiguration
+	for i := range session.ApplicationConfigurations {
+		if session.ApplicationConfigurations[i].ApplicationType == "store_setup" {
+			storeConfig = &session.ApplicationConfigurations[i]
 			break
 		}
 	}
 
-	if customDomain == nil {
+	if storeConfig == nil {
+		log.Printf("[VerificationService] No store_setup configuration found in session")
+		return nil
+	}
+
+	// Parse the configuration data to extract custom domain info
+	var configData storeSetupConfig
+	if err := json.Unmarshal(storeConfig.ConfigurationData, &configData); err != nil {
+		log.Printf("[VerificationService] Failed to parse store_setup config: %v", err)
+		return nil
+	}
+
+	// Check if custom domain is enabled and has a value
+	if !configData.UseCustomDomain || configData.CustomDomain == "" {
+		log.Printf("[VerificationService] Custom domain not enabled or not set (use_custom_domain=%v, custom_domain=%s)",
+			configData.UseCustomDomain, configData.CustomDomain)
 		return nil
 	}
 
@@ -241,7 +263,9 @@ func (s *VerificationService) buildDNSConfigFromSession(session *models.Onboardi
 	tunnelCNAME := fmt.Sprintf("%s.cfargotunnel.com", tunnelID)
 
 	// Build host URLs from the custom domain
-	domain := customDomain.DomainValue
+	domain := configData.CustomDomain
+	log.Printf("[VerificationService] Building DNS config for custom domain: %s", domain)
+
 	return &clients.CustomDomainDNSConfig{
 		IsCustomDomain:    true,
 		CustomDomain:      domain,
