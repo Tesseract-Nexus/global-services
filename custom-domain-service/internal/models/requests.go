@@ -45,6 +45,11 @@ type DomainResponse struct {
 	UpdatedAt          string             `json:"updated_at"`
 	DNSRecords         []DNSRecord        `json:"dns_records,omitempty"`
 	VerificationMethod VerificationMethod `json:"verification_method"`
+
+	// Cloudflare Tunnel fields
+	CloudflareTunnelConfigured bool   `json:"cloudflare_tunnel_configured,omitempty"`
+	CloudflareDNSConfigured    bool   `json:"cloudflare_dns_configured,omitempty"`
+	TunnelCNAMETarget          string `json:"tunnel_cname_target,omitempty"` // e.g., xxx.cfargotunnel.com
 }
 
 // DomainListResponse represents a list of domains

@@ -103,6 +103,12 @@ type CustomDomain struct {
 	KeycloakUpdated   bool       `json:"keycloak_updated" gorm:"default:false"`
 	KeycloakUpdatedAt *time.Time `json:"keycloak_updated_at"`
 
+	// Cloudflare Tunnel
+	CloudflareTunnelConfigured bool       `json:"cloudflare_tunnel_configured" gorm:"default:false"`
+	CloudflareDNSConfigured    bool       `json:"cloudflare_dns_configured" gorm:"default:false"`
+	CloudflareZoneID           string     `json:"cloudflare_zone_id" gorm:"size:100"`
+	TunnelLastCheckedAt        *time.Time `json:"tunnel_last_checked_at"`
+
 	// Overall Status
 	Status        DomainStatus `json:"status" gorm:"size:20;default:'pending';index"`
 	StatusMessage string       `json:"status_message" gorm:"size:500"`

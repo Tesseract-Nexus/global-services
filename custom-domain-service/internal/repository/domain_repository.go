@@ -297,6 +297,32 @@ func (r *DomainRepository) CleanupOldActivities(ctx context.Context, olderThan t
 	return result.RowsAffected, result.Error
 }
 
+// UpdateCloudflareStatus updates Cloudflare tunnel and DNS status
+func (r *DomainRepository) UpdateCloudflareStatus(ctx context.Context, id uuid.UUID, tunnelConfigured, dnsConfigured bool, zoneID string) error {
+	updates := map[string]interface{}{
+		"cloudflare_tunnel_configured": tunnelConfigured,
+		"cloudflare_dns_configured":    dnsConfigured,
+		"tunnel_last_checked_at":       time.Now(),
+		"updated_at":                   time.Now(),
+	}
+	if zoneID != "" {
+		updates["cloudflare_zone_id"] = zoneID
+	}
+	return r.db.WithContext(ctx).Model(&models.CustomDomain{}).Where("id = ?", id).Updates(updates).Error
+}
+
+// GetPendingCloudflareConfig retrieves domains pending Cloudflare configuration
+func (r *DomainRepository) GetPendingCloudflareConfig(ctx context.Context, limit int) ([]models.CustomDomain, error) {
+	var domains []models.CustomDomain
+	err := r.db.WithContext(ctx).
+		Where("status IN (?, ?) AND cloudflare_tunnel_configured = ?",
+			models.DomainStatusPending, models.DomainStatusProvisioning, false).
+		Order("created_at ASC").
+		Limit(limit).
+		Find(&domains).Error
+	return domains, err
+}
+
 // GetStats retrieves domain statistics for a tenant
 func (r *DomainRepository) GetStats(ctx context.Context, tenantID uuid.UUID) (*models.DomainStatsResponse, error) {
 	var stats models.DomainStatsResponse

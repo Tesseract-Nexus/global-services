@@ -363,10 +363,17 @@ func (s *DomainService) DeleteDomain(ctx context.Context, tenantID, domainID uui
 		log.Warn().Err(err).Msg("Failed to update status to deleting")
 	}
 
-	// Cleanup Cloudflare Tunnel route
+	// Cleanup Cloudflare resources (tunnel route and DNS records)
 	if s.cfg.Cloudflare.Enabled && s.cloudflare != nil {
+		// Remove from tunnel ingress
 		if err := s.cloudflare.RemoveDomainFromTunnel(ctx, domain); err != nil {
 			log.Warn().Err(err).Str("domain", domain.Domain).Msg("Failed to remove domain from Cloudflare Tunnel")
+		}
+		// Remove DNS records if they were auto-configured
+		if domain.CloudflareDNSConfigured {
+			if err := s.cloudflare.DeleteDNSRecords(ctx, domain); err != nil {
+				log.Warn().Err(err).Str("domain", domain.Domain).Msg("Failed to delete Cloudflare DNS records")
+			}
 		}
 	}
 
@@ -478,10 +485,28 @@ func (s *DomainService) provisionDomain(ctx context.Context, domain *models.Cust
 
 // provisionDomainWithCloudflare provisions a domain using Cloudflare Tunnel
 // SSL is handled by Cloudflare, no cert-manager needed
+// Flow: DNS Configuration → Tunnel Configuration → VirtualService → Keycloak → Active
 func (s *DomainService) provisionDomainWithCloudflare(ctx context.Context, domain *models.CustomDomain) {
 	log.Info().Str("domain", domain.Domain).Msg("Provisioning domain via Cloudflare Tunnel")
 
-	// Step 1: Add domain to Cloudflare Tunnel
+	// Step 0: Configure DNS (if auto-configure is enabled)
+	// This creates CNAME records pointing to the tunnel in Cloudflare
+	if s.cfg.Cloudflare.AutoConfigureDNS {
+		log.Info().Str("domain", domain.Domain).Msg("Auto-configuring DNS in Cloudflare")
+		if err := s.cloudflare.CreateOrUpdateCNAME(ctx, domain); err != nil {
+			log.Warn().Err(err).Str("domain", domain.Domain).Msg("Failed to auto-configure DNS, customer will need to configure manually")
+			s.logActivity(ctx, domain, "dns_auto_config", "skipped", "Customer must configure DNS manually")
+		} else {
+			// Update Cloudflare DNS status
+			zoneID, _ := s.cloudflare.GetZoneIDForDomain(ctx, domain.Domain)
+			s.repo.UpdateCloudflareStatus(ctx, domain.ID, false, true, zoneID)
+			s.logActivity(ctx, domain, "dns_auto_config", "success", "DNS CNAME records created in Cloudflare")
+			domain.CloudflareDNSConfigured = true
+			domain.CloudflareZoneID = zoneID
+		}
+	}
+
+	// Step 1: Add domain to Cloudflare Tunnel ingress rules
 	if err := s.cloudflare.AddDomainToTunnel(ctx, domain); err != nil {
 		log.Error().Err(err).Str("domain", domain.Domain).Msg("Failed to add domain to Cloudflare Tunnel")
 		s.repo.UpdateStatus(ctx, domain.ID, models.DomainStatusFailed, "Failed to configure Cloudflare Tunnel. Please contact support.")
@@ -492,13 +517,20 @@ func (s *DomainService) provisionDomainWithCloudflare(ctx context.Context, domai
 		return
 	}
 
-	// Mark SSL as active (Cloudflare handles SSL)
+	// Update tunnel status
+	s.repo.UpdateCloudflareStatus(ctx, domain.ID, true, domain.CloudflareDNSConfigured, domain.CloudflareZoneID)
+	s.logActivity(ctx, domain, "cloudflare_tunnel", "success", "Domain added to Cloudflare Tunnel")
+	domain.CloudflareTunnelConfigured = true
+
+	// Mark SSL as active (Cloudflare handles SSL at the edge)
 	s.repo.UpdateSSLStatus(ctx, domain.ID, models.SSLStatusActive, "cloudflare-managed", nil, "")
-	s.logActivity(ctx, domain, "ssl_provisioning", "success", "SSL managed by Cloudflare")
+	s.logActivity(ctx, domain, "ssl_provisioning", "success", "SSL managed by Cloudflare (Full SSL mode)")
 	domain.SSLStatus = models.SSLStatusActive
+	domain.SSLProvider = "cloudflare-managed"
 	s.publishDomainEvent(ctx, events.DomainSSLProvisioned, domain, string(models.SSLStatusProvisioning))
 
 	// Step 2: Configure routing (VirtualService only, no Gateway patching needed)
+	// The VirtualService routes traffic from istio-ingressgateway to the backend
 	vsResult, err := s.k8sClient.CreateVirtualService(ctx, domain)
 	if err != nil {
 		log.Error().Err(err).Str("domain", domain.Domain).Msg("Failed to create VirtualService")
@@ -510,7 +542,7 @@ func (s *DomainService) provisionDomainWithCloudflare(ctx context.Context, domai
 		return
 	}
 
-	s.repo.UpdateRoutingStatus(ctx, domain.ID, models.RoutingStatusActive, vsResult.Name, true)
+	s.repo.UpdateRoutingStatus(ctx, domain.ID, models.RoutingStatusActive, vsResult.Name, false) // Gateway not patched in tunnel mode
 	s.logActivity(ctx, domain, "routing", "success", "VirtualService configured for Cloudflare Tunnel")
 
 	// Step 3: Update Keycloak redirect URIs
@@ -532,8 +564,13 @@ func (s *DomainService) provisionDomainWithCloudflare(ctx context.Context, domai
 	// Cache the domain resolution
 	s.cacheDomainResolution(ctx, domain)
 
-	log.Info().Str("domain", domain.Domain).Msg("Domain provisioning via Cloudflare Tunnel completed successfully")
-	s.logActivity(ctx, domain, "activated", "success", "Domain is now active via Cloudflare Tunnel")
+	tunnelCNAME := s.cloudflare.GetTunnelCNAME()
+	log.Info().
+		Str("domain", domain.Domain).
+		Str("tunnel_cname", tunnelCNAME).
+		Bool("dns_configured", domain.CloudflareDNSConfigured).
+		Msg("Domain provisioning via Cloudflare Tunnel completed successfully")
+	s.logActivity(ctx, domain, "activated", "success", fmt.Sprintf("Domain is now active via Cloudflare Tunnel (%s)", tunnelCNAME))
 
 	// Publish domain activated event
 	domain.Status = models.DomainStatusActive
@@ -850,6 +887,13 @@ func (s *DomainService) toDomainResponse(domain *models.CustomDomain) *models.Do
 	if domain.ActivatedAt != nil {
 		v := domain.ActivatedAt.Format(time.RFC3339)
 		response.ActivatedAt = &v
+	}
+
+	// Add Cloudflare Tunnel information
+	if s.cfg.Cloudflare.Enabled {
+		response.CloudflareTunnelConfigured = domain.CloudflareTunnelConfigured
+		response.CloudflareDNSConfigured = domain.CloudflareDNSConfigured
+		response.TunnelCNAMETarget = s.dnsVerifier.GetTunnelCNAMETarget()
 	}
 
 	return response

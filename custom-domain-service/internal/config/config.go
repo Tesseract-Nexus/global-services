@@ -102,6 +102,13 @@ type CloudflareConfig struct {
 	AccountID     string `json:"account_id"`     // Cloudflare account ID
 	TunnelID      string `json:"tunnel_id"`      // Cloudflare Tunnel ID
 	OriginService string `json:"origin_service"` // Origin service URL (Istio ingress)
+
+	// DNS Management
+	AutoConfigureDNS bool   `json:"auto_configure_dns"` // Auto-create DNS records in Cloudflare
+	DefaultZoneID    string `json:"default_zone_id"`    // Default zone ID for tesserix.app (if customer uses our managed DNS)
+
+	// SSL Configuration
+	SSLMode string `json:"ssl_mode"` // "full" (Cloudflare handles SSL) or "flexible" (HTTP to origin)
 }
 
 func NewConfig() *Config {
@@ -149,11 +156,14 @@ func NewConfig() *Config {
 			CertificateNamespace: getEnv("SSL_CERTIFICATE_NAMESPACE", "istio-system"),
 		},
 		Cloudflare: CloudflareConfig{
-			Enabled:       getBoolEnv("CLOUDFLARE_TUNNEL_ENABLED", true),
-			APIToken:      getEnv("CLOUDFLARE_API_TOKEN", ""),
-			AccountID:     getEnv("CLOUDFLARE_ACCOUNT_ID", ""),
-			TunnelID:      getEnv("CLOUDFLARE_TUNNEL_ID", ""),
-			OriginService: getEnv("CLOUDFLARE_ORIGIN_SERVICE", "http://istio-ingressgateway.istio-ingress.svc.cluster.local:80"),
+			Enabled:          getBoolEnv("CLOUDFLARE_TUNNEL_ENABLED", true),
+			APIToken:         getEnv("CLOUDFLARE_API_TOKEN", ""),
+			AccountID:        getEnv("CLOUDFLARE_ACCOUNT_ID", ""),
+			TunnelID:         getEnv("CLOUDFLARE_TUNNEL_ID", ""),
+			OriginService:    getEnv("CLOUDFLARE_ORIGIN_SERVICE", "http://istio-ingressgateway.istio-ingress.svc.cluster.local:80"),
+			AutoConfigureDNS: getBoolEnv("CLOUDFLARE_AUTO_CONFIGURE_DNS", true),
+			DefaultZoneID:    getEnv("CLOUDFLARE_DEFAULT_ZONE_ID", ""),
+			SSLMode:          getEnv("CLOUDFLARE_SSL_MODE", "full"),
 		},
 		Limits: LimitsConfig{
 			MaxDomainsPerTenant:            getIntEnv("MAX_DOMAINS_PER_TENANT", 5),

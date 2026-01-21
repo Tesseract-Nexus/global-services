@@ -97,7 +97,7 @@ func (v *DNSVerifier) verifyTXTRecord(ctx context.Context, domain *models.Custom
 	return result, nil
 }
 
-// verifyCNAMERecord verifies CNAME record pointing to proxy domain or tenant subdomain
+// verifyCNAMERecord verifies CNAME record pointing to proxy domain, tenant subdomain, or Cloudflare tunnel
 func (v *DNSVerifier) verifyCNAMERecord(ctx context.Context, domain *models.CustomDomain, result *VerificationResult) (*VerificationResult, error) {
 	// Build list of acceptable CNAME targets
 	acceptableTargets := []string{v.cfg.DNS.ProxyDomain}
@@ -106,6 +106,12 @@ func (v *DNSVerifier) verifyCNAMERecord(ctx context.Context, domain *models.Cust
 	if domain.TenantSlug != "" && v.cfg.DNS.PlatformDomain != "" {
 		tenantSubdomain := domain.TenantSlug + "." + v.cfg.DNS.PlatformDomain
 		acceptableTargets = append(acceptableTargets, tenantSubdomain)
+	}
+
+	// Also accept CNAME to Cloudflare Tunnel (if configured)
+	if v.cfg.Cloudflare.Enabled && v.cfg.Cloudflare.TunnelID != "" {
+		tunnelCNAME := fmt.Sprintf("%s.cfargotunnel.com", v.cfg.Cloudflare.TunnelID)
+		acceptableTargets = append(acceptableTargets, tunnelCNAME)
 	}
 
 	result.ExpectedRecord = strings.Join(acceptableTargets, " or ")
@@ -138,6 +144,27 @@ func (v *DNSVerifier) verifyCNAMERecord(ctx context.Context, domain *models.Cust
 
 	result.Message = fmt.Sprintf("CNAME record found (%s) but doesn't point to an accepted target: %s", cname, strings.Join(acceptableTargets, " or "))
 	return result, nil
+}
+
+// VerifyTunnelCNAME verifies that the domain's CNAME points to the Cloudflare tunnel
+func (v *DNSVerifier) VerifyTunnelCNAME(ctx context.Context, domain string) (bool, string, error) {
+	if !v.cfg.Cloudflare.Enabled || v.cfg.Cloudflare.TunnelID == "" {
+		return false, "", fmt.Errorf("cloudflare tunnel not configured")
+	}
+
+	tunnelCNAME := fmt.Sprintf("%s.cfargotunnel.com", v.cfg.Cloudflare.TunnelID)
+
+	cname, err := v.resolver.LookupCNAME(ctx, domain)
+	if err != nil {
+		return false, "", err
+	}
+
+	cname = strings.TrimSuffix(cname, ".")
+	if strings.EqualFold(cname, tunnelCNAME) {
+		return true, cname, nil
+	}
+
+	return false, cname, nil
 }
 
 // CheckARecord checks if an A record points to our proxy IP
@@ -173,39 +200,50 @@ func (v *DNSVerifier) CheckARecord(ctx context.Context, domain string) (bool, []
 func (v *DNSVerifier) GetRequiredDNSRecords(domain *models.CustomDomain) []models.DNSRecord {
 	records := []models.DNSRecord{}
 
-	// Verification record
-	if domain.VerificationMethod == models.VerificationMethodTXT {
-		records = append(records, models.DNSRecord{
-			RecordType: "TXT",
-			Host:       "_tesserix-verification." + domain.Domain,
-			Value:      "tesserix-verify=" + domain.VerificationToken,
-			TTL:        300,
-			Purpose:    "verification",
-			IsVerified: domain.DNSVerified,
-		})
+	// Determine CNAME target based on configuration
+	// Priority: Cloudflare Tunnel > Tenant subdomain > Proxy domain
+	cnameTarget := v.cfg.DNS.ProxyDomain
+	cnameDescription := "proxy domain"
+
+	if v.cfg.Cloudflare.Enabled && v.cfg.Cloudflare.TunnelID != "" {
+		// Use Cloudflare Tunnel CNAME (preferred - no verification record needed)
+		cnameTarget = fmt.Sprintf("%s.cfargotunnel.com", v.cfg.Cloudflare.TunnelID)
+		cnameDescription = "Cloudflare Tunnel"
+	} else if domain.TenantSlug != "" && v.cfg.DNS.PlatformDomain != "" {
+		cnameTarget = domain.TenantSlug + "." + v.cfg.DNS.PlatformDomain
+		cnameDescription = "tenant subdomain"
 	}
 
-	// Determine CNAME target - prefer tenant subdomain if available
-	cnameTarget := v.cfg.DNS.ProxyDomain
-	if domain.TenantSlug != "" && v.cfg.DNS.PlatformDomain != "" {
-		cnameTarget = domain.TenantSlug + "." + v.cfg.DNS.PlatformDomain
+	// For Cloudflare Tunnel mode, we only need CNAME records (no TXT verification)
+	// The CNAME pointing to tunnel IS the verification
+	if !v.cfg.Cloudflare.Enabled {
+		// Legacy mode: Verification record needed
+		if domain.VerificationMethod == models.VerificationMethodTXT {
+			records = append(records, models.DNSRecord{
+				RecordType: "TXT",
+				Host:       "_tesserix-verification." + domain.Domain,
+				Value:      "tesserix-verify=" + domain.VerificationToken,
+				TTL:        300,
+				Purpose:    "verification",
+				IsVerified: domain.DNSVerified,
+			})
+		}
 	}
 
 	// Routing record - CNAME preferred for all domain types
 	// Modern DNS providers (Cloudflare, Route53, etc.) support CNAME flattening for apex domains
 	if domain.DomainType == models.DomainTypeApex {
 		// For apex domains: offer CNAME (preferred) with A record as fallback
-		// CNAME to tenant subdomain (recommended - works with Cloudflare, Route53 ALIAS, etc.)
 		records = append(records, models.DNSRecord{
 			RecordType: "CNAME",
 			Host:       domain.Domain,
 			Value:      cnameTarget,
 			TTL:        300,
-			Purpose:    "routing",
-			IsVerified: false,
+			Purpose:    fmt.Sprintf("routing (%s)", cnameDescription),
+			IsVerified: domain.CloudflareDNSConfigured || domain.DNSVerified,
 		})
-		// A record fallback (if DNS provider doesn't support CNAME flattening)
-		if v.cfg.DNS.ProxyIP != "" {
+		// A record fallback only for legacy mode (not Cloudflare Tunnel)
+		if !v.cfg.Cloudflare.Enabled && v.cfg.DNS.ProxyIP != "" {
 			records = append(records, models.DNSRecord{
 				RecordType: "A",
 				Host:       domain.Domain,
@@ -222,8 +260,8 @@ func (v *DNSVerifier) GetRequiredDNSRecords(domain *models.CustomDomain) []model
 			Host:       domain.Domain,
 			Value:      cnameTarget,
 			TTL:        300,
-			Purpose:    "routing",
-			IsVerified: false,
+			Purpose:    fmt.Sprintf("routing (%s)", cnameDescription),
+			IsVerified: domain.CloudflareDNSConfigured || domain.DNSVerified,
 		})
 	}
 
@@ -234,12 +272,20 @@ func (v *DNSVerifier) GetRequiredDNSRecords(domain *models.CustomDomain) []model
 			Host:       "www." + domain.Domain,
 			Value:      cnameTarget,
 			TTL:        300,
-			Purpose:    "routing",
-			IsVerified: false,
+			Purpose:    fmt.Sprintf("routing (%s)", cnameDescription),
+			IsVerified: domain.CloudflareDNSConfigured || domain.DNSVerified,
 		})
 	}
 
 	return records
+}
+
+// GetTunnelCNAMETarget returns the Cloudflare tunnel CNAME target
+func (v *DNSVerifier) GetTunnelCNAMETarget() string {
+	if v.cfg.Cloudflare.Enabled && v.cfg.Cloudflare.TunnelID != "" {
+		return fmt.Sprintf("%s.cfargotunnel.com", v.cfg.Cloudflare.TunnelID)
+	}
+	return ""
 }
 
 // DetectDomainType determines if domain is apex or subdomain
