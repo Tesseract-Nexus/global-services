@@ -5,7 +5,7 @@ go 1.25.5
 require (
 	cloud.google.com/go/pubsub v1.36.1
 	firebase.google.com/go/v4 v4.14.0
-	github.com/Tesseract-Nexus/go-shared v0.0.2-0.20260120131633-df542d485082
+	github.com/Tesseract-Nexus/go-shared v0.0.2-0.20260121002616-113bfc505e9d
 	github.com/aws/aws-sdk-go-v2 v1.41.0
 	github.com/aws/aws-sdk-go-v2/config v1.32.6
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.6
