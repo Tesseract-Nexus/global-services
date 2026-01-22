@@ -88,6 +88,7 @@ func main() {
 		}
 	}
 
+	log.Println("[DEBUG] NATS setup complete, initializing health handler...")
 	// Initialize health handler
 	healthHandler := handlers.NewHealthHandler(k8sClient, natsSubscriber, db)
 
@@ -152,6 +153,7 @@ func main() {
 			}
 		}
 	}()
+	log.Println("[DEBUG] Cleanup goroutine started, setting up gateway sync...")
 
 	// Start gateway IP sync job (syncs custom domain gateway IP to Redis)
 	// This enables other services (like tenant-service) to fetch the IP without K8s API access
