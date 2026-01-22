@@ -384,6 +384,25 @@ func (v *DNSVerifier) ValidateDomainFormat(domain string) error {
 	return nil
 }
 
+// ValidateStorefrontDomain validates that a storefront domain is a subdomain (not apex)
+// Apex domains are not supported because:
+// 1. Apex domains can't use CNAME records (not all DNS providers support CNAME flattening)
+// 2. Subdomains are more reliable for pointing to Cloudflare Tunnel
+func (v *DNSVerifier) ValidateStorefrontDomain(domain string) error {
+	// First run standard format validation
+	if err := v.ValidateDomainFormat(domain); err != nil {
+		return err
+	}
+
+	// Check if it's an apex domain (not allowed for storefront)
+	domainType := v.DetectDomainType(domain)
+	if domainType == models.DomainTypeApex {
+		return fmt.Errorf("apex domains are not supported for storefront. Please use a subdomain like www.%s or store.%s", domain, domain)
+	}
+
+	return nil
+}
+
 // CheckDomainExists verifies if a domain is registered by checking for NS records
 // This is a quick check with a short timeout to avoid hanging
 func (v *DNSVerifier) CheckDomainExists(ctx context.Context, domainName string) (bool, error) {

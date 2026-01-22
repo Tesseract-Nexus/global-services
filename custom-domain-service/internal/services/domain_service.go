@@ -63,6 +63,14 @@ func (s *DomainService) CreateDomain(ctx context.Context, tenantID uuid.UUID, re
 		return nil, fmt.Errorf("invalid domain format: %w", err)
 	}
 
+	// For storefront domains, validate that it's a subdomain (apex not supported)
+	targetType := req.TargetType
+	if targetType == "" || targetType == models.TargetTypeStorefront {
+		if err := s.dnsVerifier.ValidateStorefrontDomain(domainName); err != nil {
+			return nil, fmt.Errorf("storefront domain validation failed: %w", err)
+		}
+	}
+
 	// Check if domain already exists
 	exists, err := s.repo.DomainExists(ctx, domainName)
 	if err != nil {
@@ -98,8 +106,7 @@ func (s *DomainService) CreateDomain(ctx context.Context, tenantID uuid.UUID, re
 	// Determine domain type
 	domainType := s.dnsVerifier.DetectDomainType(domainName)
 
-	// Set default target type
-	targetType := req.TargetType
+	// Set default target type (targetType already declared above)
 	if targetType == "" {
 		targetType = models.TargetTypeStorefront
 	}
@@ -175,6 +182,13 @@ func (s *DomainService) ValidateDomain(ctx context.Context, req *ValidateDomainR
 	// Validate domain format
 	domainName := strings.ToLower(strings.TrimSpace(req.Domain))
 	if err := s.dnsVerifier.ValidateDomainFormat(domainName); err != nil {
+		response.Message = err.Error()
+		return response, nil
+	}
+
+	// Validate that it's a subdomain (apex domains not supported for storefront)
+	// This is enforced during onboarding since storefronts are the default target type
+	if err := s.dnsVerifier.ValidateStorefrontDomain(domainName); err != nil {
 		response.Message = err.Error()
 		return response, nil
 	}
