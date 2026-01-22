@@ -39,6 +39,7 @@ const (
 	ConditionStorefrontConfigured    = "StorefrontVSConfigured"
 	ConditionStorefrontWwwConfigured = "StorefrontWwwVSConfigured"
 	ConditionAPIVSConfigured         = "APIVSConfigured"
+	ConditionAuthPolicyConfigured    = "AuthPolicyConfigured"
 	ConditionReady                   = "Ready"
 
 	StatusTrue    = "True"
@@ -645,6 +646,31 @@ func (r *TenantReconciler) reconcileCreate(ctx context.Context, event *models.Te
 	// The customer simply points their domain's A record to the LoadBalancer IP, and
 	// Let's Encrypt issues a certificate via HTTP-01 challenge.
 
+	// 7. Update shared AuthorizationPolicy for custom domains
+	// Custom domain VirtualServices need their hosts added to the AuthorizationPolicy
+	// to allow traffic through the custom-ingressgateway
+	if record.IsCustomDomain {
+		if err := r.reconcileAuthorizationPolicy(ctx, record, "add"); err != nil {
+			conditions = append(conditions, Condition{
+				Type:               ConditionAuthPolicyConfigured,
+				Status:             StatusFalse,
+				LastTransitionTime: time.Now(),
+				Reason:             ReasonFailed,
+				Message:            err.Error(),
+			})
+			// Log but don't fail - the VirtualServices are created, just RBAC might be incomplete
+			log.Printf("[Reconciler] Warning: Failed to update AuthorizationPolicy for %s: %v", record.Slug, err)
+		} else {
+			conditions = append(conditions, Condition{
+				Type:               ConditionAuthPolicyConfigured,
+				Status:             StatusTrue,
+				LastTransitionTime: time.Now(),
+				Reason:             ReasonProvisioned,
+				Message:            "AuthorizationPolicy updated successfully",
+			})
+		}
+	}
+
 	// All resources provisioned - mark as ready
 	conditions = append(conditions, Condition{
 		Type:               ConditionReady,
@@ -695,6 +721,13 @@ func (r *TenantReconciler) reconcileDelete(ctx context.Context, event *models.Te
 	}
 
 	// Remove in reverse order
+	// 0. Remove hosts from AuthorizationPolicy (for custom domains)
+	if record.IsCustomDomain {
+		if err := r.reconcileAuthorizationPolicy(ctx, record, "remove"); err != nil {
+			log.Printf("[Reconciler] Failed to remove from AuthorizationPolicy: %v", err)
+		}
+	}
+
 	// 1. Remove API VirtualService
 	if err := r.reconcileVirtualService(ctx, record, r.config.Kubernetes.APIVSName, apiHost, "remove"); err != nil {
 		log.Printf("[Reconciler] Failed to remove from API VS: %v", err)
@@ -909,6 +942,61 @@ func (r *TenantReconciler) reconcileVirtualServiceWithSuffix(ctx context.Context
 		r.logActivity(ctx, record.ID, fmt.Sprintf("delete_%s", templateVSName), "VirtualService", "", true, "", time.Since(startTime))
 	}
 
+	return nil
+}
+
+// reconcileAuthorizationPolicy adds or removes custom domain hosts from the shared AuthorizationPolicy
+// This is necessary for custom domains to pass RBAC checks on the custom-ingressgateway
+func (r *TenantReconciler) reconcileAuthorizationPolicy(ctx context.Context, record *models.TenantHostRecord, operation string) error {
+	if !record.IsCustomDomain {
+		// Only custom domains need AuthorizationPolicy updates
+		return nil
+	}
+
+	// Collect all hosts that need to be added/removed
+	hosts := make([]string, 0)
+
+	// Add storefront host
+	if record.StorefrontHost != "" {
+		hosts = append(hosts, record.StorefrontHost)
+	}
+
+	// Add admin host if different from storefront
+	if record.AdminHost != "" && record.AdminHost != record.StorefrontHost {
+		hosts = append(hosts, record.AdminHost)
+	}
+
+	// Add www subdomain if configured
+	if record.StorefrontWwwHost != "" {
+		hosts = append(hosts, record.StorefrontWwwHost)
+	}
+
+	// Add API host if configured
+	if record.APIHost != "" {
+		hosts = append(hosts, record.APIHost)
+	}
+
+	if len(hosts) == 0 {
+		log.Printf("[Reconciler] No hosts to %s for AuthorizationPolicy for tenant %s", operation, record.Slug)
+		return nil
+	}
+
+	startTime := time.Now()
+	var err error
+
+	if operation == "add" {
+		err = r.k8sClient.AddHostsToSharedAuthPolicy(ctx, hosts)
+	} else if operation == "remove" {
+		err = r.k8sClient.RemoveHostsFromSharedAuthPolicy(ctx, hosts)
+	}
+
+	if err != nil {
+		r.logActivity(ctx, record.ID, fmt.Sprintf("%s_auth_policy", operation), "AuthorizationPolicy", r.config.Kubernetes.CustomDomainGatewayNS, false, err.Error(), time.Since(startTime))
+		return err
+	}
+
+	r.logActivity(ctx, record.ID, fmt.Sprintf("%s_auth_policy", operation), "AuthorizationPolicy", r.config.Kubernetes.CustomDomainGatewayNS, true, "", time.Since(startTime))
+	log.Printf("[Reconciler] %sd hosts in AuthorizationPolicy for tenant %s: %v", operation, record.Slug, hosts)
 	return nil
 }
 

@@ -10,7 +10,10 @@ import (
 	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	certmanagerclient "github.com/cert-manager/cert-manager/pkg/client/clientset/versioned"
 	networkingv1beta1 "istio.io/api/networking/v1beta1"
+	securityv1beta1 "istio.io/api/security/v1beta1"
+	typev1beta1 "istio.io/api/type/v1beta1"
 	istioversionedclient "istio.io/client-go/pkg/clientset/versioned"
+	istiosecurityv1beta1 "istio.io/client-go/pkg/apis/security/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -865,4 +868,244 @@ func (c *Client) GetCertificateStatus(ctx context.Context, slug string) (string,
 func (c *Client) IsConnected(ctx context.Context) bool {
 	_, err := c.istio.NetworkingV1beta1().VirtualServices(c.config.Kubernetes.Namespace).List(ctx, metav1.ListOptions{Limit: 1})
 	return err == nil
+}
+
+// AddHostsToSharedAuthPolicy adds custom domain hosts to the shared AuthorizationPolicy
+// This is necessary for custom domains to pass RBAC checks on the custom-ingressgateway
+// The policy must exist - this method patches it to add new hosts to the allow rules
+func (c *Client) AddHostsToSharedAuthPolicy(ctx context.Context, hosts []string) error {
+	policyName := c.config.Kubernetes.SharedAuthPolicyName
+	namespace := c.config.Kubernetes.SharedAuthPolicyNamespace
+
+	if policyName == "" {
+		log.Println("[K8s] SharedAuthPolicyName not configured, skipping AuthorizationPolicy update")
+		return nil
+	}
+
+	// Get the existing AuthorizationPolicy
+	policy, err := c.istio.SecurityV1beta1().AuthorizationPolicies(namespace).Get(ctx, policyName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get AuthorizationPolicy %s/%s: %w", namespace, policyName, err)
+	}
+
+	// Track which hosts need to be added
+	hostsToAdd := make([]string, 0)
+	existingHosts := make(map[string]bool)
+
+	// Collect all existing hosts from all rules
+	for _, rule := range policy.Spec.Rules {
+		if rule.To != nil {
+			for _, to := range rule.To {
+				if to.Operation != nil {
+					for _, host := range to.Operation.Hosts {
+						existingHosts[host] = true
+					}
+				}
+			}
+		}
+	}
+
+	// Check which hosts need to be added
+	for _, host := range hosts {
+		if !existingHosts[host] {
+			hostsToAdd = append(hostsToAdd, host)
+		}
+	}
+
+	if len(hostsToAdd) == 0 {
+		log.Printf("[K8s] All hosts already in AuthorizationPolicy %s/%s, no update needed", namespace, policyName)
+		return nil
+	}
+
+	// Add hosts to the first rule's operation (typical pattern for frontend apps)
+	// If no rules exist, create one
+	if len(policy.Spec.Rules) == 0 {
+		// Create a new rule with the hosts
+		selector := c.config.Kubernetes.SharedAuthPolicySelector
+		policy.Spec = &securityv1beta1.AuthorizationPolicy{
+			Selector: &typev1beta1.WorkloadSelector{
+				MatchLabels: map[string]string{
+					"istio": selector,
+				},
+			},
+			Action: securityv1beta1.AuthorizationPolicy_ALLOW,
+			Rules: []*securityv1beta1.Rule{
+				{
+					To: []*securityv1beta1.Rule_To{
+						{
+							Operation: &securityv1beta1.Operation{
+								Hosts: hosts,
+							},
+						},
+					},
+				},
+			},
+		}
+	} else {
+		// Add to existing rules - find rules that have hosts and add to them
+		hostsAdded := false
+		for i, rule := range policy.Spec.Rules {
+			if rule.To != nil {
+				for j, to := range rule.To {
+					if to.Operation != nil && len(to.Operation.Hosts) > 0 {
+						// Add new hosts to this rule
+						policy.Spec.Rules[i].To[j].Operation.Hosts = append(
+							policy.Spec.Rules[i].To[j].Operation.Hosts,
+							hostsToAdd...,
+						)
+						hostsAdded = true
+					}
+				}
+			}
+		}
+
+		// If no existing host-based rules found, add hosts to the first rule
+		if !hostsAdded && len(policy.Spec.Rules) > 0 {
+			rule := policy.Spec.Rules[0]
+			if rule.To == nil {
+				rule.To = make([]*securityv1beta1.Rule_To, 0)
+			}
+			if len(rule.To) == 0 {
+				rule.To = append(rule.To, &securityv1beta1.Rule_To{
+					Operation: &securityv1beta1.Operation{
+						Hosts: hostsToAdd,
+					},
+				})
+			} else if rule.To[0].Operation == nil {
+				rule.To[0].Operation = &securityv1beta1.Operation{
+					Hosts: hostsToAdd,
+				}
+			} else {
+				rule.To[0].Operation.Hosts = append(rule.To[0].Operation.Hosts, hostsToAdd...)
+			}
+			policy.Spec.Rules[0] = rule
+		}
+	}
+
+	// Update the AuthorizationPolicy
+	_, err = c.istio.SecurityV1beta1().AuthorizationPolicies(namespace).Update(ctx, policy, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to update AuthorizationPolicy %s/%s: %w", namespace, policyName, err)
+	}
+
+	log.Printf("[K8s] Added hosts to AuthorizationPolicy %s/%s: %v", namespace, policyName, hostsToAdd)
+	return nil
+}
+
+// RemoveHostsFromSharedAuthPolicy removes custom domain hosts from the shared AuthorizationPolicy
+// This is called when a custom domain tenant is deleted to clean up the RBAC rules
+func (c *Client) RemoveHostsFromSharedAuthPolicy(ctx context.Context, hosts []string) error {
+	policyName := c.config.Kubernetes.SharedAuthPolicyName
+	namespace := c.config.Kubernetes.SharedAuthPolicyNamespace
+
+	if policyName == "" {
+		log.Println("[K8s] SharedAuthPolicyName not configured, skipping AuthorizationPolicy update")
+		return nil
+	}
+
+	// Get the existing AuthorizationPolicy
+	policy, err := c.istio.SecurityV1beta1().AuthorizationPolicies(namespace).Get(ctx, policyName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get AuthorizationPolicy %s/%s: %w", namespace, policyName, err)
+	}
+
+	// Create a set of hosts to remove for efficient lookup
+	hostsToRemove := make(map[string]bool)
+	for _, h := range hosts {
+		hostsToRemove[h] = true
+	}
+
+	// Remove hosts from all rules
+	removedCount := 0
+	for i, rule := range policy.Spec.Rules {
+		if rule.To != nil {
+			for j, to := range rule.To {
+				if to.Operation != nil && len(to.Operation.Hosts) > 0 {
+					// Filter out hosts that should be removed
+					filteredHosts := make([]string, 0, len(to.Operation.Hosts))
+					for _, h := range to.Operation.Hosts {
+						if !hostsToRemove[h] {
+							filteredHosts = append(filteredHosts, h)
+						} else {
+							removedCount++
+						}
+					}
+					policy.Spec.Rules[i].To[j].Operation.Hosts = filteredHosts
+				}
+			}
+		}
+	}
+
+	if removedCount == 0 {
+		log.Printf("[K8s] No hosts to remove from AuthorizationPolicy %s/%s", namespace, policyName)
+		return nil
+	}
+
+	// Update the AuthorizationPolicy
+	_, err = c.istio.SecurityV1beta1().AuthorizationPolicies(namespace).Update(ctx, policy, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to update AuthorizationPolicy %s/%s: %w", namespace, policyName, err)
+	}
+
+	log.Printf("[K8s] Removed %d hosts from AuthorizationPolicy %s/%s: %v", removedCount, namespace, policyName, hosts)
+	return nil
+}
+
+// EnsureSharedAuthPolicy ensures the shared AuthorizationPolicy exists
+// If it doesn't exist, this method creates it with the configured selector
+// This is called during reconciliation to ensure the policy is ready before adding hosts
+func (c *Client) EnsureSharedAuthPolicy(ctx context.Context) error {
+	policyName := c.config.Kubernetes.SharedAuthPolicyName
+	namespace := c.config.Kubernetes.SharedAuthPolicyNamespace
+	selector := c.config.Kubernetes.SharedAuthPolicySelector
+
+	if policyName == "" {
+		log.Println("[K8s] SharedAuthPolicyName not configured, skipping AuthorizationPolicy check")
+		return nil
+	}
+
+	// Check if policy already exists
+	_, err := c.istio.SecurityV1beta1().AuthorizationPolicies(namespace).Get(ctx, policyName, metav1.GetOptions{})
+	if err == nil {
+		log.Printf("[K8s] AuthorizationPolicy %s/%s already exists", namespace, policyName)
+		return nil
+	}
+
+	// Create the policy if it doesn't exist
+	policy := &istiosecurityv1beta1.AuthorizationPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      policyName,
+			Namespace: namespace,
+			Labels: map[string]string{
+				"app.kubernetes.io/managed-by": "tenant-router-service",
+			},
+		},
+		Spec: securityv1beta1.AuthorizationPolicy{
+			Selector: &typev1beta1.WorkloadSelector{
+				MatchLabels: map[string]string{
+					"istio": selector,
+				},
+			},
+			Action: securityv1beta1.AuthorizationPolicy_ALLOW,
+			Rules: []*securityv1beta1.Rule{
+				{
+					To: []*securityv1beta1.Rule_To{
+						{
+							Operation: &securityv1beta1.Operation{
+								Hosts: []string{}, // Will be populated as custom domains are added
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	_, err = c.istio.SecurityV1beta1().AuthorizationPolicies(namespace).Create(ctx, policy, metav1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to create AuthorizationPolicy %s/%s: %w", namespace, policyName, err)
+	}
+
+	log.Printf("[K8s] Created AuthorizationPolicy %s/%s with selector istio=%s", namespace, policyName, selector)
+	return nil
 }

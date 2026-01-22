@@ -63,6 +63,13 @@ type K8sConfig struct {
 	CustomDomainGateway       string // Gateway for custom domains (e.g., "custom-domain-gateway")
 	CustomDomainGatewayNS     string // Namespace for custom domain gateway (e.g., "istio-ingress")
 	CustomDomainClusterIssuer string // ClusterIssuer for custom domain certs (HTTP-01)
+
+	// Shared AuthorizationPolicy for custom domain RBAC
+	// When custom domain VirtualServices are created, the hosts need to be added to this
+	// AuthorizationPolicy to allow traffic through the custom-ingressgateway
+	SharedAuthPolicyName      string // Name of the shared AuthorizationPolicy
+	SharedAuthPolicyNamespace string // Namespace where the policy is located
+	SharedAuthPolicySelector  string // Workload selector label (e.g., "custom-ingressgateway")
 }
 
 // DomainConfig holds domain configuration
@@ -109,6 +116,10 @@ func LoadConfig() *Config {
 			CustomDomainGateway:       getEnv("CUSTOM_DOMAIN_GATEWAY", "custom-ingressgateway"),
 			CustomDomainGatewayNS:     getEnv("CUSTOM_DOMAIN_GATEWAY_NS", "istio-ingress"),
 			CustomDomainClusterIssuer: getEnv("CUSTOM_DOMAIN_CLUSTER_ISSUER", "letsencrypt-custom-domain"),
+			// Shared AuthorizationPolicy for custom domain RBAC
+			SharedAuthPolicyName:      getEnv("SHARED_AUTH_POLICY_NAME", "allow-frontend-apps-public-custom"),
+			SharedAuthPolicyNamespace: getEnv("SHARED_AUTH_POLICY_NAMESPACE", "istio-ingress"),
+			SharedAuthPolicySelector:  getEnv("SHARED_AUTH_POLICY_SELECTOR", "custom-ingressgateway"),
 		},
 		Domain: DomainConfig{
 			BaseDomain: getEnv("BASE_DOMAIN", "tesserix.app"),
