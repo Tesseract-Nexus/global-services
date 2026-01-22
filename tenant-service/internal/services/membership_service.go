@@ -97,6 +97,7 @@ type UserTenantSummary struct {
 	PrimaryColor   string     `json:"primary_color,omitempty"`
 	BusinessModel  string     `json:"business_model,omitempty"` // ONLINE_STORE or MARKETPLACE
 	LastAccessedAt *time.Time `json:"last_accessed_at,omitempty"`
+	CreatedAt      *time.Time `json:"created_at,omitempty"`
 }
 
 // ResolveUserID maps a Keycloak user ID to the local user ID
@@ -141,6 +142,7 @@ func (s *MembershipService) GetUserTenants(ctx context.Context, userID uuid.UUID
 			PrimaryColor:   m.Tenant.PrimaryColor,
 			BusinessModel:  m.Tenant.BusinessModel,
 			LastAccessedAt: m.LastAccessedAt,
+			CreatedAt:      &m.Tenant.CreatedAt,
 		})
 	}
 
@@ -169,6 +171,7 @@ func (s *MembershipService) GetAllTenants(ctx context.Context) ([]UserTenantSumm
 			Status:        t.Status,
 			PrimaryColor:  t.PrimaryColor,
 			BusinessModel: t.BusinessModel,
+			CreatedAt:     &t.CreatedAt,
 		})
 	}
 
