@@ -639,39 +639,11 @@ func (r *TenantReconciler) reconcileCreate(ctx context.Context, event *models.Te
 		})
 	}
 
-	// 7. For custom domain tenants, also create platform subdomain VirtualServices
-	// These serve as CNAME targets (e.g., custom-store.tesserix.app -> Cloudflare Tunnel)
-	// Users can then CNAME their custom domain to these platform subdomains
-	// IMPORTANT: cloudflareProxied=false so external domains can CNAME to these hosts
-	// (Cloudflare blocks cross-account CNAME to proxied records)
-	if record.IsCustomDomain {
-		platformBaseDomain := r.config.Domain.BaseDomain
-
-		// Platform admin host (e.g., custom-store-admin.tesserix.app)
-		// cloudflareProxied=false to allow external CNAME
-		platformAdminHost := fmt.Sprintf("%s-admin.%s", record.Slug, platformBaseDomain)
-		log.Printf("[Reconciler] Creating platform admin VirtualService for %s (host: %s, proxied=false)", record.Slug, platformAdminHost)
-		if err := r.reconcileVirtualServiceWithSuffix(ctx, record, r.config.Kubernetes.AdminVSName, platformAdminHost, "add", "platform", false); err != nil {
-			log.Printf("[Reconciler] Warning: Failed to create platform admin VS for %s: %v", record.Slug, err)
-			// Don't fail - custom domain VS is the primary, platform is supplementary
-		}
-
-		// Platform storefront host (e.g., custom-store.tesserix.app)
-		// cloudflareProxied=false to allow external CNAME
-		platformStorefrontHost := fmt.Sprintf("%s.%s", record.Slug, platformBaseDomain)
-		log.Printf("[Reconciler] Creating platform storefront VirtualService for %s (host: %s, proxied=false)", record.Slug, platformStorefrontHost)
-		if err := r.reconcileVirtualServiceWithSuffix(ctx, record, r.config.Kubernetes.StorefrontVSName, platformStorefrontHost, "add", "platform", false); err != nil {
-			log.Printf("[Reconciler] Warning: Failed to create platform storefront VS for %s: %v", record.Slug, err)
-		}
-
-		// Platform API host (e.g., custom-store-api.tesserix.app)
-		// cloudflareProxied=false to allow external CNAME
-		platformAPIHost := fmt.Sprintf("%s-api.%s", record.Slug, platformBaseDomain)
-		log.Printf("[Reconciler] Creating platform API VirtualService for %s (host: %s, proxied=false)", record.Slug, platformAPIHost)
-		if err := r.reconcileVirtualServiceWithSuffix(ctx, record, r.config.Kubernetes.APIVSName, platformAPIHost, "add", "platform", false); err != nil {
-			log.Printf("[Reconciler] Warning: Failed to create platform API VS for %s: %v", record.Slug, err)
-		}
-	}
+	// NOTE: For custom domain tenants, we NO LONGER create platform subdomain VirtualServices
+	// Custom domains use the dedicated custom-domain-gateway with direct A record access
+	// (LoadBalancer IP: 34.151.169.37). There's no need for CNAME targets on platform subdomains.
+	// The customer simply points their domain's A record to the LoadBalancer IP, and
+	// Let's Encrypt issues a certificate via HTTP-01 challenge.
 
 	// All resources provisioned - mark as ready
 	conditions = append(conditions, Condition{
