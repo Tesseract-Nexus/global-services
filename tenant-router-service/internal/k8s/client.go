@@ -58,15 +58,30 @@ func NewClient(cfg *config.Config) (*Client, error) {
 	}, nil
 }
 
-// CreateCertificate creates a Certificate resource for a tenant
+// CreateCertificate creates a Certificate resource for a tenant (default domain)
 func (c *Client) CreateCertificate(ctx context.Context, slug, adminHost, storefrontHost string) error {
+	return c.createCertificateInNamespace(ctx, slug, []string{adminHost, storefrontHost}, c.config.Kubernetes.Namespace, c.config.Kubernetes.ClusterIssuer)
+}
+
+// CreateCustomDomainCertificate creates a Certificate resource for a custom domain tenant
+// Certificates are created in the custom domain gateway namespace (istio-ingress)
+// and use the HTTP-01 ClusterIssuer for Let's Encrypt validation
+func (c *Client) CreateCustomDomainCertificate(ctx context.Context, slug string, domains []string) error {
+	namespace := c.config.Kubernetes.CustomDomainGatewayNS
+	issuer := c.config.Kubernetes.CustomDomainClusterIssuer
+
+	log.Printf("[K8s] Creating custom domain certificate for %s in namespace %s with issuer %s", slug, namespace, issuer)
+	return c.createCertificateInNamespace(ctx, slug, domains, namespace, issuer)
+}
+
+// createCertificateInNamespace creates a Certificate resource in a specific namespace
+func (c *Client) createCertificateInNamespace(ctx context.Context, slug string, domains []string, namespace, clusterIssuer string) error {
 	certName := fmt.Sprintf("%s-tenant-tls", slug)
-	namespace := c.config.Kubernetes.Namespace
 
 	// Check if certificate already exists
 	_, err := c.certmanager.CertmanagerV1().Certificates(namespace).Get(ctx, certName, metav1.GetOptions{})
 	if err == nil {
-		log.Printf("[K8s] Certificate %s already exists, skipping creation", certName)
+		log.Printf("[K8s] Certificate %s already exists in %s, skipping creation", certName, namespace)
 		return nil
 	}
 
@@ -82,9 +97,9 @@ func (c *Client) CreateCertificate(ctx context.Context, slug, adminHost, storefr
 		},
 		Spec: certmanagerv1.CertificateSpec{
 			SecretName: certName,
-			DNSNames:   []string{adminHost, storefrontHost},
+			DNSNames:   domains,
 			IssuerRef: cmmeta.ObjectReference{
-				Name: c.config.Kubernetes.ClusterIssuer,
+				Name: clusterIssuer,
 				Kind: "ClusterIssuer",
 			},
 		},
@@ -95,7 +110,7 @@ func (c *Client) CreateCertificate(ctx context.Context, slug, adminHost, storefr
 		return fmt.Errorf("failed to create certificate: %w", err)
 	}
 
-	log.Printf("[K8s] Created Certificate %s for hosts: %s, %s", certName, adminHost, storefrontHost)
+	log.Printf("[K8s] Created Certificate %s for domains: %v in namespace %s", certName, domains, namespace)
 	return nil
 }
 
@@ -331,12 +346,27 @@ func (c *Client) CreateTenantVirtualService(ctx context.Context, slug, tenantID,
 	return c.CreateTenantVirtualServiceWithSuffix(ctx, slug, tenantID, templateVSName, tenantHost, adminHost, storefrontHost, "", cloudflareProxied)
 }
 
+// CreateCustomDomainVirtualService creates a VirtualService for a custom domain tenant
+// Custom domain VirtualServices reference the custom-domain-gateway instead of the default gateway
+// This allows custom domains to use a dedicated LoadBalancer with direct access (no Cloudflare)
+func (c *Client) CreateCustomDomainVirtualService(ctx context.Context, slug, tenantID, templateVSName, tenantHost, adminHost, storefrontHost, nameSuffix string) error {
+	return c.createVirtualServiceWithGateway(ctx, slug, tenantID, templateVSName, tenantHost, adminHost, storefrontHost, nameSuffix, false, true)
+}
+
 // CreateTenantVirtualServiceWithSuffix creates a new VirtualService for a tenant with an optional name suffix
 // The suffix is used when creating multiple VirtualServices from the same template (e.g., storefront + www)
 // cloudflareProxied controls the external-dns.alpha.kubernetes.io/cloudflare-proxied annotation:
 // - true: DNS record will be proxied through Cloudflare (orange cloud) - use for default domain tenants
 // - false: DNS record will be DNS-only (gray cloud) - use for custom domain tenants' platform subdomains (CNAME targets)
 func (c *Client) CreateTenantVirtualServiceWithSuffix(ctx context.Context, slug, tenantID, templateVSName, tenantHost, adminHost, storefrontHost, nameSuffix string, cloudflareProxied bool) error {
+	return c.createVirtualServiceWithGateway(ctx, slug, tenantID, templateVSName, tenantHost, adminHost, storefrontHost, nameSuffix, cloudflareProxied, false)
+}
+
+// createVirtualServiceWithGateway is the internal implementation for creating VirtualServices
+// isCustomDomain controls which gateway the VirtualService references:
+// - false: Uses the default gateway (for platform domains via Cloudflare Tunnel)
+// - true: Uses the custom-domain-gateway (for custom domains via direct LoadBalancer)
+func (c *Client) createVirtualServiceWithGateway(ctx context.Context, slug, tenantID, templateVSName, tenantHost, adminHost, storefrontHost, nameSuffix string, cloudflareProxied, isCustomDomain bool) error {
 	// Find the template VirtualService
 	vsLocation, err := c.FindVirtualServiceByName(ctx, templateVSName)
 	if err != nil {
@@ -407,6 +437,15 @@ func (c *Client) CreateTenantVirtualServiceWithSuffix(ctx context.Context, slug,
 	// Update the hosts to use the tenant's specific hostname
 	// This ensures this VirtualService only handles traffic for this tenant
 	newVS.Spec.Hosts = []string{tenantHost}
+
+	// Update the gateway reference based on whether this is a custom domain
+	// Custom domains use a dedicated gateway with LoadBalancer for direct access
+	// Default domains use the platform gateway (via Cloudflare Tunnel)
+	if isCustomDomain {
+		customGatewayRef := fmt.Sprintf("%s/%s", c.config.Kubernetes.CustomDomainGatewayNS, c.config.Kubernetes.CustomDomainGateway)
+		newVS.Spec.Gateways = []string{customGatewayRef}
+		log.Printf("[K8s] Using custom domain gateway %s for tenant %s", customGatewayRef, slug)
+	}
 
 	// Build CORS origins for tenant isolation
 	// Include tenant-specific domains + shared onboarding domain for cross-origin flows

@@ -810,15 +810,42 @@ func (r *TenantReconciler) ensureState(ctx context.Context, record *models.Tenan
 }
 
 // reconcileCertificate creates or verifies the certificate
+// For custom domains, certificates are created in the custom domain gateway namespace (istio-ingress)
+// using HTTP-01 challenge with Let's Encrypt. For default domains, the wildcard cert is used.
 func (r *TenantReconciler) reconcileCertificate(ctx context.Context, record *models.TenantHostRecord) error {
 	startTime := time.Now()
-	err := r.k8sClient.CreateCertificate(ctx, record.Slug, record.AdminHost, record.StorefrontHost)
+	var err error
+	var namespace string
+
+	if record.IsCustomDomain {
+		// Custom domain: create certificate in istio-ingress namespace with HTTP-01 challenge
+		// Collect all custom domain hosts for the certificate
+		domains := []string{record.StorefrontHost}
+		if record.AdminHost != "" && record.AdminHost != record.StorefrontHost {
+			domains = append(domains, record.AdminHost)
+		}
+		if record.StorefrontWwwHost != "" {
+			domains = append(domains, record.StorefrontWwwHost)
+		}
+		if record.APIHost != "" {
+			domains = append(domains, record.APIHost)
+		}
+
+		err = r.k8sClient.CreateCustomDomainCertificate(ctx, record.Slug, domains)
+		namespace = r.config.Kubernetes.CustomDomainGatewayNS
+		log.Printf("[Reconciler] Creating custom domain certificate for %s with domains: %v", record.Slug, domains)
+	} else {
+		// Default domain: use existing certificate creation (or skip if using wildcard)
+		err = r.k8sClient.CreateCertificate(ctx, record.Slug, record.AdminHost, record.StorefrontHost)
+		namespace = r.config.Kubernetes.Namespace
+	}
+
 	if err != nil {
-		r.logActivity(ctx, record.ID, "create_certificate", "Certificate", r.config.Kubernetes.Namespace, false, err.Error(), time.Since(startTime))
+		r.logActivity(ctx, record.ID, "create_certificate", "Certificate", namespace, false, err.Error(), time.Since(startTime))
 		return err
 	}
-	r.repo.UpdateProvisioningState(ctx, record.Slug, "certificate_created", true, r.config.Kubernetes.Namespace)
-	r.logActivity(ctx, record.ID, "create_certificate", "Certificate", r.config.Kubernetes.Namespace, true, "", time.Since(startTime))
+	r.repo.UpdateProvisioningState(ctx, record.Slug, "certificate_created", true, namespace)
+	r.logActivity(ctx, record.ID, "create_certificate", "Certificate", namespace, true, "", time.Since(startTime))
 	return nil
 }
 
@@ -852,14 +879,26 @@ func (r *TenantReconciler) reconcileVirtualService(ctx context.Context, record *
 // reconcileVirtualServiceWithSuffix creates or deletes a tenant-specific VirtualService with an optional name suffix
 // The suffix is used when creating multiple VirtualServices from the same template (e.g., storefront + www)
 // cloudflareProxied controls the external-dns cloudflare-proxied annotation for DNS record creation
+// For custom domains, the VirtualService references the custom-domain-gateway instead of the default gateway
 func (r *TenantReconciler) reconcileVirtualServiceWithSuffix(ctx context.Context, record *models.TenantHostRecord, templateVSName, host, operation, nameSuffix string, cloudflareProxied bool) error {
 	startTime := time.Now()
 
 	if operation == "add" {
-		// Create a new VirtualService for this tenant by copying the template
-		// Pass tenantID for X-Vendor-ID header injection and adminHost/storefrontHost for CORS policy
-		// Pass cloudflareProxied to control whether DNS should be proxied through Cloudflare
-		err := r.k8sClient.CreateTenantVirtualServiceWithSuffix(ctx, record.Slug, record.TenantID, templateVSName, host, record.AdminHost, record.StorefrontHost, nameSuffix, cloudflareProxied)
+		var err error
+
+		// For custom domains, use the custom domain gateway
+		// This routes traffic through the LoadBalancer instead of Cloudflare Tunnel
+		if record.IsCustomDomain && nameSuffix != "platform" {
+			// Custom domain VirtualServices reference the custom-domain-gateway
+			// The "platform" suffix is for platform subdomain fallbacks which still use the default gateway
+			err = r.k8sClient.CreateCustomDomainVirtualService(ctx, record.Slug, record.TenantID, templateVSName, host, record.AdminHost, record.StorefrontHost, nameSuffix)
+			log.Printf("[Reconciler] Creating custom domain VirtualService for %s (host: %s, gateway: custom-domain-gateway)", record.Slug, host)
+		} else {
+			// Default domain or platform subdomain - use the default gateway
+			// Pass cloudflareProxied to control whether DNS should be proxied through Cloudflare
+			err = r.k8sClient.CreateTenantVirtualServiceWithSuffix(ctx, record.Slug, record.TenantID, templateVSName, host, record.AdminHost, record.StorefrontHost, nameSuffix, cloudflareProxied)
+		}
+
 		if err != nil {
 			r.logActivity(ctx, record.ID, fmt.Sprintf("create_%s_%s", templateVSName, nameSuffix), "VirtualService", "", false, err.Error(), time.Since(startTime))
 			return err

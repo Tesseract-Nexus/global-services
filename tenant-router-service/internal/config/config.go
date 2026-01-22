@@ -48,6 +48,12 @@ type K8sConfig struct {
 	ClusterIssuer      string
 	SkipGatewayPatch   bool   // Skip gateway patching when using wildcard certificate
 	WildcardCertName   string // Name of the wildcard certificate (e.g., "storefront-wildcard-tls")
+
+	// Custom domain configuration
+	// Custom domains use a separate gateway and ClusterIssuer for Let's Encrypt HTTP-01 challenges
+	CustomDomainGateway       string // Gateway for custom domains (e.g., "custom-domain-gateway")
+	CustomDomainGatewayNS     string // Namespace for custom domain gateway (e.g., "istio-ingress")
+	CustomDomainClusterIssuer string // ClusterIssuer for custom domain certs (HTTP-01)
 }
 
 // DomainConfig holds domain configuration
@@ -83,6 +89,11 @@ func LoadConfig() *Config {
 			ClusterIssuer:    getEnv("CLUSTER_ISSUER", "letsencrypt-prod"),
 			SkipGatewayPatch: getEnvBool("SKIP_GATEWAY_PATCH", true), // Default true: use wildcard cert
 			WildcardCertName: getEnv("WILDCARD_CERT_NAME", "storefront-wildcard-tls"),
+			// Custom domain configuration - uses separate gateway for direct LoadBalancer access
+			// This allows customers to point their domains directly to the platform without Cloudflare
+			CustomDomainGateway:       getEnv("CUSTOM_DOMAIN_GATEWAY", "custom-domain-gateway"),
+			CustomDomainGatewayNS:     getEnv("CUSTOM_DOMAIN_GATEWAY_NS", "istio-ingress"),
+			CustomDomainClusterIssuer: getEnv("CUSTOM_DOMAIN_CLUSTER_ISSUER", "letsencrypt-custom-domain"),
 		},
 		Domain: DomainConfig{
 			BaseDomain: getEnv("BASE_DOMAIN", "tesserix.app"),
