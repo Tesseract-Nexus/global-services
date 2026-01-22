@@ -501,14 +501,58 @@ func (r *TenantReconciler) reconcileCreate(ctx context.Context, event *models.Te
 		})
 	}
 
-	// 2. Gateway - Skip if using wildcard certificate (default behavior)
-	// The wildcard certificate (*.tesserix.app) handles all tenant subdomains,
-	// so we don't need to add individual gateway server entries per tenant.
-	// This avoids cross-namespace secret reference issues where the gateway in
-	// istio-ingress namespace couldn't access secrets in devtest namespace.
+	// 2. Gateway - Handle differently for custom domains vs default domains
+	// For custom domains: Create a DEDICATED gateway with proper TLS certificate
+	// For default domains: Use wildcard certificate (skip gateway patch)
+	var dedicatedGatewayName string
 	if !record.GatewayPatched {
-		if r.config.Kubernetes.SkipGatewayPatch {
-			// Mark as patched since wildcard cert handles this
+		if record.IsCustomDomain {
+			// Custom domains get their own dedicated gateway for better isolation
+			// This avoids SNI conflicts and allows per-domain TLS certificates
+			domains := []string{record.StorefrontHost}
+			if record.AdminHost != "" && record.AdminHost != record.StorefrontHost {
+				domains = append(domains, record.AdminHost)
+			}
+			if record.StorefrontWwwHost != "" {
+				domains = append(domains, record.StorefrontWwwHost)
+			}
+			if record.APIHost != "" {
+				domains = append(domains, record.APIHost)
+			}
+
+			certSecretName := fmt.Sprintf("%s-tenant-tls", record.Slug)
+			gatewayName, err := r.k8sClient.CreateDedicatedGateway(ctx, record.Slug, domains, certSecretName)
+			if err != nil {
+				conditions = append(conditions, Condition{
+					Type:               ConditionGatewayConfigured,
+					Status:             StatusFalse,
+					LastTransitionTime: time.Now(),
+					Reason:             ReasonFailed,
+					Message:            err.Error(),
+				})
+				r.updateConditions(ctx, record, conditions)
+				return ReconcileResult{Requeue: true, RequeueAfter: 30 * time.Second}, err
+			}
+			dedicatedGatewayName = gatewayName
+			r.repo.UpdateProvisioningState(ctx, record.Slug, "gateway_patched", true, r.config.Kubernetes.CustomDomainGatewayNS)
+			conditions = append(conditions, Condition{
+				Type:               ConditionGatewayConfigured,
+				Status:             StatusTrue,
+				LastTransitionTime: time.Now(),
+				Reason:             ReasonProvisioned,
+				Message:            fmt.Sprintf("Created dedicated gateway %s for custom domain", gatewayName),
+			})
+			log.Printf("[Reconciler] Created dedicated gateway %s for custom domain tenant %s", gatewayName, record.Slug)
+
+			// Also create dedicated AuthorizationPolicy for the custom domain
+			if err := r.k8sClient.CreateDedicatedAuthorizationPolicy(ctx, record.Slug, domains); err != nil {
+				log.Printf("[Reconciler] Warning: Failed to create dedicated AuthorizationPolicy for %s: %v", record.Slug, err)
+				// Don't fail - the gateway is created, just log the warning
+			} else {
+				log.Printf("[Reconciler] Created dedicated AuthorizationPolicy for custom domain tenant %s", record.Slug)
+			}
+		} else if r.config.Kubernetes.SkipGatewayPatch {
+			// Default domain: Mark as patched since wildcard cert handles this
 			log.Printf("[Reconciler] Skipping gateway patch for %s (using wildcard cert %s)",
 				record.Slug, r.config.Kubernetes.WildcardCertName)
 			r.repo.UpdateProvisioningState(ctx, record.Slug, "gateway_patched", true, "wildcard")
@@ -520,6 +564,7 @@ func (r *TenantReconciler) reconcileCreate(ctx context.Context, event *models.Te
 				Message:            fmt.Sprintf("Using wildcard certificate %s", r.config.Kubernetes.WildcardCertName),
 			})
 		} else {
+			// Patch shared gateway (legacy behavior)
 			if err := r.reconcileGateway(ctx, record, "add"); err != nil {
 				conditions = append(conditions, Condition{
 					Type:               ConditionGatewayConfigured,
@@ -539,11 +584,14 @@ func (r *TenantReconciler) reconcileCreate(ctx context.Context, event *models.Te
 				Message:            "Gateway configured successfully",
 			})
 		}
+	} else if record.IsCustomDomain {
+		// Gateway already patched - recover the dedicated gateway name for VirtualService creation
+		dedicatedGatewayName = fmt.Sprintf("%s-gateway", record.Slug)
 	}
 
 	// 3. Admin VirtualService
 	if !record.AdminVSPatched {
-		if err := r.reconcileVirtualService(ctx, record, r.config.Kubernetes.AdminVSName, record.AdminHost, "add"); err != nil {
+		if err := r.reconcileVirtualService(ctx, record, r.config.Kubernetes.AdminVSName, record.AdminHost, "add", dedicatedGatewayName); err != nil {
 			conditions = append(conditions, Condition{
 				Type:               ConditionAdminVSConfigured,
 				Status:             StatusFalse,
@@ -565,7 +613,7 @@ func (r *TenantReconciler) reconcileCreate(ctx context.Context, event *models.Te
 
 	// 4. Storefront VirtualService
 	if !record.StorefrontVSPatched {
-		if err := r.reconcileVirtualService(ctx, record, r.config.Kubernetes.StorefrontVSName, record.StorefrontHost, "add"); err != nil {
+		if err := r.reconcileVirtualService(ctx, record, r.config.Kubernetes.StorefrontVSName, record.StorefrontHost, "add", dedicatedGatewayName); err != nil {
 			conditions = append(conditions, Condition{
 				Type:               ConditionStorefrontConfigured,
 				Status:             StatusFalse,
@@ -591,7 +639,7 @@ func (r *TenantReconciler) reconcileCreate(ctx context.Context, event *models.Te
 	// but we set it to false for consistency with other custom domain resources
 	if record.StorefrontWwwHost != "" && !record.StorefrontWwwVSPatched {
 		log.Printf("[Reconciler] Creating www VirtualService for %s (host: %s)", record.Slug, record.StorefrontWwwHost)
-		if err := r.reconcileVirtualServiceWithSuffix(ctx, record, r.config.Kubernetes.StorefrontVSName, record.StorefrontWwwHost, "add", "www", false); err != nil {
+		if err := r.reconcileVirtualServiceWithSuffix(ctx, record, r.config.Kubernetes.StorefrontVSName, record.StorefrontWwwHost, "add", "www", false, dedicatedGatewayName); err != nil {
 			conditions = append(conditions, Condition{
 				Type:               ConditionStorefrontWwwConfigured,
 				Status:             StatusFalse,
@@ -620,7 +668,7 @@ func (r *TenantReconciler) reconcileCreate(ctx context.Context, event *models.Te
 		if apiHost == "" {
 			apiHost = fmt.Sprintf("%s-api.%s", record.Slug, r.config.Domain.BaseDomain)
 		}
-		if err := r.reconcileVirtualService(ctx, record, r.config.Kubernetes.APIVSName, apiHost, "add"); err != nil {
+		if err := r.reconcileVirtualService(ctx, record, r.config.Kubernetes.APIVSName, apiHost, "add", dedicatedGatewayName); err != nil {
 			conditions = append(conditions, Condition{
 				Type:               ConditionAPIVSConfigured,
 				Status:             StatusFalse,
@@ -729,23 +777,42 @@ func (r *TenantReconciler) reconcileDelete(ctx context.Context, event *models.Te
 	}
 
 	// 1. Remove API VirtualService
-	if err := r.reconcileVirtualService(ctx, record, r.config.Kubernetes.APIVSName, apiHost, "remove"); err != nil {
+	if err := r.reconcileVirtualService(ctx, record, r.config.Kubernetes.APIVSName, apiHost, "remove", ""); err != nil {
 		log.Printf("[Reconciler] Failed to remove from API VS: %v", err)
 	}
 
 	// 2. Remove from Storefront VirtualService
-	if err := r.reconcileVirtualService(ctx, record, r.config.Kubernetes.StorefrontVSName, storefrontHost, "remove"); err != nil {
+	if err := r.reconcileVirtualService(ctx, record, r.config.Kubernetes.StorefrontVSName, storefrontHost, "remove", ""); err != nil {
 		log.Printf("[Reconciler] Failed to remove from storefront VS: %v", err)
 	}
 
+	// 2.5. Remove www Storefront VirtualService (for custom domains)
+	if record.StorefrontWwwHost != "" {
+		if err := r.k8sClient.DeleteTenantVirtualServiceWithSuffix(ctx, record.Slug, r.config.Kubernetes.StorefrontVSName, "www"); err != nil {
+			log.Printf("[Reconciler] Failed to remove www storefront VS: %v", err)
+		}
+	}
+
 	// 3. Remove from Admin VirtualService
-	if err := r.reconcileVirtualService(ctx, record, r.config.Kubernetes.AdminVSName, adminHost, "remove"); err != nil {
+	if err := r.reconcileVirtualService(ctx, record, r.config.Kubernetes.AdminVSName, adminHost, "remove", ""); err != nil {
 		log.Printf("[Reconciler] Failed to remove from admin VS: %v", err)
 	}
 
-	// 4. Remove from Gateway
-	if err := r.reconcileGateway(ctx, record, "remove"); err != nil {
-		log.Printf("[Reconciler] Failed to remove from gateway: %v", err)
+	// 4. Remove from Gateway (or delete dedicated gateway for custom domains)
+	if record.IsCustomDomain {
+		// Delete dedicated gateway for custom domains
+		if err := r.k8sClient.DeleteDedicatedGateway(ctx, record.Slug); err != nil {
+			log.Printf("[Reconciler] Failed to delete dedicated gateway: %v", err)
+		}
+		// Delete dedicated AuthorizationPolicy for custom domains
+		if err := r.k8sClient.DeleteDedicatedAuthorizationPolicy(ctx, record.Slug); err != nil {
+			log.Printf("[Reconciler] Failed to delete dedicated AuthorizationPolicy: %v", err)
+		}
+	} else {
+		// Remove from shared gateway for default domains
+		if err := r.reconcileGateway(ctx, record, "remove"); err != nil {
+			log.Printf("[Reconciler] Failed to remove from gateway: %v", err)
+		}
 	}
 
 	// 5. Delete Certificate
@@ -874,30 +941,36 @@ func (r *TenantReconciler) reconcileGateway(ctx context.Context, record *models.
 // cloudflareProxied controls whether the DNS record should be proxied through Cloudflare:
 // - true for default domain tenants (protected by Cloudflare)
 // - false for custom domain tenants' platform subdomains (allows external CNAME)
-func (r *TenantReconciler) reconcileVirtualService(ctx context.Context, record *models.TenantHostRecord, templateVSName, host, operation string) error {
+// dedicatedGatewayName is used for custom domains to reference their dedicated gateway
+func (r *TenantReconciler) reconcileVirtualService(ctx context.Context, record *models.TenantHostRecord, templateVSName, host, operation, dedicatedGatewayName string) error {
 	// Default domain tenants get Cloudflare proxy enabled for protection
 	// Custom domain tenants get proxy disabled so external domains can CNAME to them
 	cloudflareProxied := !record.IsCustomDomain
-	return r.reconcileVirtualServiceWithSuffix(ctx, record, templateVSName, host, operation, "", cloudflareProxied)
+	return r.reconcileVirtualServiceWithSuffix(ctx, record, templateVSName, host, operation, "", cloudflareProxied, dedicatedGatewayName)
 }
 
 // reconcileVirtualServiceWithSuffix creates or deletes a tenant-specific VirtualService with an optional name suffix
 // The suffix is used when creating multiple VirtualServices from the same template (e.g., storefront + www)
 // cloudflareProxied controls the external-dns cloudflare-proxied annotation for DNS record creation
-// For custom domains, the VirtualService references the custom-domain-gateway instead of the default gateway
-func (r *TenantReconciler) reconcileVirtualServiceWithSuffix(ctx context.Context, record *models.TenantHostRecord, templateVSName, host, operation, nameSuffix string, cloudflareProxied bool) error {
+// For custom domains, the VirtualService references the dedicated gateway instead of the default gateway
+// dedicatedGatewayName specifies the dedicated gateway for custom domains (if empty, uses default custom-domain-gateway)
+func (r *TenantReconciler) reconcileVirtualServiceWithSuffix(ctx context.Context, record *models.TenantHostRecord, templateVSName, host, operation, nameSuffix string, cloudflareProxied bool, dedicatedGatewayName string) error {
 	startTime := time.Now()
 
 	if operation == "add" {
 		var err error
 
-		// For custom domains, use the custom domain gateway
+		// For custom domains, use the dedicated custom domain gateway
 		// This routes traffic through the LoadBalancer instead of Cloudflare Tunnel
 		if record.IsCustomDomain && nameSuffix != "platform" {
-			// Custom domain VirtualServices reference the custom-domain-gateway
+			// Custom domain VirtualServices reference the dedicated gateway
 			// The "platform" suffix is for platform subdomain fallbacks which still use the default gateway
-			err = r.k8sClient.CreateCustomDomainVirtualService(ctx, record.Slug, record.TenantID, templateVSName, host, record.AdminHost, record.StorefrontHost, nameSuffix)
-			log.Printf("[Reconciler] Creating custom domain VirtualService for %s (host: %s, gateway: custom-domain-gateway)", record.Slug, host)
+			err = r.k8sClient.CreateCustomDomainVirtualService(ctx, record.Slug, record.TenantID, templateVSName, host, record.AdminHost, record.StorefrontHost, nameSuffix, dedicatedGatewayName)
+			gatewayRef := dedicatedGatewayName
+			if gatewayRef == "" {
+				gatewayRef = r.config.Kubernetes.CustomDomainGateway
+			}
+			log.Printf("[Reconciler] Creating custom domain VirtualService for %s (host: %s, gateway: %s)", record.Slug, host, gatewayRef)
 		} else {
 			// Default domain or platform subdomain - use the default gateway
 			// Pass cloudflareProxied to control whether DNS should be proxied through Cloudflare

@@ -13,6 +13,7 @@ import (
 	securityv1beta1 "istio.io/api/security/v1beta1"
 	typev1beta1 "istio.io/api/type/v1beta1"
 	istioversionedclient "istio.io/client-go/pkg/clientset/versioned"
+	istionetworkingv1beta1 "istio.io/client-go/pkg/apis/networking/v1beta1"
 	istiosecurityv1beta1 "istio.io/client-go/pkg/apis/security/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -156,17 +157,31 @@ func (c *Client) createCertificateInNamespace(ctx context.Context, slug string, 
 }
 
 // DeleteCertificate deletes a Certificate resource for a tenant
+// It tries both the default namespace and the custom domain namespace (istio-ingress)
+// since custom domain certificates are created in a different namespace
 func (c *Client) DeleteCertificate(ctx context.Context, slug string) error {
 	certName := fmt.Sprintf("%s-tenant-tls", slug)
-	namespace := c.config.Kubernetes.Namespace
 
+	// Try default namespace first (for default domain tenants)
+	namespace := c.config.Kubernetes.Namespace
 	err := c.certmanager.CertmanagerV1().Certificates(namespace).Delete(ctx, certName, metav1.DeleteOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to delete certificate: %w", err)
+	if err == nil {
+		log.Printf("[K8s] Deleted Certificate %s from namespace %s", certName, namespace)
+		return nil
 	}
 
-	log.Printf("[K8s] Deleted Certificate %s", certName)
-	return nil
+	// Try custom domain namespace (for custom domain tenants)
+	customNS := c.config.Kubernetes.CustomDomainGatewayNS
+	if customNS != "" && customNS != namespace {
+		err = c.certmanager.CertmanagerV1().Certificates(customNS).Delete(ctx, certName, metav1.DeleteOptions{})
+		if err == nil {
+			log.Printf("[K8s] Deleted Certificate %s from namespace %s", certName, customNS)
+			return nil
+		}
+	}
+
+	// If both fail, return the original error
+	return fmt.Errorf("failed to delete certificate %s: not found in %s or %s", certName, namespace, customNS)
 }
 
 // GatewayServerPatch represents a patch operation for Gateway servers
@@ -174,6 +189,165 @@ type GatewayServerPatch struct {
 	Op    string      `json:"op"`
 	Path  string      `json:"path"`
 	Value interface{} `json:"value,omitempty"`
+}
+
+// CreateDedicatedGateway creates a dedicated Istio Gateway for a custom domain
+// Each custom domain gets its own Gateway with proper TLS certificate reference
+// This provides better isolation and avoids SNI conflicts with the shared gateway
+func (c *Client) CreateDedicatedGateway(ctx context.Context, slug string, domains []string, certSecretName string) (string, error) {
+	namespace := c.config.Kubernetes.CustomDomainGatewayNS
+	gatewayName := fmt.Sprintf("%s-gateway", slug)
+
+	// Check if gateway already exists
+	_, err := c.istio.NetworkingV1beta1().Gateways(namespace).Get(ctx, gatewayName, metav1.GetOptions{})
+	if err == nil {
+		log.Printf("[K8s] Gateway %s already exists in %s, skipping creation", gatewayName, namespace)
+		return gatewayName, nil
+	}
+
+	// Build HTTPS server with TLS settings
+	httpsServer := &networkingv1beta1.Server{
+		Port: &networkingv1beta1.Port{
+			Number:   443,
+			Name:     "https",
+			Protocol: "HTTPS",
+		},
+		Hosts: domains,
+		Tls: &networkingv1beta1.ServerTLSSettings{
+			Mode:               networkingv1beta1.ServerTLSSettings_SIMPLE,
+			CredentialName:     certSecretName,
+			MinProtocolVersion: networkingv1beta1.ServerTLSSettings_TLSV1_2,
+		},
+	}
+
+	// Build HTTP server for redirects and ACME challenges
+	httpServer := &networkingv1beta1.Server{
+		Port: &networkingv1beta1.Port{
+			Number:   80,
+			Name:     "http",
+			Protocol: "HTTP",
+		},
+		Hosts: domains,
+	}
+
+	// Create the Gateway resource using client-go types
+	gatewayResource := &istionetworkingv1beta1.Gateway{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      gatewayName,
+			Namespace: namespace,
+			Labels: map[string]string{
+				"app.kubernetes.io/managed-by": "tenant-router-service",
+				"app.kubernetes.io/component":  "gateway",
+				"tenant-slug":                  slug,
+			},
+		},
+		Spec: networkingv1beta1.Gateway{
+			Selector: map[string]string{
+				"istio": c.config.Kubernetes.SharedAuthPolicySelector, // Uses custom-ingressgateway workload
+			},
+			Servers: []*networkingv1beta1.Server{httpsServer, httpServer},
+		},
+	}
+
+	_, err = c.istio.NetworkingV1beta1().Gateways(namespace).Create(ctx, gatewayResource, metav1.CreateOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to create gateway %s: %w", gatewayName, err)
+	}
+
+	log.Printf("[K8s] Created dedicated Gateway %s for domains: %v", gatewayName, domains)
+	return gatewayName, nil
+}
+
+// DeleteDedicatedGateway deletes a dedicated Gateway for a custom domain
+func (c *Client) DeleteDedicatedGateway(ctx context.Context, slug string) error {
+	namespace := c.config.Kubernetes.CustomDomainGatewayNS
+	gatewayName := fmt.Sprintf("%s-gateway", slug)
+
+	err := c.istio.NetworkingV1beta1().Gateways(namespace).Delete(ctx, gatewayName, metav1.DeleteOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to delete gateway %s: %w", gatewayName, err)
+	}
+
+	log.Printf("[K8s] Deleted dedicated Gateway %s", gatewayName)
+	return nil
+}
+
+// CreateDedicatedAuthorizationPolicy creates a dedicated AuthorizationPolicy for a custom domain
+// This allows traffic to the specific domain and its subdomains on the custom-ingressgateway
+func (c *Client) CreateDedicatedAuthorizationPolicy(ctx context.Context, slug string, hosts []string) error {
+	namespace := c.config.Kubernetes.SharedAuthPolicyNamespace
+	policyName := fmt.Sprintf("%s-custom-domain-policy", slug)
+	selector := c.config.Kubernetes.SharedAuthPolicySelector
+
+	if namespace == "" {
+		namespace = "istio-ingress"
+	}
+	if selector == "" {
+		selector = "custom-ingressgateway"
+	}
+
+	// Check if policy already exists
+	_, err := c.istio.SecurityV1beta1().AuthorizationPolicies(namespace).Get(ctx, policyName, metav1.GetOptions{})
+	if err == nil {
+		log.Printf("[K8s] AuthorizationPolicy %s already exists in %s, skipping creation", policyName, namespace)
+		return nil
+	}
+
+	// Create the AuthorizationPolicy
+	policy := &istiosecurityv1beta1.AuthorizationPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      policyName,
+			Namespace: namespace,
+			Labels: map[string]string{
+				"app.kubernetes.io/managed-by": "tenant-router-service",
+				"app.kubernetes.io/component":  "custom-domain-access",
+				"tenant-slug":                  slug,
+			},
+		},
+	}
+	policy.Spec.Selector = &typev1beta1.WorkloadSelector{
+		MatchLabels: map[string]string{
+			"istio": selector,
+		},
+	}
+	policy.Spec.Action = securityv1beta1.AuthorizationPolicy_ALLOW
+	policy.Spec.Rules = []*securityv1beta1.Rule{
+		{
+			To: []*securityv1beta1.Rule_To{
+				{
+					Operation: &securityv1beta1.Operation{
+						Hosts: hosts,
+					},
+				},
+			},
+		},
+	}
+
+	_, err = c.istio.SecurityV1beta1().AuthorizationPolicies(namespace).Create(ctx, policy, metav1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to create AuthorizationPolicy %s: %w", policyName, err)
+	}
+
+	log.Printf("[K8s] Created dedicated AuthorizationPolicy %s for hosts: %v", policyName, hosts)
+	return nil
+}
+
+// DeleteDedicatedAuthorizationPolicy deletes the dedicated AuthorizationPolicy for a custom domain
+func (c *Client) DeleteDedicatedAuthorizationPolicy(ctx context.Context, slug string) error {
+	namespace := c.config.Kubernetes.SharedAuthPolicyNamespace
+	policyName := fmt.Sprintf("%s-custom-domain-policy", slug)
+
+	if namespace == "" {
+		namespace = "istio-ingress"
+	}
+
+	err := c.istio.SecurityV1beta1().AuthorizationPolicies(namespace).Delete(ctx, policyName, metav1.DeleteOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to delete AuthorizationPolicy %s: %w", policyName, err)
+	}
+
+	log.Printf("[K8s] Deleted dedicated AuthorizationPolicy %s", policyName)
+	return nil
 }
 
 // PatchGatewayServer adds or removes a server entry from the Gateway
@@ -388,10 +562,11 @@ func (c *Client) CreateTenantVirtualService(ctx context.Context, slug, tenantID,
 }
 
 // CreateCustomDomainVirtualService creates a VirtualService for a custom domain tenant
-// Custom domain VirtualServices reference the custom-domain-gateway instead of the default gateway
+// Custom domain VirtualServices reference a dedicated gateway for the custom domain
 // This allows custom domains to use a dedicated LoadBalancer with direct access (no Cloudflare)
-func (c *Client) CreateCustomDomainVirtualService(ctx context.Context, slug, tenantID, templateVSName, tenantHost, adminHost, storefrontHost, nameSuffix string) error {
-	return c.createVirtualServiceWithGateway(ctx, slug, tenantID, templateVSName, tenantHost, adminHost, storefrontHost, nameSuffix, false, true)
+// If dedicatedGatewayName is empty, uses the default custom-domain-gateway from config
+func (c *Client) CreateCustomDomainVirtualService(ctx context.Context, slug, tenantID, templateVSName, tenantHost, adminHost, storefrontHost, nameSuffix, dedicatedGatewayName string) error {
+	return c.createVirtualServiceWithGateway(ctx, slug, tenantID, templateVSName, tenantHost, adminHost, storefrontHost, nameSuffix, false, true, dedicatedGatewayName)
 }
 
 // CreateTenantVirtualServiceWithSuffix creates a new VirtualService for a tenant with an optional name suffix
@@ -400,14 +575,15 @@ func (c *Client) CreateCustomDomainVirtualService(ctx context.Context, slug, ten
 // - true: DNS record will be proxied through Cloudflare (orange cloud) - use for default domain tenants
 // - false: DNS record will be DNS-only (gray cloud) - use for custom domain tenants' platform subdomains (CNAME targets)
 func (c *Client) CreateTenantVirtualServiceWithSuffix(ctx context.Context, slug, tenantID, templateVSName, tenantHost, adminHost, storefrontHost, nameSuffix string, cloudflareProxied bool) error {
-	return c.createVirtualServiceWithGateway(ctx, slug, tenantID, templateVSName, tenantHost, adminHost, storefrontHost, nameSuffix, cloudflareProxied, false)
+	return c.createVirtualServiceWithGateway(ctx, slug, tenantID, templateVSName, tenantHost, adminHost, storefrontHost, nameSuffix, cloudflareProxied, false, "")
 }
 
 // createVirtualServiceWithGateway is the internal implementation for creating VirtualServices
 // isCustomDomain controls which gateway the VirtualService references:
 // - false: Uses the default gateway (for platform domains via Cloudflare Tunnel)
-// - true: Uses the custom-domain-gateway (for custom domains via direct LoadBalancer)
-func (c *Client) createVirtualServiceWithGateway(ctx context.Context, slug, tenantID, templateVSName, tenantHost, adminHost, storefrontHost, nameSuffix string, cloudflareProxied, isCustomDomain bool) error {
+// - true: Uses the dedicated custom domain gateway (for custom domains via direct LoadBalancer)
+// dedicatedGatewayName allows specifying a dedicated gateway for the custom domain (if empty, uses default custom-domain-gateway)
+func (c *Client) createVirtualServiceWithGateway(ctx context.Context, slug, tenantID, templateVSName, tenantHost, adminHost, storefrontHost, nameSuffix string, cloudflareProxied, isCustomDomain bool, dedicatedGatewayName string) error {
 	// Find the template VirtualService
 	vsLocation, err := c.FindVirtualServiceByName(ctx, templateVSName)
 	if err != nil {
@@ -483,7 +659,12 @@ func (c *Client) createVirtualServiceWithGateway(ctx context.Context, slug, tena
 	// Custom domains use a dedicated gateway with LoadBalancer for direct access
 	// Default domains use the platform gateway (via Cloudflare Tunnel)
 	if isCustomDomain {
-		customGatewayRef := fmt.Sprintf("%s/%s", c.config.Kubernetes.CustomDomainGatewayNS, c.config.Kubernetes.CustomDomainGateway)
+		// Use dedicated gateway if provided, otherwise fall back to default custom-domain-gateway
+		gatewayName := c.config.Kubernetes.CustomDomainGateway
+		if dedicatedGatewayName != "" {
+			gatewayName = dedicatedGatewayName
+		}
+		customGatewayRef := fmt.Sprintf("%s/%s", c.config.Kubernetes.CustomDomainGatewayNS, gatewayName)
 		newVS.Spec.Gateways = []string{customGatewayRef}
 		log.Printf("[K8s] Using custom domain gateway %s for tenant %s", customGatewayRef, slug)
 	}
@@ -706,6 +887,12 @@ func (c *Client) VirtualServiceExists(ctx context.Context, vsName string) bool {
 
 // DeleteTenantVirtualService deletes a tenant's VirtualService
 func (c *Client) DeleteTenantVirtualService(ctx context.Context, slug, templateVSName string) error {
+	return c.DeleteTenantVirtualServiceWithSuffix(ctx, slug, templateVSName, "")
+}
+
+// DeleteTenantVirtualServiceWithSuffix deletes a tenant's VirtualService with an optional suffix
+// This is used to delete VirtualServices like <slug>-storefront-www-vs
+func (c *Client) DeleteTenantVirtualServiceWithSuffix(ctx context.Context, slug, templateVSName, nameSuffix string) error {
 	// Determine the VS name based on template type
 	var vsName string
 	switch templateVSName {
@@ -717,6 +904,12 @@ func (c *Client) DeleteTenantVirtualService(ctx context.Context, slug, templateV
 		vsName = fmt.Sprintf("%s-api-vs", slug)
 	default:
 		vsName = fmt.Sprintf("%s-storefront-vs", slug)
+	}
+
+	// Apply suffix if provided (e.g., for www subdomain: custom-store-storefront-www-vs)
+	if nameSuffix != "" {
+		// Insert suffix before "-vs"
+		vsName = fmt.Sprintf("%s-%s-vs", vsName[:len(vsName)-3], nameSuffix)
 	}
 
 	namespace := c.config.Kubernetes.Namespace
