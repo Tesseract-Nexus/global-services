@@ -106,7 +106,7 @@ func LoadConfig() *Config {
 			WildcardCertName: getEnv("WILDCARD_CERT_NAME", "storefront-wildcard-tls"),
 			// Custom domain configuration - uses separate gateway for direct LoadBalancer access
 			// This allows customers to point their domains directly to the platform without Cloudflare
-			CustomDomainGateway:       getEnv("CUSTOM_DOMAIN_GATEWAY", "custom-domain-gateway"),
+			CustomDomainGateway:       getEnv("CUSTOM_DOMAIN_GATEWAY", "custom-ingressgateway"),
 			CustomDomainGatewayNS:     getEnv("CUSTOM_DOMAIN_GATEWAY_NS", "istio-ingress"),
 			CustomDomainClusterIssuer: getEnv("CUSTOM_DOMAIN_CLUSTER_ISSUER", "letsencrypt-custom-domain"),
 		},
