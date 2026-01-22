@@ -155,13 +155,16 @@ func main() {
 
 	// Start gateway IP sync job (syncs custom domain gateway IP to Redis)
 	// This enables other services (like tenant-service) to fetch the IP without K8s API access
+	log.Printf("[GatewaySync] Redis client is nil: %v", redis == nil)
 	if redis != nil {
+		log.Println("[GatewaySync] Starting gateway IP sync goroutine")
 		go func() {
 			syncInterval := 5 * time.Minute
 			ticker := time.NewTicker(syncInterval)
 			defer ticker.Stop()
 
 			// Sync immediately at startup
+			log.Println("[GatewaySync] Syncing gateway IP immediately")
 			syncGatewayIP(ctx, k8sClient, redis)
 
 			for {
