@@ -204,21 +204,23 @@ func (s *DomainService) ValidateDomain(ctx context.Context, req *ValidateDomainR
 			response.Message = "This domain is already registered with another store"
 			return response, nil
 		}
-		// Domain exists but is pending - check if same session
-		// SECURITY: Only reuse token if session_id matches to prevent cross-tenant token reuse
-		if req.SessionID != "" && existingDomain.SessionID == req.SessionID {
+		// Domain exists but is pending - check if same TENANT (customer)
+		// SECURITY: Only reuse token if tenant_id matches to prevent cross-tenant token reuse
+		// Same customer should always get the same token for consistency
+		requestTenantID, _ := uuid.Parse(req.TenantID)
+		if req.TenantID != "" && existingDomain.TenantID == requestTenantID {
 			log.Info().
 				Str("domain", domainName).
 				Str("id", existingDomain.ID.String()).
-				Str("session_id", req.SessionID).
-				Msg("Reusing existing pending domain record for same session")
+				Str("tenant_id", req.TenantID).
+				Msg("Reusing existing pending domain record for same tenant")
 		} else {
-			// Different session trying to claim same domain - log warning and generate new token
+			// Different tenant trying to claim same domain - log warning and generate new token
 			log.Warn().
 				Str("domain", domainName).
-				Str("existing_session", existingDomain.SessionID).
-				Str("new_session", req.SessionID).
-				Msg("Different session attempting to claim pending domain, will generate new token")
+				Str("existing_tenant", existingDomain.TenantID.String()).
+				Str("new_tenant", req.TenantID).
+				Msg("Different tenant attempting to claim pending domain, will generate new token")
 			// Clear existingDomain so we don't reuse its token
 			existingDomain = nil
 		}
@@ -231,39 +233,43 @@ func (s *DomainService) ValidateDomain(ctx context.Context, req *ValidateDomainR
 	response.DomainType = string(domainType)
 
 	// Get or create verification token
-	// SECURITY: Each session gets a unique token to prevent verification hijacking
+	// SECURITY: Each TENANT gets a unique token to prevent cross-tenant verification hijacking
+	// Same tenant always gets the same token for consistency
 	var verificationToken string
 	var verificationID string
 
-	if existingDomain != nil && existingDomain.VerificationToken != "" && existingDomain.SessionID == req.SessionID {
-		// Reuse existing token ONLY if session matches (security check)
+	// Parse tenant ID for comparison
+	requestTenantUUID, _ := uuid.Parse(req.TenantID)
+
+	if existingDomain != nil && existingDomain.VerificationToken != "" && existingDomain.TenantID == requestTenantUUID {
+		// Reuse existing token for the SAME TENANT (consistency for customer)
 		verificationToken = existingDomain.VerificationToken
 		verificationID = existingDomain.ID.String()
 		log.Info().
 			Str("domain", domainName).
-			Str("session_id", req.SessionID).
-			Msg("Reusing verification token for same session")
-	} else if req.VerificationToken != "" && len(req.VerificationToken) >= 8 && req.SessionID != "" {
-		// Reuse the token passed from frontend ONLY if session is provided (for session persistence)
+			Str("tenant_id", req.TenantID).
+			Msg("Reusing verification token for same tenant")
+	} else if req.VerificationToken != "" && len(req.VerificationToken) >= 8 && req.TenantID != "" {
+		// Reuse the token passed from frontend for same tenant (session persistence)
 		verificationToken = req.VerificationToken
 		log.Info().
 			Str("domain", domainName).
-			Str("session_id", req.SessionID).
-			Msg("Reusing verification token from request for session")
+			Str("tenant_id", req.TenantID).
+			Msg("Reusing verification token from request for tenant")
 	} else {
-		// Generate new unique token for this session
+		// Generate new unique token for this TENANT
 		verificationToken = uuid.New().String()[:32]
 		log.Info().
 			Str("domain", domainName).
-			Str("session_id", req.SessionID).
+			Str("tenant_id", req.TenantID).
 			Str("token_prefix", verificationToken[:8]).
-			Msg("Generated new unique verification token")
+			Msg("Generated new unique verification token for tenant")
 
 		// If tenant_id is provided, create a pending domain record to store the token
 		if req.TenantID != "" {
 			tenantUUID, parseErr := uuid.Parse(req.TenantID)
 			if parseErr == nil {
-				// Create pending domain record with session_id for security
+				// Create pending domain record linked to tenant
 				pendingDomain := &models.CustomDomain{
 					TenantID:           tenantUUID,
 					TenantSlug:         req.TenantSlug,
@@ -272,7 +278,7 @@ func (s *DomainService) ValidateDomain(ctx context.Context, req *ValidateDomainR
 					TargetType:         models.TargetTypeStorefront,
 					VerificationMethod: models.VerificationMethodCNAME,
 					VerificationToken:  verificationToken,
-					SessionID:          req.SessionID, // SECURITY: Track session for token isolation
+					SessionID:          req.SessionID, // Track session for audit/debugging
 					Status:             models.DomainStatusPending,
 					StatusMessage:      "Waiting for DNS verification",
 				}
@@ -284,8 +290,7 @@ func (s *DomainService) ValidateDomain(ctx context.Context, req *ValidateDomainR
 						Str("domain", domainName).
 						Str("id", pendingDomain.ID.String()).
 						Str("tenant_id", req.TenantID).
-						Str("session_id", req.SessionID).
-						Msg("Created pending domain record for verification with session tracking")
+						Msg("Created pending domain record for tenant verification")
 					verificationID = pendingDomain.ID.String()
 
 					// Log activity
