@@ -25,7 +25,7 @@ import (
 )
 
 func main() {
-	log.Println("Starting tenant-router-service v2.0.1 (internal mode)...")
+	log.Println("Starting tenant-router-service v2.0.2-debug (internal mode)...")
 
 	// Load configuration
 	cfg := config.LoadConfig()
@@ -87,7 +87,7 @@ func main() {
 			natsSubscriber = nil // Set to nil so health check knows NATS is not active
 		}
 	}
-
+	log.Println("[DEBUG-A] After NATS Start block")
 	log.Println("[DEBUG] NATS setup complete, initializing health handler...")
 	// Initialize health handler
 	healthHandler := handlers.NewHealthHandler(k8sClient, natsSubscriber, db)
