@@ -25,7 +25,7 @@ import (
 )
 
 func main() {
-	log.Println("Starting tenant-router-service (internal mode)...")
+	log.Println("Starting tenant-router-service v2.0.1 (internal mode)...")
 
 	// Load configuration
 	cfg := config.LoadConfig()
