@@ -335,7 +335,7 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
                             <!-- Security notice -->
                             <div style="border-left: 4px solid #f59e0b; background-color: #fffbeb; padding: 16px; border-radius: 0 8px 8px 0;">
                                 <p style="color: #92400e; font-size: 14px; margin: 0;">
-                                    ⏰ This link expires in <strong>24 hours</strong>. If you didn't request this, you can safely ignore this email.
+                                    ⏰ This link expires in <strong>{{.ExpiryTime}}</strong>. If you didn't request this, you can safely ignore this email.
                                 </p>
                             </div>
                         </td>
@@ -368,6 +368,7 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
 		VerificationLink      string
 		BusinessName          string
 		Email                 string
+		ExpiryTime            string // Human-readable expiry time (e.g., "1 hour")
 		IsCustomDomain        bool
 		CustomDomain          string
 		AdminHost             string
@@ -385,6 +386,7 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
 		VerificationLink: verificationLink,
 		BusinessName:     businessName,
 		Email:            email,
+		ExpiryTime:       "1 hour", // Matches VERIFICATION_TOKEN_EXPIRY_HOURS config
 	}
 
 	// Add DNS config if provided

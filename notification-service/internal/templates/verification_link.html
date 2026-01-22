@@ -108,7 +108,7 @@
                                             <span style="font-size: 18px;">&#9888;</span>
                                         </td>
                                         <td style="vertical-align: top;">
-                                            <p style="margin: 0 0 4px 0; font-size: 13px; font-weight: 600; color: #92400e;">This link expires in 24 hours</p>
+                                            <p style="margin: 0 0 4px 0; font-size: 13px; font-weight: 600; color: #92400e;">This link expires in {{if .VerificationExpiry}}{{.VerificationExpiry}}{{else}}1 hour{{end}}</p>
                                             <p style="margin: 0; font-size: 12px; color: #a16207; line-height: 1.5;">
                                                 If you didn't request this email, you can safely ignore it.
                                             </p>

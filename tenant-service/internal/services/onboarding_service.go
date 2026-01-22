@@ -1748,8 +1748,7 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 	// Extract custom domain config from store_setup if present
 	var useCustomDomain bool
 	var customDomain string
-	var customAdminSubdomain string = "admin"         // Default admin subdomain
-	var customStorefrontSubdomain string = ""         // Default empty (root domain)
+	var customAdminSubdomain string = "admin" // Default admin subdomain
 	for _, config := range session.ApplicationConfigurations {
 		if config.ApplicationType == "store_setup" {
 			var configData map[string]interface{}
@@ -1769,11 +1768,6 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 						customAdminSubdomain = v
 					}
 				}
-				if css, exists := configData["custom_storefront_subdomain"]; exists {
-					if v, ok := css.(string); ok {
-						customStorefrontSubdomain = v
-					}
-				}
 			}
 			break
 		}
@@ -1783,18 +1777,16 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 	var adminHost, storefrontHost, storefrontWwwHost, apiHost string
 	isCustomDomainUsed := useCustomDomain && customDomain != ""
 	if isCustomDomainUsed {
-		// For custom domains, use the custom subdomains
+		// For custom domains:
+		// - storefrontHost = apex domain (yahvismartfarm.com)
+		// - storefrontWwwHost = www subdomain (www.yahvismartfarm.com)
+		// - adminHost = admin subdomain (admin.yahvismartfarm.com)
+		// - apiHost = api subdomain (api.yahvismartfarm.com)
 		adminHost = fmt.Sprintf("%s.%s", customAdminSubdomain, customDomain)
-		if customStorefrontSubdomain != "" {
-			storefrontHost = fmt.Sprintf("%s.%s", customStorefrontSubdomain, customDomain)
-		} else {
-			storefrontHost = customDomain // Root domain
-		}
-		// Always add www subdomain for custom domains
-		storefrontWwwHost = fmt.Sprintf("www.%s", customDomain)
-		// API host uses api subdomain for custom domains
+		storefrontHost = customDomain // Always use apex domain for storefront
+		storefrontWwwHost = fmt.Sprintf("www.%s", customDomain) // www subdomain
 		apiHost = fmt.Sprintf("api.%s", customDomain)
-		log.Printf("[OnboardingService] Using custom domain hosts: admin=%s, storefront=%s, www=%s, api=%s", adminHost, storefrontHost, storefrontWwwHost, apiHost)
+		log.Printf("[OnboardingService] Using custom domain hosts: admin=%s, storefront=%s (apex), www=%s, api=%s", adminHost, storefrontHost, storefrontWwwHost, apiHost)
 	} else {
 		// Default tesserix.app domain
 		adminHost = fmt.Sprintf("%s-admin.%s", slug, baseDomain)
