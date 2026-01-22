@@ -34,6 +34,7 @@ type VerificationService struct {
 	verificationConfig config.VerificationConfig
 	natsClient         *tsnats.Client
 	onboardingRepo     *repository.OnboardingRepository
+	k8sClient          *clients.K8sClient
 }
 
 // NewVerificationService creates a new verification service
@@ -59,6 +60,11 @@ func (s *VerificationService) SetNATSClient(natsClient *tsnats.Client) {
 // SetOnboardingRepo sets the onboarding repository for session lookups
 func (s *VerificationService) SetOnboardingRepo(repo *repository.OnboardingRepository) {
 	s.onboardingRepo = repo
+}
+
+// SetK8sClient sets the Kubernetes client for fetching gateway IPs
+func (s *VerificationService) SetK8sClient(k8sClient *clients.K8sClient) {
+	s.k8sClient = k8sClient
 }
 
 // GetVerificationMethod returns the current verification method
@@ -289,10 +295,30 @@ func (s *VerificationService) buildDNSConfigFromSession(session *models.Onboardi
 	domain := configData.CustomDomain
 	log.Printf("[VerificationService] Building DNS config for custom domain: %s (tenant slug: %s)", domain, slug)
 
-	// Get custom domain gateway IP from config
-	gatewayIP := s.verificationConfig.CustomDomainGatewayIP
+	// Get custom domain gateway IP dynamically from Kubernetes API
+	var gatewayIP string
+	if s.k8sClient != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		ip, err := s.k8sClient.GetCustomDomainGatewayIP(ctx)
+		if err != nil {
+			log.Printf("[VerificationService] Warning: Failed to fetch gateway IP from K8s: %v", err)
+		} else {
+			gatewayIP = ip
+			log.Printf("[VerificationService] Fetched gateway IP from K8s: %s", gatewayIP)
+		}
+	}
+
+	// Fall back to config value if K8s client not available or failed
 	if gatewayIP == "" {
-		log.Printf("[VerificationService] Warning: CUSTOM_DOMAIN_GATEWAY_IP not set, custom domain instructions may be incomplete")
+		gatewayIP = s.verificationConfig.CustomDomainGatewayIP
+		if gatewayIP != "" {
+			log.Printf("[VerificationService] Using gateway IP from config: %s", gatewayIP)
+		}
+	}
+
+	if gatewayIP == "" {
+		log.Printf("[VerificationService] Warning: No gateway IP available, custom domain instructions may be incomplete")
 	}
 
 	// Build A record configuration for custom domains
