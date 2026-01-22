@@ -11,9 +11,18 @@ import (
 type Config struct {
 	Server     ServerConfig
 	Database   DatabaseConfig
+	Redis      RedisConfig
 	NATS       NATSConfig
 	Kubernetes K8sConfig
 	Domain     DomainConfig
+}
+
+// RedisConfig holds Redis configuration for caching platform settings
+type RedisConfig struct {
+	Host     string
+	Port     string
+	Password string
+	DB       int
 }
 
 // DatabaseConfig holds PostgreSQL database configuration
@@ -75,6 +84,12 @@ func LoadConfig() *Config {
 			Password: secrets.GetDBPassword(),
 			Name:     getEnv("DB_NAME", "tesseract_hub"),
 			SSLMode:  getEnv("DB_SSLMODE", "disable"),
+		},
+		Redis: RedisConfig{
+			Host:     getEnv("REDIS_HOST", "redis.redis-marketplace.svc.cluster.local"),
+			Port:     getEnv("REDIS_PORT", "6379"),
+			Password: getEnv("REDIS_PASSWORD", ""),
+			DB:       getEnvInt("REDIS_DB", 0),
 		},
 		NATS: NATSConfig{
 			URL: getEnv("NATS_URL", "nats://nats.devtest.svc.cluster.local:4222"),

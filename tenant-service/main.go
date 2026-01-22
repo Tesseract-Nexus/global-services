@@ -116,28 +116,10 @@ func main() {
 	// Use verification-service for sending emails (instead of deprecated notification-service)
 	notificationClient := clients.NewNotificationClient(verificationServiceURL, verificationServiceAPIKey)
 
-	// Initialize Kubernetes client for dynamic gateway IP fetching
-	// This is used to get the custom domain gateway LoadBalancer IP for verification emails
-	var k8sClient *clients.K8sClient
-	k8sClient, err = clients.NewK8sClient(clients.K8sClientConfig{
-		GatewayServiceName:      getEnv("CUSTOM_DOMAIN_GATEWAY_SERVICE", "custom-ingressgateway"),
-		GatewayServiceNamespace: getEnv("CUSTOM_DOMAIN_GATEWAY_NAMESPACE", "istio-ingress"),
-	})
-	if err != nil {
-		log.Printf("Warning: Failed to initialize K8s client: %v", err)
-		log.Println("Custom domain gateway IP will use CUSTOM_DOMAIN_GATEWAY_IP env var fallback")
-	} else {
-		log.Println("K8s client initialized for dynamic gateway IP fetching")
-	}
-
 	// Initialize services
+	// Note: Gateway IP for custom domains is now fetched from Redis (populated by tenant-router-service)
 	paymentSvc := services.NewPaymentService()
 	verificationSvc := services.NewVerificationService(verificationClient, notificationClient, redisClient, cfg.Verification)
-	// Wire up K8s client for dynamic gateway IP fetching
-	if k8sClient != nil {
-		verificationSvc.SetK8sClient(k8sClient)
-		log.Println("Verification service: K8s client wired for dynamic gateway IP")
-	}
 	// Wire up NATS client and onboarding repo for event-driven verification emails
 	if nc != nil {
 		verificationSvc.SetNATSClient(nc)

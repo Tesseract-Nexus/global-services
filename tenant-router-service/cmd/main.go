@@ -18,6 +18,7 @@ import (
 	"tenant-router-service/internal/k8s"
 	"tenant-router-service/internal/models"
 	natsClient "tenant-router-service/internal/nats"
+	redisClient "tenant-router-service/internal/redis"
 	"tenant-router-service/internal/reconciler"
 	"tenant-router-service/internal/repository"
 	"tenant-router-service/internal/services"
@@ -47,6 +48,15 @@ func main() {
 	k8sClient, err := k8s.NewClient(cfg)
 	if err != nil {
 		log.Fatalf("Failed to initialize Kubernetes client: %v", err)
+	}
+
+	// Initialize Redis client for caching platform settings (e.g., gateway IP)
+	var redis *redisClient.Client
+	redis, err = redisClient.NewClient(cfg.Redis)
+	if err != nil {
+		log.Printf("Warning: Failed to initialize Redis: %v (gateway IP caching disabled)", err)
+	} else {
+		log.Println("Connected to Redis successfully")
 	}
 
 	// Initialize router service for VS sync operations
@@ -142,6 +152,28 @@ func main() {
 			}
 		}
 	}()
+
+	// Start gateway IP sync job (syncs custom domain gateway IP to Redis)
+	// This enables other services (like tenant-service) to fetch the IP without K8s API access
+	if redis != nil {
+		go func() {
+			syncInterval := 5 * time.Minute
+			ticker := time.NewTicker(syncInterval)
+			defer ticker.Stop()
+
+			// Sync immediately at startup
+			syncGatewayIP(ctx, k8sClient, redis)
+
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					syncGatewayIP(ctx, k8sClient, redis)
+				}
+			}
+		}()
+	}
 
 	// API endpoints for tenant host management
 	api := router.Group("/api/v1")
@@ -451,6 +483,13 @@ func main() {
 		log.Printf("Error shutting down server: %v", err)
 	}
 
+	// Close Redis connection
+	if redis != nil {
+		if err := redis.Close(); err != nil {
+			log.Printf("Error closing Redis connection: %v", err)
+		}
+	}
+
 	// Close database connection
 	sqlDB, _ := db.DB()
 	if sqlDB != nil {
@@ -469,4 +508,20 @@ func runCleanup(ctx context.Context, repo repository.TenantHostRepository, reten
 		return
 	}
 	log.Printf("[Cleanup] Cleanup completed: %d records permanently deleted", deleted)
+}
+
+// syncGatewayIP fetches the custom domain gateway IP from K8s and stores it in Redis
+func syncGatewayIP(ctx context.Context, k8sClient *k8s.Client, redis *redisClient.Client) {
+	ip, err := k8sClient.GetCustomDomainGatewayIP(ctx)
+	if err != nil {
+		log.Printf("[GatewaySync] Failed to fetch gateway IP from K8s: %v", err)
+		return
+	}
+
+	if err := redis.SetCustomDomainGatewayIP(ctx, ip); err != nil {
+		log.Printf("[GatewaySync] Failed to store gateway IP in Redis: %v", err)
+		return
+	}
+
+	log.Printf("[GatewaySync] Custom domain gateway IP synced to Redis: %s", ip)
 }

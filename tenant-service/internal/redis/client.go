@@ -402,3 +402,26 @@ func (c *Client) GetVerificationTokenBySession(ctx context.Context, sessionID, e
 
 	return token, nil
 }
+
+// Platform settings constants (shared with tenant-router-service)
+const (
+	// PlatformSettingsPrefix is the prefix for platform-wide settings in Redis
+	PlatformSettingsPrefix = "platform:settings:"
+
+	// CustomDomainGatewayIPKey is the Redis key for the custom domain gateway IP
+	// This is populated by tenant-router-service and read by tenant-service
+	CustomDomainGatewayIPKey = PlatformSettingsPrefix + "custom_domain_gateway_ip"
+)
+
+// GetCustomDomainGatewayIP retrieves the custom domain gateway LoadBalancer IP from Redis
+// This IP is populated by tenant-router-service which has K8s API access
+func (c *Client) GetCustomDomainGatewayIP(ctx context.Context) (string, error) {
+	ip, err := c.rdb.Get(ctx, CustomDomainGatewayIPKey).Result()
+	if err == redis.Nil {
+		return "", nil // Key doesn't exist - tenant-router-service hasn't synced yet
+	}
+	if err != nil {
+		return "", fmt.Errorf("failed to get gateway IP from Redis: %w", err)
+	}
+	return ip, nil
+}

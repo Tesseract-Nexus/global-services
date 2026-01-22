@@ -13,6 +13,7 @@ import (
 	istioversionedclient "istio.io/client-go/pkg/clientset/versioned"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
 	"tenant-router-service/internal/config"
@@ -20,6 +21,7 @@ import (
 
 // Client wraps Kubernetes clients for Istio and cert-manager
 type Client struct {
+	core             kubernetes.Interface
 	istio            istioversionedclient.Interface
 	certmanager      certmanagerclient.Interface
 	config           *config.Config
@@ -47,15 +49,51 @@ func NewClient(cfg *config.Config) (*Client, error) {
 		return nil, fmt.Errorf("failed to create cert-manager client: %w", err)
 	}
 
+	// Create core Kubernetes client for Service lookups
+	coreClient, err := kubernetes.NewForConfig(restConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create core Kubernetes client: %w", err)
+	}
+
 	log.Println("[K8s] Kubernetes clients initialized successfully")
 
 	return &Client{
+		core:             coreClient,
 		istio:            istioClient,
 		certmanager:      cmClient,
 		config:           cfg,
 		vsNamespaceCache: make(map[string]string),
 		gwNamespaceCache: make(map[string]string),
 	}, nil
+}
+
+// GetCustomDomainGatewayIP fetches the LoadBalancer IP of the custom domain gateway Service
+func (c *Client) GetCustomDomainGatewayIP(ctx context.Context) (string, error) {
+	serviceName := c.config.Kubernetes.CustomDomainGateway
+	namespace := c.config.Kubernetes.CustomDomainGatewayNS
+
+	svc, err := c.core.CoreV1().Services(namespace).Get(ctx, serviceName, metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to get service %s/%s: %w", namespace, serviceName, err)
+	}
+
+	// Extract LoadBalancer IP
+	if len(svc.Status.LoadBalancer.Ingress) == 0 {
+		return "", fmt.Errorf("service %s/%s has no LoadBalancer ingress", namespace, serviceName)
+	}
+
+	ingress := svc.Status.LoadBalancer.Ingress[0]
+	ip := ingress.IP
+	if ip == "" {
+		// Some cloud providers use hostname instead of IP
+		ip = ingress.Hostname
+	}
+
+	if ip == "" {
+		return "", fmt.Errorf("service %s/%s has no IP or hostname", namespace, serviceName)
+	}
+
+	return ip, nil
 }
 
 // CreateCertificate creates a Certificate resource for a tenant (default domain)
