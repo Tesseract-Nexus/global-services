@@ -63,8 +63,43 @@ func (c *Client) SetCustomDomainGatewayIP(ctx context.Context, ip string) error 
 		return fmt.Errorf("failed to set gateway IP in Redis: %w", err)
 	}
 
-	log.Printf("[Redis] Stored custom domain gateway IP: %s (TTL: %v)", ip, DefaultTTL)
+	log.Printf("[Redis] Stored custom domain gateway IP: %s (TTL: %v)", maskIP(ip), DefaultTTL)
 	return nil
+}
+
+// maskIP masks an IP address for logging (e.g., "34.151.169.37" -> "34.***.***.**")
+func maskIP(ip string) string {
+	parts := make([]string, 0)
+	current := ""
+	for _, c := range ip {
+		if c == '.' {
+			if len(parts) == 0 {
+				parts = append(parts, current)
+			} else {
+				parts = append(parts, "***")
+			}
+			current = ""
+		} else {
+			current += string(c)
+		}
+	}
+	// Handle last segment
+	if current != "" {
+		if len(parts) == 0 {
+			parts = append(parts, current)
+		} else {
+			parts = append(parts, "***")
+		}
+	}
+	// Join parts
+	result := ""
+	for i, part := range parts {
+		if i > 0 {
+			result += "."
+		}
+		result += part
+	}
+	return result
 }
 
 // GetCustomDomainGatewayIP retrieves the custom domain gateway LoadBalancer IP

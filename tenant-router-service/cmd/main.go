@@ -524,5 +524,46 @@ func syncGatewayIP(ctx context.Context, k8sClient *k8s.Client, redis *redisClien
 		return
 	}
 
-	log.Printf("[GatewaySync] Custom domain gateway IP synced to Redis: %s", ip)
+	log.Printf("[GatewaySync] Custom domain gateway IP synced to Redis: %s", maskIP(ip))
+}
+
+// maskIP masks an IP address for logging (e.g., "34.151.169.37" -> "34.***.***.**")
+func maskIP(ip string) string {
+	parts := make([]string, 0)
+	for i, part := range splitIP(ip) {
+		if i == 0 {
+			parts = append(parts, part)
+		} else {
+			parts = append(parts, "***")
+		}
+	}
+	return joinIP(parts)
+}
+
+func splitIP(ip string) []string {
+	result := make([]string, 0)
+	current := ""
+	for _, c := range ip {
+		if c == '.' {
+			result = append(result, current)
+			current = ""
+		} else {
+			current += string(c)
+		}
+	}
+	if current != "" {
+		result = append(result, current)
+	}
+	return result
+}
+
+func joinIP(parts []string) string {
+	result := ""
+	for i, part := range parts {
+		if i > 0 {
+			result += "."
+		}
+		result += part
+	}
+	return result
 }
