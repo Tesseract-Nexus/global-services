@@ -40,11 +40,12 @@ type DraftConfig struct {
 
 // VerificationConfig holds email verification configuration
 type VerificationConfig struct {
-	Method             string // "otp" or "link" (default: "link")
-	TokenExpiryHours   int    // Verification token expiry in hours (default: 24)
-	OnboardingAppURL   string // Base URL for onboarding app (for verification links)
-	BaseDomain         string // Base domain for tenant URLs (e.g., "tesserix.app")
-	CloudflareTunnelID string // Cloudflare Tunnel ID for custom domain CNAME target
+	Method                 string // "otp" or "link" (default: "link")
+	TokenExpiryHours       int    // Verification token expiry in hours (default: 24)
+	OnboardingAppURL       string // Base URL for onboarding app (for verification links)
+	BaseDomain             string // Base domain for tenant URLs (e.g., "tesserix.app")
+	CustomDomainGatewayIP  string // LoadBalancer IP for custom domain gateway (customers point A records here)
+	CloudflareTunnelID     string // Deprecated: Cloudflare Tunnel ID (no longer used for custom domains)
 }
 
 // ServerConfig holds server configuration
@@ -176,11 +177,12 @@ func New() *Config {
 			CleanupInterval:  getEnvAsIntWithDefault("DRAFT_CLEANUP_INTERVAL_MINS", 60),
 		},
 		Verification: VerificationConfig{
-			Method:             getEnvWithDefault("VERIFICATION_METHOD", "link"),
-			TokenExpiryHours:   getEnvAsIntWithDefault("VERIFICATION_TOKEN_EXPIRY_HOURS", 24),
-			OnboardingAppURL:   getEnvWithDefault("ONBOARDING_APP_URL", "http://localhost:3000"),
-			BaseDomain:         getEnvWithDefault("BASE_DOMAIN", "tesserix.app"),
-			CloudflareTunnelID: getEnvWithDefault("CLOUDFLARE_TUNNEL_ID", ""), // Get from cluster secret or env
+			Method:                getEnvWithDefault("VERIFICATION_METHOD", "link"),
+			TokenExpiryHours:      getEnvAsIntWithDefault("VERIFICATION_TOKEN_EXPIRY_HOURS", 24),
+			OnboardingAppURL:      getEnvWithDefault("ONBOARDING_APP_URL", "http://localhost:3000"),
+			BaseDomain:            getEnvWithDefault("BASE_DOMAIN", "tesserix.app"),
+			CustomDomainGatewayIP: getEnvWithDefault("CUSTOM_DOMAIN_GATEWAY_IP", ""), // LoadBalancer IP for custom domains
+			CloudflareTunnelID:    getEnvWithDefault("CLOUDFLARE_TUNNEL_ID", ""),     // Deprecated
 		},
 		URL: URLConfig{
 			// Base domain for subdomain-based tenant URLs

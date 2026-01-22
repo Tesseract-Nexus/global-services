@@ -63,16 +63,20 @@ type CustomDomainDNSConfig struct {
 	StorefrontHost string // Storefront host (e.g., "www.customdomain.com" or "customdomain.com")
 	APIHost        string // API host (e.g., "api.customdomain.com")
 
-	// Platform subdomain CNAME targets (what customers point their DNS to)
-	// These are the tenant's subdomains on the platform domain
-	TenantSlug           string // The tenant slug (e.g., "awesome-store")
-	AdminCNAMETarget     string // Platform admin subdomain (e.g., "awesome-store-admin.tesserix.app")
-	StorefrontCNAMETarget string // Platform store subdomain (e.g., "awesome-store.tesserix.app")
-	APICNAMETarget       string // Platform API subdomain (e.g., "awesome-store-api.tesserix.app")
-	BaseDomain           string // Platform base domain (e.g., "tesserix.app")
+	// Custom Domain Gateway IP - customers point A records to this IP
+	// This is the LoadBalancer IP of the custom-ingressgateway
+	// The IP is fetched from CUSTOM_DOMAIN_GATEWAY_IP environment variable
+	GatewayIP string // LoadBalancer IP (e.g., "34.151.169.37")
 
-	// Deprecated: TunnelCNAMETarget is no longer used - customers CNAME to platform subdomains
-	TunnelCNAMETarget string // Kept for backwards compatibility, not displayed in new emails
+	// Tenant identification
+	TenantSlug string // The tenant slug (e.g., "awesome-store")
+	BaseDomain string // Platform base domain (e.g., "tesserix.app")
+
+	// Deprecated: CNAME targets are no longer used - customers use A records to gateway IP
+	AdminCNAMETarget      string // Deprecated: kept for backwards compatibility
+	StorefrontCNAMETarget string // Deprecated: kept for backwards compatibility
+	APICNAMETarget        string // Deprecated: kept for backwards compatibility
+	TunnelCNAMETarget     string // Deprecated: kept for backwards compatibility
 }
 
 // SendVerificationLinkEmail sends an email with a verification link via notification-service
@@ -183,61 +187,79 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
                                     🌐 ACTION REQUIRED: Set Up Your DNS Records
                                 </h2>
                                 <p style="color: #78350f; font-size: 15px; line-height: 1.6; margin: 0 0 20px;">
-                                    To use your custom domain <strong style="font-size: 16px;">{{.CustomDomain}}</strong>, you need to add CNAME records pointing to your platform subdomains. <strong>You can do this now while your email is being verified!</strong>
+                                    To use your custom domain <strong style="font-size: 16px;">{{.CustomDomain}}</strong>, you need to add A records pointing to our platform. <strong>You can do this now while your email is being verified!</strong>
                                 </p>
+
+                                <!-- Gateway IP highlight -->
+                                <div style="background-color: #ffffff; border-radius: 8px; padding: 20px; margin-bottom: 16px; text-align: center; border: 2px solid #10b981;">
+                                    <p style="color: #374151; font-size: 14px; margin: 0 0 8px;">All your domains should point to this IP address:</p>
+                                    <p style="color: #10b981; font-size: 28px; font-weight: 700; font-family: monospace; margin: 0; letter-spacing: 1px;">{{.GatewayIP}}</p>
+                                </div>
 
                                 <!-- Step-by-step Instructions -->
                                 <div style="background-color: #ffffff; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
                                     <p style="color: #1f2937; font-size: 14px; font-weight: 600; margin: 0 0 16px;">
-                                        📝 Add these CNAME records at your domain registrar (GoDaddy, Namecheap, Cloudflare, etc.):
+                                        📝 Add these A records at your domain registrar (GoDaddy, Namecheap, Cloudflare, etc.):
                                     </p>
 
-                                    <!-- Step 1 - Storefront -->
+                                    <!-- Step 1 - Root domain -->
                                     <div style="margin-bottom: 16px; padding-left: 12px; border-left: 3px solid #6366f1;">
-                                        <p style="color: #6366f1; font-size: 12px; font-weight: 600; margin: 0 0 4px; text-transform: uppercase;">Step 1 - Storefront (www)</p>
-                                        <p style="color: #374151; font-size: 13px; margin: 0 0 8px;">Add a CNAME record for your storefront:</p>
+                                        <p style="color: #6366f1; font-size: 12px; font-weight: 600; margin: 0 0 4px; text-transform: uppercase;">Step 1 - Root Domain (Storefront)</p>
+                                        <p style="color: #374151; font-size: 13px; margin: 0 0 8px;">Add an A record for your main storefront:</p>
                                         <table style="width: 100%; border-collapse: collapse; background-color: #f9fafb; border-radius: 6px;">
                                             <tr>
-                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280; width: 70px;">Name:</td>
-                                                <td style="padding: 10px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">www</td>
+                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280; width: 70px;">Type:</td>
+                                                <td style="padding: 10px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">A</td>
                                             </tr>
                                             <tr>
-                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280;">Points to:</td>
-                                                <td style="padding: 10px 12px; font-size: 13px; font-family: monospace; color: #6366f1; word-break: break-all; background-color: #eef2ff; border-radius: 4px;"><strong>{{.StorefrontCNAMETarget}}</strong></td>
-                                            </tr>
-                                        </table>
-                                        <p style="color: #6b7280; font-size: 11px; margin: 6px 0 0;">Enables: <strong>www.{{.CustomDomain}}</strong> → Your storefront</p>
-                                    </div>
-
-                                    <!-- Step 2 - Root domain -->
-                                    <div style="margin-bottom: 16px; padding-left: 12px; border-left: 3px solid #8b5cf6;">
-                                        <p style="color: #8b5cf6; font-size: 12px; font-weight: 600; margin: 0 0 4px; text-transform: uppercase;">Step 2 - Root Domain (Optional)</p>
-                                        <p style="color: #374151; font-size: 13px; margin: 0 0 8px;">Add a CNAME record for your root domain:</p>
-                                        <table style="width: 100%; border-collapse: collapse; background-color: #f9fafb; border-radius: 6px;">
-                                            <tr>
-                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280; width: 70px;">Name:</td>
+                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280;">Name:</td>
                                                 <td style="padding: 10px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">@ <span style="color: #9ca3af; font-weight: normal;">(or leave blank)</span></td>
                                             </tr>
                                             <tr>
-                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280;">Points to:</td>
-                                                <td style="padding: 10px 12px; font-size: 13px; font-family: monospace; color: #6366f1; word-break: break-all; background-color: #eef2ff; border-radius: 4px;"><strong>{{.StorefrontCNAMETarget}}</strong></td>
+                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280;">Value:</td>
+                                                <td style="padding: 10px 12px; font-size: 14px; font-family: monospace; color: #10b981; background-color: #ecfdf5; border-radius: 4px;"><strong>{{.GatewayIP}}</strong></td>
                                             </tr>
                                         </table>
                                         <p style="color: #6b7280; font-size: 11px; margin: 6px 0 0;">Enables: <strong>{{.CustomDomain}}</strong> → Your storefront</p>
                                     </div>
 
+                                    <!-- Step 2 - www subdomain -->
+                                    <div style="margin-bottom: 16px; padding-left: 12px; border-left: 3px solid #8b5cf6;">
+                                        <p style="color: #8b5cf6; font-size: 12px; font-weight: 600; margin: 0 0 4px; text-transform: uppercase;">Step 2 - WWW Subdomain</p>
+                                        <p style="color: #374151; font-size: 13px; margin: 0 0 8px;">Add an A record for www:</p>
+                                        <table style="width: 100%; border-collapse: collapse; background-color: #f9fafb; border-radius: 6px;">
+                                            <tr>
+                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280; width: 70px;">Type:</td>
+                                                <td style="padding: 10px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">A</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280;">Name:</td>
+                                                <td style="padding: 10px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">www</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280;">Value:</td>
+                                                <td style="padding: 10px 12px; font-size: 14px; font-family: monospace; color: #10b981; background-color: #ecfdf5; border-radius: 4px;"><strong>{{.GatewayIP}}</strong></td>
+                                            </tr>
+                                        </table>
+                                        <p style="color: #6b7280; font-size: 11px; margin: 6px 0 0;">Enables: <strong>www.{{.CustomDomain}}</strong> → Your storefront</p>
+                                    </div>
+
                                     <!-- Step 3 - Admin -->
                                     <div style="margin-bottom: 16px; padding-left: 12px; border-left: 3px solid #10b981;">
                                         <p style="color: #10b981; font-size: 12px; font-weight: 600; margin: 0 0 4px; text-transform: uppercase;">Step 3 - Admin Panel</p>
-                                        <p style="color: #374151; font-size: 13px; margin: 0 0 8px;">Add a CNAME record for your admin dashboard:</p>
+                                        <p style="color: #374151; font-size: 13px; margin: 0 0 8px;">Add an A record for your admin dashboard:</p>
                                         <table style="width: 100%; border-collapse: collapse; background-color: #f9fafb; border-radius: 6px;">
                                             <tr>
-                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280; width: 70px;">Name:</td>
+                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280; width: 70px;">Type:</td>
+                                                <td style="padding: 10px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">A</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280;">Name:</td>
                                                 <td style="padding: 10px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">admin</td>
                                             </tr>
                                             <tr>
-                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280;">Points to:</td>
-                                                <td style="padding: 10px 12px; font-size: 13px; font-family: monospace; color: #6366f1; word-break: break-all; background-color: #eef2ff; border-radius: 4px;"><strong>{{.AdminCNAMETarget}}</strong></td>
+                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280;">Value:</td>
+                                                <td style="padding: 10px 12px; font-size: 14px; font-family: monospace; color: #10b981; background-color: #ecfdf5; border-radius: 4px;"><strong>{{.GatewayIP}}</strong></td>
                                             </tr>
                                         </table>
                                         <p style="color: #6b7280; font-size: 11px; margin: 6px 0 0;">Enables: <strong>admin.{{.CustomDomain}}</strong> → Admin dashboard</p>
@@ -246,15 +268,19 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
                                     <!-- Step 4 - API -->
                                     <div style="padding-left: 12px; border-left: 3px solid #f59e0b;">
                                         <p style="color: #f59e0b; font-size: 12px; font-weight: 600; margin: 0 0 4px; text-transform: uppercase;">Step 4 - API Access (For Mobile Apps)</p>
-                                        <p style="color: #374151; font-size: 13px; margin: 0 0 8px;">Add a CNAME record for API access:</p>
+                                        <p style="color: #374151; font-size: 13px; margin: 0 0 8px;">Add an A record for API access:</p>
                                         <table style="width: 100%; border-collapse: collapse; background-color: #f9fafb; border-radius: 6px;">
                                             <tr>
-                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280; width: 70px;">Name:</td>
+                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280; width: 70px;">Type:</td>
+                                                <td style="padding: 10px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">A</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280;">Name:</td>
                                                 <td style="padding: 10px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">api</td>
                                             </tr>
                                             <tr>
-                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280;">Points to:</td>
-                                                <td style="padding: 10px 12px; font-size: 13px; font-family: monospace; color: #6366f1; word-break: break-all; background-color: #eef2ff; border-radius: 4px;"><strong>{{.APICNAMETarget}}</strong></td>
+                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280;">Value:</td>
+                                                <td style="padding: 10px 12px; font-size: 14px; font-family: monospace; color: #10b981; background-color: #ecfdf5; border-radius: 4px;"><strong>{{.GatewayIP}}</strong></td>
                                             </tr>
                                         </table>
                                         <p style="color: #6b7280; font-size: 11px; margin: 6px 0 0;">Enables: <strong>api.{{.CustomDomain}}</strong> → API endpoints</p>
@@ -263,23 +289,32 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
 
                                 <!-- Summary table -->
                                 <div style="background-color: #ffffff; border-radius: 8px; padding: 16px; margin-bottom: 16px; border: 1px dashed #d1d5db;">
-                                    <p style="color: #374151; font-size: 13px; font-weight: 600; margin: 0 0 12px;">📋 Quick Reference - Copy these CNAME values:</p>
+                                    <p style="color: #374151; font-size: 13px; font-weight: 600; margin: 0 0 12px;">📋 Quick Reference - All A Records Point to: <span style="color: #10b981; font-family: monospace;">{{.GatewayIP}}</span></p>
                                     <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
                                         <tr style="background-color: #f3f4f6;">
-                                            <th style="padding: 8px; text-align: left; color: #374151; border-bottom: 1px solid #e5e7eb;">Your Subdomain</th>
-                                            <th style="padding: 8px; text-align: left; color: #374151; border-bottom: 1px solid #e5e7eb;">→ Points To</th>
+                                            <th style="padding: 8px; text-align: left; color: #374151; border-bottom: 1px solid #e5e7eb;">Type</th>
+                                            <th style="padding: 8px; text-align: left; color: #374151; border-bottom: 1px solid #e5e7eb;">Name</th>
+                                            <th style="padding: 8px; text-align: left; color: #374151; border-bottom: 1px solid #e5e7eb;">Value</th>
                                         </tr>
                                         <tr>
-                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">www.{{.CustomDomain}}</td>
-                                            <td style="padding: 8px; font-family: monospace; color: #6366f1;">{{.StorefrontCNAMETarget}}</td>
+                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">A</td>
+                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">@</td>
+                                            <td style="padding: 8px; font-family: monospace; color: #10b981;">{{.GatewayIP}}</td>
                                         </tr>
                                         <tr style="background-color: #f9fafb;">
-                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">admin.{{.CustomDomain}}</td>
-                                            <td style="padding: 8px; font-family: monospace; color: #6366f1;">{{.AdminCNAMETarget}}</td>
+                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">A</td>
+                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">www</td>
+                                            <td style="padding: 8px; font-family: monospace; color: #10b981;">{{.GatewayIP}}</td>
                                         </tr>
                                         <tr>
-                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">api.{{.CustomDomain}}</td>
-                                            <td style="padding: 8px; font-family: monospace; color: #6366f1;">{{.APICNAMETarget}}</td>
+                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">A</td>
+                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">admin</td>
+                                            <td style="padding: 8px; font-family: monospace; color: #10b981;">{{.GatewayIP}}</td>
+                                        </tr>
+                                        <tr style="background-color: #f9fafb;">
+                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">A</td>
+                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">api</td>
+                                            <td style="padding: 8px; font-family: monospace; color: #10b981;">{{.GatewayIP}}</td>
                                         </tr>
                                     </table>
                                 </div>
@@ -288,9 +323,10 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
                                 <div style="background-color: #ffffff; border-radius: 8px; padding: 12px; border-left: 4px solid #3b82f6;">
                                     <p style="color: #1e40af; font-size: 13px; margin: 0; line-height: 1.6;">
                                         💡 <strong>Tips:</strong><br>
-                                        • If using <strong>Cloudflare</strong> as your DNS provider, enable the <strong>orange cloud (Proxy)</strong> for SSL<br>
+                                        • All subdomains use the <strong>same IP address</strong> - easy to configure!<br>
                                         • DNS changes usually take <strong>5-30 minutes</strong> to propagate (max 48 hours)<br>
-                                        • Each subdomain points to a <strong>different platform URL</strong> - don't mix them up!
+                                        • We'll automatically provision an <strong>SSL certificate</strong> once DNS is configured<br>
+                                        • If using <strong>Cloudflare</strong>, you can keep DNS-only mode (gray cloud)
                                     </p>
                                 </div>
                             </div>
@@ -338,11 +374,13 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
 		StorefrontHost        string
 		APIHost               string
 		TenantSlug            string
+		GatewayIP             string // Custom domain gateway LoadBalancer IP
+		BaseDomain            string
+		// Deprecated fields - kept for backwards compatibility
 		AdminCNAMETarget      string
 		StorefrontCNAMETarget string
 		APICNAMETarget        string
-		BaseDomain            string
-		TunnelCNAMETarget     string // Deprecated, kept for backwards compatibility
+		TunnelCNAMETarget     string
 	}{
 		VerificationLink: verificationLink,
 		BusinessName:     businessName,
@@ -357,11 +395,13 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
 		data.StorefrontHost = dnsConfig.StorefrontHost
 		data.APIHost = dnsConfig.APIHost
 		data.TenantSlug = dnsConfig.TenantSlug
+		data.GatewayIP = dnsConfig.GatewayIP
+		data.BaseDomain = dnsConfig.BaseDomain
+		// Deprecated fields
 		data.AdminCNAMETarget = dnsConfig.AdminCNAMETarget
 		data.StorefrontCNAMETarget = dnsConfig.StorefrontCNAMETarget
 		data.APICNAMETarget = dnsConfig.APICNAMETarget
-		data.BaseDomain = dnsConfig.BaseDomain
-		data.TunnelCNAMETarget = dnsConfig.TunnelCNAMETarget // Deprecated
+		data.TunnelCNAMETarget = dnsConfig.TunnelCNAMETarget
 	}
 
 	var buf strings.Builder

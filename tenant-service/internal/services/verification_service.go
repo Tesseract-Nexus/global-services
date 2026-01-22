@@ -289,26 +289,34 @@ func (s *VerificationService) buildDNSConfigFromSession(session *models.Onboardi
 	domain := configData.CustomDomain
 	log.Printf("[VerificationService] Building DNS config for custom domain: %s (tenant slug: %s)", domain, slug)
 
-	// Build platform subdomain CNAME targets
-	// These are the URLs that customers CNAME their custom domain subdomains to
+	// Get custom domain gateway IP from config
+	gatewayIP := s.verificationConfig.CustomDomainGatewayIP
+	if gatewayIP == "" {
+		log.Printf("[VerificationService] Warning: CUSTOM_DOMAIN_GATEWAY_IP not set, custom domain instructions may be incomplete")
+	}
+
+	// Build A record configuration for custom domains
+	// Customers point A records to the custom domain gateway LoadBalancer IP
 	return &clients.CustomDomainDNSConfig{
 		IsCustomDomain: true,
 		CustomDomain:   domain,
 
-		// Customer's subdomain hosts
-		StorefrontHost: fmt.Sprintf("www.%s", domain),
-		AdminHost:      fmt.Sprintf("admin.%s", domain),
-		APIHost:        fmt.Sprintf("api.%s", domain),
+		// Customer's subdomain hosts (what they configure DNS for)
+		StorefrontHost: domain,                       // customdomain.com
+		AdminHost:      fmt.Sprintf("admin.%s", domain), // admin.customdomain.com
+		APIHost:        fmt.Sprintf("api.%s", domain),   // api.customdomain.com
 
-		// Platform CNAME targets (what customers point their DNS to)
-		TenantSlug:            slug,
-		StorefrontCNAMETarget: fmt.Sprintf("%s.%s", slug, baseDomain),       // awesome-store.tesserix.app
-		AdminCNAMETarget:      fmt.Sprintf("%s-admin.%s", slug, baseDomain), // awesome-store-admin.tesserix.app
-		APICNAMETarget:        fmt.Sprintf("%s-api.%s", slug, baseDomain),   // awesome-store-api.tesserix.app
-		BaseDomain:            baseDomain,
+		// Custom domain gateway IP (customers point A records to this IP)
+		GatewayIP:  gatewayIP,
+		TenantSlug: slug,
+		BaseDomain: baseDomain,
 
-		// Deprecated: tunnel CNAME is no longer used
-		TunnelCNAMETarget: "",
+		// Deprecated: CNAME targets are no longer used for custom domains
+		// Kept for backwards compatibility with older email templates
+		StorefrontCNAMETarget: fmt.Sprintf("%s.%s", slug, baseDomain),
+		AdminCNAMETarget:      fmt.Sprintf("%s-admin.%s", slug, baseDomain),
+		APICNAMETarget:        fmt.Sprintf("%s-api.%s", slug, baseDomain),
+		TunnelCNAMETarget:     "",
 	}
 }
 
