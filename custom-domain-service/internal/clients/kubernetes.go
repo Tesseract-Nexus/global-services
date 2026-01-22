@@ -760,6 +760,7 @@ func (k *KubernetesClient) CreateAuthorizationPolicy(ctx context.Context, domain
 }
 
 // DeleteAuthorizationPolicy removes the AuthorizationPolicy for the custom domain
+// DEPRECATED: Use RemoveHostFromSharedAuthPolicy instead for production
 func (k *KubernetesClient) DeleteAuthorizationPolicy(ctx context.Context, domain *models.CustomDomain) error {
 	policyName := generateResourceName(domain.Domain, "authz")
 	err := k.istioClient.SecurityV1beta1().AuthorizationPolicies(k.cfg.Istio.GatewayNamespace).Delete(ctx, policyName, metav1.DeleteOptions{})
@@ -768,6 +769,189 @@ func (k *KubernetesClient) DeleteAuthorizationPolicy(ctx context.Context, domain
 		return err
 	}
 	log.Info().Str("policy", policyName).Msg("Authorization policy deleted")
+	return nil
+}
+
+// AddHostToSharedAuthPolicy adds custom domain hosts to the shared AuthorizationPolicy
+// This is the production-ready approach that patches the existing allow-frontend-apps-public-custom
+// policy instead of creating per-domain policies
+func (k *KubernetesClient) AddHostToSharedAuthPolicy(ctx context.Context, domain *models.CustomDomain) error {
+	policyName := k.cfg.Istio.SharedAuthPolicyName
+	namespace := k.cfg.Istio.SharedAuthPolicyNamespace
+
+	if policyName == "" || namespace == "" {
+		log.Warn().Msg("Shared auth policy not configured, skipping")
+		return nil
+	}
+
+	// Build hosts list
+	hosts := []string{domain.Domain}
+	if domain.IncludeWWW && domain.DomainType == models.DomainTypeApex {
+		hosts = append(hosts, "www."+domain.Domain)
+	}
+
+	// Get existing policy
+	policy, err := k.istioClient.SecurityV1beta1().AuthorizationPolicies(namespace).Get(ctx, policyName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get shared auth policy %s/%s: %w", namespace, policyName, err)
+	}
+
+	// Check if hosts already exist in any rule
+	existingHosts := make(map[string]bool)
+	for _, rule := range policy.Spec.Rules {
+		for _, to := range rule.To {
+			if to.Operation != nil {
+				for _, h := range to.Operation.Hosts {
+					existingHosts[h] = true
+				}
+			}
+		}
+	}
+
+	// Check if any of our hosts need to be added
+	hostsToAdd := []string{}
+	for _, h := range hosts {
+		if !existingHosts[h] {
+			hostsToAdd = append(hostsToAdd, h)
+		}
+	}
+
+	if len(hostsToAdd) == 0 {
+		log.Debug().Str("domain", domain.Domain).Msg("Hosts already exist in shared auth policy")
+		return nil
+	}
+
+	// Add new rules for each host (matching the Helm template structure)
+	for _, host := range hostsToAdd {
+		newRule := &securityv1beta1.Rule{
+			To: []*securityv1beta1.Rule_To{
+				{
+					Operation: &securityv1beta1.Operation{
+						Hosts: []string{host},
+					},
+				},
+			},
+		}
+		policy.Spec.Rules = append(policy.Spec.Rules, newRule)
+	}
+
+	// Add annotation to track custom domains managed by this service
+	if policy.Annotations == nil {
+		policy.Annotations = make(map[string]string)
+	}
+	customDomains := policy.Annotations["tesserix.app/custom-domains"]
+	if customDomains != "" {
+		customDomains += "," + domain.Domain
+	} else {
+		customDomains = domain.Domain
+	}
+	policy.Annotations["tesserix.app/custom-domains"] = customDomains
+	policy.Annotations["tesserix.app/last-updated"] = time.Now().UTC().Format(time.RFC3339)
+
+	// Update the policy
+	_, err = k.istioClient.SecurityV1beta1().AuthorizationPolicies(namespace).Update(ctx, policy, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to update shared auth policy: %w", err)
+	}
+
+	log.Info().
+		Str("policy", policyName).
+		Str("namespace", namespace).
+		Str("domain", domain.Domain).
+		Strs("hosts_added", hostsToAdd).
+		Msg("Added hosts to shared authorization policy")
+
+	return nil
+}
+
+// RemoveHostFromSharedAuthPolicy removes custom domain hosts from the shared AuthorizationPolicy
+func (k *KubernetesClient) RemoveHostFromSharedAuthPolicy(ctx context.Context, domain *models.CustomDomain) error {
+	policyName := k.cfg.Istio.SharedAuthPolicyName
+	namespace := k.cfg.Istio.SharedAuthPolicyNamespace
+
+	if policyName == "" || namespace == "" {
+		log.Warn().Msg("Shared auth policy not configured, skipping")
+		return nil
+	}
+
+	// Build hosts list to remove
+	hostsToRemove := map[string]bool{domain.Domain: true}
+	if domain.IncludeWWW && domain.DomainType == models.DomainTypeApex {
+		hostsToRemove["www."+domain.Domain] = true
+	}
+
+	// Get existing policy
+	policy, err := k.istioClient.SecurityV1beta1().AuthorizationPolicies(namespace).Get(ctx, policyName, metav1.GetOptions{})
+	if err != nil {
+		log.Warn().Err(err).Str("policy", policyName).Msg("Failed to get shared auth policy for removal")
+		return nil // Don't fail if policy doesn't exist
+	}
+
+	// Filter out rules that match our hosts
+	newRules := []*securityv1beta1.Rule{}
+	removed := false
+	for _, rule := range policy.Spec.Rules {
+		shouldKeep := true
+		for _, to := range rule.To {
+			if to.Operation != nil {
+				// Check if this rule only contains hosts we want to remove
+				allHostsRemoved := true
+				for _, h := range to.Operation.Hosts {
+					if !hostsToRemove[h] {
+						allHostsRemoved = false
+						break
+					}
+				}
+				if allHostsRemoved && len(to.Operation.Hosts) > 0 {
+					shouldKeep = false
+					removed = true
+				}
+			}
+		}
+		if shouldKeep {
+			newRules = append(newRules, rule)
+		}
+	}
+
+	if !removed {
+		log.Debug().Str("domain", domain.Domain).Msg("Hosts not found in shared auth policy")
+		return nil
+	}
+
+	policy.Spec.Rules = newRules
+
+	// Update annotation to remove this custom domain
+	if policy.Annotations != nil {
+		customDomains := policy.Annotations["tesserix.app/custom-domains"]
+		if customDomains != "" {
+			domains := strings.Split(customDomains, ",")
+			newDomains := []string{}
+			for _, d := range domains {
+				if d != domain.Domain {
+					newDomains = append(newDomains, d)
+				}
+			}
+			if len(newDomains) > 0 {
+				policy.Annotations["tesserix.app/custom-domains"] = strings.Join(newDomains, ",")
+			} else {
+				delete(policy.Annotations, "tesserix.app/custom-domains")
+			}
+		}
+		policy.Annotations["tesserix.app/last-updated"] = time.Now().UTC().Format(time.RFC3339)
+	}
+
+	// Update the policy
+	_, err = k.istioClient.SecurityV1beta1().AuthorizationPolicies(namespace).Update(ctx, policy, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to update shared auth policy: %w", err)
+	}
+
+	log.Info().
+		Str("policy", policyName).
+		Str("namespace", namespace).
+		Str("domain", domain.Domain).
+		Msg("Removed hosts from shared authorization policy")
+
 	return nil
 }
 

@@ -586,6 +586,11 @@ func (s *DomainService) DeleteDomain(ctx context.Context, tenantID, domainID uui
 				log.Warn().Err(err).Str("domain", domain.Domain).Msg("Failed to remove from gateway")
 			}
 		}
+
+		// Remove domain from shared AuthorizationPolicy
+		if err := s.k8sClient.RemoveHostFromSharedAuthPolicy(ctx, domain); err != nil {
+			log.Warn().Err(err).Str("domain", domain.Domain).Msg("Failed to remove from shared auth policy")
+		}
 	}
 
 	// Cleanup certificate (only if not using Cloudflare Tunnel)
@@ -742,6 +747,15 @@ func (s *DomainService) provisionDomainWithCloudflare(ctx context.Context, domai
 	s.repo.UpdateRoutingStatus(ctx, domain.ID, models.RoutingStatusActive, vsResult.Name, false) // Gateway not patched in tunnel mode
 	s.logActivity(ctx, domain, "routing", "success", "VirtualService configured for Cloudflare Tunnel")
 
+	// Step 2b: Add domain to shared AuthorizationPolicy for RBAC
+	// This allows traffic to the custom domain through the custom ingress gateway
+	if err := s.k8sClient.AddHostToSharedAuthPolicy(ctx, domain); err != nil {
+		log.Warn().Err(err).Str("domain", domain.Domain).Msg("Failed to add domain to shared auth policy, traffic may be blocked")
+		s.logActivity(ctx, domain, "auth_policy", "warning", "Failed to update authorization policy - traffic may be blocked")
+	} else {
+		s.logActivity(ctx, domain, "auth_policy", "success", "Added domain to shared authorization policy")
+	}
+
 	// Step 3: Update Keycloak redirect URIs
 	if err := s.keycloak.AddDomainRedirectURIs(ctx, domain); err != nil {
 		log.Error().Err(err).Str("domain", domain.Domain).Msg("Failed to update Keycloak")
@@ -869,6 +883,14 @@ configureRouting:
 
 	s.repo.UpdateRoutingStatus(ctx, domain.ID, models.RoutingStatusActive, vsResult.Name, true)
 	s.logActivity(ctx, domain, "routing", "success", "VirtualService and Gateway configured")
+
+	// Step 3b: Add domain to shared AuthorizationPolicy for RBAC (if using custom gateway)
+	if err := s.k8sClient.AddHostToSharedAuthPolicy(ctx, domain); err != nil {
+		log.Warn().Err(err).Str("domain", domain.Domain).Msg("Failed to add domain to shared auth policy")
+		s.logActivity(ctx, domain, "auth_policy", "warning", "Failed to update authorization policy")
+	} else {
+		s.logActivity(ctx, domain, "auth_policy", "success", "Added domain to shared authorization policy")
+	}
 
 	// Step 4: Update Keycloak redirect URIs
 	if err := s.keycloak.AddDomainRedirectURIs(ctx, domain); err != nil {

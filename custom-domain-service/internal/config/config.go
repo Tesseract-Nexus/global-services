@@ -62,6 +62,12 @@ type IstioConfig struct {
 	GatewayName      string `json:"gateway_name"`
 	GatewayNamespace string `json:"gateway_namespace"`
 	VSNamespace      string `json:"vs_namespace"`
+
+	// Shared AuthorizationPolicy configuration for custom domains
+	// Instead of creating per-domain policies, we patch the shared policy with domain hosts
+	SharedAuthPolicyName      string `json:"shared_auth_policy_name"`
+	SharedAuthPolicyNamespace string `json:"shared_auth_policy_namespace"`
+	SharedAuthPolicySelector  string `json:"shared_auth_policy_selector"` // e.g., "custom-ingressgateway"
 }
 
 type DNSConfig struct {
@@ -147,6 +153,10 @@ func NewConfig() *Config {
 			GatewayName:      getEnv("ISTIO_GATEWAY_NAME", "custom-domains-gateway"),
 			GatewayNamespace: getEnv("ISTIO_GATEWAY_NAMESPACE", "istio-system"),
 			VSNamespace:      getEnv("ISTIO_VS_NAMESPACE", "marketplace"),
+			// Shared AuthorizationPolicy for custom domain traffic at the custom ingress gateway
+			SharedAuthPolicyName:      getEnv("ISTIO_SHARED_AUTH_POLICY_NAME", "allow-frontend-apps-public-custom"),
+			SharedAuthPolicyNamespace: getEnv("ISTIO_SHARED_AUTH_POLICY_NAMESPACE", "istio-ingress"),
+			SharedAuthPolicySelector:  getEnv("ISTIO_SHARED_AUTH_POLICY_SELECTOR", "custom-ingressgateway"),
 		},
 		DNS: DNSConfig{
 			VerificationDomain: getEnv("DNS_VERIFICATION_DOMAIN", "tesserix.app"),
