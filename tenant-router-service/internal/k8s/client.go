@@ -922,20 +922,18 @@ func (c *Client) AddHostsToSharedAuthPolicy(ctx context.Context, hosts []string)
 	if len(policy.Spec.Rules) == 0 {
 		// Create a new rule with the hosts
 		selector := c.config.Kubernetes.SharedAuthPolicySelector
-		policy.Spec = &securityv1beta1.AuthorizationPolicy{
-			Selector: &typev1beta1.WorkloadSelector{
-				MatchLabels: map[string]string{
-					"istio": selector,
-				},
+		policy.Spec.Selector = &typev1beta1.WorkloadSelector{
+			MatchLabels: map[string]string{
+				"istio": selector,
 			},
-			Action: securityv1beta1.AuthorizationPolicy_ALLOW,
-			Rules: []*securityv1beta1.Rule{
-				{
-					To: []*securityv1beta1.Rule_To{
-						{
-							Operation: &securityv1beta1.Operation{
-								Hosts: hosts,
-							},
+		}
+		policy.Spec.Action = securityv1beta1.AuthorizationPolicy_ALLOW
+		policy.Spec.Rules = []*securityv1beta1.Rule{
+			{
+				To: []*securityv1beta1.Rule_To{
+					{
+						Operation: &securityv1beta1.Operation{
+							Hosts: hosts,
 						},
 					},
 				},
