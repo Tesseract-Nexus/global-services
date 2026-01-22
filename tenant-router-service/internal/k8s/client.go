@@ -699,8 +699,10 @@ func (c *Client) createVirtualServiceWithGateway(ctx context.Context, slug, tena
 			slug, adminHost, storefrontHost, onboardingHost)
 	}
 
-	// Inject X-Vendor-ID header with tenant UUID for all routes
-	// This allows backend services to identify the tenant without the client needing to pass the UUID
+	// Inject tenant identification headers for all routes
+	// These headers allow backend services to identify the tenant without parsing the host
+	// Security note: Istio's "set" operation OVERWRITES any client-provided headers with the same name,
+	// so malicious clients cannot spoof these headers - they are set by infrastructure only
 	if tenantID != "" {
 		for i := range newVS.Spec.Http {
 			// Initialize headers if nil
@@ -713,12 +715,20 @@ func (c *Client) createVirtualServiceWithGateway(ctx context.Context, slug, tena
 			if newVS.Spec.Http[i].Headers.Request.Set == nil {
 				newVS.Spec.Http[i].Headers.Request.Set = make(map[string]string)
 			}
-			// Set the X-Vendor-ID header to the tenant UUID
+			// Set tenant identification headers
+			// X-Vendor-ID: Tenant UUID for API services
 			newVS.Spec.Http[i].Headers.Request.Set["X-Vendor-ID"] = tenantID
-			// Also set X-Tenant-ID for backwards compatibility
+			// X-Tenant-ID: Tenant UUID (same as Vendor-ID, for compatibility)
 			newVS.Spec.Http[i].Headers.Request.Set["X-Tenant-ID"] = tenantID
+			// X-Tenant-Slug: Tenant slug for storefront resolution
+			newVS.Spec.Http[i].Headers.Request.Set["X-Tenant-Slug"] = slug
+			// X-Custom-Domain: Set the custom domain host if this is a custom domain VS
+			if isCustomDomain {
+				newVS.Spec.Http[i].Headers.Request.Set["X-Custom-Domain"] = tenantHost
+			}
 		}
-		log.Printf("[K8s] Injected X-Vendor-ID header for tenant %s (UUID: %s)", slug, tenantID)
+		log.Printf("[K8s] Injected tenant headers for %s (UUID: %s, slug: %s, customDomain: %v)",
+			slug, tenantID, slug, isCustomDomain)
 	}
 
 	// Create the new VirtualService
