@@ -63,12 +63,10 @@ func (s *DomainService) CreateDomain(ctx context.Context, tenantID uuid.UUID, re
 		return nil, fmt.Errorf("invalid domain format: %w", err)
 	}
 
-	// For storefront domains, validate that it's a subdomain (apex not supported)
+	// Note: Apex domains are now supported - we use A records pointing to gateway IP
 	targetType := req.TargetType
-	if targetType == "" || targetType == models.TargetTypeStorefront {
-		if err := s.dnsVerifier.ValidateStorefrontDomain(domainName); err != nil {
-			return nil, fmt.Errorf("storefront domain validation failed: %w", err)
-		}
+	if targetType == "" {
+		targetType = models.TargetTypeStorefront
 	}
 
 	// Check if domain already exists
@@ -186,12 +184,8 @@ func (s *DomainService) ValidateDomain(ctx context.Context, req *ValidateDomainR
 		return response, nil
 	}
 
-	// Validate that it's a subdomain (apex domains not supported for storefront)
-	// This is enforced during onboarding since storefronts are the default target type
-	if err := s.dnsVerifier.ValidateStorefrontDomain(domainName); err != nil {
-		response.Message = err.Error()
-		return response, nil
-	}
+	// Note: Apex domains are now supported - we use A records pointing to gateway IP
+	// instead of CNAME records which don't work for apex domains
 
 	response.Valid = true
 
