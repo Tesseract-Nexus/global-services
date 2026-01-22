@@ -327,13 +327,16 @@ func (c *Client) FindGatewayByName(ctx context.Context, gwName string) (string, 
 // - Replaces CORS origins with tenant-specific domains for security isolation
 // - Adds shared domains (onboarding) that may be needed for cross-origin flows
 // - Preserves all route matching rules, destinations, and service configurations
-func (c *Client) CreateTenantVirtualService(ctx context.Context, slug, tenantID, templateVSName, tenantHost, adminHost, storefrontHost string) error {
-	return c.CreateTenantVirtualServiceWithSuffix(ctx, slug, tenantID, templateVSName, tenantHost, adminHost, storefrontHost, "")
+func (c *Client) CreateTenantVirtualService(ctx context.Context, slug, tenantID, templateVSName, tenantHost, adminHost, storefrontHost string, cloudflareProxied bool) error {
+	return c.CreateTenantVirtualServiceWithSuffix(ctx, slug, tenantID, templateVSName, tenantHost, adminHost, storefrontHost, "", cloudflareProxied)
 }
 
 // CreateTenantVirtualServiceWithSuffix creates a new VirtualService for a tenant with an optional name suffix
 // The suffix is used when creating multiple VirtualServices from the same template (e.g., storefront + www)
-func (c *Client) CreateTenantVirtualServiceWithSuffix(ctx context.Context, slug, tenantID, templateVSName, tenantHost, adminHost, storefrontHost, nameSuffix string) error {
+// cloudflareProxied controls the external-dns.alpha.kubernetes.io/cloudflare-proxied annotation:
+// - true: DNS record will be proxied through Cloudflare (orange cloud) - use for default domain tenants
+// - false: DNS record will be DNS-only (gray cloud) - use for custom domain tenants' platform subdomains (CNAME targets)
+func (c *Client) CreateTenantVirtualServiceWithSuffix(ctx context.Context, slug, tenantID, templateVSName, tenantHost, adminHost, storefrontHost, nameSuffix string, cloudflareProxied bool) error {
 	// Find the template VirtualService
 	vsLocation, err := c.FindVirtualServiceByName(ctx, templateVSName)
 	if err != nil {
@@ -375,6 +378,15 @@ func (c *Client) CreateTenantVirtualServiceWithSuffix(ctx context.Context, slug,
 	// Create a new VirtualService by deep copying the template
 	// This preserves all routes, timeouts, retries, destinations, and other configurations
 	newVS := templateVS.DeepCopy()
+
+	// Determine cloudflare-proxied annotation value
+	// - "true": DNS will be proxied through Cloudflare (DDoS protection, WAF)
+	// - "false": DNS-only mode, allows external domains to CNAME to this host
+	cloudflareProxiedValue := "false"
+	if cloudflareProxied {
+		cloudflareProxiedValue = "true"
+	}
+
 	newVS.ObjectMeta = metav1.ObjectMeta{
 		Name:      newVSName,
 		Namespace: vsLocation.Namespace,
@@ -384,10 +396,11 @@ func (c *Client) CreateTenantVirtualServiceWithSuffix(ctx context.Context, slug,
 			"tenant-slug":                  slug,
 		},
 		Annotations: map[string]string{
-			"tenant-router-service/created-from":     templateVSName,
-			"tenant-router-service/tenant-slug":      slug,
-			"tenant-router-service/admin-host":       adminHost,
-			"tenant-router-service/storefront-host":  storefrontHost,
+			"tenant-router-service/created-from":                templateVSName,
+			"tenant-router-service/tenant-slug":                 slug,
+			"tenant-router-service/admin-host":                  adminHost,
+			"tenant-router-service/storefront-host":             storefrontHost,
+			"external-dns.alpha.kubernetes.io/cloudflare-proxied": cloudflareProxiedValue,
 		},
 	}
 

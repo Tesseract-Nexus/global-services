@@ -586,9 +586,11 @@ func (r *TenantReconciler) reconcileCreate(ctx context.Context, event *models.Te
 
 	// 5. Storefront www VirtualService (only for custom domains with www subdomain)
 	// Use "www" suffix to create unique VS name (e.g., custom-store-storefront-www-vs)
+	// Custom domain's www subdomain - we don't control this DNS, so proxied setting doesn't matter
+	// but we set it to false for consistency with other custom domain resources
 	if record.StorefrontWwwHost != "" && !record.StorefrontWwwVSPatched {
 		log.Printf("[Reconciler] Creating www VirtualService for %s (host: %s)", record.Slug, record.StorefrontWwwHost)
-		if err := r.reconcileVirtualServiceWithSuffix(ctx, record, r.config.Kubernetes.StorefrontVSName, record.StorefrontWwwHost, "add", "www"); err != nil {
+		if err := r.reconcileVirtualServiceWithSuffix(ctx, record, r.config.Kubernetes.StorefrontVSName, record.StorefrontWwwHost, "add", "www", false); err != nil {
 			conditions = append(conditions, Condition{
 				Type:               ConditionStorefrontWwwConfigured,
 				Status:             StatusFalse,
@@ -640,28 +642,33 @@ func (r *TenantReconciler) reconcileCreate(ctx context.Context, event *models.Te
 	// 7. For custom domain tenants, also create platform subdomain VirtualServices
 	// These serve as CNAME targets (e.g., custom-store.tesserix.app -> Cloudflare Tunnel)
 	// Users can then CNAME their custom domain to these platform subdomains
+	// IMPORTANT: cloudflareProxied=false so external domains can CNAME to these hosts
+	// (Cloudflare blocks cross-account CNAME to proxied records)
 	if record.IsCustomDomain {
 		platformBaseDomain := r.config.Domain.BaseDomain
 
 		// Platform admin host (e.g., custom-store-admin.tesserix.app)
+		// cloudflareProxied=false to allow external CNAME
 		platformAdminHost := fmt.Sprintf("%s-admin.%s", record.Slug, platformBaseDomain)
-		log.Printf("[Reconciler] Creating platform admin VirtualService for %s (host: %s)", record.Slug, platformAdminHost)
-		if err := r.reconcileVirtualServiceWithSuffix(ctx, record, r.config.Kubernetes.AdminVSName, platformAdminHost, "add", "platform"); err != nil {
+		log.Printf("[Reconciler] Creating platform admin VirtualService for %s (host: %s, proxied=false)", record.Slug, platformAdminHost)
+		if err := r.reconcileVirtualServiceWithSuffix(ctx, record, r.config.Kubernetes.AdminVSName, platformAdminHost, "add", "platform", false); err != nil {
 			log.Printf("[Reconciler] Warning: Failed to create platform admin VS for %s: %v", record.Slug, err)
 			// Don't fail - custom domain VS is the primary, platform is supplementary
 		}
 
 		// Platform storefront host (e.g., custom-store.tesserix.app)
+		// cloudflareProxied=false to allow external CNAME
 		platformStorefrontHost := fmt.Sprintf("%s.%s", record.Slug, platformBaseDomain)
-		log.Printf("[Reconciler] Creating platform storefront VirtualService for %s (host: %s)", record.Slug, platformStorefrontHost)
-		if err := r.reconcileVirtualServiceWithSuffix(ctx, record, r.config.Kubernetes.StorefrontVSName, platformStorefrontHost, "add", "platform"); err != nil {
+		log.Printf("[Reconciler] Creating platform storefront VirtualService for %s (host: %s, proxied=false)", record.Slug, platformStorefrontHost)
+		if err := r.reconcileVirtualServiceWithSuffix(ctx, record, r.config.Kubernetes.StorefrontVSName, platformStorefrontHost, "add", "platform", false); err != nil {
 			log.Printf("[Reconciler] Warning: Failed to create platform storefront VS for %s: %v", record.Slug, err)
 		}
 
 		// Platform API host (e.g., custom-store-api.tesserix.app)
+		// cloudflareProxied=false to allow external CNAME
 		platformAPIHost := fmt.Sprintf("%s-api.%s", record.Slug, platformBaseDomain)
-		log.Printf("[Reconciler] Creating platform API VirtualService for %s (host: %s)", record.Slug, platformAPIHost)
-		if err := r.reconcileVirtualServiceWithSuffix(ctx, record, r.config.Kubernetes.APIVSName, platformAPIHost, "add", "platform"); err != nil {
+		log.Printf("[Reconciler] Creating platform API VirtualService for %s (host: %s, proxied=false)", record.Slug, platformAPIHost)
+		if err := r.reconcileVirtualServiceWithSuffix(ctx, record, r.config.Kubernetes.APIVSName, platformAPIHost, "add", "platform", false); err != nil {
 			log.Printf("[Reconciler] Warning: Failed to create platform API VS for %s: %v", record.Slug, err)
 		}
 	}
@@ -832,19 +839,27 @@ func (r *TenantReconciler) reconcileGateway(ctx context.Context, record *models.
 
 // reconcileVirtualService creates or deletes a tenant-specific VirtualService
 // Uses the multi-tenant isolation pattern - each tenant gets their own VS instead of patching shared ones
+// cloudflareProxied controls whether the DNS record should be proxied through Cloudflare:
+// - true for default domain tenants (protected by Cloudflare)
+// - false for custom domain tenants' platform subdomains (allows external CNAME)
 func (r *TenantReconciler) reconcileVirtualService(ctx context.Context, record *models.TenantHostRecord, templateVSName, host, operation string) error {
-	return r.reconcileVirtualServiceWithSuffix(ctx, record, templateVSName, host, operation, "")
+	// Default domain tenants get Cloudflare proxy enabled for protection
+	// Custom domain tenants get proxy disabled so external domains can CNAME to them
+	cloudflareProxied := !record.IsCustomDomain
+	return r.reconcileVirtualServiceWithSuffix(ctx, record, templateVSName, host, operation, "", cloudflareProxied)
 }
 
 // reconcileVirtualServiceWithSuffix creates or deletes a tenant-specific VirtualService with an optional name suffix
 // The suffix is used when creating multiple VirtualServices from the same template (e.g., storefront + www)
-func (r *TenantReconciler) reconcileVirtualServiceWithSuffix(ctx context.Context, record *models.TenantHostRecord, templateVSName, host, operation, nameSuffix string) error {
+// cloudflareProxied controls the external-dns cloudflare-proxied annotation for DNS record creation
+func (r *TenantReconciler) reconcileVirtualServiceWithSuffix(ctx context.Context, record *models.TenantHostRecord, templateVSName, host, operation, nameSuffix string, cloudflareProxied bool) error {
 	startTime := time.Now()
 
 	if operation == "add" {
 		// Create a new VirtualService for this tenant by copying the template
 		// Pass tenantID for X-Vendor-ID header injection and adminHost/storefrontHost for CORS policy
-		err := r.k8sClient.CreateTenantVirtualServiceWithSuffix(ctx, record.Slug, record.TenantID, templateVSName, host, record.AdminHost, record.StorefrontHost, nameSuffix)
+		// Pass cloudflareProxied to control whether DNS should be proxied through Cloudflare
+		err := r.k8sClient.CreateTenantVirtualServiceWithSuffix(ctx, record.Slug, record.TenantID, templateVSName, host, record.AdminHost, record.StorefrontHost, nameSuffix, cloudflareProxied)
 		if err != nil {
 			r.logActivity(ctx, record.ID, fmt.Sprintf("create_%s_%s", templateVSName, nameSuffix), "VirtualService", "", false, err.Error(), time.Since(startTime))
 			return err
