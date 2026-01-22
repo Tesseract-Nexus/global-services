@@ -328,6 +328,12 @@ func (c *Client) FindGatewayByName(ctx context.Context, gwName string) (string, 
 // - Adds shared domains (onboarding) that may be needed for cross-origin flows
 // - Preserves all route matching rules, destinations, and service configurations
 func (c *Client) CreateTenantVirtualService(ctx context.Context, slug, tenantID, templateVSName, tenantHost, adminHost, storefrontHost string) error {
+	return c.CreateTenantVirtualServiceWithSuffix(ctx, slug, tenantID, templateVSName, tenantHost, adminHost, storefrontHost, "")
+}
+
+// CreateTenantVirtualServiceWithSuffix creates a new VirtualService for a tenant with an optional name suffix
+// The suffix is used when creating multiple VirtualServices from the same template (e.g., storefront + www)
+func (c *Client) CreateTenantVirtualServiceWithSuffix(ctx context.Context, slug, tenantID, templateVSName, tenantHost, adminHost, storefrontHost, nameSuffix string) error {
 	// Find the template VirtualService
 	vsLocation, err := c.FindVirtualServiceByName(ctx, templateVSName)
 	if err != nil {
@@ -351,6 +357,12 @@ func (c *Client) CreateTenantVirtualService(ctx context.Context, slug, tenantID,
 		newVSName = fmt.Sprintf("%s-api-vs", slug)
 	default:
 		newVSName = fmt.Sprintf("%s-storefront-vs", slug)
+	}
+
+	// Apply suffix if provided (e.g., for www subdomain: custom-store-storefront-www-vs)
+	if nameSuffix != "" {
+		// Insert suffix before "-vs"
+		newVSName = fmt.Sprintf("%s-%s-vs", newVSName[:len(newVSName)-3], nameSuffix)
 	}
 
 	// Check if VS already exists (idempotent operation)

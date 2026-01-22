@@ -585,9 +585,10 @@ func (r *TenantReconciler) reconcileCreate(ctx context.Context, event *models.Te
 	}
 
 	// 5. Storefront www VirtualService (only for custom domains with www subdomain)
+	// Use "www" suffix to create unique VS name (e.g., custom-store-storefront-www-vs)
 	if record.StorefrontWwwHost != "" && !record.StorefrontWwwVSPatched {
 		log.Printf("[Reconciler] Creating www VirtualService for %s (host: %s)", record.Slug, record.StorefrontWwwHost)
-		if err := r.reconcileVirtualService(ctx, record, r.config.Kubernetes.StorefrontVSName, record.StorefrontWwwHost, "add"); err != nil {
+		if err := r.reconcileVirtualServiceWithSuffix(ctx, record, r.config.Kubernetes.StorefrontVSName, record.StorefrontWwwHost, "add", "www"); err != nil {
 			conditions = append(conditions, Condition{
 				Type:               ConditionStorefrontWwwConfigured,
 				Status:             StatusFalse,
@@ -634,6 +635,35 @@ func (r *TenantReconciler) reconcileCreate(ctx context.Context, event *models.Te
 			Reason:             ReasonProvisioned,
 			Message:            "API VirtualService configured successfully",
 		})
+	}
+
+	// 7. For custom domain tenants, also create platform subdomain VirtualServices
+	// These serve as CNAME targets (e.g., custom-store.tesserix.app -> Cloudflare Tunnel)
+	// Users can then CNAME their custom domain to these platform subdomains
+	if record.IsCustomDomain {
+		platformBaseDomain := r.config.Domain.BaseDomain
+
+		// Platform admin host (e.g., custom-store-admin.tesserix.app)
+		platformAdminHost := fmt.Sprintf("%s-admin.%s", record.Slug, platformBaseDomain)
+		log.Printf("[Reconciler] Creating platform admin VirtualService for %s (host: %s)", record.Slug, platformAdminHost)
+		if err := r.reconcileVirtualServiceWithSuffix(ctx, record, r.config.Kubernetes.AdminVSName, platformAdminHost, "add", "platform"); err != nil {
+			log.Printf("[Reconciler] Warning: Failed to create platform admin VS for %s: %v", record.Slug, err)
+			// Don't fail - custom domain VS is the primary, platform is supplementary
+		}
+
+		// Platform storefront host (e.g., custom-store.tesserix.app)
+		platformStorefrontHost := fmt.Sprintf("%s.%s", record.Slug, platformBaseDomain)
+		log.Printf("[Reconciler] Creating platform storefront VirtualService for %s (host: %s)", record.Slug, platformStorefrontHost)
+		if err := r.reconcileVirtualServiceWithSuffix(ctx, record, r.config.Kubernetes.StorefrontVSName, platformStorefrontHost, "add", "platform"); err != nil {
+			log.Printf("[Reconciler] Warning: Failed to create platform storefront VS for %s: %v", record.Slug, err)
+		}
+
+		// Platform API host (e.g., custom-store-api.tesserix.app)
+		platformAPIHost := fmt.Sprintf("%s-api.%s", record.Slug, platformBaseDomain)
+		log.Printf("[Reconciler] Creating platform API VirtualService for %s (host: %s)", record.Slug, platformAPIHost)
+		if err := r.reconcileVirtualServiceWithSuffix(ctx, record, r.config.Kubernetes.APIVSName, platformAPIHost, "add", "platform"); err != nil {
+			log.Printf("[Reconciler] Warning: Failed to create platform API VS for %s: %v", record.Slug, err)
+		}
 	}
 
 	// All resources provisioned - mark as ready
@@ -803,14 +833,20 @@ func (r *TenantReconciler) reconcileGateway(ctx context.Context, record *models.
 // reconcileVirtualService creates or deletes a tenant-specific VirtualService
 // Uses the multi-tenant isolation pattern - each tenant gets their own VS instead of patching shared ones
 func (r *TenantReconciler) reconcileVirtualService(ctx context.Context, record *models.TenantHostRecord, templateVSName, host, operation string) error {
+	return r.reconcileVirtualServiceWithSuffix(ctx, record, templateVSName, host, operation, "")
+}
+
+// reconcileVirtualServiceWithSuffix creates or deletes a tenant-specific VirtualService with an optional name suffix
+// The suffix is used when creating multiple VirtualServices from the same template (e.g., storefront + www)
+func (r *TenantReconciler) reconcileVirtualServiceWithSuffix(ctx context.Context, record *models.TenantHostRecord, templateVSName, host, operation, nameSuffix string) error {
 	startTime := time.Now()
 
 	if operation == "add" {
 		// Create a new VirtualService for this tenant by copying the template
 		// Pass tenantID for X-Vendor-ID header injection and adminHost/storefrontHost for CORS policy
-		err := r.k8sClient.CreateTenantVirtualService(ctx, record.Slug, record.TenantID, templateVSName, host, record.AdminHost, record.StorefrontHost)
+		err := r.k8sClient.CreateTenantVirtualServiceWithSuffix(ctx, record.Slug, record.TenantID, templateVSName, host, record.AdminHost, record.StorefrontHost, nameSuffix)
 		if err != nil {
-			r.logActivity(ctx, record.ID, fmt.Sprintf("create_%s", templateVSName), "VirtualService", "", false, err.Error(), time.Since(startTime))
+			r.logActivity(ctx, record.ID, fmt.Sprintf("create_%s_%s", templateVSName, nameSuffix), "VirtualService", "", false, err.Error(), time.Since(startTime))
 			return err
 		}
 
@@ -820,16 +856,23 @@ func (r *TenantReconciler) reconcileVirtualService(ctx context.Context, record *
 			ns = vsLocation.Namespace
 		}
 
-		switch templateVSName {
-		case r.config.Kubernetes.AdminVSName:
-			r.repo.UpdateProvisioningState(ctx, record.Slug, "admin_vs_patched", true, ns)
-		case r.config.Kubernetes.StorefrontVSName:
-			r.repo.UpdateProvisioningState(ctx, record.Slug, "storefront_vs_patched", true, ns)
-		case r.config.Kubernetes.APIVSName:
-			r.repo.UpdateProvisioningState(ctx, record.Slug, "api_vs_patched", true, ns)
+		// Only update provisioning state for non-suffixed VS (primary VS)
+		if nameSuffix == "" {
+			switch templateVSName {
+			case r.config.Kubernetes.AdminVSName:
+				r.repo.UpdateProvisioningState(ctx, record.Slug, "admin_vs_patched", true, ns)
+			case r.config.Kubernetes.StorefrontVSName:
+				r.repo.UpdateProvisioningState(ctx, record.Slug, "storefront_vs_patched", true, ns)
+			case r.config.Kubernetes.APIVSName:
+				r.repo.UpdateProvisioningState(ctx, record.Slug, "api_vs_patched", true, ns)
+			}
 		}
 
-		r.logActivity(ctx, record.ID, fmt.Sprintf("create_%s", templateVSName), "VirtualService", ns, true, "", time.Since(startTime))
+		logSuffix := ""
+		if nameSuffix != "" {
+			logSuffix = "_" + nameSuffix
+		}
+		r.logActivity(ctx, record.ID, fmt.Sprintf("create_%s%s", templateVSName, logSuffix), "VirtualService", ns, true, "", time.Since(startTime))
 	} else if operation == "remove" {
 		// Delete the tenant's VirtualService
 		err := r.k8sClient.DeleteTenantVirtualService(ctx, record.Slug, templateVSName)
