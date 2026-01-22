@@ -25,7 +25,7 @@ import (
 )
 
 func main() {
-	log.Println("Starting tenant-router-service v2.0.2-debug (internal mode)...")
+	log.Println("Starting tenant-router-service...")
 
 	// Load configuration
 	cfg := config.LoadConfig()
@@ -87,8 +87,7 @@ func main() {
 			natsSubscriber = nil // Set to nil so health check knows NATS is not active
 		}
 	}
-	log.Println("[DEBUG-A] After NATS Start block")
-	log.Println("[DEBUG] NATS setup complete, initializing health handler...")
+
 	// Initialize health handler
 	healthHandler := handlers.NewHealthHandler(k8sClient, natsSubscriber, db)
 
@@ -153,11 +152,9 @@ func main() {
 			}
 		}
 	}()
-	log.Println("[DEBUG] Cleanup goroutine started, setting up gateway sync...")
 
 	// Start gateway IP sync job (syncs custom domain gateway IP to Redis)
 	// This enables other services (like tenant-service) to fetch the IP without K8s API access
-	log.Printf("[GatewaySync] Redis client is nil: %v", redis == nil)
 	if redis != nil {
 		log.Println("[GatewaySync] Starting gateway IP sync goroutine")
 		go func() {
@@ -166,7 +163,6 @@ func main() {
 			defer ticker.Stop()
 
 			// Sync immediately at startup
-			log.Println("[GatewaySync] Syncing gateway IP immediately")
 			syncGatewayIP(ctx, k8sClient, redis)
 
 			for {
