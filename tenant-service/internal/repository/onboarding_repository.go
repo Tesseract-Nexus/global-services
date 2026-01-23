@@ -178,6 +178,32 @@ func (r *OnboardingRepository) GetCompletedSessionByTenantID(ctx context.Context
 	return &session, nil
 }
 
+// GetPendingSessionByEmail finds a pending onboarding session by primary contact email
+// Used for resending verification emails when the token has expired
+func (r *OnboardingRepository) GetPendingSessionByEmail(ctx context.Context, email string) (*models.OnboardingSession, error) {
+	var session models.OnboardingSession
+
+	// Join with contact_information to find session by email
+	// Only return sessions that are pending or in_progress (not completed/failed)
+	err := r.db.WithContext(ctx).
+		Joins("JOIN contact_information ON contact_information.onboarding_session_id = onboarding_sessions.id").
+		Where("LOWER(contact_information.email) = LOWER(?) AND contact_information.is_primary = true", email).
+		Where("onboarding_sessions.status IN ?", []string{"pending", "in_progress"}).
+		Preload("ContactInformation").
+		Preload("BusinessInformation").
+		Order("onboarding_sessions.created_at DESC"). // Get the most recent session
+		First(&session).Error
+
+	if err == gorm.ErrRecordNotFound {
+		return nil, nil // No session found
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get session by email: %w", err)
+	}
+
+	return &session, nil
+}
+
 // UpdateSessionProgress updates session progress and marks draft as updated
 func (r *OnboardingRepository) UpdateSessionProgress(ctx context.Context, sessionID uuid.UUID, currentStep string, progressPercentage int) error {
 	now := time.Now()

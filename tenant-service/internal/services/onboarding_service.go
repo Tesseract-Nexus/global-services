@@ -292,6 +292,12 @@ func (s *OnboardingService) GetOnboardingSession(ctx context.Context, sessionID 
 	return s.onboardingRepo.GetSessionByID(ctx, sessionID, includeRelations)
 }
 
+// GetPendingSessionByEmail finds a pending onboarding session by email address
+// This is used for resending verification emails when the link has expired
+func (s *OnboardingService) GetPendingSessionByEmail(ctx context.Context, email string) (*models.OnboardingSession, error) {
+	return s.onboardingRepo.GetPendingSessionByEmail(ctx, email)
+}
+
 // SaveApplicationConfiguration saves or updates an application configuration for a session
 func (s *OnboardingService) SaveApplicationConfiguration(ctx context.Context, sessionID uuid.UUID, config *models.ApplicationConfiguration) (*models.ApplicationConfiguration, error) {
 	// Verify session exists and is active

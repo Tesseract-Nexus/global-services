@@ -196,6 +196,52 @@ func (h *VerificationHandler) ResendVerificationCode(c *gin.Context) {
 	SuccessResponse(c, http.StatusOK, "Verification code resent", response)
 }
 
+// ResendVerificationByEmail resends verification email using only email address
+// This is used when a verification link has expired and the user doesn't have the session ID
+func (h *VerificationHandler) ResendVerificationByEmail(c *gin.Context) {
+	var req struct {
+		Email string `json:"email" binding:"required,email"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Valid email is required", err)
+		return
+	}
+
+	// Find the pending session by email
+	session, err := h.onboardingService.GetPendingSessionByEmail(c.Request.Context(), req.Email)
+	if err != nil {
+		log.Printf("[VerificationHandler] Error looking up session by email: %v", err)
+		ErrorResponse(c, http.StatusInternalServerError, "Failed to lookup session", err)
+		return
+	}
+
+	if session == nil {
+		// Don't reveal whether email exists - return generic success for security
+		log.Printf("[VerificationHandler] No pending session found for email, returning success anyway")
+		SuccessResponse(c, http.StatusOK, "If your email is registered, you will receive a new verification link", nil)
+		return
+	}
+
+	// Resend verification email
+	record, err := h.verificationService.ResendVerificationCode(c.Request.Context(), session.ID, "email", req.Email)
+	if err != nil {
+		log.Printf("[VerificationHandler] Failed to resend verification: %v", err)
+		ErrorResponse(c, http.StatusInternalServerError, "Failed to resend verification email", err)
+		return
+	}
+
+	log.Printf("[VerificationHandler] Resent verification email for session %s", session.ID)
+
+	response := map[string]interface{}{
+		"id":         record.ID,
+		"status":     record.Status,
+		"expires_at": record.ExpiresAt,
+	}
+
+	SuccessResponse(c, http.StatusOK, "Verification email sent", response)
+}
+
 // GetVerificationStatus gets verification status for a session
 func (h *VerificationHandler) GetVerificationStatus(c *gin.Context) {
 	sessionID, err := uuid.Parse(c.Param("sessionId"))

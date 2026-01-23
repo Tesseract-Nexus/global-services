@@ -487,6 +487,7 @@ func setupRouter(
 			verify.POST("/token", verificationHandler.VerifyByToken)
 			verify.GET("/token-info", verificationHandler.GetTokenInfo)
 			verify.POST("/token-info", verificationHandler.GetTokenInfoPost)
+			verify.POST("/resend-by-email", verificationHandler.ResendVerificationByEmail)
 		}
 
 		// Public invitation acceptance (no auth)
