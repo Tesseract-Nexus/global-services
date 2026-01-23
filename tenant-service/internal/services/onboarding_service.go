@@ -1857,10 +1857,14 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 		log.Printf("[OnboardingService] WARNING: Tenant router client not initialized")
 	}
 
-	// If custom domain was specified, create it in custom-domain-service
+	// If custom domain was specified, create all domain entries in custom-domain-service
+	// This includes: storefront (apex domain), admin subdomain, and API subdomain
 	if useCustomDomain && customDomain != "" && s.customDomainClient != nil {
-		log.Printf("[OnboardingService] Creating custom domain %s for tenant %s", customDomain, tenantID)
-		domainReq := &clients.CreateDomainRequest{
+		log.Printf("[OnboardingService] Creating custom domains for tenant %s: storefront=%s, admin=%s, api=%s",
+			tenantID, customDomain, adminHost, apiHost)
+
+		// 1. Create storefront domain (apex domain - e.g., yahvismartfarm.com)
+		storefrontDomainReq := &clients.CreateDomainRequest{
 			Domain:      customDomain,
 			TargetType:  "storefront",
 			RedirectWWW: true,
@@ -1868,13 +1872,46 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 			IsPrimary:   true,
 		}
 		domainCtx, domainCancel := context.WithTimeout(context.Background(), 30*time.Second)
-		domainResp, domainErr := s.customDomainClient.CreateDomain(domainCtx, tenantID.String(), domainReq)
+		storefrontResp, storefrontErr := s.customDomainClient.CreateDomain(domainCtx, tenantID.String(), storefrontDomainReq)
 		domainCancel()
-		if domainErr != nil {
-			// Log but don't fail - custom domain is not critical for basic tenant operation
-			log.Printf("[OnboardingService] WARNING: Failed to create custom domain %s for tenant %s: %v", customDomain, tenantID, domainErr)
+		if storefrontErr != nil {
+			log.Printf("[OnboardingService] WARNING: Failed to create storefront domain %s: %v", customDomain, storefrontErr)
 		} else {
-			log.Printf("[OnboardingService] Created custom domain %s for tenant %s (status: %s)", customDomain, tenantID, domainResp.Status)
+			log.Printf("[OnboardingService] Created storefront domain %s (status: %s)", customDomain, storefrontResp.Status)
+		}
+
+		// 2. Create admin domain (e.g., admin.yahvismartfarm.com)
+		adminDomainReq := &clients.CreateDomainRequest{
+			Domain:      adminHost,
+			TargetType:  "admin",
+			RedirectWWW: false, // No www redirect for admin subdomain
+			ForceHTTPS:  true,
+			IsPrimary:   false,
+		}
+		adminCtx, adminCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		adminResp, adminErr := s.customDomainClient.CreateDomain(adminCtx, tenantID.String(), adminDomainReq)
+		adminCancel()
+		if adminErr != nil {
+			log.Printf("[OnboardingService] WARNING: Failed to create admin domain %s: %v", adminHost, adminErr)
+		} else {
+			log.Printf("[OnboardingService] Created admin domain %s (status: %s)", adminHost, adminResp.Status)
+		}
+
+		// 3. Create API domain (e.g., api.yahvismartfarm.com)
+		apiDomainReq := &clients.CreateDomainRequest{
+			Domain:      apiHost,
+			TargetType:  "api",
+			RedirectWWW: false, // No www redirect for API subdomain
+			ForceHTTPS:  true,
+			IsPrimary:   false,
+		}
+		apiCtx, apiCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		apiResp, apiErr := s.customDomainClient.CreateDomain(apiCtx, tenantID.String(), apiDomainReq)
+		apiCancel()
+		if apiErr != nil {
+			log.Printf("[OnboardingService] WARNING: Failed to create API domain %s: %v", apiHost, apiErr)
+		} else {
+			log.Printf("[OnboardingService] Created API domain %s (status: %s)", apiHost, apiResp.Status)
 		}
 	} else if useCustomDomain && customDomain != "" && s.customDomainClient == nil {
 		log.Printf("[OnboardingService] WARNING: Custom domain requested but custom-domain-service client not initialized")
