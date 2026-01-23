@@ -403,7 +403,7 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
     });
 
     // Set session cookie with dynamic domain based on request host
-    const forwardedHost = request.headers['x-forwarded-host'] as string | undefined;
+    const forwardedHost = request.headers['x-forwarded-host'] as string || request.hostname;
     setSessionCookie(reply, session.id, forwardedHost, remember_me);
 
     logger.info({
@@ -578,7 +578,7 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
     });
 
     // Set session cookie with dynamic domain based on request host
-    const forwardedHost = request.headers['x-forwarded-host'] as string | undefined;
+    const forwardedHost = request.headers['x-forwarded-host'] as string || request.hostname;
     setSessionCookie(reply, session.id, forwardedHost, remember_me);
 
     logger.info({
@@ -856,7 +856,7 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
     });
 
     // Set session cookie with dynamic domain based on request host
-    const forwardedHost = request.headers['x-forwarded-host'] as string | undefined;
+    const forwardedHost = request.headers['x-forwarded-host'] as string || request.hostname;
     setSessionCookie(reply, session.id, forwardedHost, false);
 
     logger.info({

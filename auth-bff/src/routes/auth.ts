@@ -241,7 +241,7 @@ export async function authRoutes(fastify: FastifyInstance) {
       });
 
       // Set session cookie with dynamic domain for custom domain support
-      const forwardedHost = request.headers['x-forwarded-host'] as string | undefined;
+      const forwardedHost = request.headers['x-forwarded-host'] as string || request.hostname;
       setSessionCookie(reply, session.id, forwardedHost);
 
       logger.info({ userId: session.userId, sessionId: session.id, forwardedHost }, 'Authentication successful');
@@ -293,7 +293,7 @@ export async function authRoutes(fastify: FastifyInstance) {
       await sessionStore.deleteSession(session.id);
 
       // Clear cookie with dynamic domain for custom domain support
-      const forwardedHost = request.headers['x-forwarded-host'] as string | undefined;
+      const forwardedHost = request.headers['x-forwarded-host'] as string || request.hostname;
       clearSessionCookie(reply, forwardedHost);
 
       // Revoke tokens with Keycloak (but don't redirect to Keycloak UI)
@@ -327,7 +327,7 @@ export async function authRoutes(fastify: FastifyInstance) {
 
     if (session) {
       await sessionStore.deleteSession(session.id);
-      const forwardedHost = request.headers['x-forwarded-host'] as string | undefined;
+      const forwardedHost = request.headers['x-forwarded-host'] as string || request.hostname;
       clearSessionCookie(reply, forwardedHost);
 
       // Revoke tokens with Keycloak (but don't redirect to Keycloak UI)
@@ -368,7 +368,7 @@ export async function authRoutes(fastify: FastifyInstance) {
       // Session has expired - clear it
       logger.info({ sessionId: session.id }, 'Session expired');
       await sessionStore.deleteSession(session.id);
-      const forwardedHost = request.headers['x-forwarded-host'] as string | undefined;
+      const forwardedHost = request.headers['x-forwarded-host'] as string || request.hostname;
       clearSessionCookie(reply, forwardedHost);
       return reply.code(401).send({ authenticated: false, error: 'session_expired' });
     }
@@ -420,7 +420,7 @@ export async function authRoutes(fastify: FastifyInstance) {
     } catch (error) {
       logger.error({ error }, 'Token refresh failed');
       await sessionStore.deleteSession(session.id);
-      const forwardedHost = request.headers['x-forwarded-host'] as string | undefined;
+      const forwardedHost = request.headers['x-forwarded-host'] as string || request.hostname;
       clearSessionCookie(reply, forwardedHost);
       return reply.code(401).send({ error: 'refresh_failed' });
     }
@@ -627,7 +627,7 @@ export async function authRoutes(fastify: FastifyInstance) {
     });
 
     // Set session cookie for this domain with dynamic domain support
-    const forwardedHost = request.headers['x-forwarded-host'] as string | undefined;
+    const forwardedHost = request.headers['x-forwarded-host'] as string || request.hostname;
     setSessionCookie(reply, session.id, forwardedHost);
 
     logger.info({ userId: session.userId, sessionId: session.id, forwardedHost }, 'Session transfer accepted');
