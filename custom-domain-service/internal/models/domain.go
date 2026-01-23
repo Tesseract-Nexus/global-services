@@ -115,13 +115,17 @@ type CustomDomain struct {
 
 	// CNAME Delegation for automatic certificate management
 	// When enabled, certificates are issued via DNS-01 challenges instead of HTTP-01
-	// Customer adds: _acme-challenge.theirdomain.com CNAME theirdomain-com.acme.tesserix.app
+	// Customer adds: _acme-challenge.theirdomain.com CNAME theirdomain-com-{tenant-id}.acme.tesserix.app
 	// cert-manager follows the CNAME and creates TXT records in our Cloudflare zone
 	CNAMEDelegationEnabled       bool       `json:"cname_delegation_enabled" gorm:"column:ns_delegation_enabled;default:false"`
 	CNAMEDelegationVerified      bool       `json:"cname_delegation_verified" gorm:"column:ns_delegation_verified;default:false"`
 	CNAMEDelegationVerifiedAt    *time.Time `json:"cname_delegation_verified_at" gorm:"column:ns_delegation_verified_at"`
 	CNAMEDelegationCheckAttempts int        `json:"cname_delegation_check_attempts" gorm:"column:ns_delegation_check_attempts;default:0"`
 	CNAMEDelegationLastCheckedAt *time.Time `json:"cname_delegation_last_checked_at" gorm:"column:ns_delegation_last_checked_at"`
+	// CNAMEDelegationTarget stores the tenant-specific ACME challenge CNAME target
+	// Format: domain-com-{tenant-short-id}.acme.tesserix.app
+	// This is stored at domain creation for consistent verification and audit trail
+	CNAMEDelegationTarget string `json:"cname_delegation_target" gorm:"column:cname_delegation_target;size:255"`
 
 	// Overall Status
 	Status        DomainStatus `json:"status" gorm:"size:20;default:'pending';index"`

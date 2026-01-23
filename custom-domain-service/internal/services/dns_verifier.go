@@ -69,8 +69,15 @@ func (v *DNSVerifier) VerifyDomain(ctx context.Context, domain *models.CustomDom
 // VerifyCNAMEDelegation checks if _acme-challenge.{domain} CNAME points to our ACME zone
 // Customer adds: _acme-challenge.theirdomain.com CNAME theirdomain-com.acme.tesserix.app
 // This enables DNS-01 ACME challenges via CNAME following for automatic certificate management
+// Deprecated: Use VerifyCNAMEDelegationWithTarget for tenant-specific verification
 func (v *DNSVerifier) VerifyCNAMEDelegation(ctx context.Context, domain string) (*CNAMEDelegationResult, error) {
 	expectedTarget := v.GetCNAMEDelegationTarget(domain)
+	return v.VerifyCNAMEDelegationWithTarget(ctx, domain, expectedTarget)
+}
+
+// VerifyCNAMEDelegationWithTarget verifies CNAME delegation against a specific expected target
+// This should be used when the target is stored in the database (tenant-specific)
+func (v *DNSVerifier) VerifyCNAMEDelegationWithTarget(ctx context.Context, domain, expectedTarget string) (*CNAMEDelegationResult, error) {
 	result := &CNAMEDelegationResult{
 		CheckedAt:     time.Now(),
 		ExpectedCNAME: expectedTarget,
@@ -366,8 +373,12 @@ func (v *DNSVerifier) GetRequiredDNSRecords(domain *models.CustomDomain) []model
 	// This ensures each tenant gets a unique target, preventing cross-tenant certificate hijacking
 	if v.cfg.CNAMEDelegation.Enabled && domain.CNAMEDelegationEnabled {
 		challengeHost := "_acme-challenge." + domain.Domain
-		// Use tenant-specific CNAME target for security
-		target := v.GetCNAMEDelegationTargetForTenant(domain.Domain, domain.TenantID.String())
+		// Use stored CNAME target from database (tenant-specific)
+		// Fall back to generating if not stored (backward compatibility)
+		target := domain.CNAMEDelegationTarget
+		if target == "" {
+			target = v.GetCNAMEDelegationTargetForTenant(domain.Domain, domain.TenantID.String())
+		}
 		records = append(records, models.DNSRecord{
 			RecordType: "CNAME",
 			Host:       challengeHost,

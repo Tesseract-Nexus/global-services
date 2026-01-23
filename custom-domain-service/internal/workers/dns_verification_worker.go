@@ -135,6 +135,7 @@ func (w *DNSVerificationWorker) verifyDomain(ctx context.Context, domain *models
 }
 
 // verifyCNAMEDelegation checks if CNAME delegation is properly configured
+// Uses the stored CNAMEDelegationTarget from the database for security
 func (w *DNSVerificationWorker) verifyCNAMEDelegation(ctx context.Context, domain *models.CustomDomain) {
 	// Skip if already verified or too many attempts
 	if domain.CNAMEDelegationVerified {
@@ -154,8 +155,21 @@ func (w *DNSVerificationWorker) verifyCNAMEDelegation(ctx context.Context, domai
 		return
 	}
 
-	// Verify CNAME delegation
-	cnameResult, err := w.dnsVerifier.VerifyCNAMEDelegation(ctx, domain.Domain)
+	// Use the stored CNAME delegation target from the database
+	// This ensures we validate against the tenant-specific target that was assigned at domain creation
+	// If not stored (legacy domains), fall back to generating based on tenant ID
+	expectedTarget := domain.CNAMEDelegationTarget
+	if expectedTarget == "" {
+		// Fallback for domains created before CNAMEDelegationTarget was stored
+		expectedTarget = w.dnsVerifier.GetCNAMEDelegationTargetForTenant(domain.Domain, domain.TenantID.String())
+		log.Debug().
+			Str("domain", domain.Domain).
+			Str("generated_target", expectedTarget).
+			Msg("CNAME delegation target not stored, using generated target")
+	}
+
+	// Verify CNAME delegation against the stored/expected target
+	cnameResult, err := w.dnsVerifier.VerifyCNAMEDelegationWithTarget(ctx, domain.Domain, expectedTarget)
 	if err != nil {
 		log.Error().Err(err).Str("domain", domain.Domain).Msg("CNAME delegation verification error")
 		return
@@ -170,11 +184,13 @@ func (w *DNSVerificationWorker) verifyCNAMEDelegation(ctx context.Context, domai
 	if cnameResult.IsVerified {
 		log.Info().
 			Str("domain", domain.Domain).
-			Str("cname_target", cnameResult.FoundCNAME).
+			Str("expected_target", expectedTarget).
+			Str("found_cname", cnameResult.FoundCNAME).
 			Msg("CNAME delegation verified successfully - DNS-01 challenges now possible")
 	} else {
 		log.Debug().
 			Str("domain", domain.Domain).
+			Str("expected_target", expectedTarget).
 			Str("message", cnameResult.Message).
 			Msg("CNAME delegation not yet verified")
 	}

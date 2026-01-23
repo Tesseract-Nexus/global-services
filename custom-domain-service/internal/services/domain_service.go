@@ -109,18 +109,23 @@ func (s *DomainService) CreateDomain(ctx context.Context, tenantID uuid.UUID, re
 		targetType = models.TargetTypeStorefront
 	}
 
+	// Generate tenant-specific CNAME delegation target for automatic SSL
+	// This is stored in DB for consistent verification and audit trail
+	cnameDelegationTarget := s.dnsVerifier.GetCNAMEDelegationTargetForTenant(domainName, tenantID.String())
+
 	// Create domain record
 	domain := &models.CustomDomain{
-		TenantID:           tenantID,
-		TenantSlug:         tenant.Slug,
-		Domain:             domainName,
-		DomainType:         domainType,
-		TargetType:         targetType,
-		VerificationMethod: models.VerificationMethodTXT,
-		IncludeWWW:         req.IncludeWWW,
-		Status:             models.DomainStatusPending,
-		StatusMessage:      "Waiting for DNS verification",
-		CreatedBy:          createdBy,
+		TenantID:              tenantID,
+		TenantSlug:            tenant.Slug,
+		Domain:                domainName,
+		DomainType:            domainType,
+		TargetType:            targetType,
+		VerificationMethod:    models.VerificationMethodTXT,
+		IncludeWWW:            req.IncludeWWW,
+		Status:                models.DomainStatusPending,
+		StatusMessage:         "Waiting for DNS verification",
+		CreatedBy:             createdBy,
+		CNAMEDelegationTarget: cnameDelegationTarget, // Store tenant-specific target
 	}
 
 	if err := s.repo.Create(ctx, domain); err != nil {
@@ -283,18 +288,22 @@ func (s *DomainService) ValidateDomain(ctx context.Context, req *ValidateDomainR
 		if req.TenantID != "" {
 			tenantUUID, parseErr := uuid.Parse(req.TenantID)
 			if parseErr == nil {
+				// Generate tenant-specific CNAME delegation target for automatic SSL
+				cnameDelegationTarget := s.dnsVerifier.GetCNAMEDelegationTargetForTenant(domainName, req.TenantID)
+
 				// Create pending domain record linked to tenant
 				pendingDomain := &models.CustomDomain{
-					TenantID:           tenantUUID,
-					TenantSlug:         req.TenantSlug,
-					Domain:             domainName,
-					DomainType:         domainType,
-					TargetType:         models.TargetTypeStorefront,
-					VerificationMethod: models.VerificationMethodCNAME,
-					VerificationToken:  verificationToken,
-					SessionID:          req.SessionID, // Track session for audit/debugging
-					Status:             models.DomainStatusPending,
-					StatusMessage:      "Waiting for DNS verification",
+					TenantID:              tenantUUID,
+					TenantSlug:            req.TenantSlug,
+					Domain:                domainName,
+					DomainType:            domainType,
+					TargetType:            models.TargetTypeStorefront,
+					VerificationMethod:    models.VerificationMethodCNAME,
+					VerificationToken:     verificationToken,
+					SessionID:             req.SessionID, // Track session for audit/debugging
+					Status:                models.DomainStatusPending,
+					StatusMessage:         "Waiting for DNS verification",
+					CNAMEDelegationTarget: cnameDelegationTarget, // Store tenant-specific target for verification
 				}
 
 				if createErr := s.repo.Create(ctx, pendingDomain); createErr != nil {
@@ -1378,8 +1387,20 @@ func (s *DomainService) VerifyCNAMEDelegation(ctx context.Context, tenantID, dom
 		return nil, fmt.Errorf("CNAME delegation is not enabled for this domain")
 	}
 
-	// Verify CNAME delegation
-	cnameResult, err := s.dnsVerifier.VerifyCNAMEDelegation(ctx, domain.Domain)
+	// Use the stored CNAME delegation target from database for verification
+	// This ensures we verify against the exact target given to this tenant
+	expectedTarget := domain.CNAMEDelegationTarget
+	if expectedTarget == "" {
+		// Fallback: regenerate target if not stored (backward compatibility)
+		expectedTarget = s.dnsVerifier.GetCNAMEDelegationTargetForTenant(domain.Domain, domain.TenantID.String())
+		log.Warn().
+			Str("domain", domain.Domain).
+			Str("tenant_id", domain.TenantID.String()).
+			Msg("CNAME delegation target not stored in DB, regenerating")
+	}
+
+	// Verify CNAME delegation against the stored/expected target
+	cnameResult, err := s.dnsVerifier.VerifyCNAMEDelegationWithTarget(ctx, domain.Domain, expectedTarget)
 	if err != nil {
 		log.Error().Err(err).Str("domain", domain.Domain).Msg("CNAME delegation verification error")
 		return nil, fmt.Errorf("CNAME delegation verification failed: %w", err)
@@ -1438,8 +1459,21 @@ func (s *DomainService) EnableCNAMEDelegation(ctx context.Context, tenantID, dom
 
 // toCNAMEDelegationStatusResponse converts a domain to CNAME delegation status response
 func (s *DomainService) toCNAMEDelegationStatusResponse(domain *models.CustomDomain) *models.CNAMEDelegationStatusResponse {
-	// Use tenant-specific CNAME record for security
-	cnameRecord := s.dnsVerifier.GetCNAMEDelegationRecordForTenant(domain.Domain, domain.TenantID.String())
+	// Use stored CNAME target from database for consistency
+	// Fall back to generating if not stored (backward compatibility)
+	target := domain.CNAMEDelegationTarget
+	if target == "" {
+		target = s.dnsVerifier.GetCNAMEDelegationTargetForTenant(domain.Domain, domain.TenantID.String())
+	}
+
+	cnameRecord := &models.DNSRecord{
+		RecordType: "CNAME",
+		Host:       "_acme-challenge." + domain.Domain,
+		Value:      target,
+		TTL:        3600,
+		Purpose:    "cname_delegation (automatic SSL - tenant specific)",
+		IsVerified: domain.CNAMEDelegationVerified,
+	}
 
 	response := &models.CNAMEDelegationStatusResponse{
 		DomainID:          domain.ID,
