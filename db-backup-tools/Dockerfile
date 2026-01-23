@@ -20,19 +20,11 @@ RUN pg_dump --version && \
     gcloud --version && \
     gsutil --version
 
-# Create non-root user for running backups
-RUN addgroup -g 1000 -S backup && \
-    adduser -D -u 1000 -S backup -G backup
-
 # Create working directories
-RUN mkdir -p /backup /tmp/backups && \
-    chown -R backup:backup /backup /tmp/backups
+RUN mkdir -p /backup /tmp/backups
 
 # Set working directory
 WORKDIR /backup
-
-# Default to root for package operations, but scripts can switch to backup user
-# The CronJob will run as root to ensure GCS authentication works with Workload Identity
 
 # Labels
 LABEL org.opencontainers.image.title="db-backup-tools" \
