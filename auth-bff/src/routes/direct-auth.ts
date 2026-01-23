@@ -168,7 +168,13 @@ const setSessionCookie = (
   const maxAge = rememberMe ? config.session.maxAge * 7 : config.session.maxAge; // 7 days if remember me
   const domain = getCookieDomain(forwardedHost);
 
-  logger.debug({ domain, forwardedHost, sessionId: sessionId.substring(0, 8) + '...' }, 'Setting session cookie');
+  // Use info level for debugging in production
+  logger.info({
+    domain: domain || '(not set)',
+    forwardedHost: forwardedHost || '(not provided)',
+    sessionId: sessionId.substring(0, 8) + '...',
+    configuredDomain: config.session.cookieDomain || '(empty)',
+  }, 'Setting session cookie');
 
   reply.setCookie(config.session.cookieName, sessionId, {
     httpOnly: true,
