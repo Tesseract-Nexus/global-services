@@ -674,6 +674,11 @@ func autoMigrate(db *gorm.DB) error {
 		log.Printf("Warning: Failed to seed reserved slugs: %v", err)
 	}
 
+	// Populate URLs for existing tenants that don't have them set
+	if err := populateTenantURLs(db); err != nil {
+		log.Printf("Warning: Failed to populate tenant URLs: %v", err)
+	}
+
 	return nil
 }
 
@@ -1195,5 +1200,58 @@ func preMigrateUserModel(db *gorm.DB) error {
 	}
 
 	log.Println("User model pre-migration completed")
+	return nil
+}
+
+// populateTenantURLs sets default URLs for existing tenants that don't have them
+// This ensures all tenants (both custom domain and standard) have admin_url, storefront_url, api_url set
+func populateTenantURLs(db *gorm.DB) error {
+	// Get all tenants without admin_url set
+	var tenants []models.Tenant
+	if err := db.Where("admin_url IS NULL OR admin_url = ''").Find(&tenants).Error; err != nil {
+		return fmt.Errorf("failed to find tenants without URLs: %w", err)
+	}
+
+	if len(tenants) == 0 {
+		log.Println("All tenants already have URLs set")
+		return nil
+	}
+
+	log.Printf("Populating URLs for %d tenants...", len(tenants))
+
+	// Default base domain from environment
+	baseDomain := os.Getenv("BASE_DOMAIN")
+	if baseDomain == "" {
+		baseDomain = "tesserix.app"
+	}
+
+	for _, tenant := range tenants {
+		// Generate URLs based on whether tenant has custom domain
+		adminURL := fmt.Sprintf("https://%s-admin.%s", tenant.Slug, baseDomain)
+		storefrontURL := fmt.Sprintf("https://%s.%s", tenant.Slug, baseDomain)
+		apiURL := fmt.Sprintf("https://%s-api.%s", tenant.Slug, baseDomain)
+
+		// If tenant has custom domain set, use that instead
+		if tenant.CustomDomain != "" && tenant.UseCustomDomain {
+			adminURL = fmt.Sprintf("https://admin.%s", tenant.CustomDomain)
+			storefrontURL = fmt.Sprintf("https://%s", tenant.CustomDomain)
+			apiURL = fmt.Sprintf("https://api.%s", tenant.CustomDomain)
+		}
+
+		// Update tenant with URLs
+		updates := map[string]interface{}{
+			"admin_url":      adminURL,
+			"storefront_url": storefrontURL,
+			"api_url":        apiURL,
+		}
+		if err := db.Model(&models.Tenant{}).Where("id = ?", tenant.ID).Updates(updates).Error; err != nil {
+			log.Printf("Warning: Failed to update URLs for tenant %s: %v", tenant.Slug, err)
+			continue
+		}
+		log.Printf("Set URLs for tenant %s: admin=%s, storefront=%s, api=%s",
+			tenant.Slug, adminURL, storefrontURL, apiURL)
+	}
+
+	log.Println("Tenant URL population completed")
 	return nil
 }

@@ -98,6 +98,12 @@ type UserTenantSummary struct {
 	BusinessModel  string     `json:"business_model,omitempty"` // ONLINE_STORE or MARKETPLACE
 	LastAccessedAt *time.Time `json:"last_accessed_at,omitempty"`
 	CreatedAt      *time.Time `json:"created_at,omitempty"`
+	// Tenant URLs - for custom domain and standard domain tenants
+	AdminURL        string `json:"admin_url,omitempty"`         // e.g., https://admin.yahvismartfarm.com
+	StorefrontURL   string `json:"storefront_url,omitempty"`    // e.g., https://yahvismartfarm.com
+	APIURL          string `json:"api_url,omitempty"`           // e.g., https://api.yahvismartfarm.com
+	CustomDomain    string `json:"custom_domain,omitempty"`     // Base custom domain if set
+	UseCustomDomain bool   `json:"use_custom_domain,omitempty"` // Whether custom domain is active
 }
 
 // ResolveUserID maps a Keycloak user ID to the local user ID
@@ -130,19 +136,24 @@ func (s *MembershipService) GetUserTenants(ctx context.Context, userID uuid.UUID
 			continue
 		}
 		summaries = append(summaries, UserTenantSummary{
-			TenantID:       m.TenantID,
-			Slug:           m.Tenant.Slug,
-			Name:           m.Tenant.Name,
-			DisplayName:    m.Tenant.DisplayName,
-			LogoURL:        m.Tenant.LogoURL,
-			Role:           m.Role,
-			IsDefault:      m.IsDefault,
-			IsOwner:        m.Role == models.MembershipRoleOwner,
-			Status:         m.Tenant.Status,
-			PrimaryColor:   m.Tenant.PrimaryColor,
-			BusinessModel:  m.Tenant.BusinessModel,
-			LastAccessedAt: m.LastAccessedAt,
-			CreatedAt:      &m.Tenant.CreatedAt,
+			TenantID:        m.TenantID,
+			Slug:            m.Tenant.Slug,
+			Name:            m.Tenant.Name,
+			DisplayName:     m.Tenant.DisplayName,
+			LogoURL:         m.Tenant.LogoURL,
+			Role:            m.Role,
+			IsDefault:       m.IsDefault,
+			IsOwner:         m.Role == models.MembershipRoleOwner,
+			Status:          m.Tenant.Status,
+			PrimaryColor:    m.Tenant.PrimaryColor,
+			BusinessModel:   m.Tenant.BusinessModel,
+			LastAccessedAt:  m.LastAccessedAt,
+			CreatedAt:       &m.Tenant.CreatedAt,
+			AdminURL:        m.Tenant.AdminURL,
+			StorefrontURL:   m.Tenant.StorefrontURL,
+			APIURL:          m.Tenant.APIURL,
+			CustomDomain:    m.Tenant.CustomDomain,
+			UseCustomDomain: m.Tenant.UseCustomDomain,
 		})
 	}
 
@@ -160,18 +171,23 @@ func (s *MembershipService) GetAllTenants(ctx context.Context) ([]UserTenantSumm
 	summaries := make([]UserTenantSummary, 0, len(tenants))
 	for _, t := range tenants {
 		summaries = append(summaries, UserTenantSummary{
-			TenantID:      t.ID,
-			Slug:          t.Slug,
-			Name:          t.Name,
-			DisplayName:   t.DisplayName,
-			LogoURL:       t.LogoURL,
-			Role:          "platform_admin", // Indicate platform-level access
-			IsDefault:     false,
-			IsOwner:       false,
-			Status:        t.Status,
-			PrimaryColor:  t.PrimaryColor,
-			BusinessModel: t.BusinessModel,
-			CreatedAt:     &t.CreatedAt,
+			TenantID:        t.ID,
+			Slug:            t.Slug,
+			Name:            t.Name,
+			DisplayName:     t.DisplayName,
+			LogoURL:         t.LogoURL,
+			Role:            "platform_admin", // Indicate platform-level access
+			IsDefault:       false,
+			IsOwner:         false,
+			Status:          t.Status,
+			PrimaryColor:    t.PrimaryColor,
+			BusinessModel:   t.BusinessModel,
+			CreatedAt:       &t.CreatedAt,
+			AdminURL:        t.AdminURL,
+			StorefrontURL:   t.StorefrontURL,
+			APIURL:          t.APIURL,
+			CustomDomain:    t.CustomDomain,
+			UseCustomDomain: t.UseCustomDomain,
 		})
 	}
 

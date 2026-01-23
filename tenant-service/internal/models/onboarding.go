@@ -390,6 +390,16 @@ type Tenant struct {
 	Status       string    `json:"status" gorm:"default:'creating';index" validate:"oneof=creating active inactive suspended"`
 	Mode         string    `json:"mode" gorm:"default:'development'" validate:"oneof=development production"`
 
+	// Tenant URLs - stored for both custom domain and default tesserix.app domains
+	// These URLs are the canonical endpoints for accessing the tenant's services
+	AdminURL      string `json:"admin_url" gorm:"size:255"`      // e.g., https://admin.yahvismartfarm.com or https://default-store-admin.tesserix.app
+	StorefrontURL string `json:"storefront_url" gorm:"size:255"` // e.g., https://yahvismartfarm.com or https://default-store.tesserix.app
+	APIURL        string `json:"api_url" gorm:"size:255"`        // e.g., https://api.yahvismartfarm.com or https://default-store-api.tesserix.app
+
+	// Custom domain configuration
+	UseCustomDomain bool   `json:"use_custom_domain" gorm:"default:false"` // Whether custom domain is active
+	CustomDomain    string `json:"custom_domain" gorm:"size:255"`          // Base custom domain (e.g., yahvismartfarm.com)
+
 	// Business model: ONLINE_STORE (single vendor, D2C) or MARKETPLACE (multi-vendor)
 	BusinessModel string `json:"business_model" gorm:"type:varchar(50);default:'ONLINE_STORE';index" validate:"omitempty,oneof=ONLINE_STORE MARKETPLACE"`
 

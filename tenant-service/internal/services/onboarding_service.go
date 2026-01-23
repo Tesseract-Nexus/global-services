@@ -1796,6 +1796,24 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 		storefrontWwwHost = ""
 	}
 
+	// Update tenant with URLs - these are stored for all tenants (custom or default domain)
+	// This enables the business switcher to redirect to the correct admin URL
+	tenantURLs := map[string]interface{}{
+		"admin_url":         fmt.Sprintf("https://%s", adminHost),
+		"storefront_url":    fmt.Sprintf("https://%s", storefrontHost),
+		"api_url":           fmt.Sprintf("https://%s", apiHost),
+		"use_custom_domain": isCustomDomainUsed,
+		"custom_domain":     customDomain,
+	}
+	if updateErr := tx.WithContext(ctx).Model(&models.Tenant{}).
+		Where("id = ?", tenantID).
+		Updates(tenantURLs).Error; updateErr != nil {
+		log.Printf("[OnboardingService] WARNING: Failed to update tenant URLs: %v", updateErr)
+	} else {
+		log.Printf("[OnboardingService] Updated tenant %s with URLs: admin=%s, storefront=%s, api=%s, customDomain=%v",
+			tenantID, tenantURLs["admin_url"], tenantURLs["storefront_url"], tenantURLs["api_url"], isCustomDomainUsed)
+	}
+
 	// Publish tenant.created event for document migration, routing, and other subscribers
 	// This is synchronous to ensure the VS is created before returning success
 	natsPublished := false
