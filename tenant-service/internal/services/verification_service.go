@@ -70,6 +70,26 @@ func (s *VerificationService) GetVerificationMethod() string {
 	return method
 }
 
+// GetDNSConfig returns the DNS configuration for a session's custom domain
+// This is used by the UI to display DNS setup instructions including ACME CNAME for SSL
+func (s *VerificationService) GetDNSConfig(ctx context.Context, sessionID uuid.UUID) (*clients.CustomDomainDNSConfig, error) {
+	if s.onboardingRepo == nil {
+		return nil, fmt.Errorf("onboarding repository not configured")
+	}
+
+	session, err := s.onboardingRepo.GetSessionByID(ctx, sessionID, []string{"business_information", "application_configurations"})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get session: %w", err)
+	}
+
+	dnsConfig := s.buildDNSConfigFromSession(session)
+	if dnsConfig == nil {
+		return nil, nil // No custom domain configured
+	}
+
+	return dnsConfig, nil
+}
+
 // StartEmailVerification initiates email verification process
 func (s *VerificationService) StartEmailVerification(ctx context.Context, sessionID uuid.UUID, email string) (*models.VerificationRecord, error) {
 	method := s.GetVerificationMethod()

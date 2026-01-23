@@ -467,6 +467,7 @@ func setupRouter(
 				verification.POST("/resend", verificationHandler.ResendVerificationCode)
 				verification.GET("/status", verificationHandler.GetVerificationStatus)
 				verification.GET("/:type/check", verificationHandler.CheckVerification)
+				verification.GET("/dns-config", verificationHandler.GetDNSConfig)
 			}
 		}
 

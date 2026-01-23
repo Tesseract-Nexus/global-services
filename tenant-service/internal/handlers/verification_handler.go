@@ -287,6 +287,55 @@ func (h *VerificationHandler) CheckVerification(c *gin.Context) {
 	SuccessResponse(c, http.StatusOK, "Verification check completed", response)
 }
 
+// GetDNSConfig returns DNS configuration for a session's custom domain
+// Used by the UI to display DNS setup instructions including ACME CNAME for SSL
+func (h *VerificationHandler) GetDNSConfig(c *gin.Context) {
+	sessionID, err := uuid.Parse(c.Param("sessionId"))
+	if err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid session ID", err)
+		return
+	}
+
+	dnsConfig, err := h.verificationService.GetDNSConfig(c.Request.Context(), sessionID)
+	if err != nil {
+		ErrorResponse(c, http.StatusInternalServerError, "Failed to get DNS configuration", err)
+		return
+	}
+
+	if dnsConfig == nil {
+		// No custom domain configured - return empty response
+		SuccessResponse(c, http.StatusOK, "No custom domain configured", map[string]interface{}{
+			"is_custom_domain": false,
+		})
+		return
+	}
+
+	// Return full DNS configuration for UI display
+	response := map[string]interface{}{
+		"is_custom_domain": true,
+		"custom_domain":    dnsConfig.CustomDomain,
+
+		// Host URLs
+		"storefront_host": dnsConfig.StorefrontHost,
+		"admin_host":      dnsConfig.AdminHost,
+		"api_host":        dnsConfig.APIHost,
+
+		// Routing configuration (A records)
+		"use_a_records": dnsConfig.UseARecords,
+		"routing_ip":    dnsConfig.RoutingIP,
+
+		// ACME CNAME delegation for automatic SSL
+		"use_cname_delegation": dnsConfig.UseCNAMEDelegation,
+		"acme_challenge_host":  dnsConfig.ACMEChallengeHost,
+		"acme_cname_target":    dnsConfig.ACMECNAMETarget,
+
+		"tenant_slug": dnsConfig.TenantSlug,
+		"base_domain": dnsConfig.BaseDomain,
+	}
+
+	SuccessResponse(c, http.StatusOK, "DNS configuration retrieved", response)
+}
+
 // GetVerificationMethod returns the current verification method (otp or link)
 func (h *VerificationHandler) GetVerificationMethod(c *gin.Context) {
 	method := h.verificationService.GetVerificationMethod()
