@@ -166,6 +166,12 @@ type ValidateDomainResponse struct {
 	DomainType          string              `json:"domain_type,omitempty"`
 	VerificationToken   string              `json:"verification_token,omitempty"` // Token for verifying ownership
 	VerificationID      string              `json:"verification_id,omitempty"`    // Pending verification record ID
+
+	// Complete DNS configuration for customer setup
+	RoutingRecords         []models.DNSRecord `json:"routing_records,omitempty"`          // CNAME records for routing traffic
+	CNAMEDelegationRecord  *models.DNSRecord  `json:"cname_delegation_record,omitempty"`  // CNAME for automatic SSL (_acme-challenge)
+	CNAMEDelegationEnabled bool               `json:"cname_delegation_enabled"`           // Whether CNAME delegation is available
+	ProxyTarget            string             `json:"proxy_target,omitempty"`             // Target for routing (e.g., proxy.tesserix.app)
 }
 
 // ValidateDomain validates a domain and creates/retrieves a pending verification record
@@ -340,6 +346,50 @@ func (s *DomainService) ValidateDomain(ctx context.Context, req *ValidateDomainR
 
 	// Return both options in VerificationRecords
 	response.VerificationRecords = []models.DNSRecord{cnameRecord, txtRecord}
+
+	// Determine routing target (CNAME target for domain routing)
+	proxyTarget := s.cfg.DNS.ProxyDomain
+	if s.cfg.Cloudflare.Enabled && s.cfg.Cloudflare.TunnelID != "" {
+		proxyTarget = fmt.Sprintf("%s.cfargotunnel.com", s.cfg.Cloudflare.TunnelID)
+	}
+	response.ProxyTarget = proxyTarget
+
+	// Build routing records (CNAME records for traffic routing)
+	routingRecords := []models.DNSRecord{
+		{
+			RecordType: "CNAME",
+			Host:       domainName,
+			Value:      proxyTarget,
+			TTL:        300,
+			Purpose:    "routing",
+		},
+	}
+
+	// Add www subdomain if apex domain
+	if domainType == models.DomainTypeApex {
+		routingRecords = append(routingRecords, models.DNSRecord{
+			RecordType: "CNAME",
+			Host:       "www." + domainName,
+			Value:      proxyTarget,
+			TTL:        300,
+			Purpose:    "routing",
+		})
+	}
+	response.RoutingRecords = routingRecords
+
+	// Build CNAME delegation record for automatic SSL (unique per domain)
+	// Customer adds: _acme-challenge.theirdomain.com CNAME theirdomain-com.acme.tesserix.app
+	if s.cfg.CNAMEDelegation.Enabled {
+		response.CNAMEDelegationEnabled = true
+		cnameTarget := s.dnsVerifier.GetCNAMEDelegationTarget(domainName)
+		response.CNAMEDelegationRecord = &models.DNSRecord{
+			RecordType: "CNAME",
+			Host:       "_acme-challenge." + domainName,
+			Value:      cnameTarget,
+			TTL:        3600,
+			Purpose:    "cname_delegation (automatic SSL)",
+		}
+	}
 
 	response.Message = "Domain is valid and available"
 

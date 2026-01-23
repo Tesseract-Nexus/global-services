@@ -40,18 +40,22 @@ type CreateDomainRequest struct {
 
 // CreateDomainResponse represents the response from creating a domain
 type CreateDomainResponse struct {
-	ID                 string     `json:"id"`
-	TenantID           string     `json:"tenant_id"`
-	Domain             string     `json:"domain"`
-	DomainType         string     `json:"domain_type"`
-	Status             string     `json:"status"`
-	VerificationMethod string     `json:"verification_method"`
-	VerificationToken  string     `json:"verification_token"`
-	VerificationRecord DNSRecord  `json:"verification_record,omitempty"`
-	DNSVerified        bool       `json:"dns_verified"`
-	SSLStatus          string     `json:"ssl_status"`
-	CreatedAt          string     `json:"created_at"`
-	Error              string     `json:"error,omitempty"`
+	ID                 string      `json:"id"`
+	TenantID           string      `json:"tenant_id"`
+	Domain             string      `json:"domain"`
+	DomainType         string      `json:"domain_type"`
+	Status             string      `json:"status"`
+	VerificationMethod string      `json:"verification_method"`
+	VerificationToken  string      `json:"verification_token"`
+	VerificationRecord DNSRecord   `json:"verification_record,omitempty"`
+	DNSRecords         []DNSRecord `json:"dns_records,omitempty"` // All DNS records including routing and CNAME delegation
+	DNSVerified        bool        `json:"dns_verified"`
+	SSLStatus          string      `json:"ssl_status"`
+	CreatedAt          string      `json:"created_at"`
+	Error              string      `json:"error,omitempty"`
+
+	// CNAME delegation for automatic SSL
+	CNAMEDelegationEnabled bool `json:"cname_delegation_enabled,omitempty"`
 }
 
 // DNSRecord represents a DNS record for domain verification
@@ -130,12 +134,20 @@ type ValidateDomainRequest struct {
 
 // ValidateDomainResponse represents the response from validating a domain
 type ValidateDomainResponse struct {
-	Valid              bool       `json:"valid"`
-	Available          bool       `json:"available"`
-	DNSConfigured      bool       `json:"dns_configured"`
-	Message            string     `json:"message,omitempty"`
-	VerificationRecord *DNSRecord `json:"verification_record,omitempty"`
-	DomainType         string     `json:"domain_type,omitempty"`
+	Valid              bool        `json:"valid"`
+	Available          bool        `json:"available"`
+	DNSConfigured      bool        `json:"dns_configured"`
+	Message            string      `json:"message,omitempty"`
+	VerificationRecord *DNSRecord  `json:"verification_record,omitempty"`
+	DomainType         string      `json:"domain_type,omitempty"`
+	VerificationToken  string      `json:"verification_token,omitempty"`
+	VerificationID     string      `json:"verification_id,omitempty"`
+
+	// Complete DNS configuration for customer setup
+	RoutingRecords         []DNSRecord `json:"routing_records,omitempty"`          // CNAME records for routing traffic
+	CNAMEDelegationRecord  *DNSRecord  `json:"cname_delegation_record,omitempty"`  // CNAME for automatic SSL
+	CNAMEDelegationEnabled bool        `json:"cname_delegation_enabled"`           // Whether CNAME delegation is available
+	ProxyTarget            string      `json:"proxy_target,omitempty"`             // Target for routing
 }
 
 // ValidateDomain validates a domain before creating it
