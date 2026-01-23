@@ -12,14 +12,16 @@ import (
 
 // Runner manages background jobs for draft persistence and account maintenance
 type Runner struct {
-	draftSvc        *services.DraftService
-	deactivationSvc *services.CustomerDeactivationService
-	config          config.DraftConfig
-	stopCh          chan struct{}
-	wg              sync.WaitGroup
-	cleanupTicker   *time.Ticker
-	reminderTicker  *time.Ticker
-	purgeTicker     *time.Ticker // For purging deactivated accounts
+	draftSvc          *services.DraftService
+	deactivationSvc   *services.CustomerDeactivationService
+	reconciliationSvc *services.TenantReconciliationService
+	config            config.DraftConfig
+	stopCh            chan struct{}
+	wg                sync.WaitGroup
+	cleanupTicker     *time.Ticker
+	reminderTicker    *time.Ticker
+	purgeTicker       *time.Ticker         // For purging deactivated accounts
+	reconcileTicker   *time.Ticker         // For reconciling stuck tenants
 }
 
 // NewRunner creates a new background runner
@@ -34,6 +36,11 @@ func NewRunner(draftSvc *services.DraftService, cfg config.DraftConfig) *Runner 
 // SetDeactivationService sets the customer deactivation service for purge jobs
 func (r *Runner) SetDeactivationService(svc *services.CustomerDeactivationService) {
 	r.deactivationSvc = svc
+}
+
+// SetReconciliationService sets the tenant reconciliation service
+func (r *Runner) SetReconciliationService(svc *services.TenantReconciliationService) {
+	r.reconciliationSvc = svc
 }
 
 // Start begins the background job processing
@@ -68,6 +75,16 @@ func (r *Runner) Start() {
 		go r.runPurgeJob()
 	}
 
+	// Start tenant reconciliation job (runs every 5 minutes)
+	if r.reconciliationSvc != nil {
+		reconcileInterval := 5 * time.Minute
+		r.reconcileTicker = time.NewTicker(reconcileInterval)
+		log.Printf("Tenant reconciliation job scheduled every %v", reconcileInterval)
+
+		r.wg.Add(1)
+		go r.runReconciliationJob()
+	}
+
 	log.Println("Background job runner started successfully")
 }
 
@@ -84,6 +101,9 @@ func (r *Runner) Stop() {
 	}
 	if r.purgeTicker != nil {
 		r.purgeTicker.Stop()
+	}
+	if r.reconcileTicker != nil {
+		r.reconcileTicker.Stop()
 	}
 
 	// Wait for goroutines to finish with timeout
@@ -219,5 +239,46 @@ func (r *Runner) executePurge() {
 		log.Printf("Account purge job completed: %d accounts permanently deleted", purged)
 	} else {
 		log.Println("Account purge job completed: no accounts to purge")
+	}
+}
+
+// runReconciliationJob runs the tenant reconciliation job periodically
+func (r *Runner) runReconciliationJob() {
+	defer r.wg.Done()
+
+	// Run immediately on start to catch any tenants stuck while service was down
+	r.executeReconciliation()
+
+	for {
+		select {
+		case <-r.stopCh:
+			log.Println("Reconciliation job stopping...")
+			return
+		case <-r.reconcileTicker.C:
+			r.executeReconciliation()
+		}
+	}
+}
+
+// executeReconciliation reconciles tenants stuck in "creating" status
+func (r *Runner) executeReconciliation() {
+	if r.reconciliationSvc == nil {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
+	log.Println("Running tenant reconciliation job...")
+	result, err := r.reconciliationSvc.ReconcileStuckTenants(ctx)
+	if err != nil {
+		log.Printf("Error in tenant reconciliation job: %v", err)
+	} else {
+		if result.TenantsReconciled > 0 || result.TenantsFailed > 0 || len(result.Errors) > 0 {
+			log.Printf("Tenant reconciliation job completed: checked=%d, reconciled=%d, failed=%d, errors=%d",
+				result.TenantsChecked, result.TenantsReconciled, result.TenantsFailed, len(result.Errors))
+		} else {
+			log.Println("Tenant reconciliation job completed: no stuck tenants")
+		}
 	}
 }

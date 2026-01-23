@@ -282,6 +282,100 @@ type GetStorefrontBySlugResponse struct {
 	Error   *ErrorData      `json:"error,omitempty"`
 }
 
+// GetVendorsForTenant retrieves all vendors for a tenant
+// Uses /internal/vendors endpoint with X-Tenant-ID header
+func (c *VendorClient) GetVendorsForTenant(ctx context.Context, tenantID uuid.UUID) ([]VendorData, error) {
+	url := fmt.Sprintf("%s/internal/vendors", c.baseURL)
+	httpReq, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	httpReq.Header.Set("X-Tenant-ID", tenantID.String())
+	httpReq.Header.Set("X-Vendor-ID", tenantID.String()) // For middleware compatibility
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return []VendorData{}, nil // No vendors
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("vendor service returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// VendorListResponse format from vendor-service
+	var response struct {
+		Success bool         `json:"success"`
+		Data    []VendorData `json:"data"`
+	}
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	if !response.Success {
+		return []VendorData{}, nil
+	}
+
+	return response.Data, nil
+}
+
+// GetStorefrontsForVendor retrieves all storefronts for a vendor
+// Uses /internal/vendors/:id/storefronts endpoint
+func (c *VendorClient) GetStorefrontsForVendor(ctx context.Context, tenantID, vendorID uuid.UUID) ([]StorefrontData, error) {
+	url := fmt.Sprintf("%s/internal/vendors/%s/storefronts", c.baseURL, vendorID.String())
+	httpReq, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	httpReq.Header.Set("X-Tenant-ID", tenantID.String())
+	httpReq.Header.Set("X-Vendor-ID", vendorID.String())
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return []StorefrontData{}, nil // No storefronts
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("vendor service returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// StorefrontListResponse format from vendor-service
+	var response struct {
+		Success bool             `json:"success"`
+		Data    []StorefrontData `json:"data"`
+	}
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	if !response.Success {
+		return []StorefrontData{}, nil
+	}
+
+	return response.Data, nil
+}
+
 // GetStorefrontBySlug retrieves a storefront by its slug
 // Returns the storefront data including tenant_id, which can be used to resolve the tenant
 func (c *VendorClient) GetStorefrontBySlug(ctx context.Context, slug string) (*StorefrontData, error) {

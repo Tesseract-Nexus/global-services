@@ -277,6 +277,11 @@ func main() {
 		verificationHandler.SetDraftService(draftSvc)
 	}
 
+	// Initialize tenant reconciliation service
+	reconciliationCfg := services.DefaultReconciliationConfig()
+	reconciliationSvc := services.NewTenantReconciliationService(db, reconciliationCfg)
+	log.Println("TenantReconciliationService initialized for stuck tenant recovery")
+
 	// Start background jobs (if Redis is available)
 	var bgRunner *background.Runner
 	if draftSvc != nil {
@@ -286,6 +291,9 @@ func main() {
 			bgRunner.SetDeactivationService(customerDeactivationSvc)
 			log.Println("CustomerDeactivationService wired to background runner for account purge job")
 		}
+		// Wire reconciliation service for stuck tenant recovery
+		bgRunner.SetReconciliationService(reconciliationSvc)
+		log.Println("TenantReconciliationService wired to background runner for stuck tenant recovery")
 		bgRunner.Start()
 	}
 

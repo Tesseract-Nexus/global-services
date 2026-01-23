@@ -1407,16 +1407,20 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 		return nil, fmt.Errorf("staff service client not configured - cannot create owner permissions")
 	}
 
-	bootstrapCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-	bootstrapResult, bootstrapErr := s.staffClient.BootstrapOwner(
-		bootstrapCtx,
-		tenantID,
-		keycloakUserID,
-		primaryContact.Email,
-		primaryContact.FirstName,
-		primaryContact.LastName,
-	)
+	// Use retry with backoff for RBAC bootstrap (critical operation)
+	retryCfg := defaultRetryConfig()
+	bootstrapResult, bootstrapErr := retryWithBackoff(ctx, retryCfg, "Owner RBAC bootstrap", func() (*clients.BootstrapOwnerResponse, error) {
+		bootstrapCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+		return s.staffClient.BootstrapOwner(
+			bootstrapCtx,
+			tenantID,
+			keycloakUserID,
+			primaryContact.Email,
+			primaryContact.FirstName,
+			primaryContact.LastName,
+		)
+	})
 	if bootstrapErr != nil {
 		// CRITICAL: Owner RBAC bootstrap failure means owner can't access admin panel
 		// This is a fatal error - tenant without owner permissions is unusable
@@ -1736,14 +1740,8 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 		Message:      "Account created successfully. You can now access your admin dashboard.",
 	}
 
-	// Send welcome pack email in background with complete tenant URLs
-	go s.sendWelcomePackEmail(context.Background(), &WelcomePackEmailRequest{
-		Email:        primaryContact.Email,
-		FirstName:    primaryContact.FirstName,
-		BusinessName: session.BusinessInformation.BusinessName,
-		TenantSlug:   slug,
-		AdminURL:     adminURL,
-	})
+	// NOTE: Welcome email is sent AFTER VirtualServices are provisioned (see below)
+	// This ensures the store URLs in the email are actually accessible when the user clicks them
 
 	// Extract custom domain config from store_setup if present
 	var useCustomDomain bool
@@ -1934,6 +1932,28 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 	} else if useCustomDomain && customDomain != "" && s.customDomainClient == nil {
 		log.Printf("[OnboardingService] WARNING: Custom domain requested but custom-domain-service client not initialized")
 	}
+
+	// ============================================================================
+	// WELCOME EMAIL: Send AFTER all infrastructure is provisioned
+	// ============================================================================
+	// This is the FINAL step - only send email when everything is ready:
+	// - Tenant created and activated
+	// - Vendor and storefront created
+	// - Owner RBAC bootstrapped
+	// - VirtualServices created (via NATS + HTTP fallback)
+	// - Custom domain configured (if applicable)
+	//
+	// We send synchronously (not in goroutine) to ensure email delivery is confirmed
+	// before returning to the user. This also adds a small delay which helps ensure
+	// VirtualServices have time to propagate in the Istio mesh.
+	log.Printf("[OnboardingService] All infrastructure provisioned for %s, sending welcome email...", slug)
+	s.sendWelcomePackEmail(context.Background(), &WelcomePackEmailRequest{
+		Email:        primaryContact.Email,
+		FirstName:    primaryContact.FirstName,
+		BusinessName: session.BusinessInformation.BusinessName,
+		TenantSlug:   slug,
+		AdminURL:     adminURL,
+	})
 
 	return response, nil
 }
