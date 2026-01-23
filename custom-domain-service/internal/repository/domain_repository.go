@@ -147,8 +147,8 @@ func (r *DomainRepository) UpdateDNSVerification(ctx context.Context, id uuid.UU
 	return r.db.WithContext(ctx).Model(&models.CustomDomain{}).Where("id = ?", id).Updates(updates).Error
 }
 
-// UpdateNSDelegationVerification updates NS delegation verification status
-func (r *DomainRepository) UpdateNSDelegationVerification(ctx context.Context, id uuid.UUID, verified bool, attempts int) error {
+// UpdateCNAMEDelegationVerification updates CNAME delegation verification status
+func (r *DomainRepository) UpdateCNAMEDelegationVerification(ctx context.Context, id uuid.UUID, verified bool, attempts int) error {
 	updates := map[string]interface{}{
 		"ns_delegation_verified":        verified,
 		"ns_delegation_last_checked_at": time.Now(),
@@ -162,8 +162,8 @@ func (r *DomainRepository) UpdateNSDelegationVerification(ctx context.Context, i
 	return r.db.WithContext(ctx).Model(&models.CustomDomain{}).Where("id = ?", id).Updates(updates).Error
 }
 
-// EnableNSDelegation enables NS delegation for a domain
-func (r *DomainRepository) EnableNSDelegation(ctx context.Context, id uuid.UUID, enabled bool) error {
+// EnableCNAMEDelegation enables CNAME delegation for a domain
+func (r *DomainRepository) EnableCNAMEDelegation(ctx context.Context, id uuid.UUID, enabled bool) error {
 	return r.db.WithContext(ctx).Model(&models.CustomDomain{}).Where("id = ?", id).Updates(map[string]interface{}{
 		"ns_delegation_enabled": enabled,
 		"updated_at":            time.Now(),

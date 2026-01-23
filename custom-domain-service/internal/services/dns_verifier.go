@@ -41,13 +41,13 @@ type VerificationResult struct {
 	CheckedAt      time.Time
 }
 
-// NSDelegationResult contains the result of NS delegation verification
-type NSDelegationResult struct {
-	IsVerified       bool
-	FoundNameservers []string
-	ExpectedNS       []string
-	Message          string
-	CheckedAt        time.Time
+// CNAMEDelegationResult contains the result of CNAME delegation verification
+type CNAMEDelegationResult struct {
+	IsVerified     bool
+	FoundCNAME     string
+	ExpectedCNAME  string
+	Message        string
+	CheckedAt      time.Time
 }
 
 // VerifyDomain verifies DNS configuration for a domain
@@ -66,101 +66,91 @@ func (v *DNSVerifier) VerifyDomain(ctx context.Context, domain *models.CustomDom
 	}
 }
 
-// VerifyNSDelegation checks if _acme-challenge.{domain} NS records point to our nameservers
-// This enables DNS-01 ACME challenges for automatic certificate management
-func (v *DNSVerifier) VerifyNSDelegation(ctx context.Context, domain string) (*NSDelegationResult, error) {
-	result := &NSDelegationResult{
-		CheckedAt:  time.Now(),
-		ExpectedNS: v.cfg.NSDelegation.Nameservers,
+// VerifyCNAMEDelegation checks if _acme-challenge.{domain} CNAME points to our ACME zone
+// Customer adds: _acme-challenge.theirdomain.com CNAME theirdomain-com.acme.tesserix.app
+// This enables DNS-01 ACME challenges via CNAME following for automatic certificate management
+func (v *DNSVerifier) VerifyCNAMEDelegation(ctx context.Context, domain string) (*CNAMEDelegationResult, error) {
+	expectedTarget := v.GetCNAMEDelegationTarget(domain)
+	result := &CNAMEDelegationResult{
+		CheckedAt:     time.Now(),
+		ExpectedCNAME: expectedTarget,
 	}
 
-	if !v.cfg.NSDelegation.Enabled {
-		result.Message = "NS delegation feature is not enabled"
+	if !v.cfg.CNAMEDelegation.Enabled {
+		result.Message = "CNAME delegation feature is not enabled"
 		return result, nil
 	}
 
-	// Check NS records for _acme-challenge.{domain}
+	// Check CNAME record for _acme-challenge.{domain}
 	challengeHost := "_acme-challenge." + domain
 
-	nsRecords, err := v.resolver.LookupNS(ctx, challengeHost)
+	cname, err := v.resolver.LookupCNAME(ctx, challengeHost)
 	if err != nil {
 		if dnsErr, ok := err.(*net.DNSError); ok {
 			if dnsErr.IsNotFound {
-				result.Message = fmt.Sprintf("NS records not found for %s. Please add NS records pointing to %v",
-					challengeHost, v.cfg.NSDelegation.Nameservers)
+				result.Message = fmt.Sprintf("CNAME record not found for %s. Please add: %s CNAME %s",
+					challengeHost, challengeHost, expectedTarget)
 				return result, nil
 			}
 		}
-		log.Warn().Err(err).Str("host", challengeHost).Msg("NS delegation lookup failed")
+		log.Warn().Err(err).Str("host", challengeHost).Msg("CNAME delegation lookup failed")
 		result.Message = "DNS lookup failed. Please try again later."
 		return result, nil
 	}
 
-	// Extract hostnames from NS records
-	foundNS := make([]string, 0, len(nsRecords))
-	for _, ns := range nsRecords {
-		// Remove trailing dot and convert to lowercase
-		host := strings.TrimSuffix(strings.ToLower(ns.Host), ".")
-		foundNS = append(foundNS, host)
-	}
-	result.FoundNameservers = foundNS
+	// Normalize CNAME (remove trailing dot, lowercase)
+	cname = strings.TrimSuffix(strings.ToLower(cname), ".")
+	result.FoundCNAME = cname
 
-	// Check if any of our expected nameservers are in the NS records
-	matchCount := 0
-	for _, found := range foundNS {
-		for _, expected := range v.cfg.NSDelegation.Nameservers {
-			expectedLower := strings.ToLower(expected)
-			if found == expectedLower || found == expectedLower+"." {
-				matchCount++
-				break
-			}
-		}
-	}
-
-	// Consider verified if at least one of our nameservers is in the NS records
-	if matchCount > 0 {
+	// Check if CNAME points to our expected target
+	expectedLower := strings.ToLower(expectedTarget)
+	if cname == expectedLower || cname == expectedLower+"." {
 		result.IsVerified = true
-		result.Message = fmt.Sprintf("NS delegation verified. Found %d of our nameservers delegated for %s",
-			matchCount, challengeHost)
+		result.Message = fmt.Sprintf("CNAME delegation verified. %s correctly points to %s",
+			challengeHost, expectedTarget)
 		log.Info().
 			Str("domain", domain).
-			Strs("found_ns", foundNS).
-			Int("match_count", matchCount).
-			Msg("NS delegation verified successfully")
+			Str("found_cname", cname).
+			Str("expected", expectedTarget).
+			Msg("CNAME delegation verified successfully")
 	} else {
-		result.Message = fmt.Sprintf("NS records found at %s but none point to our nameservers. Found: %v, Expected: %v",
-			challengeHost, foundNS, v.cfg.NSDelegation.Nameservers)
+		result.Message = fmt.Sprintf("CNAME record found at %s but points to %s instead of %s",
+			challengeHost, cname, expectedTarget)
 		log.Info().
 			Str("domain", domain).
-			Strs("found_ns", foundNS).
-			Strs("expected_ns", v.cfg.NSDelegation.Nameservers).
-			Msg("NS delegation not verified - nameservers don't match")
+			Str("found_cname", cname).
+			Str("expected", expectedTarget).
+			Msg("CNAME delegation not verified - target doesn't match")
 	}
 
 	return result, nil
 }
 
-// GetNSDelegationRecords returns the NS records needed for NS delegation setup
-func (v *DNSVerifier) GetNSDelegationRecords(domain string) []models.DNSRecord {
-	if !v.cfg.NSDelegation.Enabled {
+// GetCNAMEDelegationTarget returns the expected CNAME target for a domain
+// e.g., "store.example.com" -> "store-example-com.acme.tesserix.app"
+func (v *DNSVerifier) GetCNAMEDelegationTarget(domain string) string {
+	// Sanitize domain name: replace dots with dashes
+	sanitized := strings.ReplaceAll(domain, ".", "-")
+	return sanitized + "." + v.cfg.CNAMEDelegation.ACMEZone
+}
+
+// GetCNAMEDelegationRecord returns the CNAME record needed for CNAME delegation setup
+func (v *DNSVerifier) GetCNAMEDelegationRecord(domain string) *models.DNSRecord {
+	if !v.cfg.CNAMEDelegation.Enabled {
 		return nil
 	}
 
-	records := make([]models.DNSRecord, 0, len(v.cfg.NSDelegation.Nameservers))
 	challengeHost := "_acme-challenge." + domain
+	target := v.GetCNAMEDelegationTarget(domain)
 
-	for _, ns := range v.cfg.NSDelegation.Nameservers {
-		records = append(records, models.DNSRecord{
-			RecordType: "NS",
-			Host:       challengeHost,
-			Value:      ns,
-			TTL:        3600,
-			Purpose:    "ns_delegation",
-			IsVerified: false,
-		})
+	return &models.DNSRecord{
+		RecordType: "CNAME",
+		Host:       challengeHost,
+		Value:      target,
+		TTL:        3600,
+		Purpose:    "cname_delegation (automatic SSL)",
+		IsVerified: false,
 	}
-
-	return records
 }
 
 // verifyTXTRecord verifies TXT record for domain ownership
@@ -321,24 +311,23 @@ func (v *DNSVerifier) CheckARecord(ctx context.Context, domain string) (bool, []
 }
 
 // GetRequiredDNSRecords returns the DNS records needed for domain setup
-// This includes NS delegation records when enabled for automatic certificate management
+// This includes CNAME delegation record when enabled for automatic certificate management
 func (v *DNSVerifier) GetRequiredDNSRecords(domain *models.CustomDomain) []models.DNSRecord {
 	records := []models.DNSRecord{}
 
-	// NS Delegation records for automatic SSL (recommended when enabled)
-	// Customer delegates _acme-challenge.{domain} to our nameservers
-	if v.cfg.NSDelegation.Enabled && domain.NSDelegationEnabled {
+	// CNAME Delegation record for automatic SSL (recommended when enabled)
+	// Customer adds: _acme-challenge.theirdomain.com CNAME theirdomain-com.acme.tesserix.app
+	if v.cfg.CNAMEDelegation.Enabled && domain.CNAMEDelegationEnabled {
 		challengeHost := "_acme-challenge." + domain.Domain
-		for _, ns := range v.cfg.NSDelegation.Nameservers {
-			records = append(records, models.DNSRecord{
-				RecordType: "NS",
-				Host:       challengeHost,
-				Value:      ns,
-				TTL:        3600,
-				Purpose:    "ns_delegation (automatic SSL)",
-				IsVerified: domain.NSDelegationVerified,
-			})
-		}
+		target := v.GetCNAMEDelegationTarget(domain.Domain)
+		records = append(records, models.DNSRecord{
+			RecordType: "CNAME",
+			Host:       challengeHost,
+			Value:      target,
+			TTL:        3600,
+			Purpose:    "cname_delegation (automatic SSL)",
+			IsVerified: domain.CNAMEDelegationVerified,
+		})
 	}
 
 	// Determine CNAME target based on configuration

@@ -289,34 +289,17 @@ func (s *VerificationService) buildDNSConfigFromSession(session *models.Onboardi
 	domain := configData.CustomDomain
 	log.Printf("[VerificationService] Building DNS config for custom domain: %s (tenant slug: %s)", domain, slug)
 
-	// Get custom domain gateway IP from Redis (populated by tenant-router-service)
-	var gatewayIP string
-	if s.redisClient != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		ip, err := s.redisClient.GetCustomDomainGatewayIP(ctx)
-		if err != nil {
-			log.Printf("[VerificationService] Warning: Failed to fetch gateway IP from Redis: %v", err)
-		} else if ip != "" {
-			gatewayIP = ip
-			log.Printf("[VerificationService] Fetched gateway IP from Redis: %s", gatewayIP)
-		}
-	}
+	// Build CNAME configuration for custom domains
+	// Customers point CNAME records to our routing proxy
+	// This is more secure than exposing the gateway IP directly
+	routingCNAMETarget := fmt.Sprintf("proxy.%s", baseDomain) // e.g., proxy.tesserix.app
 
-	// Fall back to config value if Redis not available or key not set
-	if gatewayIP == "" {
-		gatewayIP = s.verificationConfig.CustomDomainGatewayIP
-		if gatewayIP != "" {
-			log.Printf("[VerificationService] Using gateway IP from config fallback: %s", gatewayIP)
-		}
-	}
+	// Build unique ACME CNAME target for this domain
+	// e.g., "store.example.com" -> "store-example-com.acme.tesserix.app"
+	sanitizedDomain := strings.ReplaceAll(domain, ".", "-")
+	acmeZone := fmt.Sprintf("acme.%s", baseDomain)
+	acmeCNAMETarget := fmt.Sprintf("%s.%s", sanitizedDomain, acmeZone)
 
-	if gatewayIP == "" {
-		log.Printf("[VerificationService] Warning: No gateway IP available, custom domain instructions may be incomplete")
-	}
-
-	// Build A record configuration for custom domains
-	// Customers point A records to the custom domain gateway LoadBalancer IP
 	return &clients.CustomDomainDNSConfig{
 		IsCustomDomain: true,
 		CustomDomain:   domain,
@@ -326,24 +309,17 @@ func (s *VerificationService) buildDNSConfigFromSession(session *models.Onboardi
 		AdminHost:      fmt.Sprintf("admin.%s", domain), // admin.customdomain.com
 		APIHost:        fmt.Sprintf("api.%s", domain),   // api.customdomain.com
 
-		// Custom domain gateway IP (customers point A records to this IP)
-		GatewayIP:  gatewayIP,
-		TenantSlug: slug,
-		BaseDomain: baseDomain,
+		// Routing CNAME target - more secure than exposing IP
+		RoutingCNAMETarget: routingCNAMETarget,
+		TenantSlug:         slug,
+		BaseDomain:         baseDomain,
 
-		// NS Delegation for automatic SSL certificate management
-		// Customers add NS records for _acme-challenge subdomain to enable DNS-01 ACME challenges
-		// This allows automatic certificate issuance/renewal without manual intervention
-		UseNSDelegation:   true,                                      // Always show NS delegation option
-		NameServers:       []string{"ns1.tesserix.app", "ns2.tesserix.app"}, // Our authoritative nameservers
-		ACMEChallengeHost: fmt.Sprintf("_acme-challenge.%s", domain), // The subdomain to delegate
-
-		// Deprecated: CNAME targets are no longer used for custom domains
-		// Kept for backwards compatibility with older email templates
-		StorefrontCNAMETarget: fmt.Sprintf("%s.%s", slug, baseDomain),
-		AdminCNAMETarget:      fmt.Sprintf("%s-admin.%s", slug, baseDomain),
-		APICNAMETarget:        fmt.Sprintf("%s-api.%s", slug, baseDomain),
-		TunnelCNAMETarget:     "",
+		// CNAME Delegation for automatic SSL certificate management
+		// Customer adds: _acme-challenge.theirdomain.com CNAME theirdomain-com.acme.tesserix.app
+		// cert-manager follows the CNAME and creates TXT records in our Cloudflare zone
+		UseCNAMEDelegation: true,                                      // Always show CNAME delegation option
+		ACMEChallengeHost:  fmt.Sprintf("_acme-challenge.%s", domain), // The subdomain to add CNAME for
+		ACMECNAMETarget:    acmeCNAMETarget,                           // Unique CNAME target per domain
 	}
 }
 

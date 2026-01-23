@@ -113,14 +113,15 @@ type CustomDomain struct {
 	CloudflareZoneID           string     `json:"cloudflare_zone_id" gorm:"size:100"`
 	TunnelLastCheckedAt        *time.Time `json:"tunnel_last_checked_at"`
 
-	// NS Delegation for automatic certificate management
+	// CNAME Delegation for automatic certificate management
 	// When enabled, certificates are issued via DNS-01 challenges instead of HTTP-01
-	// Customer delegates _acme-challenge.{domain} NS records to our nameservers
-	NSDelegationEnabled       bool       `json:"ns_delegation_enabled" gorm:"default:false"`
-	NSDelegationVerified      bool       `json:"ns_delegation_verified" gorm:"default:false"`
-	NSDelegationVerifiedAt    *time.Time `json:"ns_delegation_verified_at"`
-	NSDelegationCheckAttempts int        `json:"ns_delegation_check_attempts" gorm:"default:0"`
-	NSDelegationLastCheckedAt *time.Time `json:"ns_delegation_last_checked_at"`
+	// Customer adds: _acme-challenge.theirdomain.com CNAME theirdomain-com.acme.tesserix.app
+	// cert-manager follows the CNAME and creates TXT records in our Cloudflare zone
+	CNAMEDelegationEnabled       bool       `json:"cname_delegation_enabled" gorm:"column:ns_delegation_enabled;default:false"`
+	CNAMEDelegationVerified      bool       `json:"cname_delegation_verified" gorm:"column:ns_delegation_verified;default:false"`
+	CNAMEDelegationVerifiedAt    *time.Time `json:"cname_delegation_verified_at" gorm:"column:ns_delegation_verified_at"`
+	CNAMEDelegationCheckAttempts int        `json:"cname_delegation_check_attempts" gorm:"column:ns_delegation_check_attempts;default:0"`
+	CNAMEDelegationLastCheckedAt *time.Time `json:"cname_delegation_last_checked_at" gorm:"column:ns_delegation_last_checked_at"`
 
 	// Overall Status
 	Status        DomainStatus `json:"status" gorm:"size:20;default:'pending';index"`
@@ -176,12 +177,12 @@ func (d *CustomDomain) CanRetryVerification() bool {
 	return d.Status == DomainStatusPending || d.Status == DomainStatusVerifying || d.Status == DomainStatusFailed
 }
 
-// IsNSDelegationReady returns true if NS delegation is verified and ready for DNS-01 challenges
-func (d *CustomDomain) IsNSDelegationReady() bool {
-	return d.NSDelegationEnabled && d.NSDelegationVerified && d.NSDelegationVerifiedAt != nil
+// IsCNAMEDelegationReady returns true if CNAME delegation is verified and ready for DNS-01 challenges
+func (d *CustomDomain) IsCNAMEDelegationReady() bool {
+	return d.CNAMEDelegationEnabled && d.CNAMEDelegationVerified && d.CNAMEDelegationVerifiedAt != nil
 }
 
-// GetACMEChallengeHost returns the ACME challenge subdomain for NS delegation
+// GetACMEChallengeHost returns the ACME challenge subdomain for CNAME delegation
 func (d *CustomDomain) GetACMEChallengeHost() string {
 	return "_acme-challenge." + d.Domain
 }

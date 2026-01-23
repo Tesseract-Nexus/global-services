@@ -336,10 +336,10 @@ func setupRouter(cfg *config.Config, domainHandlers *handlers.DomainHandlers, in
 			domains.GET("/:id/health", domainHandlers.HealthCheck)
 			domains.GET("/:id/activities", domainHandlers.GetActivities)
 
-			// NS Delegation routes for automatic SSL certificate management
-			domains.GET("/:id/ns-delegation", domainHandlers.GetNSDelegationStatus)
-			domains.POST("/:id/ns-delegation/verify", domainHandlers.VerifyNSDelegation)
-			domains.POST("/:id/ns-delegation/enable", domainHandlers.EnableNSDelegation)
+			// CNAME Delegation routes for automatic SSL certificate management
+			domains.GET("/:id/cname-delegation", domainHandlers.GetCNAMEDelegationStatus)
+			domains.POST("/:id/cname-delegation/verify", domainHandlers.VerifyCNAMEDelegation)
+			domains.POST("/:id/cname-delegation/enable", domainHandlers.EnableCNAMEDelegation)
 		}
 
 		// Internal routes (service-to-service)

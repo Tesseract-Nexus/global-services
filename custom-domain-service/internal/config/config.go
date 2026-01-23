@@ -15,10 +15,10 @@ type Config struct {
 	NATS         NATSConfig         `json:"nats"`
 	Keycloak     KeycloakConfig     `json:"keycloak"`
 	Istio        IstioConfig        `json:"istio"`
-	DNS          DNSConfig          `json:"dns"`
-	SSL          SSLConfig          `json:"ssl"`
-	NSDelegation NSDelegationConfig `json:"ns_delegation"`
-	Cloudflare   CloudflareConfig   `json:"cloudflare"`
+	DNS             DNSConfig             `json:"dns"`
+	SSL             SSLConfig             `json:"ssl"`
+	CNAMEDelegation CNAMEDelegationConfig `json:"cname_delegation"`
+	Cloudflare      CloudflareConfig      `json:"cloudflare"`
 	Limits       LimitsConfig       `json:"limits"`
 	Tenant       TenantConfig       `json:"tenant"`
 	Workers      WorkersConfig      `json:"workers"`
@@ -79,19 +79,21 @@ type DNSConfig struct {
 }
 
 type SSLConfig struct {
-	IssuerName             string `json:"issuer_name"`
-	IssuerKind             string `json:"issuer_kind"`
-	HTTP01IssuerName       string `json:"http01_issuer_name"`        // Issuer for HTTP-01 challenges (custom domains)
-	NSDelegationIssuerName string `json:"ns_delegation_issuer_name"` // Issuer for DNS-01 challenges (NS-delegated domains)
-	RenewalDaysBefore      int    `json:"renewal_days_before"`
-	CertificateNamespace   string `json:"certificate_namespace"`
+	IssuerName                 string `json:"issuer_name"`
+	IssuerKind                 string `json:"issuer_kind"`
+	HTTP01IssuerName           string `json:"http01_issuer_name"`             // Issuer for HTTP-01 challenges (custom domains)
+	CNAMEDelegationIssuerName  string `json:"cname_delegation_issuer_name"`   // Issuer for DNS-01 challenges (CNAME-delegated domains)
+	RenewalDaysBefore          int    `json:"renewal_days_before"`
+	CertificateNamespace       string `json:"certificate_namespace"`
 }
 
-// NSDelegationConfig holds NS delegation configuration for automatic certificate management
-type NSDelegationConfig struct {
-	Enabled              bool          `json:"enabled"`               // Enable NS delegation feature
-	Nameservers          []string      `json:"nameservers"`           // Nameservers customers delegate to (e.g., ns1.tesserix.app)
-	VerificationInterval time.Duration `json:"verification_interval"` // How often to check NS delegation status
+// CNAMEDelegationConfig holds CNAME delegation configuration for automatic certificate management
+// Customers add: _acme-challenge.theirdomain.com CNAME theirdomain-com.acme.tesserix.app
+// cert-manager follows the CNAME and creates TXT records in our Cloudflare zone
+type CNAMEDelegationConfig struct {
+	Enabled              bool          `json:"enabled"`               // Enable CNAME delegation feature
+	ACMEZone             string        `json:"acme_zone"`             // Zone for CNAME targets (e.g., "acme.tesserix.app")
+	VerificationInterval time.Duration `json:"verification_interval"` // How often to check CNAME delegation status
 	MaxAttempts          int           `json:"max_attempts"`          // Max verification attempts before marking as failed
 }
 
@@ -175,18 +177,18 @@ func NewConfig() *Config {
 			PlatformDomain:     getEnv("DNS_PLATFORM_DOMAIN", "tesserix.app"),
 		},
 		SSL: SSLConfig{
-			IssuerName:             getEnv("SSL_ISSUER_NAME", "letsencrypt-prod"),
-			IssuerKind:             getEnv("SSL_ISSUER_KIND", "ClusterIssuer"),
-			HTTP01IssuerName:       getEnv("SSL_HTTP01_ISSUER_NAME", "letsencrypt-prod-http01"),
-			NSDelegationIssuerName: getEnv("SSL_NS_DELEGATION_ISSUER_NAME", "letsencrypt-prod-ns-delegation"),
-			RenewalDaysBefore:      getIntEnv("SSL_RENEWAL_DAYS_BEFORE", 30),
-			CertificateNamespace:   getEnv("SSL_CERTIFICATE_NAMESPACE", "istio-system"),
+			IssuerName:                getEnv("SSL_ISSUER_NAME", "letsencrypt-prod"),
+			IssuerKind:                getEnv("SSL_ISSUER_KIND", "ClusterIssuer"),
+			HTTP01IssuerName:          getEnv("SSL_HTTP01_ISSUER_NAME", "letsencrypt-prod-http01"),
+			CNAMEDelegationIssuerName: getEnv("SSL_CNAME_DELEGATION_ISSUER_NAME", "letsencrypt-prod-cname-delegation"),
+			RenewalDaysBefore:         getIntEnv("SSL_RENEWAL_DAYS_BEFORE", 30),
+			CertificateNamespace:      getEnv("SSL_CERTIFICATE_NAMESPACE", "istio-system"),
 		},
-		NSDelegation: NSDelegationConfig{
-			Enabled:              getBoolEnv("NS_DELEGATION_ENABLED", false),
-			Nameservers:          getStringSliceEnv("NS_DELEGATION_NAMESERVERS", []string{"ns1.tesserix.app", "ns2.tesserix.app"}),
-			VerificationInterval: getDurationEnv("NS_DELEGATION_VERIFICATION_INTERVAL", 5*time.Minute),
-			MaxAttempts:          getIntEnv("NS_DELEGATION_MAX_ATTEMPTS", 100),
+		CNAMEDelegation: CNAMEDelegationConfig{
+			Enabled:              getBoolEnv("CNAME_DELEGATION_ENABLED", false),
+			ACMEZone:             getEnv("CNAME_DELEGATION_ACME_ZONE", "acme.tesserix.app"),
+			VerificationInterval: getDurationEnv("CNAME_DELEGATION_VERIFICATION_INTERVAL", 5*time.Minute),
+			MaxAttempts:          getIntEnv("CNAME_DELEGATION_MAX_ATTEMPTS", 100),
 		},
 		Cloudflare: CloudflareConfig{
 			Enabled:          getBoolEnv("CLOUDFLARE_TUNNEL_ENABLED", true),

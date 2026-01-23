@@ -108,9 +108,9 @@ func (w *DNSVerificationWorker) verifyDomain(ctx context.Context, domain *models
 		return
 	}
 
-	// Check NS delegation if enabled for this domain
-	if domain.NSDelegationEnabled && !domain.NSDelegationVerified && w.cfg.NSDelegation.Enabled {
-		w.verifyNSDelegation(ctx, domain)
+	// Check CNAME delegation if enabled for this domain
+	if domain.CNAMEDelegationEnabled && !domain.CNAMEDelegationVerified && w.cfg.CNAMEDelegation.Enabled {
+		w.verifyCNAMEDelegation(ctx, domain)
 	}
 
 	// Verify DNS ownership (TXT or CNAME record)
@@ -134,48 +134,48 @@ func (w *DNSVerificationWorker) verifyDomain(ctx context.Context, domain *models
 	}
 }
 
-// verifyNSDelegation checks if NS delegation is properly configured
-func (w *DNSVerificationWorker) verifyNSDelegation(ctx context.Context, domain *models.CustomDomain) {
+// verifyCNAMEDelegation checks if CNAME delegation is properly configured
+func (w *DNSVerificationWorker) verifyCNAMEDelegation(ctx context.Context, domain *models.CustomDomain) {
 	// Skip if already verified or too many attempts
-	if domain.NSDelegationVerified {
+	if domain.CNAMEDelegationVerified {
 		return
 	}
 
-	maxAttempts := w.cfg.NSDelegation.MaxAttempts
+	maxAttempts := w.cfg.CNAMEDelegation.MaxAttempts
 	if maxAttempts == 0 {
 		maxAttempts = 100
 	}
 
-	if domain.NSDelegationCheckAttempts >= maxAttempts {
+	if domain.CNAMEDelegationCheckAttempts >= maxAttempts {
 		log.Warn().
 			Str("domain", domain.Domain).
-			Int("attempts", domain.NSDelegationCheckAttempts).
-			Msg("NS delegation exceeded max verification attempts")
+			Int("attempts", domain.CNAMEDelegationCheckAttempts).
+			Msg("CNAME delegation exceeded max verification attempts")
 		return
 	}
 
-	// Verify NS delegation
-	nsResult, err := w.dnsVerifier.VerifyNSDelegation(ctx, domain.Domain)
+	// Verify CNAME delegation
+	cnameResult, err := w.dnsVerifier.VerifyCNAMEDelegation(ctx, domain.Domain)
 	if err != nil {
-		log.Error().Err(err).Str("domain", domain.Domain).Msg("NS delegation verification error")
+		log.Error().Err(err).Str("domain", domain.Domain).Msg("CNAME delegation verification error")
 		return
 	}
 
-	// Update NS delegation status
-	if err := w.repo.UpdateNSDelegationVerification(ctx, domain.ID, nsResult.IsVerified, domain.NSDelegationCheckAttempts+1); err != nil {
-		log.Error().Err(err).Str("domain", domain.Domain).Msg("Failed to update NS delegation status")
+	// Update CNAME delegation status
+	if err := w.repo.UpdateCNAMEDelegationVerification(ctx, domain.ID, cnameResult.IsVerified, domain.CNAMEDelegationCheckAttempts+1); err != nil {
+		log.Error().Err(err).Str("domain", domain.Domain).Msg("Failed to update CNAME delegation status")
 		return
 	}
 
-	if nsResult.IsVerified {
+	if cnameResult.IsVerified {
 		log.Info().
 			Str("domain", domain.Domain).
-			Strs("nameservers", nsResult.FoundNameservers).
-			Msg("NS delegation verified successfully - DNS-01 challenges now possible")
+			Str("cname_target", cnameResult.FoundCNAME).
+			Msg("CNAME delegation verified successfully - DNS-01 challenges now possible")
 	} else {
 		log.Debug().
 			Str("domain", domain.Domain).
-			Str("message", nsResult.Message).
-			Msg("NS delegation not yet verified")
+			Str("message", cnameResult.Message).
+			Msg("CNAME delegation not yet verified")
 	}
 }

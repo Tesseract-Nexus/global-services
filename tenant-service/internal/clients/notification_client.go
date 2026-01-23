@@ -63,27 +63,24 @@ type CustomDomainDNSConfig struct {
 	StorefrontHost string // Storefront host (e.g., "www.customdomain.com" or "customdomain.com")
 	APIHost        string // API host (e.g., "api.customdomain.com")
 
-	// Custom Domain Gateway IP - customers point A records to this IP
-	// This is the LoadBalancer IP of the custom-ingressgateway
-	// The IP is fetched from CUSTOM_DOMAIN_GATEWAY_IP environment variable
-	GatewayIP string // LoadBalancer IP (e.g., "34.151.169.37")
+	// Routing CNAME target - customers point their domain to this
+	// Using CNAME instead of IP is more secure (doesn't expose infrastructure IP)
+	// Example: proxy.tesserix.app or customers.tesserix.app
+	RoutingCNAMETarget string // CNAME target for routing (e.g., "proxy.tesserix.app")
 
 	// Tenant identification
 	TenantSlug string // The tenant slug (e.g., "awesome-store")
 	BaseDomain string // Platform base domain (e.g., "tesserix.app")
 
-	// NS Delegation for automatic SSL certificate management
-	// When enabled, customers add NS records to delegate _acme-challenge subdomain to our nameservers
-	// This allows automatic certificate issuance/renewal via DNS-01 ACME challenges
-	UseNSDelegation   bool     // If true, show NS delegation option in email
-	NameServers       []string // Our nameservers (e.g., ["ns1.tesserix.app", "ns2.tesserix.app"])
-	ACMEChallengeHost string   // The _acme-challenge subdomain (e.g., "_acme-challenge.customdomain.com")
+	// CNAME Delegation for automatic SSL certificate management
+	// Customer adds: _acme-challenge.theirdomain.com CNAME theirdomain-com.acme.tesserix.app
+	// cert-manager follows the CNAME and creates TXT records in our Cloudflare zone
+	UseCNAMEDelegation    bool   // If true, show CNAME delegation option in email
+	ACMEChallengeHost     string // The _acme-challenge subdomain (e.g., "_acme-challenge.customdomain.com")
+	ACMECNAMETarget       string // The CNAME target for ACME challenges (e.g., "customdomain-com.acme.tesserix.app")
 
-	// Deprecated: CNAME targets are no longer used - customers use A records to gateway IP
-	AdminCNAMETarget      string // Deprecated: kept for backwards compatibility
-	StorefrontCNAMETarget string // Deprecated: kept for backwards compatibility
-	APICNAMETarget        string // Deprecated: kept for backwards compatibility
-	TunnelCNAMETarget     string // Deprecated: kept for backwards compatibility
+	// Legacy: Gateway IP (deprecated - use RoutingCNAMETarget instead)
+	GatewayIP string // LoadBalancer IP - kept for backwards compatibility
 }
 
 // SendVerificationLinkEmail sends an email with a verification link via notification-service
@@ -194,134 +191,141 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
                                     🌐 ACTION REQUIRED: Set Up Your DNS Records
                                 </h2>
                                 <p style="color: #78350f; font-size: 15px; line-height: 1.6; margin: 0 0 20px;">
-                                    To use your custom domain <strong style="font-size: 16px;">{{.CustomDomain}}</strong>, you need to add A records pointing to our platform. <strong>You can do this now while your email is being verified!</strong>
+                                    To use your custom domain <strong style="font-size: 16px;">{{.CustomDomain}}</strong>, you need to add CNAME records pointing to our platform. <strong>You can do this now while your email is being verified!</strong>
                                 </p>
 
-                                <!-- Gateway IP highlight -->
-                                <div style="background-color: #ffffff; border-radius: 8px; padding: 20px; margin-bottom: 16px; text-align: center; border: 2px solid #10b981;">
-                                    <p style="color: #374151; font-size: 14px; margin: 0 0 8px;">All your domains should point to this IP address:</p>
-                                    <p style="color: #10b981; font-size: 28px; font-weight: 700; font-family: monospace; margin: 0; letter-spacing: 1px;">{{.GatewayIP}}</p>
-                                </div>
-
-                                <!-- Step-by-step Instructions -->
-                                <div style="background-color: #ffffff; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
-                                    <p style="color: #1f2937; font-size: 14px; font-weight: 600; margin: 0 0 16px;">
-                                        📝 Add these A records at your domain registrar (GoDaddy, Namecheap, Cloudflare, etc.):
+                                {{if .UseCNAMEDelegation}}
+                                <!-- CNAME Delegation Section - Automatic SSL Certificates (FIRST - Most Important) -->
+                                <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 12px; padding: 24px; margin-bottom: 20px;">
+                                    <h3 style="color: #ffffff; font-size: 18px; font-weight: 700; margin: 0 0 12px;">
+                                        🔐 Step 1: Enable Automatic SSL (Recommended)
+                                    </h3>
+                                    <p style="color: #d1fae5; font-size: 14px; line-height: 1.6; margin: 0 0 16px;">
+                                        Add this CNAME record once, and we'll <strong>automatically issue and renew SSL certificates</strong> for your domain forever!
                                     </p>
 
-                                    <!-- Step 1 - Root domain -->
+                                    <div style="background-color: rgba(255,255,255,0.95); border-radius: 8px; padding: 16px;">
+                                        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                                            <tr style="background-color: #f0fdf4;">
+                                                <th style="padding: 10px; text-align: left; color: #166534; border-bottom: 2px solid #10b981;">Type</th>
+                                                <th style="padding: 10px; text-align: left; color: #166534; border-bottom: 2px solid #10b981;">Host</th>
+                                                <th style="padding: 10px; text-align: left; color: #166534; border-bottom: 2px solid #10b981;">Value</th>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 12px 10px; font-family: monospace; font-weight: 600; color: #18181b;">CNAME</td>
+                                                <td style="padding: 12px 10px; font-family: monospace; color: #4b5563;">{{.ACMEChallengeHost}}</td>
+                                                <td style="padding: 12px 10px; font-family: monospace; color: #10b981; font-weight: 600;">{{.ACMECNAMETarget}}</td>
+                                            </tr>
+                                        </table>
+                                    </div>
+
+                                    <p style="color: #d1fae5; font-size: 12px; margin: 12px 0 0; line-height: 1.6;">
+                                        ✅ Certificates auto-renew without any action from you<br>
+                                        ✅ SSL can be issued <strong>before</strong> your domain points to us
+                                    </p>
+                                </div>
+                                {{end}}
+
+                                <!-- Routing CNAME target highlight -->
+                                <div style="background-color: #ffffff; border-radius: 8px; padding: 20px; margin-bottom: 16px; text-align: center; border: 2px solid #6366f1;">
+                                    <p style="color: #374151; font-size: 14px; margin: 0 0 8px;">All your domains should point to:</p>
+                                    <p style="color: #6366f1; font-size: 22px; font-weight: 700; font-family: monospace; margin: 0;">{{.RoutingCNAMETarget}}</p>
+                                </div>
+
+                                <!-- Step-by-step Instructions for Routing -->
+                                <div style="background-color: #ffffff; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
+                                    <p style="color: #1f2937; font-size: 14px; font-weight: 600; margin: 0 0 16px;">
+                                        📝 {{if .UseCNAMEDelegation}}Step 2: {{end}}Add these CNAME records for routing:
+                                    </p>
+
+                                    <!-- Storefront -->
                                     <div style="margin-bottom: 16px; padding-left: 12px; border-left: 3px solid #6366f1;">
-                                        <p style="color: #6366f1; font-size: 12px; font-weight: 600; margin: 0 0 4px; text-transform: uppercase;">Step 1 - Root Domain (Storefront)</p>
-                                        <p style="color: #374151; font-size: 13px; margin: 0 0 8px;">Add an A record for your main storefront:</p>
+                                        <p style="color: #6366f1; font-size: 12px; font-weight: 600; margin: 0 0 4px; text-transform: uppercase;">Storefront (www)</p>
                                         <table style="width: 100%; border-collapse: collapse; background-color: #f9fafb; border-radius: 6px;">
                                             <tr>
-                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280; width: 70px;">Type:</td>
-                                                <td style="padding: 10px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">A</td>
+                                                <td style="padding: 8px 12px; font-size: 12px; color: #6b7280; width: 60px;">Type:</td>
+                                                <td style="padding: 8px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">CNAME</td>
                                             </tr>
                                             <tr>
-                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280;">Name:</td>
-                                                <td style="padding: 10px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">@ <span style="color: #9ca3af; font-weight: normal;">(or leave blank)</span></td>
+                                                <td style="padding: 8px 12px; font-size: 12px; color: #6b7280;">Name:</td>
+                                                <td style="padding: 8px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">www</td>
                                             </tr>
                                             <tr>
-                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280;">Value:</td>
-                                                <td style="padding: 10px 12px; font-size: 14px; font-family: monospace; color: #10b981; background-color: #ecfdf5; border-radius: 4px;"><strong>{{.GatewayIP}}</strong></td>
+                                                <td style="padding: 8px 12px; font-size: 12px; color: #6b7280;">Value:</td>
+                                                <td style="padding: 8px 12px; font-size: 14px; font-family: monospace; color: #6366f1;"><strong>{{.RoutingCNAMETarget}}</strong></td>
                                             </tr>
                                         </table>
-                                        <p style="color: #6b7280; font-size: 11px; margin: 6px 0 0;">Enables: <strong>{{.CustomDomain}}</strong> → Your storefront</p>
                                     </div>
 
-                                    <!-- Step 2 - www subdomain -->
-                                    <div style="margin-bottom: 16px; padding-left: 12px; border-left: 3px solid #8b5cf6;">
-                                        <p style="color: #8b5cf6; font-size: 12px; font-weight: 600; margin: 0 0 4px; text-transform: uppercase;">Step 2 - WWW Subdomain</p>
-                                        <p style="color: #374151; font-size: 13px; margin: 0 0 8px;">Add an A record for www:</p>
-                                        <table style="width: 100%; border-collapse: collapse; background-color: #f9fafb; border-radius: 6px;">
-                                            <tr>
-                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280; width: 70px;">Type:</td>
-                                                <td style="padding: 10px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">A</td>
-                                            </tr>
-                                            <tr>
-                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280;">Name:</td>
-                                                <td style="padding: 10px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">www</td>
-                                            </tr>
-                                            <tr>
-                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280;">Value:</td>
-                                                <td style="padding: 10px 12px; font-size: 14px; font-family: monospace; color: #10b981; background-color: #ecfdf5; border-radius: 4px;"><strong>{{.GatewayIP}}</strong></td>
-                                            </tr>
-                                        </table>
-                                        <p style="color: #6b7280; font-size: 11px; margin: 6px 0 0;">Enables: <strong>www.{{.CustomDomain}}</strong> → Your storefront</p>
-                                    </div>
-
-                                    <!-- Step 3 - Admin -->
+                                    <!-- Admin -->
                                     <div style="margin-bottom: 16px; padding-left: 12px; border-left: 3px solid #10b981;">
-                                        <p style="color: #10b981; font-size: 12px; font-weight: 600; margin: 0 0 4px; text-transform: uppercase;">Step 3 - Admin Panel</p>
-                                        <p style="color: #374151; font-size: 13px; margin: 0 0 8px;">Add an A record for your admin dashboard:</p>
+                                        <p style="color: #10b981; font-size: 12px; font-weight: 600; margin: 0 0 4px; text-transform: uppercase;">Admin Panel</p>
                                         <table style="width: 100%; border-collapse: collapse; background-color: #f9fafb; border-radius: 6px;">
                                             <tr>
-                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280; width: 70px;">Type:</td>
-                                                <td style="padding: 10px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">A</td>
+                                                <td style="padding: 8px 12px; font-size: 12px; color: #6b7280; width: 60px;">Type:</td>
+                                                <td style="padding: 8px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">CNAME</td>
                                             </tr>
                                             <tr>
-                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280;">Name:</td>
-                                                <td style="padding: 10px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">admin</td>
+                                                <td style="padding: 8px 12px; font-size: 12px; color: #6b7280;">Name:</td>
+                                                <td style="padding: 8px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">admin</td>
                                             </tr>
                                             <tr>
-                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280;">Value:</td>
-                                                <td style="padding: 10px 12px; font-size: 14px; font-family: monospace; color: #10b981; background-color: #ecfdf5; border-radius: 4px;"><strong>{{.GatewayIP}}</strong></td>
+                                                <td style="padding: 8px 12px; font-size: 12px; color: #6b7280;">Value:</td>
+                                                <td style="padding: 8px 12px; font-size: 14px; font-family: monospace; color: #6366f1;"><strong>{{.RoutingCNAMETarget}}</strong></td>
                                             </tr>
                                         </table>
-                                        <p style="color: #6b7280; font-size: 11px; margin: 6px 0 0;">Enables: <strong>admin.{{.CustomDomain}}</strong> → Admin dashboard</p>
                                     </div>
 
-                                    <!-- Step 4 - API -->
+                                    <!-- API -->
                                     <div style="padding-left: 12px; border-left: 3px solid #f59e0b;">
-                                        <p style="color: #f59e0b; font-size: 12px; font-weight: 600; margin: 0 0 4px; text-transform: uppercase;">Step 4 - API Access (For Mobile Apps)</p>
-                                        <p style="color: #374151; font-size: 13px; margin: 0 0 8px;">Add an A record for API access:</p>
+                                        <p style="color: #f59e0b; font-size: 12px; font-weight: 600; margin: 0 0 4px; text-transform: uppercase;">API (Optional)</p>
                                         <table style="width: 100%; border-collapse: collapse; background-color: #f9fafb; border-radius: 6px;">
                                             <tr>
-                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280; width: 70px;">Type:</td>
-                                                <td style="padding: 10px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">A</td>
+                                                <td style="padding: 8px 12px; font-size: 12px; color: #6b7280; width: 60px;">Type:</td>
+                                                <td style="padding: 8px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">CNAME</td>
                                             </tr>
                                             <tr>
-                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280;">Name:</td>
-                                                <td style="padding: 10px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">api</td>
+                                                <td style="padding: 8px 12px; font-size: 12px; color: #6b7280;">Name:</td>
+                                                <td style="padding: 8px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">api</td>
                                             </tr>
                                             <tr>
-                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280;">Value:</td>
-                                                <td style="padding: 10px 12px; font-size: 14px; font-family: monospace; color: #10b981; background-color: #ecfdf5; border-radius: 4px;"><strong>{{.GatewayIP}}</strong></td>
+                                                <td style="padding: 8px 12px; font-size: 12px; color: #6b7280;">Value:</td>
+                                                <td style="padding: 8px 12px; font-size: 14px; font-family: monospace; color: #6366f1;"><strong>{{.RoutingCNAMETarget}}</strong></td>
                                             </tr>
                                         </table>
-                                        <p style="color: #6b7280; font-size: 11px; margin: 6px 0 0;">Enables: <strong>api.{{.CustomDomain}}</strong> → API endpoints</p>
                                     </div>
                                 </div>
 
                                 <!-- Summary table -->
                                 <div style="background-color: #ffffff; border-radius: 8px; padding: 16px; margin-bottom: 16px; border: 1px dashed #d1d5db;">
-                                    <p style="color: #374151; font-size: 13px; font-weight: 600; margin: 0 0 12px;">📋 Quick Reference - All A Records Point to: <span style="color: #10b981; font-family: monospace;">{{.GatewayIP}}</span></p>
+                                    <p style="color: #374151; font-size: 13px; font-weight: 600; margin: 0 0 12px;">📋 Quick Reference - All CNAME Records</p>
                                     <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
                                         <tr style="background-color: #f3f4f6;">
                                             <th style="padding: 8px; text-align: left; color: #374151; border-bottom: 1px solid #e5e7eb;">Type</th>
                                             <th style="padding: 8px; text-align: left; color: #374151; border-bottom: 1px solid #e5e7eb;">Name</th>
                                             <th style="padding: 8px; text-align: left; color: #374151; border-bottom: 1px solid #e5e7eb;">Value</th>
                                         </tr>
-                                        <tr>
-                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">A</td>
-                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">@</td>
-                                            <td style="padding: 8px; font-family: monospace; color: #10b981;">{{.GatewayIP}}</td>
+                                        {{if .UseCNAMEDelegation}}
+                                        <tr style="background-color: #f0fdf4;">
+                                            <td style="padding: 8px; font-family: monospace; color: #166534; font-weight: 600;">CNAME</td>
+                                            <td style="padding: 8px; font-family: monospace; color: #166534;">{{.ACMEChallengeHost}}</td>
+                                            <td style="padding: 8px; font-family: monospace; color: #166534;">{{.ACMECNAMETarget}}</td>
                                         </tr>
-                                        <tr style="background-color: #f9fafb;">
-                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">A</td>
+                                        {{end}}
+                                        <tr>
+                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">CNAME</td>
                                             <td style="padding: 8px; font-family: monospace; color: #4b5563;">www</td>
-                                            <td style="padding: 8px; font-family: monospace; color: #10b981;">{{.GatewayIP}}</td>
-                                        </tr>
-                                        <tr>
-                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">A</td>
-                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">admin</td>
-                                            <td style="padding: 8px; font-family: monospace; color: #10b981;">{{.GatewayIP}}</td>
+                                            <td style="padding: 8px; font-family: monospace; color: #6366f1;">{{.RoutingCNAMETarget}}</td>
                                         </tr>
                                         <tr style="background-color: #f9fafb;">
-                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">A</td>
+                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">CNAME</td>
+                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">admin</td>
+                                            <td style="padding: 8px; font-family: monospace; color: #6366f1;">{{.RoutingCNAMETarget}}</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">CNAME</td>
                                             <td style="padding: 8px; font-family: monospace; color: #4b5563;">api</td>
-                                            <td style="padding: 8px; font-family: monospace; color: #10b981;">{{.GatewayIP}}</td>
+                                            <td style="padding: 8px; font-family: monospace; color: #6366f1;">{{.RoutingCNAMETarget}}</td>
                                         </tr>
                                     </table>
                                 </div>
@@ -330,57 +334,13 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
                                 <div style="background-color: #ffffff; border-radius: 8px; padding: 12px; border-left: 4px solid #3b82f6;">
                                     <p style="color: #1e40af; font-size: 13px; margin: 0; line-height: 1.6;">
                                         💡 <strong>Tips:</strong><br>
-                                        • All subdomains use the <strong>same IP address</strong> - easy to configure!<br>
-                                        • DNS changes usually take <strong>5-30 minutes</strong> to propagate (max 48 hours)<br>
-                                        • We'll automatically provision an <strong>SSL certificate</strong> once DNS is configured<br>
-                                        • If using <strong>Cloudflare</strong>, you can keep DNS-only mode (gray cloud)
+                                        • All subdomains use the <strong>same CNAME target</strong> - easy to configure!<br>
+                                        • DNS changes usually take <strong>5-30 minutes</strong> to propagate<br>
+                                        • We'll automatically provision your <strong>SSL certificate</strong><br>
+                                        • If using <strong>Cloudflare</strong>, you can keep proxy mode enabled
                                     </p>
                                 </div>
                             </div>
-
-                            {{if .UseNSDelegation}}
-                            <!-- NS Delegation Section - Automatic SSL Certificates -->
-                            <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 12px; padding: 24px; margin-bottom: 24px;">
-                                <h2 style="color: #ffffff; font-size: 20px; font-weight: 700; margin: 0 0 12px;">
-                                    🔐 RECOMMENDED: Enable Automatic SSL Certificates
-                                </h2>
-                                <p style="color: #d1fae5; font-size: 14px; line-height: 1.6; margin: 0 0 20px;">
-                                    Add these NS records once, and we'll <strong>automatically issue and renew SSL certificates</strong> for your domain forever. No manual intervention needed!
-                                </p>
-
-                                <!-- NS Records Table -->
-                                <div style="background-color: rgba(255,255,255,0.95); border-radius: 8px; padding: 16px; margin-bottom: 16px;">
-                                    <p style="color: #374151; font-size: 13px; font-weight: 600; margin: 0 0 12px;">
-                                        📝 Add these NS records at your domain registrar:
-                                    </p>
-                                    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-                                        <tr style="background-color: #f0fdf4;">
-                                            <th style="padding: 10px; text-align: left; color: #166534; border-bottom: 2px solid #10b981;">Type</th>
-                                            <th style="padding: 10px; text-align: left; color: #166534; border-bottom: 2px solid #10b981;">Host</th>
-                                            <th style="padding: 10px; text-align: left; color: #166534; border-bottom: 2px solid #10b981;">Value</th>
-                                        </tr>
-                                        {{range .NameServers}}
-                                        <tr>
-                                            <td style="padding: 10px; font-family: monospace; color: #4b5563; border-bottom: 1px solid #e5e7eb;">NS</td>
-                                            <td style="padding: 10px; font-family: monospace; color: #4b5563; border-bottom: 1px solid #e5e7eb;">{{$.ACMEChallengeHost}}</td>
-                                            <td style="padding: 10px; font-family: monospace; color: #10b981; font-weight: 600; border-bottom: 1px solid #e5e7eb;">{{.}}</td>
-                                        </tr>
-                                        {{end}}
-                                    </table>
-                                </div>
-
-                                <!-- Benefits -->
-                                <div style="background-color: rgba(255,255,255,0.1); border-radius: 8px; padding: 12px;">
-                                    <p style="color: #d1fae5; font-size: 12px; margin: 0; line-height: 1.8;">
-                                        ✅ <strong>Benefits of NS Delegation:</strong><br>
-                                        • Certificates auto-renew without any action from you<br>
-                                        • SSL can be issued <strong>before</strong> your domain points to us<br>
-                                        • Supports wildcard certificates (*.yourdomain.com)<br>
-                                        • No renewal failures - ever!
-                                    </p>
-                                </div>
-                            </div>
-                            {{end}}
                             {{end}}
 
                             <!-- Security notice -->
@@ -416,27 +376,22 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
 	}
 
 	data := struct {
-		VerificationLink      string
-		BusinessName          string
-		Email                 string
-		ExpiryTime            string // Human-readable expiry time (e.g., "1 hour")
-		IsCustomDomain        bool
-		CustomDomain          string
-		AdminHost             string
-		StorefrontHost        string
-		APIHost               string
-		TenantSlug            string
-		GatewayIP             string // Custom domain gateway LoadBalancer IP
-		BaseDomain            string
-		// NS Delegation fields for automatic SSL
-		UseNSDelegation   bool
-		NameServers       []string
-		ACMEChallengeHost string
-		// Deprecated fields - kept for backwards compatibility
-		AdminCNAMETarget      string
-		StorefrontCNAMETarget string
-		APICNAMETarget        string
-		TunnelCNAMETarget     string
+		VerificationLink   string
+		BusinessName       string
+		Email              string
+		ExpiryTime         string // Human-readable expiry time (e.g., "1 hour")
+		IsCustomDomain     bool
+		CustomDomain       string
+		AdminHost          string
+		StorefrontHost     string
+		APIHost            string
+		TenantSlug         string
+		BaseDomain         string
+		RoutingCNAMETarget string // CNAME target for routing (e.g., "proxy.tesserix.app")
+		// CNAME Delegation fields for automatic SSL
+		UseCNAMEDelegation bool
+		ACMEChallengeHost  string // e.g., "_acme-challenge.customdomain.com"
+		ACMECNAMETarget    string // e.g., "customdomain-com.acme.tesserix.app"
 	}{
 		VerificationLink: verificationLink,
 		BusinessName:     businessName,
@@ -452,17 +407,12 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
 		data.StorefrontHost = dnsConfig.StorefrontHost
 		data.APIHost = dnsConfig.APIHost
 		data.TenantSlug = dnsConfig.TenantSlug
-		data.GatewayIP = dnsConfig.GatewayIP
 		data.BaseDomain = dnsConfig.BaseDomain
-		// NS Delegation fields for automatic SSL
-		data.UseNSDelegation = dnsConfig.UseNSDelegation
-		data.NameServers = dnsConfig.NameServers
+		data.RoutingCNAMETarget = dnsConfig.RoutingCNAMETarget
+		// CNAME Delegation fields for automatic SSL
+		data.UseCNAMEDelegation = dnsConfig.UseCNAMEDelegation
 		data.ACMEChallengeHost = dnsConfig.ACMEChallengeHost
-		// Deprecated fields
-		data.AdminCNAMETarget = dnsConfig.AdminCNAMETarget
-		data.StorefrontCNAMETarget = dnsConfig.StorefrontCNAMETarget
-		data.APICNAMETarget = dnsConfig.APICNAMETarget
-		data.TunnelCNAMETarget = dnsConfig.TunnelCNAMETarget
+		data.ACMECNAMETarget = dnsConfig.ACMECNAMETarget
 	}
 
 	var buf strings.Builder
