@@ -184,13 +184,31 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
                             </div>
 
                             {{if .IsCustomDomain}}
+                            <!-- CRITICAL: IP Address Highlight Box - Cannot be missed -->
+                            {{if .UseARecords}}
+                            <div style="background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); border-radius: 16px; padding: 28px; margin-bottom: 24px; text-align: center; box-shadow: 0 4px 20px rgba(220, 38, 38, 0.3);">
+                                <p style="color: #fecaca; font-size: 14px; font-weight: 600; margin: 0 0 8px; text-transform: uppercase; letter-spacing: 1px;">
+                                    ⚠️ REQUIRED - Point all domains to this IP address
+                                </p>
+                                <div style="background-color: rgba(255,255,255,0.95); border-radius: 12px; padding: 20px; margin: 12px 0;">
+                                    <p style="color: #dc2626; font-size: 36px; font-weight: 800; font-family: 'Courier New', monospace; margin: 0; letter-spacing: 2px;">
+                                        📋 {{.RoutingIP}}
+                                    </p>
+                                    <p style="color: #6b7280; font-size: 12px; margin: 8px 0 0;">Click to select, then copy (Ctrl+C / Cmd+C)</p>
+                                </div>
+                                <p style="color: #fecaca; font-size: 13px; margin: 12px 0 0;">
+                                    ⬆️ Add this IP as an <strong>A record</strong> for each subdomain below
+                                </p>
+                            </div>
+                            {{end}}
+
                             <!-- Custom Domain DNS Instructions - IMPORTANT -->
                             <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 12px; padding: 24px; margin-bottom: 24px; border: 2px solid #f59e0b;">
                                 <h2 style="color: #92400e; font-size: 20px; font-weight: 700; margin: 0 0 16px;">
                                     🌐 ACTION REQUIRED: Set Up Your DNS Records
                                 </h2>
                                 <p style="color: #78350f; font-size: 15px; line-height: 1.6; margin: 0 0 20px;">
-                                    To use your custom domain <strong style="font-size: 16px;">{{.CustomDomain}}</strong>, you need to add CNAME records pointing to our platform. <strong>You can do this now while your email is being verified!</strong>
+                                    To use your custom domain <strong style="font-size: 16px;">{{.CustomDomain}}</strong>, you need to add DNS records pointing to our platform. <strong>You can do this now while your email is being verified!</strong>
                                 </p>
 
                                 {{if .UseCNAMEDelegation}}
@@ -207,15 +225,16 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
                                         <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
                                             <tr style="background-color: #f0fdf4;">
                                                 <th style="padding: 10px; text-align: left; color: #166534; border-bottom: 2px solid #10b981;">Type</th>
-                                                <th style="padding: 10px; text-align: left; color: #166534; border-bottom: 2px solid #10b981;">Host</th>
-                                                <th style="padding: 10px; text-align: left; color: #166534; border-bottom: 2px solid #10b981;">Value</th>
+                                                <th style="padding: 10px; text-align: left; color: #166534; border-bottom: 2px solid #10b981;">Host 📋</th>
+                                                <th style="padding: 10px; text-align: left; color: #166534; border-bottom: 2px solid #10b981;">Value 📋</th>
                                             </tr>
                                             <tr>
                                                 <td style="padding: 12px 10px; font-family: monospace; font-weight: 600; color: #18181b;">CNAME</td>
-                                                <td style="padding: 12px 10px; font-family: monospace; color: #4b5563;">{{.ACMEChallengeHost}}</td>
-                                                <td style="padding: 12px 10px; font-family: monospace; color: #10b981; font-weight: 600;">{{.ACMECNAMETarget}}</td>
+                                                <td style="padding: 12px 10px; font-family: 'Courier New', monospace; color: #4b5563; background-color: #f0fdf4;">{{.ACMEChallengeHost}}</td>
+                                                <td style="padding: 12px 10px; font-family: 'Courier New', monospace; color: #10b981; font-weight: 600; background-color: #f0fdf4;">{{.ACMECNAMETarget}}</td>
                                             </tr>
                                         </table>
+                                        <p style="color: #6b7280; font-size: 11px; margin: 8px 0 0; text-align: center;">📋 Click each value to select, then Ctrl+C / Cmd+C to copy</p>
                                     </div>
 
                                     <p style="color: #d1fae5; font-size: 12px; margin: 12px 0 0; line-height: 1.6;">
@@ -225,148 +244,165 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
                                 </div>
                                 {{end}}
 
-                                <!-- Routing target highlight -->
+                                <!-- Routing target highlight - Secondary for A records since main highlight is above -->
+                                {{if not .UseARecords}}
                                 <div style="background-color: #ffffff; border-radius: 8px; padding: 20px; margin-bottom: 16px; text-align: center; border: 2px solid #6366f1;">
                                     <p style="color: #374151; font-size: 14px; margin: 0 0 8px;">All your domains should point to:</p>
-                                    {{if .UseARecords}}
-                                    <p style="color: #6366f1; font-size: 22px; font-weight: 700; font-family: monospace; margin: 0;">{{.RoutingIP}}</p>
-                                    <p style="color: #6b7280; font-size: 12px; margin: 8px 0 0;">(Use A records pointing to this IP address)</p>
-                                    {{else}}
-                                    <p style="color: #6366f1; font-size: 22px; font-weight: 700; font-family: monospace; margin: 0;">{{.RoutingCNAMETarget}}</p>
-                                    {{end}}
+                                    <p style="color: #6366f1; font-size: 22px; font-weight: 700; font-family: monospace; margin: 0;">📋 {{.RoutingCNAMETarget}}</p>
+                                    <p style="color: #6b7280; font-size: 11px; margin: 8px 0 0;">Click to select, then Ctrl+C / Cmd+C to copy</p>
                                 </div>
+                                {{end}}
 
                                 <!-- Step-by-step Instructions for Routing -->
-                                <div style="background-color: #ffffff; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
-                                    <p style="color: #1f2937; font-size: 14px; font-weight: 600; margin: 0 0 16px;">
+                                <div style="background-color: #ffffff; border-radius: 8px; padding: 20px; margin-bottom: 16px; border: 2px solid #e5e7eb;">
+                                    <p style="color: #1f2937; font-size: 16px; font-weight: 700; margin: 0 0 8px;">
                                         📝 {{if .UseCNAMEDelegation}}Step 2: {{end}}Add these {{if .UseARecords}}A{{else}}CNAME{{end}} records for routing:
                                     </p>
+                                    {{if .UseARecords}}
+                                    <p style="color: #dc2626; font-size: 13px; font-weight: 600; margin: 0 0 16px; background-color: #fef2f2; padding: 8px 12px; border-radius: 6px;">
+                                        ⚠️ All records below use the same IP: <span style="font-family: 'Courier New', monospace; font-size: 14px;">{{.RoutingIP}}</span>
+                                    </p>
+                                    {{end}}
 
                                     <!-- Root domain -->
-                                    <div style="margin-bottom: 16px; padding-left: 12px; border-left: 3px solid #8b5cf6;">
-                                        <p style="color: #8b5cf6; font-size: 12px; font-weight: 600; margin: 0 0 4px; text-transform: uppercase;">Root Domain</p>
+                                    <div style="margin-bottom: 16px; padding-left: 12px; border-left: 4px solid #8b5cf6;">
+                                        <p style="color: #8b5cf6; font-size: 13px; font-weight: 700; margin: 0 0 6px; text-transform: uppercase;">🏠 Root Domain ({{.CustomDomain}})</p>
                                         <table style="width: 100%; border-collapse: collapse; background-color: #f9fafb; border-radius: 6px;">
                                             <tr>
-                                                <td style="padding: 8px 12px; font-size: 12px; color: #6b7280; width: 60px;">Type:</td>
-                                                <td style="padding: 8px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">{{if .UseARecords}}A{{else}}CNAME{{end}}</td>
+                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280; width: 60px;">Type:</td>
+                                                <td style="padding: 10px 12px; font-size: 15px; font-family: 'Courier New', monospace; font-weight: 700; color: #18181b;">{{if .UseARecords}}A{{else}}CNAME{{end}}</td>
                                             </tr>
                                             <tr>
-                                                <td style="padding: 8px 12px; font-size: 12px; color: #6b7280;">Name:</td>
-                                                <td style="padding: 8px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">@</td>
+                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280;">Name:</td>
+                                                <td style="padding: 10px 12px; font-size: 15px; font-family: 'Courier New', monospace; font-weight: 700; color: #18181b;">@ <span style="color: #9ca3af; font-size: 11px;">(or leave empty)</span></td>
                                             </tr>
-                                            <tr>
-                                                <td style="padding: 8px 12px; font-size: 12px; color: #6b7280;">Value:</td>
-                                                <td style="padding: 8px 12px; font-size: 14px; font-family: monospace; color: #6366f1;"><strong>{{if .UseARecords}}{{.RoutingIP}}{{else}}{{.RoutingCNAMETarget}}{{end}}</strong></td>
+                                            <tr style="background-color: #fef2f2;">
+                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280;">Value:</td>
+                                                <td style="padding: 10px 12px; font-size: 15px; font-family: 'Courier New', monospace; color: #dc2626; font-weight: 700;">📋 {{if .UseARecords}}{{.RoutingIP}}{{else}}{{.RoutingCNAMETarget}}{{end}}</td>
                                             </tr>
                                         </table>
                                     </div>
 
                                     <!-- Storefront (www) -->
-                                    <div style="margin-bottom: 16px; padding-left: 12px; border-left: 3px solid #6366f1;">
-                                        <p style="color: #6366f1; font-size: 12px; font-weight: 600; margin: 0 0 4px; text-transform: uppercase;">Storefront (www)</p>
+                                    <div style="margin-bottom: 16px; padding-left: 12px; border-left: 4px solid #6366f1;">
+                                        <p style="color: #6366f1; font-size: 13px; font-weight: 700; margin: 0 0 6px; text-transform: uppercase;">🛍️ Storefront (www.{{.CustomDomain}})</p>
                                         <table style="width: 100%; border-collapse: collapse; background-color: #f9fafb; border-radius: 6px;">
                                             <tr>
-                                                <td style="padding: 8px 12px; font-size: 12px; color: #6b7280; width: 60px;">Type:</td>
-                                                <td style="padding: 8px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">{{if .UseARecords}}A{{else}}CNAME{{end}}</td>
+                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280; width: 60px;">Type:</td>
+                                                <td style="padding: 10px 12px; font-size: 15px; font-family: 'Courier New', monospace; font-weight: 700; color: #18181b;">{{if .UseARecords}}A{{else}}CNAME{{end}}</td>
                                             </tr>
                                             <tr>
-                                                <td style="padding: 8px 12px; font-size: 12px; color: #6b7280;">Name:</td>
-                                                <td style="padding: 8px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">www</td>
+                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280;">Name:</td>
+                                                <td style="padding: 10px 12px; font-size: 15px; font-family: 'Courier New', monospace; font-weight: 700; color: #18181b;">www</td>
                                             </tr>
-                                            <tr>
-                                                <td style="padding: 8px 12px; font-size: 12px; color: #6b7280;">Value:</td>
-                                                <td style="padding: 8px 12px; font-size: 14px; font-family: monospace; color: #6366f1;"><strong>{{if .UseARecords}}{{.RoutingIP}}{{else}}{{.RoutingCNAMETarget}}{{end}}</strong></td>
+                                            <tr style="background-color: #fef2f2;">
+                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280;">Value:</td>
+                                                <td style="padding: 10px 12px; font-size: 15px; font-family: 'Courier New', monospace; color: #dc2626; font-weight: 700;">📋 {{if .UseARecords}}{{.RoutingIP}}{{else}}{{.RoutingCNAMETarget}}{{end}}</td>
                                             </tr>
                                         </table>
                                     </div>
 
                                     <!-- Admin -->
-                                    <div style="margin-bottom: 16px; padding-left: 12px; border-left: 3px solid #10b981;">
-                                        <p style="color: #10b981; font-size: 12px; font-weight: 600; margin: 0 0 4px; text-transform: uppercase;">Admin Panel</p>
+                                    <div style="margin-bottom: 16px; padding-left: 12px; border-left: 4px solid #10b981;">
+                                        <p style="color: #10b981; font-size: 13px; font-weight: 700; margin: 0 0 6px; text-transform: uppercase;">⚙️ Admin Panel (admin.{{.CustomDomain}})</p>
                                         <table style="width: 100%; border-collapse: collapse; background-color: #f9fafb; border-radius: 6px;">
                                             <tr>
-                                                <td style="padding: 8px 12px; font-size: 12px; color: #6b7280; width: 60px;">Type:</td>
-                                                <td style="padding: 8px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">{{if .UseARecords}}A{{else}}CNAME{{end}}</td>
+                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280; width: 60px;">Type:</td>
+                                                <td style="padding: 10px 12px; font-size: 15px; font-family: 'Courier New', monospace; font-weight: 700; color: #18181b;">{{if .UseARecords}}A{{else}}CNAME{{end}}</td>
                                             </tr>
                                             <tr>
-                                                <td style="padding: 8px 12px; font-size: 12px; color: #6b7280;">Name:</td>
-                                                <td style="padding: 8px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">admin</td>
+                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280;">Name:</td>
+                                                <td style="padding: 10px 12px; font-size: 15px; font-family: 'Courier New', monospace; font-weight: 700; color: #18181b;">admin</td>
                                             </tr>
-                                            <tr>
-                                                <td style="padding: 8px 12px; font-size: 12px; color: #6b7280;">Value:</td>
-                                                <td style="padding: 8px 12px; font-size: 14px; font-family: monospace; color: #6366f1;"><strong>{{if .UseARecords}}{{.RoutingIP}}{{else}}{{.RoutingCNAMETarget}}{{end}}</strong></td>
+                                            <tr style="background-color: #fef2f2;">
+                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280;">Value:</td>
+                                                <td style="padding: 10px 12px; font-size: 15px; font-family: 'Courier New', monospace; color: #dc2626; font-weight: 700;">📋 {{if .UseARecords}}{{.RoutingIP}}{{else}}{{.RoutingCNAMETarget}}{{end}}</td>
                                             </tr>
                                         </table>
                                     </div>
 
                                     <!-- API -->
-                                    <div style="padding-left: 12px; border-left: 3px solid #f59e0b;">
-                                        <p style="color: #f59e0b; font-size: 12px; font-weight: 600; margin: 0 0 4px; text-transform: uppercase;">API (Optional)</p>
+                                    <div style="padding-left: 12px; border-left: 4px solid #f59e0b;">
+                                        <p style="color: #f59e0b; font-size: 13px; font-weight: 700; margin: 0 0 6px; text-transform: uppercase;">🔌 API (api.{{.CustomDomain}}) - Optional</p>
                                         <table style="width: 100%; border-collapse: collapse; background-color: #f9fafb; border-radius: 6px;">
                                             <tr>
-                                                <td style="padding: 8px 12px; font-size: 12px; color: #6b7280; width: 60px;">Type:</td>
-                                                <td style="padding: 8px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">{{if .UseARecords}}A{{else}}CNAME{{end}}</td>
+                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280; width: 60px;">Type:</td>
+                                                <td style="padding: 10px 12px; font-size: 15px; font-family: 'Courier New', monospace; font-weight: 700; color: #18181b;">{{if .UseARecords}}A{{else}}CNAME{{end}}</td>
                                             </tr>
                                             <tr>
-                                                <td style="padding: 8px 12px; font-size: 12px; color: #6b7280;">Name:</td>
-                                                <td style="padding: 8px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">api</td>
+                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280;">Name:</td>
+                                                <td style="padding: 10px 12px; font-size: 15px; font-family: 'Courier New', monospace; font-weight: 700; color: #18181b;">api</td>
                                             </tr>
-                                            <tr>
-                                                <td style="padding: 8px 12px; font-size: 12px; color: #6b7280;">Value:</td>
-                                                <td style="padding: 8px 12px; font-size: 14px; font-family: monospace; color: #6366f1;"><strong>{{if .UseARecords}}{{.RoutingIP}}{{else}}{{.RoutingCNAMETarget}}{{end}}</strong></td>
+                                            <tr style="background-color: #fef2f2;">
+                                                <td style="padding: 10px 12px; font-size: 12px; color: #6b7280;">Value:</td>
+                                                <td style="padding: 10px 12px; font-size: 15px; font-family: 'Courier New', monospace; color: #dc2626; font-weight: 700;">📋 {{if .UseARecords}}{{.RoutingIP}}{{else}}{{.RoutingCNAMETarget}}{{end}}</td>
                                             </tr>
                                         </table>
                                     </div>
                                 </div>
 
-                                <!-- Summary table -->
-                                <div style="background-color: #ffffff; border-radius: 8px; padding: 16px; margin-bottom: 16px; border: 1px dashed #d1d5db;">
-                                    <p style="color: #374151; font-size: 13px; font-weight: 600; margin: 0 0 12px;">📋 Quick Reference - All DNS Records</p>
-                                    <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
-                                        <tr style="background-color: #f3f4f6;">
-                                            <th style="padding: 8px; text-align: left; color: #374151; border-bottom: 1px solid #e5e7eb;">Type</th>
-                                            <th style="padding: 8px; text-align: left; color: #374151; border-bottom: 1px solid #e5e7eb;">Name</th>
-                                            <th style="padding: 8px; text-align: left; color: #374151; border-bottom: 1px solid #e5e7eb;">Value</th>
+                                <!-- Summary table - Easy Copy Reference -->
+                                <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); border-radius: 12px; padding: 20px; margin-bottom: 16px;">
+                                    <p style="color: #f1f5f9; font-size: 15px; font-weight: 700; margin: 0 0 16px;">📋 COPY-PASTE QUICK REFERENCE</p>
+                                    <p style="color: #94a3b8; font-size: 12px; margin: 0 0 12px;">Triple-click each row to select the entire line, then copy</p>
+                                    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                                        <tr style="background-color: rgba(255,255,255,0.1);">
+                                            <th style="padding: 10px; text-align: left; color: #e2e8f0; border-bottom: 2px solid #475569;">Type</th>
+                                            <th style="padding: 10px; text-align: left; color: #e2e8f0; border-bottom: 2px solid #475569;">Name</th>
+                                            <th style="padding: 10px; text-align: left; color: #e2e8f0; border-bottom: 2px solid #475569;">Value (📋 click to copy)</th>
                                         </tr>
                                         {{if .UseCNAMEDelegation}}
-                                        <tr style="background-color: #f0fdf4;">
-                                            <td style="padding: 8px; font-family: monospace; color: #166534; font-weight: 600;">CNAME</td>
-                                            <td style="padding: 8px; font-family: monospace; color: #166534;">{{.ACMEChallengeHost}}</td>
-                                            <td style="padding: 8px; font-family: monospace; color: #166534;">{{.ACMECNAMETarget}}</td>
+                                        <tr style="background-color: rgba(16, 185, 129, 0.2);">
+                                            <td style="padding: 10px; font-family: 'Courier New', monospace; color: #34d399; font-weight: 600;">CNAME</td>
+                                            <td style="padding: 10px; font-family: 'Courier New', monospace; color: #34d399;">{{.ACMEChallengeHost}}</td>
+                                            <td style="padding: 10px; font-family: 'Courier New', monospace; color: #34d399; font-weight: 600;">{{.ACMECNAMETarget}}</td>
                                         </tr>
                                         {{end}}
                                         <tr>
-                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">{{if .UseARecords}}A{{else}}CNAME{{end}}</td>
-                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">@</td>
-                                            <td style="padding: 8px; font-family: monospace; color: #6366f1;">{{if .UseARecords}}{{.RoutingIP}}{{else}}{{.RoutingCNAMETarget}}{{end}}</td>
+                                            <td style="padding: 10px; font-family: 'Courier New', monospace; color: #f8fafc; font-weight: 600;">{{if .UseARecords}}A{{else}}CNAME{{end}}</td>
+                                            <td style="padding: 10px; font-family: 'Courier New', monospace; color: #cbd5e1;">@</td>
+                                            <td style="padding: 10px; font-family: 'Courier New', monospace; color: #fbbf24; font-weight: 700;">{{if .UseARecords}}{{.RoutingIP}}{{else}}{{.RoutingCNAMETarget}}{{end}}</td>
                                         </tr>
-                                        <tr style="background-color: #f9fafb;">
-                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">{{if .UseARecords}}A{{else}}CNAME{{end}}</td>
-                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">www</td>
-                                            <td style="padding: 8px; font-family: monospace; color: #6366f1;">{{if .UseARecords}}{{.RoutingIP}}{{else}}{{.RoutingCNAMETarget}}{{end}}</td>
+                                        <tr style="background-color: rgba(255,255,255,0.05);">
+                                            <td style="padding: 10px; font-family: 'Courier New', monospace; color: #f8fafc; font-weight: 600;">{{if .UseARecords}}A{{else}}CNAME{{end}}</td>
+                                            <td style="padding: 10px; font-family: 'Courier New', monospace; color: #cbd5e1;">www</td>
+                                            <td style="padding: 10px; font-family: 'Courier New', monospace; color: #fbbf24; font-weight: 700;">{{if .UseARecords}}{{.RoutingIP}}{{else}}{{.RoutingCNAMETarget}}{{end}}</td>
                                         </tr>
                                         <tr>
-                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">{{if .UseARecords}}A{{else}}CNAME{{end}}</td>
-                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">admin</td>
-                                            <td style="padding: 8px; font-family: monospace; color: #6366f1;">{{if .UseARecords}}{{.RoutingIP}}{{else}}{{.RoutingCNAMETarget}}{{end}}</td>
+                                            <td style="padding: 10px; font-family: 'Courier New', monospace; color: #f8fafc; font-weight: 600;">{{if .UseARecords}}A{{else}}CNAME{{end}}</td>
+                                            <td style="padding: 10px; font-family: 'Courier New', monospace; color: #cbd5e1;">admin</td>
+                                            <td style="padding: 10px; font-family: 'Courier New', monospace; color: #fbbf24; font-weight: 700;">{{if .UseARecords}}{{.RoutingIP}}{{else}}{{.RoutingCNAMETarget}}{{end}}</td>
                                         </tr>
-                                        <tr style="background-color: #f9fafb;">
-                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">{{if .UseARecords}}A{{else}}CNAME{{end}}</td>
-                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">api</td>
-                                            <td style="padding: 8px; font-family: monospace; color: #6366f1;">{{if .UseARecords}}{{.RoutingIP}}{{else}}{{.RoutingCNAMETarget}}{{end}}</td>
+                                        <tr style="background-color: rgba(255,255,255,0.05);">
+                                            <td style="padding: 10px; font-family: 'Courier New', monospace; color: #f8fafc; font-weight: 600;">{{if .UseARecords}}A{{else}}CNAME{{end}}</td>
+                                            <td style="padding: 10px; font-family: 'Courier New', monospace; color: #cbd5e1;">api</td>
+                                            <td style="padding: 10px; font-family: 'Courier New', monospace; color: #fbbf24; font-weight: 700;">{{if .UseARecords}}{{.RoutingIP}}{{else}}{{.RoutingCNAMETarget}}{{end}}</td>
                                         </tr>
                                     </table>
                                 </div>
 
+                                <!-- Important Cloudflare Warning -->
+                                {{if .UseARecords}}
+                                <div style="background-color: #fef2f2; border-radius: 8px; padding: 16px; margin-bottom: 16px; border: 2px solid #dc2626;">
+                                    <p style="color: #dc2626; font-size: 14px; font-weight: 700; margin: 0 0 8px;">
+                                        ⚠️ IMPORTANT: Cloudflare Users
+                                    </p>
+                                    <p style="color: #991b1b; font-size: 13px; margin: 0; line-height: 1.6;">
+                                        If you use Cloudflare for DNS, you <strong>MUST</strong> set the proxy status to <strong>"DNS only"</strong> (grey cloud icon, not orange).
+                                        Otherwise your domain will not work correctly.
+                                    </p>
+                                </div>
+                                {{end}}
+
                                 <!-- Tips -->
-                                <div style="background-color: #ffffff; border-radius: 8px; padding: 12px; border-left: 4px solid #3b82f6;">
-                                    <p style="color: #1e40af; font-size: 13px; margin: 0; line-height: 1.6;">
+                                <div style="background-color: #eff6ff; border-radius: 8px; padding: 16px; border-left: 4px solid #3b82f6;">
+                                    <p style="color: #1e40af; font-size: 14px; margin: 0; line-height: 1.7;">
                                         💡 <strong>Tips:</strong><br>
                                         {{if .UseARecords}}
-                                        • All records point to the <strong>same IP address</strong> - easy to configure!<br>
+                                        • All A records point to the <strong>same IP address</strong>: <span style="font-family: 'Courier New', monospace; background-color: #dbeafe; padding: 2px 6px; border-radius: 4px;">{{.RoutingIP}}</span><br>
                                         • DNS changes usually take <strong>5-30 minutes</strong> to propagate<br>
-                                        • We'll automatically provision your <strong>SSL certificate</strong><br>
-                                        • If using <strong>Cloudflare</strong>, set the proxy status to <strong>"DNS only"</strong> (grey cloud)
+                                        • We'll automatically provision your <strong>SSL certificate</strong> once DNS is configured<br>
+                                        • Bookmark this email for reference when configuring your DNS
                                         {{else}}
                                         • All subdomains use the <strong>same CNAME target</strong> - easy to configure!<br>
                                         • DNS changes usually take <strong>5-30 minutes</strong> to propagate<br>
