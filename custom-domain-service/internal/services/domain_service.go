@@ -288,8 +288,8 @@ func (s *DomainService) ValidateDomain(ctx context.Context, req *ValidateDomainR
 		if req.TenantID != "" {
 			tenantUUID, parseErr := uuid.Parse(req.TenantID)
 			if parseErr == nil {
-				// Generate tenant-specific CNAME delegation target for automatic SSL
-				cnameDelegationTarget := s.dnsVerifier.GetCNAMEDelegationTargetForTenant(domainName, req.TenantID)
+				// Generate slug-specific CNAME delegation target for automatic SSL
+				cnameDelegationTarget := s.dnsVerifier.GetCNAMEDelegationTargetForSlug(domainName, req.TenantSlug)
 
 				// Create pending domain record linked to tenant
 				pendingDomain := &models.CustomDomain{
@@ -430,19 +430,22 @@ func (s *DomainService) ValidateDomain(ctx context.Context, req *ValidateDomainR
 	}
 	response.RoutingRecords = routingRecords
 
-	// Build CNAME delegation record for automatic SSL (unique per tenant + domain)
-	// Format: _acme-challenge.theirdomain.com CNAME theirdomain-com-{tenant-short-id}.acme.tesserix.app
-	// This ensures each tenant gets a unique CNAME target, preventing cross-tenant certificate hijacking
+	// Build CNAME delegation record for automatic SSL (unique per store + domain)
+	// Format: _acme-challenge.theirdomain.com CNAME theirdomain-com-{slug}.acme.tesserix.app
+	// This ensures each store gets a unique CNAME target, preventing cross-tenant certificate hijacking
+	// Uses the unique store slug (business name identifier) which is available during onboarding
 	if s.cfg.CNAMEDelegation.Enabled {
 		response.CNAMEDelegationEnabled = true
-		// Use tenant-specific CNAME target if tenant ID is provided
-		cnameTarget := s.dnsVerifier.GetCNAMEDelegationTargetForTenant(domainName, req.TenantID)
-		response.CNAMEDelegationRecord = &models.DNSRecord{
-			RecordType: "CNAME",
-			Host:       "_acme-challenge." + domainName,
-			Value:      cnameTarget,
-			TTL:        3600,
-			Purpose:    "cname_delegation (automatic SSL - tenant specific)",
+		// Use slug-specific CNAME target for uniqueness
+		cnameTarget := s.dnsVerifier.GetCNAMEDelegationTargetForSlug(domainName, req.TenantSlug)
+		if cnameTarget != "" {
+			response.CNAMEDelegationRecord = &models.DNSRecord{
+				RecordType: "CNAME",
+				Host:       "_acme-challenge." + domainName,
+				Value:      cnameTarget,
+				TTL:        3600,
+				Purpose:    "cname_delegation (automatic SSL - unique per store)",
+			}
 		}
 	}
 

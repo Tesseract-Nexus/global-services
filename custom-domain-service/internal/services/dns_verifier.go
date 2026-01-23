@@ -143,14 +143,11 @@ func (v *DNSVerifier) GetCNAMEDelegationTarget(domain string) string {
 }
 
 // GetCNAMEDelegationTargetForTenant returns a tenant-specific CNAME target for automatic SSL
-// Format: {domain-sanitized}-{tenant-short-id}.acme.tesserix.app
-// This ensures each tenant gets a unique target, preventing cross-tenant certificate hijacking
-// e.g., domain="store.example.com", tenantID="a1b2c3d4-..." -> "store-example-com-a1b2c3d4.acme.tesserix.app"
+// Deprecated: Use GetCNAMEDelegationTargetForSlug instead
 func (v *DNSVerifier) GetCNAMEDelegationTargetForTenant(domain, tenantID string) string {
 	// Sanitize domain name: replace dots with dashes
 	sanitized := strings.ReplaceAll(domain, ".", "-")
 
-	// Use first 8 chars of tenant ID for uniqueness (UUID is globally unique)
 	tenantShort := ""
 	if len(tenantID) >= 8 {
 		tenantShort = tenantID[:8]
@@ -158,12 +155,36 @@ func (v *DNSVerifier) GetCNAMEDelegationTargetForTenant(domain, tenantID string)
 		tenantShort = tenantID
 	}
 
-	// If no tenant ID, fall back to domain-only target
 	if tenantShort == "" {
 		return sanitized + "." + v.cfg.CNAMEDelegation.ACMEZone
 	}
 
 	return sanitized + "-" + tenantShort + "." + v.cfg.CNAMEDelegation.ACMEZone
+}
+
+// GetCNAMEDelegationTargetForSlug returns a slug-specific CNAME target for automatic SSL
+// Format: {domain-sanitized}-{slug}.acme.tesserix.app
+// This ensures each store gets a unique target, preventing cross-tenant certificate hijacking
+// e.g., domain="store.example.com", slug="yahvismartfarm" -> "store-example-com-yahvismartfarm.acme.tesserix.app"
+// The slug is the unique business/store identifier available during onboarding
+func (v *DNSVerifier) GetCNAMEDelegationTargetForSlug(domain, slug string) string {
+	// Sanitize domain name: replace dots with dashes
+	sanitizedDomain := strings.ReplaceAll(domain, ".", "-")
+
+	// Sanitize slug: lowercase, replace spaces/special chars with dashes
+	sanitizedSlug := strings.ToLower(slug)
+	sanitizedSlug = strings.ReplaceAll(sanitizedSlug, " ", "-")
+	sanitizedSlug = strings.ReplaceAll(sanitizedSlug, "_", "-")
+
+	// If no slug provided, return empty - ACME CNAME requires unique identifier
+	if sanitizedSlug == "" {
+		log.Debug().
+			Str("domain", domain).
+			Msg("No slug provided for CNAME delegation target - ACME CNAME will not be generated")
+		return ""
+	}
+
+	return sanitizedDomain + "-" + sanitizedSlug + "." + v.cfg.CNAMEDelegation.ACMEZone
 }
 
 // GetCNAMEDelegationRecord returns the CNAME record needed for CNAME delegation setup

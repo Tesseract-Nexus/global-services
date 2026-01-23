@@ -317,21 +317,29 @@ func (s *VerificationService) buildDNSConfigFromSession(session *models.Onboardi
 	useARecords := routingIP != ""
 	routingCNAMETarget := fmt.Sprintf("proxy.%s", baseDomain) // fallback if IP not configured
 
-	// Build unique ACME CNAME target for this domain + session combination
-	// Format: {domain-sanitized}-{session-short-id}.acme.tesserix.app
-	// We use session ID (not tenant ID) because tenant ID may not exist yet during onboarding
-	// This ensures each onboarding session gets a unique target, preventing cross-tenant certificate hijacking
-	// e.g., domain="store.example.com", sessionID="a1b2c3d4-..." -> "store-example-com-a1b2c3d4.acme.tesserix.app"
+	// Build unique ACME CNAME target for this domain + slug combination
+	// Format: {domain-sanitized}-{slug}.acme.tesserix.app
+	// We use the store slug (business name identifier) as it's unique per tenant and available during onboarding
+	// This ensures each store gets a unique target, preventing cross-tenant certificate hijacking
+	// e.g., domain="store.example.com", slug="yahvismartfarm" -> "store-example-com-yahvismartfarm.acme.tesserix.app"
 	sanitizedDomain := strings.ReplaceAll(domain, ".", "-")
 	acmeZone := fmt.Sprintf("acme.%s", baseDomain)
 
-	// Get session short ID for uniqueness (first 8 chars of UUID)
-	// Session ID is always available during onboarding, unlike tenant ID
-	sessionShortID := session.ID.String()[:8]
+	// Sanitize the slug for DNS compatibility
+	sanitizedSlug := strings.ToLower(slug)
+	sanitizedSlug = strings.ReplaceAll(sanitizedSlug, " ", "-")
+	sanitizedSlug = strings.ReplaceAll(sanitizedSlug, "_", "-")
 
-	// Build ACME CNAME target with session-specific suffix
-	acmeCNAMETarget := fmt.Sprintf("%s-%s.%s", sanitizedDomain, sessionShortID, acmeZone)
-	log.Printf("[VerificationService] Generated session-specific ACME CNAME target: %s (session: %s)", acmeCNAMETarget, session.ID)
+	// Build ACME CNAME target with slug-specific suffix
+	var acmeCNAMETarget string
+	if sanitizedSlug != "" {
+		acmeCNAMETarget = fmt.Sprintf("%s-%s.%s", sanitizedDomain, sanitizedSlug, acmeZone)
+		log.Printf("[VerificationService] Generated slug-specific ACME CNAME target: %s (slug: %s)", acmeCNAMETarget, slug)
+	} else {
+		// Fallback if no slug (shouldn't happen in normal flow)
+		acmeCNAMETarget = fmt.Sprintf("%s.%s", sanitizedDomain, acmeZone)
+		log.Printf("[VerificationService] Warning: No slug available, using domain-only ACME CNAME target: %s", acmeCNAMETarget)
+	}
 
 	return &clients.CustomDomainDNSConfig{
 		IsCustomDomain: true,
