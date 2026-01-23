@@ -41,6 +41,15 @@ type VerificationResult struct {
 	CheckedAt      time.Time
 }
 
+// NSDelegationResult contains the result of NS delegation verification
+type NSDelegationResult struct {
+	IsVerified       bool
+	FoundNameservers []string
+	ExpectedNS       []string
+	Message          string
+	CheckedAt        time.Time
+}
+
 // VerifyDomain verifies DNS configuration for a domain
 func (v *DNSVerifier) VerifyDomain(ctx context.Context, domain *models.CustomDomain) (*VerificationResult, error) {
 	result := &VerificationResult{
@@ -55,6 +64,103 @@ func (v *DNSVerifier) VerifyDomain(ctx context.Context, domain *models.CustomDom
 	default:
 		return v.verifyTXTRecord(ctx, domain, result)
 	}
+}
+
+// VerifyNSDelegation checks if _acme-challenge.{domain} NS records point to our nameservers
+// This enables DNS-01 ACME challenges for automatic certificate management
+func (v *DNSVerifier) VerifyNSDelegation(ctx context.Context, domain string) (*NSDelegationResult, error) {
+	result := &NSDelegationResult{
+		CheckedAt:  time.Now(),
+		ExpectedNS: v.cfg.NSDelegation.Nameservers,
+	}
+
+	if !v.cfg.NSDelegation.Enabled {
+		result.Message = "NS delegation feature is not enabled"
+		return result, nil
+	}
+
+	// Check NS records for _acme-challenge.{domain}
+	challengeHost := "_acme-challenge." + domain
+
+	nsRecords, err := v.resolver.LookupNS(ctx, challengeHost)
+	if err != nil {
+		if dnsErr, ok := err.(*net.DNSError); ok {
+			if dnsErr.IsNotFound {
+				result.Message = fmt.Sprintf("NS records not found for %s. Please add NS records pointing to %v",
+					challengeHost, v.cfg.NSDelegation.Nameservers)
+				return result, nil
+			}
+		}
+		log.Warn().Err(err).Str("host", challengeHost).Msg("NS delegation lookup failed")
+		result.Message = "DNS lookup failed. Please try again later."
+		return result, nil
+	}
+
+	// Extract hostnames from NS records
+	foundNS := make([]string, 0, len(nsRecords))
+	for _, ns := range nsRecords {
+		// Remove trailing dot and convert to lowercase
+		host := strings.TrimSuffix(strings.ToLower(ns.Host), ".")
+		foundNS = append(foundNS, host)
+	}
+	result.FoundNameservers = foundNS
+
+	// Check if any of our expected nameservers are in the NS records
+	matchCount := 0
+	for _, found := range foundNS {
+		for _, expected := range v.cfg.NSDelegation.Nameservers {
+			expectedLower := strings.ToLower(expected)
+			if found == expectedLower || found == expectedLower+"." {
+				matchCount++
+				break
+			}
+		}
+	}
+
+	// Consider verified if at least one of our nameservers is in the NS records
+	if matchCount > 0 {
+		result.IsVerified = true
+		result.Message = fmt.Sprintf("NS delegation verified. Found %d of our nameservers delegated for %s",
+			matchCount, challengeHost)
+		log.Info().
+			Str("domain", domain).
+			Strs("found_ns", foundNS).
+			Int("match_count", matchCount).
+			Msg("NS delegation verified successfully")
+	} else {
+		result.Message = fmt.Sprintf("NS records found at %s but none point to our nameservers. Found: %v, Expected: %v",
+			challengeHost, foundNS, v.cfg.NSDelegation.Nameservers)
+		log.Info().
+			Str("domain", domain).
+			Strs("found_ns", foundNS).
+			Strs("expected_ns", v.cfg.NSDelegation.Nameservers).
+			Msg("NS delegation not verified - nameservers don't match")
+	}
+
+	return result, nil
+}
+
+// GetNSDelegationRecords returns the NS records needed for NS delegation setup
+func (v *DNSVerifier) GetNSDelegationRecords(domain string) []models.DNSRecord {
+	if !v.cfg.NSDelegation.Enabled {
+		return nil
+	}
+
+	records := make([]models.DNSRecord, 0, len(v.cfg.NSDelegation.Nameservers))
+	challengeHost := "_acme-challenge." + domain
+
+	for _, ns := range v.cfg.NSDelegation.Nameservers {
+		records = append(records, models.DNSRecord{
+			RecordType: "NS",
+			Host:       challengeHost,
+			Value:      ns,
+			TTL:        3600,
+			Purpose:    "ns_delegation",
+			IsVerified: false,
+		})
+	}
+
+	return records
 }
 
 // verifyTXTRecord verifies TXT record for domain ownership
@@ -215,8 +321,25 @@ func (v *DNSVerifier) CheckARecord(ctx context.Context, domain string) (bool, []
 }
 
 // GetRequiredDNSRecords returns the DNS records needed for domain setup
+// This includes NS delegation records when enabled for automatic certificate management
 func (v *DNSVerifier) GetRequiredDNSRecords(domain *models.CustomDomain) []models.DNSRecord {
 	records := []models.DNSRecord{}
+
+	// NS Delegation records for automatic SSL (recommended when enabled)
+	// Customer delegates _acme-challenge.{domain} to our nameservers
+	if v.cfg.NSDelegation.Enabled && domain.NSDelegationEnabled {
+		challengeHost := "_acme-challenge." + domain.Domain
+		for _, ns := range v.cfg.NSDelegation.Nameservers {
+			records = append(records, models.DNSRecord{
+				RecordType: "NS",
+				Host:       challengeHost,
+				Value:      ns,
+				TTL:        3600,
+				Purpose:    "ns_delegation (automatic SSL)",
+				IsVerified: domain.NSDelegationVerified,
+			})
+		}
+	}
 
 	// Determine CNAME target based on configuration
 	// Priority: Cloudflare Tunnel > Tenant subdomain > Proxy domain

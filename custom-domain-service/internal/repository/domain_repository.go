@@ -147,6 +147,29 @@ func (r *DomainRepository) UpdateDNSVerification(ctx context.Context, id uuid.UU
 	return r.db.WithContext(ctx).Model(&models.CustomDomain{}).Where("id = ?", id).Updates(updates).Error
 }
 
+// UpdateNSDelegationVerification updates NS delegation verification status
+func (r *DomainRepository) UpdateNSDelegationVerification(ctx context.Context, id uuid.UUID, verified bool, attempts int) error {
+	updates := map[string]interface{}{
+		"ns_delegation_verified":        verified,
+		"ns_delegation_last_checked_at": time.Now(),
+		"ns_delegation_check_attempts":  attempts,
+		"updated_at":                    time.Now(),
+	}
+	if verified {
+		now := time.Now()
+		updates["ns_delegation_verified_at"] = &now
+	}
+	return r.db.WithContext(ctx).Model(&models.CustomDomain{}).Where("id = ?", id).Updates(updates).Error
+}
+
+// EnableNSDelegation enables NS delegation for a domain
+func (r *DomainRepository) EnableNSDelegation(ctx context.Context, id uuid.UUID, enabled bool) error {
+	return r.db.WithContext(ctx).Model(&models.CustomDomain{}).Where("id = ?", id).Updates(map[string]interface{}{
+		"ns_delegation_enabled": enabled,
+		"updated_at":            time.Now(),
+	}).Error
+}
+
 // UpdateSSLStatus updates SSL certificate status
 func (r *DomainRepository) UpdateSSLStatus(ctx context.Context, id uuid.UUID, status models.SSLStatus, secretName string, expiresAt *time.Time, lastError string) error {
 	updates := map[string]interface{}{

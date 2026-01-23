@@ -9,18 +9,19 @@ import (
 )
 
 type Config struct {
-	Server     ServerConfig     `json:"server"`
-	Database   DatabaseConfig   `json:"database"`
-	Redis      RedisConfig      `json:"redis"`
-	NATS       NATSConfig       `json:"nats"`
-	Keycloak   KeycloakConfig   `json:"keycloak"`
-	Istio      IstioConfig      `json:"istio"`
-	DNS        DNSConfig        `json:"dns"`
-	SSL        SSLConfig        `json:"ssl"`
-	Cloudflare CloudflareConfig `json:"cloudflare"`
-	Limits     LimitsConfig     `json:"limits"`
-	Tenant     TenantConfig     `json:"tenant"`
-	Workers    WorkersConfig    `json:"workers"`
+	Server       ServerConfig       `json:"server"`
+	Database     DatabaseConfig     `json:"database"`
+	Redis        RedisConfig        `json:"redis"`
+	NATS         NATSConfig         `json:"nats"`
+	Keycloak     KeycloakConfig     `json:"keycloak"`
+	Istio        IstioConfig        `json:"istio"`
+	DNS          DNSConfig          `json:"dns"`
+	SSL          SSLConfig          `json:"ssl"`
+	NSDelegation NSDelegationConfig `json:"ns_delegation"`
+	Cloudflare   CloudflareConfig   `json:"cloudflare"`
+	Limits       LimitsConfig       `json:"limits"`
+	Tenant       TenantConfig       `json:"tenant"`
+	Workers      WorkersConfig      `json:"workers"`
 }
 
 type ServerConfig struct {
@@ -78,11 +79,20 @@ type DNSConfig struct {
 }
 
 type SSLConfig struct {
-	IssuerName           string `json:"issuer_name"`
-	IssuerKind           string `json:"issuer_kind"`
-	HTTP01IssuerName     string `json:"http01_issuer_name"`     // Issuer for HTTP-01 challenges (custom domains)
-	RenewalDaysBefore    int    `json:"renewal_days_before"`
-	CertificateNamespace string `json:"certificate_namespace"`
+	IssuerName             string `json:"issuer_name"`
+	IssuerKind             string `json:"issuer_kind"`
+	HTTP01IssuerName       string `json:"http01_issuer_name"`        // Issuer for HTTP-01 challenges (custom domains)
+	NSDelegationIssuerName string `json:"ns_delegation_issuer_name"` // Issuer for DNS-01 challenges (NS-delegated domains)
+	RenewalDaysBefore      int    `json:"renewal_days_before"`
+	CertificateNamespace   string `json:"certificate_namespace"`
+}
+
+// NSDelegationConfig holds NS delegation configuration for automatic certificate management
+type NSDelegationConfig struct {
+	Enabled              bool          `json:"enabled"`               // Enable NS delegation feature
+	Nameservers          []string      `json:"nameservers"`           // Nameservers customers delegate to (e.g., ns1.tesserix.app)
+	VerificationInterval time.Duration `json:"verification_interval"` // How often to check NS delegation status
+	MaxAttempts          int           `json:"max_attempts"`          // Max verification attempts before marking as failed
 }
 
 type LimitsConfig struct {
@@ -165,11 +175,18 @@ func NewConfig() *Config {
 			PlatformDomain:     getEnv("DNS_PLATFORM_DOMAIN", "tesserix.app"),
 		},
 		SSL: SSLConfig{
-			IssuerName:           getEnv("SSL_ISSUER_NAME", "letsencrypt-prod"),
-			IssuerKind:           getEnv("SSL_ISSUER_KIND", "ClusterIssuer"),
-			HTTP01IssuerName:     getEnv("SSL_HTTP01_ISSUER_NAME", "letsencrypt-prod-http01"),
-			RenewalDaysBefore:    getIntEnv("SSL_RENEWAL_DAYS_BEFORE", 30),
-			CertificateNamespace: getEnv("SSL_CERTIFICATE_NAMESPACE", "istio-system"),
+			IssuerName:             getEnv("SSL_ISSUER_NAME", "letsencrypt-prod"),
+			IssuerKind:             getEnv("SSL_ISSUER_KIND", "ClusterIssuer"),
+			HTTP01IssuerName:       getEnv("SSL_HTTP01_ISSUER_NAME", "letsencrypt-prod-http01"),
+			NSDelegationIssuerName: getEnv("SSL_NS_DELEGATION_ISSUER_NAME", "letsencrypt-prod-ns-delegation"),
+			RenewalDaysBefore:      getIntEnv("SSL_RENEWAL_DAYS_BEFORE", 30),
+			CertificateNamespace:   getEnv("SSL_CERTIFICATE_NAMESPACE", "istio-system"),
+		},
+		NSDelegation: NSDelegationConfig{
+			Enabled:              getBoolEnv("NS_DELEGATION_ENABLED", false),
+			Nameservers:          getStringSliceEnv("NS_DELEGATION_NAMESERVERS", []string{"ns1.tesserix.app", "ns2.tesserix.app"}),
+			VerificationInterval: getDurationEnv("NS_DELEGATION_VERIFICATION_INTERVAL", 5*time.Minute),
+			MaxAttempts:          getIntEnv("NS_DELEGATION_MAX_ATTEMPTS", 100),
 		},
 		Cloudflare: CloudflareConfig{
 			Enabled:          getBoolEnv("CLOUDFLARE_TUNNEL_ENABLED", true),
@@ -266,4 +283,58 @@ func getBoolEnv(key string, fallback bool) bool {
 		return value == "true" || value == "1" || value == "yes"
 	}
 	return fallback
+}
+
+func getStringSliceEnv(key string, fallback []string) []string {
+	if value := os.Getenv(key); value != "" {
+		// Split by comma, trim whitespace
+		parts := make([]string, 0)
+		for _, part := range splitAndTrim(value, ",") {
+			if part != "" {
+				parts = append(parts, part)
+			}
+		}
+		if len(parts) > 0 {
+			return parts
+		}
+	}
+	return fallback
+}
+
+func splitAndTrim(s, sep string) []string {
+	parts := make([]string, 0)
+	for _, part := range splitString(s, sep) {
+		trimmed := trimSpace(part)
+		parts = append(parts, trimmed)
+	}
+	return parts
+}
+
+func splitString(s, sep string) []string {
+	if s == "" {
+		return nil
+	}
+	result := make([]string, 0)
+	start := 0
+	for i := 0; i <= len(s)-len(sep); i++ {
+		if s[i:i+len(sep)] == sep {
+			result = append(result, s[start:i])
+			start = i + len(sep)
+			i += len(sep) - 1
+		}
+	}
+	result = append(result, s[start:])
+	return result
+}
+
+func trimSpace(s string) string {
+	start := 0
+	end := len(s)
+	for start < end && (s[start] == ' ' || s[start] == '\t') {
+		start++
+	}
+	for end > start && (s[end-1] == ' ' || s[end-1] == '\t') {
+		end--
+	}
+	return s[start:end]
 }

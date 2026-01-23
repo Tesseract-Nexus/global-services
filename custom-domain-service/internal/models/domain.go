@@ -113,6 +113,15 @@ type CustomDomain struct {
 	CloudflareZoneID           string     `json:"cloudflare_zone_id" gorm:"size:100"`
 	TunnelLastCheckedAt        *time.Time `json:"tunnel_last_checked_at"`
 
+	// NS Delegation for automatic certificate management
+	// When enabled, certificates are issued via DNS-01 challenges instead of HTTP-01
+	// Customer delegates _acme-challenge.{domain} NS records to our nameservers
+	NSDelegationEnabled       bool       `json:"ns_delegation_enabled" gorm:"default:false"`
+	NSDelegationVerified      bool       `json:"ns_delegation_verified" gorm:"default:false"`
+	NSDelegationVerifiedAt    *time.Time `json:"ns_delegation_verified_at"`
+	NSDelegationCheckAttempts int        `json:"ns_delegation_check_attempts" gorm:"default:0"`
+	NSDelegationLastCheckedAt *time.Time `json:"ns_delegation_last_checked_at"`
+
 	// Overall Status
 	Status        DomainStatus `json:"status" gorm:"size:20;default:'pending';index"`
 	StatusMessage string       `json:"status_message" gorm:"size:500"`
@@ -165,6 +174,16 @@ func (d *CustomDomain) IsActive() bool {
 // CanRetryVerification returns true if verification can be retried
 func (d *CustomDomain) CanRetryVerification() bool {
 	return d.Status == DomainStatusPending || d.Status == DomainStatusVerifying || d.Status == DomainStatusFailed
+}
+
+// IsNSDelegationReady returns true if NS delegation is verified and ready for DNS-01 challenges
+func (d *CustomDomain) IsNSDelegationReady() bool {
+	return d.NSDelegationEnabled && d.NSDelegationVerified && d.NSDelegationVerifiedAt != nil
+}
+
+// GetACMEChallengeHost returns the ACME challenge subdomain for NS delegation
+func (d *CustomDomain) GetACMEChallengeHost() string {
+	return "_acme-challenge." + d.Domain
 }
 
 // GetAllHosts returns all hosts for this domain (including www if enabled)

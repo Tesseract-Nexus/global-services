@@ -665,6 +665,158 @@ func (h *DomainHandlers) VerifyDomainByName(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": response})
 }
 
+// GetNSDelegationStatus handles GET /api/v1/domains/:id/ns-delegation
+// @Summary Get NS delegation status
+// @Description Get NS delegation status and required NS records for automatic SSL certificates
+// @Tags domains
+// @Produce json
+// @Param id path string true "Domain ID"
+// @Success 200 {object} models.NSDelegationStatusResponse
+// @Failure 404 {object} models.ErrorResponse
+// @Router /api/v1/domains/{id}/ns-delegation [get]
+func (h *DomainHandlers) GetNSDelegationStatus(c *gin.Context) {
+	tenantID, _, err := getTenantAndUserFromContext(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse{
+			Error: "unauthorized",
+			Code:  "UNAUTHORIZED",
+		})
+		return
+	}
+
+	domainID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error: "invalid domain ID",
+			Code:  "INVALID_ID",
+		})
+		return
+	}
+
+	status, err := h.domainService.GetNSDelegationStatus(c.Request.Context(), tenantID, domainID)
+	if err != nil {
+		if err == repository.ErrDomainNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{
+				Error: "domain not found",
+				Code:  "NOT_FOUND",
+			})
+			return
+		}
+		log.Error().Err(err).Msg("Failed to get NS delegation status")
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error: "failed to get NS delegation status",
+			Code:  "INTERNAL_ERROR",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, status)
+}
+
+// VerifyNSDelegation handles POST /api/v1/domains/:id/ns-delegation/verify
+// @Summary Verify NS delegation
+// @Description Trigger manual NS delegation verification
+// @Tags domains
+// @Produce json
+// @Param id path string true "Domain ID"
+// @Success 200 {object} models.NSDelegationStatusResponse
+// @Failure 404 {object} models.ErrorResponse
+// @Router /api/v1/domains/{id}/ns-delegation/verify [post]
+func (h *DomainHandlers) VerifyNSDelegation(c *gin.Context) {
+	tenantID, _, err := getTenantAndUserFromContext(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse{
+			Error: "unauthorized",
+			Code:  "UNAUTHORIZED",
+		})
+		return
+	}
+
+	domainID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error: "invalid domain ID",
+			Code:  "INVALID_ID",
+		})
+		return
+	}
+
+	status, err := h.domainService.VerifyNSDelegation(c.Request.Context(), tenantID, domainID)
+	if err != nil {
+		if err == repository.ErrDomainNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{
+				Error: "domain not found",
+				Code:  "NOT_FOUND",
+			})
+			return
+		}
+		log.Error().Err(err).Msg("Failed to verify NS delegation")
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error: "NS delegation verification failed",
+			Code:  "VERIFICATION_FAILED",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, status)
+}
+
+// EnableNSDelegation handles POST /api/v1/domains/:id/ns-delegation/enable
+// @Summary Enable NS delegation
+// @Description Enable NS delegation for a domain (switches from HTTP-01 to DNS-01 for certificates)
+// @Tags domains
+// @Accept json
+// @Produce json
+// @Param id path string true "Domain ID"
+// @Param request body models.EnableNSDelegationRequest true "Enable request"
+// @Success 200 {object} models.NSDelegationStatusResponse
+// @Failure 404 {object} models.ErrorResponse
+// @Router /api/v1/domains/{id}/ns-delegation/enable [post]
+func (h *DomainHandlers) EnableNSDelegation(c *gin.Context) {
+	tenantID, _, err := getTenantAndUserFromContext(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse{
+			Error: "unauthorized",
+			Code:  "UNAUTHORIZED",
+		})
+		return
+	}
+
+	domainID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error: "invalid domain ID",
+			Code:  "INVALID_ID",
+		})
+		return
+	}
+
+	var req models.EnableNSDelegationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		// Default to enabled if no body provided
+		req.Enabled = true
+	}
+
+	status, err := h.domainService.EnableNSDelegation(c.Request.Context(), tenantID, domainID, req.Enabled)
+	if err != nil {
+		if err == repository.ErrDomainNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{
+				Error: "domain not found",
+				Code:  "NOT_FOUND",
+			})
+			return
+		}
+		log.Error().Err(err).Msg("Failed to enable NS delegation")
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error: "failed to enable NS delegation",
+			Code:  "INTERNAL_ERROR",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, status)
+}
+
 // Helper function to extract tenant ID and user ID from context
 func getTenantAndUserFromContext(c *gin.Context) (uuid.UUID, uuid.UUID, error) {
 	// Get tenant ID from header (set by Istio/JWT middleware)

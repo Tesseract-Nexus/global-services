@@ -108,7 +108,12 @@ func (w *DNSVerificationWorker) verifyDomain(ctx context.Context, domain *models
 		return
 	}
 
-	// Verify DNS
+	// Check NS delegation if enabled for this domain
+	if domain.NSDelegationEnabled && !domain.NSDelegationVerified && w.cfg.NSDelegation.Enabled {
+		w.verifyNSDelegation(ctx, domain)
+	}
+
+	// Verify DNS ownership (TXT or CNAME record)
 	result, err := w.dnsVerifier.VerifyDomain(ctx, domain)
 	if err != nil {
 		log.Error().Err(err).Str("domain", domain.Domain).Msg("DNS verification error")
@@ -126,5 +131,51 @@ func (w *DNSVerificationWorker) verifyDomain(ctx context.Context, domain *models
 		// Note: The domain service will handle provisioning when status changes to provisioning
 	} else {
 		log.Debug().Str("domain", domain.Domain).Str("message", result.Message).Msg("Domain DNS not yet verified")
+	}
+}
+
+// verifyNSDelegation checks if NS delegation is properly configured
+func (w *DNSVerificationWorker) verifyNSDelegation(ctx context.Context, domain *models.CustomDomain) {
+	// Skip if already verified or too many attempts
+	if domain.NSDelegationVerified {
+		return
+	}
+
+	maxAttempts := w.cfg.NSDelegation.MaxAttempts
+	if maxAttempts == 0 {
+		maxAttempts = 100
+	}
+
+	if domain.NSDelegationCheckAttempts >= maxAttempts {
+		log.Warn().
+			Str("domain", domain.Domain).
+			Int("attempts", domain.NSDelegationCheckAttempts).
+			Msg("NS delegation exceeded max verification attempts")
+		return
+	}
+
+	// Verify NS delegation
+	nsResult, err := w.dnsVerifier.VerifyNSDelegation(ctx, domain.Domain)
+	if err != nil {
+		log.Error().Err(err).Str("domain", domain.Domain).Msg("NS delegation verification error")
+		return
+	}
+
+	// Update NS delegation status
+	if err := w.repo.UpdateNSDelegationVerification(ctx, domain.ID, nsResult.IsVerified, domain.NSDelegationCheckAttempts+1); err != nil {
+		log.Error().Err(err).Str("domain", domain.Domain).Msg("Failed to update NS delegation status")
+		return
+	}
+
+	if nsResult.IsVerified {
+		log.Info().
+			Str("domain", domain.Domain).
+			Strs("nameservers", nsResult.FoundNameservers).
+			Msg("NS delegation verified successfully - DNS-01 challenges now possible")
+	} else {
+		log.Debug().
+			Str("domain", domain.Domain).
+			Str("message", nsResult.Message).
+			Msg("NS delegation not yet verified")
 	}
 }

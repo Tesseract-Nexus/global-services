@@ -322,7 +322,7 @@ func (s *VerificationService) buildDNSConfigFromSession(session *models.Onboardi
 		CustomDomain:   domain,
 
 		// Customer's subdomain hosts (what they configure DNS for)
-		StorefrontHost: domain,                       // customdomain.com
+		StorefrontHost: domain,                          // customdomain.com
 		AdminHost:      fmt.Sprintf("admin.%s", domain), // admin.customdomain.com
 		APIHost:        fmt.Sprintf("api.%s", domain),   // api.customdomain.com
 
@@ -330,6 +330,13 @@ func (s *VerificationService) buildDNSConfigFromSession(session *models.Onboardi
 		GatewayIP:  gatewayIP,
 		TenantSlug: slug,
 		BaseDomain: baseDomain,
+
+		// NS Delegation for automatic SSL certificate management
+		// Customers add NS records for _acme-challenge subdomain to enable DNS-01 ACME challenges
+		// This allows automatic certificate issuance/renewal without manual intervention
+		UseNSDelegation:   true,                                      // Always show NS delegation option
+		NameServers:       []string{"ns1.tesserix.app", "ns2.tesserix.app"}, // Our authoritative nameservers
+		ACMEChallengeHost: fmt.Sprintf("_acme-challenge.%s", domain), // The subdomain to delegate
 
 		// Deprecated: CNAME targets are no longer used for custom domains
 		// Kept for backwards compatibility with older email templates

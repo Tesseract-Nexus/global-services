@@ -72,6 +72,13 @@ type CustomDomainDNSConfig struct {
 	TenantSlug string // The tenant slug (e.g., "awesome-store")
 	BaseDomain string // Platform base domain (e.g., "tesserix.app")
 
+	// NS Delegation for automatic SSL certificate management
+	// When enabled, customers add NS records to delegate _acme-challenge subdomain to our nameservers
+	// This allows automatic certificate issuance/renewal via DNS-01 ACME challenges
+	UseNSDelegation   bool     // If true, show NS delegation option in email
+	NameServers       []string // Our nameservers (e.g., ["ns1.tesserix.app", "ns2.tesserix.app"])
+	ACMEChallengeHost string   // The _acme-challenge subdomain (e.g., "_acme-challenge.customdomain.com")
+
 	// Deprecated: CNAME targets are no longer used - customers use A records to gateway IP
 	AdminCNAMETarget      string // Deprecated: kept for backwards compatibility
 	StorefrontCNAMETarget string // Deprecated: kept for backwards compatibility
@@ -330,6 +337,50 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
                                     </p>
                                 </div>
                             </div>
+
+                            {{if .UseNSDelegation}}
+                            <!-- NS Delegation Section - Automatic SSL Certificates -->
+                            <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+                                <h2 style="color: #ffffff; font-size: 20px; font-weight: 700; margin: 0 0 12px;">
+                                    🔐 RECOMMENDED: Enable Automatic SSL Certificates
+                                </h2>
+                                <p style="color: #d1fae5; font-size: 14px; line-height: 1.6; margin: 0 0 20px;">
+                                    Add these NS records once, and we'll <strong>automatically issue and renew SSL certificates</strong> for your domain forever. No manual intervention needed!
+                                </p>
+
+                                <!-- NS Records Table -->
+                                <div style="background-color: rgba(255,255,255,0.95); border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                                    <p style="color: #374151; font-size: 13px; font-weight: 600; margin: 0 0 12px;">
+                                        📝 Add these NS records at your domain registrar:
+                                    </p>
+                                    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                                        <tr style="background-color: #f0fdf4;">
+                                            <th style="padding: 10px; text-align: left; color: #166534; border-bottom: 2px solid #10b981;">Type</th>
+                                            <th style="padding: 10px; text-align: left; color: #166534; border-bottom: 2px solid #10b981;">Host</th>
+                                            <th style="padding: 10px; text-align: left; color: #166534; border-bottom: 2px solid #10b981;">Value</th>
+                                        </tr>
+                                        {{range .NameServers}}
+                                        <tr>
+                                            <td style="padding: 10px; font-family: monospace; color: #4b5563; border-bottom: 1px solid #e5e7eb;">NS</td>
+                                            <td style="padding: 10px; font-family: monospace; color: #4b5563; border-bottom: 1px solid #e5e7eb;">{{$.ACMEChallengeHost}}</td>
+                                            <td style="padding: 10px; font-family: monospace; color: #10b981; font-weight: 600; border-bottom: 1px solid #e5e7eb;">{{.}}</td>
+                                        </tr>
+                                        {{end}}
+                                    </table>
+                                </div>
+
+                                <!-- Benefits -->
+                                <div style="background-color: rgba(255,255,255,0.1); border-radius: 8px; padding: 12px;">
+                                    <p style="color: #d1fae5; font-size: 12px; margin: 0; line-height: 1.8;">
+                                        ✅ <strong>Benefits of NS Delegation:</strong><br>
+                                        • Certificates auto-renew without any action from you<br>
+                                        • SSL can be issued <strong>before</strong> your domain points to us<br>
+                                        • Supports wildcard certificates (*.yourdomain.com)<br>
+                                        • No renewal failures - ever!
+                                    </p>
+                                </div>
+                            </div>
+                            {{end}}
                             {{end}}
 
                             <!-- Security notice -->
@@ -377,6 +428,10 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
 		TenantSlug            string
 		GatewayIP             string // Custom domain gateway LoadBalancer IP
 		BaseDomain            string
+		// NS Delegation fields for automatic SSL
+		UseNSDelegation   bool
+		NameServers       []string
+		ACMEChallengeHost string
 		// Deprecated fields - kept for backwards compatibility
 		AdminCNAMETarget      string
 		StorefrontCNAMETarget string
@@ -399,6 +454,10 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
 		data.TenantSlug = dnsConfig.TenantSlug
 		data.GatewayIP = dnsConfig.GatewayIP
 		data.BaseDomain = dnsConfig.BaseDomain
+		// NS Delegation fields for automatic SSL
+		data.UseNSDelegation = dnsConfig.UseNSDelegation
+		data.NameServers = dnsConfig.NameServers
+		data.ACMEChallengeHost = dnsConfig.ACMEChallengeHost
 		// Deprecated fields
 		data.AdminCNAMETarget = dnsConfig.AdminCNAMETarget
 		data.StorefrontCNAMETarget = dnsConfig.StorefrontCNAMETarget

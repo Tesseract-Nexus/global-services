@@ -795,22 +795,52 @@ func (s *DomainService) provisionDomainWithCloudflare(ctx context.Context, domai
 
 // provisionDomainWithCertManager provisions a domain using cert-manager (legacy)
 func (s *DomainService) provisionDomainWithCertManager(ctx context.Context, domain *models.CustomDomain) {
-	log.Info().Str("domain", domain.Domain).Msg("Provisioning domain via cert-manager (legacy)")
+	// Determine which ACME challenge type to use
+	useNSDelegation := domain.IsNSDelegationReady()
+	solverType := "HTTP-01"
+	if useNSDelegation {
+		solverType = "DNS-01 (NS Delegation)"
+	}
 
-	// Step 1: Create SSL certificate
-	certResult, err := s.k8sClient.CreateCertificate(ctx, domain)
-	if err != nil {
-		log.Error().Err(err).Str("domain", domain.Domain).Msg("Failed to create certificate")
-		s.repo.UpdateStatus(ctx, domain.ID, models.DomainStatusFailed, "SSL certificate creation failed. Please contact support if the issue persists.")
-		s.logActivity(ctx, domain, "ssl_provisioning", "failed", "Certificate creation failed")
-		domain.Status = models.DomainStatusFailed
-		domain.StatusMessage = "SSL certificate creation failed"
-		s.publishDomainEvent(ctx, events.DomainFailed, domain, string(models.DomainStatusPending))
-		return
+	log.Info().
+		Str("domain", domain.Domain).
+		Str("solver", solverType).
+		Bool("ns_delegation", useNSDelegation).
+		Msg("Provisioning domain via cert-manager")
+
+	// Step 1: Create SSL certificate using appropriate solver
+	var certResult *clients.CertificateResult
+	var err error
+
+	if useNSDelegation {
+		// Use DNS-01 solver via NS delegation - works before CNAME is configured
+		certResult, err = s.k8sClient.CreateCertificateWithNSDelegation(ctx, domain)
+		if err != nil {
+			log.Error().Err(err).Str("domain", domain.Domain).Msg("Failed to create certificate with NS delegation")
+			s.repo.UpdateStatus(ctx, domain.ID, models.DomainStatusFailed, "SSL certificate creation via DNS-01 failed. Please verify NS delegation records.")
+			s.logActivity(ctx, domain, "ssl_provisioning", "failed", "DNS-01 certificate creation failed")
+			domain.Status = models.DomainStatusFailed
+			domain.StatusMessage = "SSL certificate creation via DNS-01 failed"
+			s.publishDomainEvent(ctx, events.DomainFailed, domain, string(models.DomainStatusPending))
+			return
+		}
+		s.logActivity(ctx, domain, "ssl_provisioning", "in_progress", "Certificate requested via DNS-01 (NS delegation)")
+	} else {
+		// Use HTTP-01 solver - requires CNAME to be configured first
+		certResult, err = s.k8sClient.CreateCertificate(ctx, domain)
+		if err != nil {
+			log.Error().Err(err).Str("domain", domain.Domain).Msg("Failed to create certificate")
+			s.repo.UpdateStatus(ctx, domain.ID, models.DomainStatusFailed, "SSL certificate creation failed. Please contact support if the issue persists.")
+			s.logActivity(ctx, domain, "ssl_provisioning", "failed", "Certificate creation failed")
+			domain.Status = models.DomainStatusFailed
+			domain.StatusMessage = "SSL certificate creation failed"
+			s.publishDomainEvent(ctx, events.DomainFailed, domain, string(models.DomainStatusPending))
+			return
+		}
+		s.logActivity(ctx, domain, "ssl_provisioning", "in_progress", "Certificate requested from Let's Encrypt via HTTP-01")
 	}
 
 	s.repo.UpdateSSLStatus(ctx, domain.ID, models.SSLStatusProvisioning, certResult.SecretName, nil, "")
-	s.logActivity(ctx, domain, "ssl_provisioning", "in_progress", "Certificate requested from Let's Encrypt")
 
 	// Step 2: Wait for certificate to be ready (with timeout)
 	certCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
@@ -1264,4 +1294,145 @@ func (s *DomainService) publishDomainEvent(ctx context.Context, eventType string
 				Msg("Domain event published")
 		}
 	}()
+}
+
+// GetNSDelegationStatus returns NS delegation status and required NS records
+func (s *DomainService) GetNSDelegationStatus(ctx context.Context, tenantID, domainID uuid.UUID) (*models.NSDelegationStatusResponse, error) {
+	domain, err := s.repo.GetByID(ctx, domainID)
+	if err != nil {
+		return nil, err
+	}
+
+	if domain.TenantID != tenantID {
+		return nil, repository.ErrDomainNotFound
+	}
+
+	return s.toNSDelegationStatusResponse(domain), nil
+}
+
+// VerifyNSDelegation triggers manual NS delegation verification
+func (s *DomainService) VerifyNSDelegation(ctx context.Context, tenantID, domainID uuid.UUID) (*models.NSDelegationStatusResponse, error) {
+	domain, err := s.repo.GetByID(ctx, domainID)
+	if err != nil {
+		return nil, err
+	}
+
+	if domain.TenantID != tenantID {
+		return nil, repository.ErrDomainNotFound
+	}
+
+	// Check if NS delegation is enabled
+	if !domain.NSDelegationEnabled {
+		return nil, fmt.Errorf("NS delegation is not enabled for this domain")
+	}
+
+	// Verify NS delegation
+	nsResult, err := s.dnsVerifier.VerifyNSDelegation(ctx, domain.Domain)
+	if err != nil {
+		log.Error().Err(err).Str("domain", domain.Domain).Msg("NS delegation verification error")
+		return nil, fmt.Errorf("NS delegation verification failed: %w", err)
+	}
+
+	// Update verification status
+	if err := s.repo.UpdateNSDelegationVerification(ctx, domainID, nsResult.IsVerified, domain.NSDelegationCheckAttempts+1); err != nil {
+		return nil, fmt.Errorf("failed to update NS delegation status: %w", err)
+	}
+
+	// Reload domain to get updated values
+	domain, _ = s.repo.GetByID(ctx, domainID)
+
+	if nsResult.IsVerified {
+		s.logActivity(ctx, domain, "ns_delegation_verified", "success", "NS delegation verified - DNS-01 challenges now possible")
+		log.Info().
+			Str("domain", domain.Domain).
+			Strs("nameservers", nsResult.FoundNameservers).
+			Msg("NS delegation verified successfully")
+	} else {
+		s.logActivity(ctx, domain, "ns_delegation_check", "pending", nsResult.Message)
+	}
+
+	return s.toNSDelegationStatusResponse(domain), nil
+}
+
+// EnableNSDelegation enables or disables NS delegation for a domain
+func (s *DomainService) EnableNSDelegation(ctx context.Context, tenantID, domainID uuid.UUID, enabled bool) (*models.NSDelegationStatusResponse, error) {
+	domain, err := s.repo.GetByID(ctx, domainID)
+	if err != nil {
+		return nil, err
+	}
+
+	if domain.TenantID != tenantID {
+		return nil, repository.ErrDomainNotFound
+	}
+
+	// Update NS delegation enabled status
+	if err := s.repo.EnableNSDelegation(ctx, domainID, enabled); err != nil {
+		return nil, fmt.Errorf("failed to update NS delegation status: %w", err)
+	}
+
+	// Reload domain
+	domain, _ = s.repo.GetByID(ctx, domainID)
+
+	action := "ns_delegation_disabled"
+	message := "NS delegation disabled - using HTTP-01 for certificates"
+	if enabled {
+		action = "ns_delegation_enabled"
+		message = "NS delegation enabled - add NS records for automatic certificate management"
+	}
+	s.logActivity(ctx, domain, action, "success", message)
+
+	return s.toNSDelegationStatusResponse(domain), nil
+}
+
+// toNSDelegationStatusResponse converts a domain to NS delegation status response
+func (s *DomainService) toNSDelegationStatusResponse(domain *models.CustomDomain) *models.NSDelegationStatusResponse {
+	response := &models.NSDelegationStatusResponse{
+		DomainID:          domain.ID,
+		Domain:            domain.Domain,
+		IsEnabled:         domain.NSDelegationEnabled,
+		IsVerified:        domain.NSDelegationVerified,
+		CheckAttempts:     domain.NSDelegationCheckAttempts,
+		ACMEChallengeHost: domain.GetACMEChallengeHost(),
+		CertificateSolver: "http-01",
+		Benefits: []string{
+			"Automatic certificate issuance and renewal",
+			"Certificates can be issued before domain points to gateway",
+			"No renewal failures due to routing issues",
+			"Supports wildcard certificates",
+		},
+	}
+
+	// Determine solver type
+	if domain.IsNSDelegationReady() {
+		response.CertificateSolver = "dns-01"
+		response.Message = "NS delegation verified - using DNS-01 for certificates"
+	} else if domain.NSDelegationEnabled {
+		response.CertificateSolver = "dns-01 (pending verification)"
+		response.Message = "NS delegation enabled but not yet verified - add NS records to your DNS"
+	} else {
+		response.Message = "NS delegation not enabled - using HTTP-01 for certificates"
+	}
+
+	// Add timestamps
+	if domain.NSDelegationVerifiedAt != nil {
+		v := domain.NSDelegationVerifiedAt.Format(time.RFC3339)
+		response.VerifiedAt = &v
+	}
+	if domain.NSDelegationLastCheckedAt != nil {
+		v := domain.NSDelegationLastCheckedAt.Format(time.RFC3339)
+		response.LastCheckedAt = &v
+	}
+
+	// Get required NS records from config
+	nsRecords := s.dnsVerifier.GetNSDelegationRecords(domain.Domain)
+	response.RequiredNSRecords = make([]models.NSRecord, len(nsRecords))
+	for i, ns := range nsRecords {
+		response.RequiredNSRecords[i] = models.NSRecord{
+			Host:  ns.Host,
+			Value: ns.Value,
+			TTL:   ns.TTL,
+		}
+	}
+
+	return response
 }

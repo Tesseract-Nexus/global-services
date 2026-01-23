@@ -150,6 +150,90 @@ func (k *KubernetesClient) CreateCertificate(ctx context.Context, domain *models
 	return result, nil
 }
 
+// CreateCertificateWithNSDelegation creates a cert-manager Certificate resource using DNS-01 challenges
+// This method is used when NS delegation is verified, allowing certificate issuance before the domain
+// points to our servers. This is the recommended approach for custom domains as it ensures
+// reliable certificate renewals without HTTP-01 dependencies.
+func (k *KubernetesClient) CreateCertificateWithNSDelegation(ctx context.Context, domain *models.CustomDomain) (*CertificateResult, error) {
+	result := &CertificateResult{}
+
+	// Generate certificate name from domain
+	certName := generateResourceName(domain.Domain, "cert")
+	secretName := generateResourceName(domain.Domain, "tls")
+	result.SecretName = secretName
+
+	// Build DNS names including www if enabled
+	dnsNames := []string{domain.Domain}
+	if domain.IncludeWWW && domain.DomainType == models.DomainTypeApex {
+		dnsNames = append(dnsNames, "www."+domain.Domain)
+	}
+
+	// Use NS delegation issuer (DNS-01) instead of HTTP-01
+	issuerName := k.cfg.SSL.NSDelegationIssuerName
+	if issuerName == "" {
+		// Fallback to default DNS-01 issuer
+		issuerName = "letsencrypt-prod-ns-delegation"
+	}
+
+	cert := &certmanagerv1.Certificate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      certName,
+			Namespace: k.cfg.SSL.CertificateNamespace,
+			Labels: map[string]string{
+				"app.kubernetes.io/managed-by": "custom-domain-service",
+				"tesserix.app/tenant-id":       domain.TenantID.String(),
+				"tesserix.app/domain-id":       domain.ID.String(),
+				"tesserix.app/solver-type":     "ns-delegation", // Mark as NS delegation certificate
+			},
+			Annotations: map[string]string{
+				"tesserix.app/domain":        domain.Domain,
+				"tesserix.app/created-at":    time.Now().UTC().Format(time.RFC3339),
+				"tesserix.app/challenge-type": "dns-01",
+			},
+		},
+		Spec: certmanagerv1.CertificateSpec{
+			SecretName: secretName,
+			DNSNames:   dnsNames,
+			IssuerRef: cmmeta.ObjectReference{
+				Name: issuerName,
+				Kind: k.cfg.SSL.IssuerKind,
+			},
+			PrivateKey: &certmanagerv1.CertificatePrivateKey{
+				Algorithm: certmanagerv1.RSAKeyAlgorithm,
+				Size:      2048,
+			},
+		},
+	}
+
+	// Check if certificate already exists
+	existing, err := k.certmanagerClient.CertmanagerV1().Certificates(k.cfg.SSL.CertificateNamespace).Get(ctx, certName, metav1.GetOptions{})
+	if err == nil {
+		// Certificate exists, update it
+		existing.Spec = cert.Spec
+		existing.Labels = cert.Labels
+		existing.Annotations = cert.Annotations
+		_, err = k.certmanagerClient.CertmanagerV1().Certificates(k.cfg.SSL.CertificateNamespace).Update(ctx, existing, metav1.UpdateOptions{})
+		if err != nil {
+			result.Error = fmt.Sprintf("failed to update certificate: %v", err)
+			result.Status = models.SSLStatusFailed
+			return result, err
+		}
+		log.Info().Str("cert", certName).Str("issuer", issuerName).Msg("Certificate updated with NS delegation issuer")
+	} else {
+		// Create new certificate
+		_, err = k.certmanagerClient.CertmanagerV1().Certificates(k.cfg.SSL.CertificateNamespace).Create(ctx, cert, metav1.CreateOptions{})
+		if err != nil {
+			result.Error = fmt.Sprintf("failed to create certificate: %v", err)
+			result.Status = models.SSLStatusFailed
+			return result, err
+		}
+		log.Info().Str("cert", certName).Str("issuer", issuerName).Msg("Certificate created with NS delegation issuer (DNS-01)")
+	}
+
+	result.Status = models.SSLStatusProvisioning
+	return result, nil
+}
+
 // GetCertificateStatus checks the status of a certificate
 func (k *KubernetesClient) GetCertificateStatus(ctx context.Context, domain *models.CustomDomain) (*CertificateResult, error) {
 	result := &CertificateResult{}

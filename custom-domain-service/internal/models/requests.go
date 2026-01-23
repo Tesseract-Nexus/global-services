@@ -132,3 +132,31 @@ type SuccessResponse struct {
 	Success bool   `json:"success"`
 	Message string `json:"message,omitempty"`
 }
+
+// EnableNSDelegationRequest represents a request to enable/disable NS delegation
+type EnableNSDelegationRequest struct {
+	Enabled bool `json:"enabled"` // Enable or disable NS delegation
+}
+
+// NSDelegationStatusResponse represents NS delegation status and required records
+type NSDelegationStatusResponse struct {
+	DomainID          uuid.UUID `json:"domain_id"`
+	Domain            string    `json:"domain"`
+	IsEnabled         bool      `json:"is_enabled"`          // Whether NS delegation is enabled for this domain
+	IsVerified        bool      `json:"is_verified"`         // Whether NS delegation has been verified
+	VerifiedAt        *string   `json:"verified_at,omitempty"`
+	LastCheckedAt     *string   `json:"last_checked_at,omitempty"`
+	CheckAttempts     int       `json:"check_attempts"`
+	ACMEChallengeHost string    `json:"acme_challenge_host"` // e.g., "_acme-challenge.example.com"
+	RequiredNSRecords []NSRecord `json:"required_ns_records"` // NS records the customer needs to add
+	CertificateSolver string    `json:"certificate_solver"`  // "dns-01" or "http-01"
+	Message           string    `json:"message,omitempty"`
+	Benefits          []string  `json:"benefits,omitempty"`  // Benefits of NS delegation
+}
+
+// NSRecord represents an NS record for NS delegation
+type NSRecord struct {
+	Host  string `json:"host"`  // The host/subdomain (e.g., "_acme-challenge.example.com")
+	Value string `json:"value"` // The nameserver value (e.g., "ns1.tesserix.app")
+	TTL   int    `json:"ttl"`   // Recommended TTL
+}
