@@ -375,6 +375,13 @@ type TenantBasicInfo struct {
 	Subdomain    string `json:"subdomain,omitempty"`
 	BillingEmail string `json:"billingEmail,omitempty"`
 	Status       string `json:"status"` // Required for middleware tenant validation
+
+	// URL fields for custom domain support
+	StorefrontURL   string `json:"storefront_url,omitempty"`
+	AdminURL        string `json:"admin_url,omitempty"`
+	APIURL          string `json:"api_url,omitempty"`
+	CustomDomain    string `json:"custom_domain,omitempty"`
+	UseCustomDomain bool   `json:"use_custom_domain,omitempty"`
 }
 
 // GetTenantByID retrieves basic tenant information by ID (for internal service calls)
@@ -385,13 +392,18 @@ func (s *TenantService) GetTenantByID(ctx context.Context, tenantID uuid.UUID) (
 	}
 
 	return &TenantBasicInfo{
-		ID:           tenant.ID.String(),
-		Slug:         tenant.Slug,
-		Name:         tenant.Name,
-		DisplayName:  tenant.DisplayName,
-		Subdomain:    tenant.Subdomain,
-		BillingEmail: tenant.BillingEmail,
-		Status:       tenant.Status,
+		ID:              tenant.ID.String(),
+		Slug:            tenant.Slug,
+		Name:            tenant.Name,
+		DisplayName:     tenant.DisplayName,
+		Subdomain:       tenant.Subdomain,
+		BillingEmail:    tenant.BillingEmail,
+		Status:          tenant.Status,
+		StorefrontURL:   tenant.StorefrontURL,
+		AdminURL:        tenant.AdminURL,
+		APIURL:          tenant.APIURL,
+		CustomDomain:    tenant.CustomDomain,
+		UseCustomDomain: tenant.UseCustomDomain,
 	}, nil
 }
 
