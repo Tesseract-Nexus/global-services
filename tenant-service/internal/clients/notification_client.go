@@ -345,19 +345,25 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
                                 <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); border-radius: 12px; padding: 20px; margin-bottom: 16px;">
                                     <p style="color: #f1f5f9; font-size: 15px; font-weight: 700; margin: 0 0 16px;">📋 COPY-PASTE QUICK REFERENCE</p>
                                     <p style="color: #94a3b8; font-size: 12px; margin: 0 0 12px;">Triple-click each row to select the entire line, then copy</p>
+
+                                    {{if .UseCNAMEDelegation}}
+                                    <!-- CNAME Delegation - Separate section for better readability -->
+                                    <div style="background-color: rgba(16, 185, 129, 0.2); border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+                                        <p style="color: #34d399; font-size: 12px; font-weight: 700; margin: 0 0 8px;">🔐 SSL Certificate (CNAME)</p>
+                                        <p style="color: #94a3b8; font-size: 11px; margin: 0 0 4px;">Host:</p>
+                                        <p style="color: #34d399; font-size: 13px; font-family: 'Courier New', monospace; margin: 0 0 8px; word-break: break-all;">{{.ACMEChallengeHost}}</p>
+                                        <p style="color: #94a3b8; font-size: 11px; margin: 0 0 4px;">Value:</p>
+                                        <p style="color: #34d399; font-size: 13px; font-family: 'Courier New', monospace; margin: 0; word-break: break-all; font-weight: 600;">{{.ACMECNAMETarget}}</p>
+                                    </div>
+                                    {{end}}
+
+                                    <!-- A Records Table -->
                                     <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
                                         <tr style="background-color: rgba(255,255,255,0.1);">
-                                            <th style="padding: 10px; text-align: left; color: #e2e8f0; border-bottom: 2px solid #475569;">Type</th>
-                                            <th style="padding: 10px; text-align: left; color: #e2e8f0; border-bottom: 2px solid #475569;">Name</th>
-                                            <th style="padding: 10px; text-align: left; color: #e2e8f0; border-bottom: 2px solid #475569;">Value (📋 click to copy)</th>
+                                            <th style="padding: 10px; text-align: left; color: #e2e8f0; border-bottom: 2px solid #475569; width: 60px;">Type</th>
+                                            <th style="padding: 10px; text-align: left; color: #e2e8f0; border-bottom: 2px solid #475569; width: 80px;">Name</th>
+                                            <th style="padding: 10px; text-align: left; color: #e2e8f0; border-bottom: 2px solid #475569;">Value</th>
                                         </tr>
-                                        {{if .UseCNAMEDelegation}}
-                                        <tr style="background-color: rgba(16, 185, 129, 0.2);">
-                                            <td style="padding: 10px; font-family: 'Courier New', monospace; color: #34d399; font-weight: 600;">CNAME</td>
-                                            <td style="padding: 10px; font-family: 'Courier New', monospace; color: #34d399;">{{.ACMEChallengeHost}}</td>
-                                            <td style="padding: 10px; font-family: 'Courier New', monospace; color: #34d399; font-weight: 600;">{{.ACMECNAMETarget}}</td>
-                                        </tr>
-                                        {{end}}
                                         <tr>
                                             <td style="padding: 10px; font-family: 'Courier New', monospace; color: #f8fafc; font-weight: 600;">{{if .UseARecords}}A{{else}}CNAME{{end}}</td>
                                             <td style="padding: 10px; font-family: 'Courier New', monospace; color: #cbd5e1;">@</td>
