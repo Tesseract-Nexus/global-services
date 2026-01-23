@@ -294,11 +294,30 @@ func (s *VerificationService) buildDNSConfigFromSession(session *models.Onboardi
 	// This is more secure than exposing the gateway IP directly
 	routingCNAMETarget := fmt.Sprintf("proxy.%s", baseDomain) // e.g., proxy.tesserix.app
 
-	// Build unique ACME CNAME target for this domain
-	// e.g., "store.example.com" -> "store-example-com.acme.tesserix.app"
+	// Build unique ACME CNAME target for this domain + tenant combination
+	// Format: {domain-sanitized}-{tenant-short-id}.acme.tesserix.app
+	// This ensures each tenant gets a unique target, preventing cross-tenant certificate hijacking
+	// e.g., domain="store.example.com", tenantID="a1b2c3d4-..." -> "store-example-com-a1b2c3d4.acme.tesserix.app"
 	sanitizedDomain := strings.ReplaceAll(domain, ".", "-")
 	acmeZone := fmt.Sprintf("acme.%s", baseDomain)
-	acmeCNAMETarget := fmt.Sprintf("%s.%s", sanitizedDomain, acmeZone)
+
+	// Get tenant short ID for uniqueness (first 8 chars of UUID)
+	tenantShortID := ""
+	if session.TenantID != nil && *session.TenantID != uuid.Nil {
+		tenantIDStr := session.TenantID.String()
+		if len(tenantIDStr) >= 8 {
+			tenantShortID = tenantIDStr[:8]
+		}
+	}
+
+	// Build ACME CNAME target with tenant-specific suffix
+	var acmeCNAMETarget string
+	if tenantShortID != "" {
+		acmeCNAMETarget = fmt.Sprintf("%s-%s.%s", sanitizedDomain, tenantShortID, acmeZone)
+	} else {
+		acmeCNAMETarget = fmt.Sprintf("%s.%s", sanitizedDomain, acmeZone)
+	}
+	log.Printf("[VerificationService] Generated tenant-specific ACME CNAME target: %s", acmeCNAMETarget)
 
 	return &clients.CustomDomainDNSConfig{
 		IsCustomDomain: true,

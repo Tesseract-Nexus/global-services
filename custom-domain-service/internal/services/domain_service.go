@@ -377,17 +377,19 @@ func (s *DomainService) ValidateDomain(ctx context.Context, req *ValidateDomainR
 	}
 	response.RoutingRecords = routingRecords
 
-	// Build CNAME delegation record for automatic SSL (unique per domain)
-	// Customer adds: _acme-challenge.theirdomain.com CNAME theirdomain-com.acme.tesserix.app
+	// Build CNAME delegation record for automatic SSL (unique per tenant + domain)
+	// Format: _acme-challenge.theirdomain.com CNAME theirdomain-com-{tenant-short-id}.acme.tesserix.app
+	// This ensures each tenant gets a unique CNAME target, preventing cross-tenant certificate hijacking
 	if s.cfg.CNAMEDelegation.Enabled {
 		response.CNAMEDelegationEnabled = true
-		cnameTarget := s.dnsVerifier.GetCNAMEDelegationTarget(domainName)
+		// Use tenant-specific CNAME target if tenant ID is provided
+		cnameTarget := s.dnsVerifier.GetCNAMEDelegationTargetForTenant(domainName, req.TenantID)
 		response.CNAMEDelegationRecord = &models.DNSRecord{
 			RecordType: "CNAME",
 			Host:       "_acme-challenge." + domainName,
 			Value:      cnameTarget,
 			TTL:        3600,
-			Purpose:    "cname_delegation (automatic SSL)",
+			Purpose:    "cname_delegation (automatic SSL - tenant specific)",
 		}
 	}
 
@@ -1436,7 +1438,8 @@ func (s *DomainService) EnableCNAMEDelegation(ctx context.Context, tenantID, dom
 
 // toCNAMEDelegationStatusResponse converts a domain to CNAME delegation status response
 func (s *DomainService) toCNAMEDelegationStatusResponse(domain *models.CustomDomain) *models.CNAMEDelegationStatusResponse {
-	cnameRecord := s.dnsVerifier.GetCNAMEDelegationRecord(domain.Domain)
+	// Use tenant-specific CNAME record for security
+	cnameRecord := s.dnsVerifier.GetCNAMEDelegationRecordForTenant(domain.Domain, domain.TenantID.String())
 
 	response := &models.CNAMEDelegationStatusResponse{
 		DomainID:          domain.ID,

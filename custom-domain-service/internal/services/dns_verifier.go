@@ -128,13 +128,39 @@ func (v *DNSVerifier) VerifyCNAMEDelegation(ctx context.Context, domain string) 
 
 // GetCNAMEDelegationTarget returns the expected CNAME target for a domain
 // e.g., "store.example.com" -> "store-example-com.acme.tesserix.app"
+// For tenant-specific targets, use GetCNAMEDelegationTargetForTenant
 func (v *DNSVerifier) GetCNAMEDelegationTarget(domain string) string {
 	// Sanitize domain name: replace dots with dashes
 	sanitized := strings.ReplaceAll(domain, ".", "-")
 	return sanitized + "." + v.cfg.CNAMEDelegation.ACMEZone
 }
 
+// GetCNAMEDelegationTargetForTenant returns a tenant-specific CNAME target for automatic SSL
+// Format: {domain-sanitized}-{tenant-short-id}.acme.tesserix.app
+// This ensures each tenant gets a unique target, preventing cross-tenant certificate hijacking
+// e.g., domain="store.example.com", tenantID="a1b2c3d4-..." -> "store-example-com-a1b2c3d4.acme.tesserix.app"
+func (v *DNSVerifier) GetCNAMEDelegationTargetForTenant(domain, tenantID string) string {
+	// Sanitize domain name: replace dots with dashes
+	sanitized := strings.ReplaceAll(domain, ".", "-")
+
+	// Use first 8 chars of tenant ID for uniqueness (UUID is globally unique)
+	tenantShort := ""
+	if len(tenantID) >= 8 {
+		tenantShort = tenantID[:8]
+	} else if tenantID != "" {
+		tenantShort = tenantID
+	}
+
+	// If no tenant ID, fall back to domain-only target
+	if tenantShort == "" {
+		return sanitized + "." + v.cfg.CNAMEDelegation.ACMEZone
+	}
+
+	return sanitized + "-" + tenantShort + "." + v.cfg.CNAMEDelegation.ACMEZone
+}
+
 // GetCNAMEDelegationRecord returns the CNAME record needed for CNAME delegation setup
+// Deprecated: Use GetCNAMEDelegationRecordForTenant for tenant-specific targets
 func (v *DNSVerifier) GetCNAMEDelegationRecord(domain string) *models.DNSRecord {
 	if !v.cfg.CNAMEDelegation.Enabled {
 		return nil
@@ -149,6 +175,26 @@ func (v *DNSVerifier) GetCNAMEDelegationRecord(domain string) *models.DNSRecord 
 		Value:      target,
 		TTL:        3600,
 		Purpose:    "cname_delegation (automatic SSL)",
+		IsVerified: false,
+	}
+}
+
+// GetCNAMEDelegationRecordForTenant returns a tenant-specific CNAME record for automatic SSL
+// This ensures each tenant gets a unique CNAME target that can't be reused by other tenants
+func (v *DNSVerifier) GetCNAMEDelegationRecordForTenant(domain, tenantID string) *models.DNSRecord {
+	if !v.cfg.CNAMEDelegation.Enabled {
+		return nil
+	}
+
+	challengeHost := "_acme-challenge." + domain
+	target := v.GetCNAMEDelegationTargetForTenant(domain, tenantID)
+
+	return &models.DNSRecord{
+		RecordType: "CNAME",
+		Host:       challengeHost,
+		Value:      target,
+		TTL:        3600,
+		Purpose:    "cname_delegation (automatic SSL - tenant specific)",
 		IsVerified: false,
 	}
 }
@@ -315,17 +361,19 @@ func (v *DNSVerifier) CheckARecord(ctx context.Context, domain string) (bool, []
 func (v *DNSVerifier) GetRequiredDNSRecords(domain *models.CustomDomain) []models.DNSRecord {
 	records := []models.DNSRecord{}
 
-	// CNAME Delegation record for automatic SSL (recommended when enabled)
-	// Customer adds: _acme-challenge.theirdomain.com CNAME theirdomain-com.acme.tesserix.app
+	// CNAME Delegation record for automatic SSL (tenant-specific target)
+	// Customer adds: _acme-challenge.theirdomain.com CNAME theirdomain-com-{tenant-short-id}.acme.tesserix.app
+	// This ensures each tenant gets a unique target, preventing cross-tenant certificate hijacking
 	if v.cfg.CNAMEDelegation.Enabled && domain.CNAMEDelegationEnabled {
 		challengeHost := "_acme-challenge." + domain.Domain
-		target := v.GetCNAMEDelegationTarget(domain.Domain)
+		// Use tenant-specific CNAME target for security
+		target := v.GetCNAMEDelegationTargetForTenant(domain.Domain, domain.TenantID.String())
 		records = append(records, models.DNSRecord{
 			RecordType: "CNAME",
 			Host:       challengeHost,
 			Value:      target,
 			TTL:        3600,
-			Purpose:    "cname_delegation (automatic SSL)",
+			Purpose:    "cname_delegation (automatic SSL - tenant specific)",
 			IsVerified: domain.CNAMEDelegationVerified,
 		})
 	}
