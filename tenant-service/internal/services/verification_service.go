@@ -289,10 +289,13 @@ func (s *VerificationService) buildDNSConfigFromSession(session *models.Onboardi
 	domain := configData.CustomDomain
 	log.Printf("[VerificationService] Building DNS config for custom domain: %s (tenant slug: %s)", domain, slug)
 
-	// Build CNAME configuration for custom domains
-	// Customers point CNAME records to our routing proxy
-	// This is more secure than exposing the gateway IP directly
-	routingCNAMETarget := fmt.Sprintf("proxy.%s", baseDomain) // e.g., proxy.tesserix.app
+	// Build routing configuration for custom domains
+	// Custom domains must use A records (pointing to LoadBalancer IP) due to
+	// Cloudflare cross-account CNAME restrictions (Error 1014)
+	// If CustomDomainGatewayIP is configured, use A records; otherwise fallback to CNAME
+	routingIP := s.verificationConfig.CustomDomainGatewayIP
+	useARecords := routingIP != ""
+	routingCNAMETarget := fmt.Sprintf("proxy.%s", baseDomain) // fallback if IP not configured
 
 	// Build unique ACME CNAME target for this domain + tenant combination
 	// Format: {domain-sanitized}-{tenant-short-id}.acme.tesserix.app
@@ -328,10 +331,14 @@ func (s *VerificationService) buildDNSConfigFromSession(session *models.Onboardi
 		AdminHost:      fmt.Sprintf("admin.%s", domain), // admin.customdomain.com
 		APIHost:        fmt.Sprintf("api.%s", domain),   // api.customdomain.com
 
-		// Routing CNAME target - more secure than exposing IP
-		RoutingCNAMETarget: routingCNAMETarget,
-		TenantSlug:         slug,
-		BaseDomain:         baseDomain,
+		// Routing configuration - A records to LoadBalancer IP (preferred)
+		// Custom domains MUST use A records due to Cloudflare cross-account CNAME restrictions
+		UseARecords:        useARecords,
+		RoutingIP:          routingIP,
+		RoutingCNAMETarget: routingCNAMETarget, // fallback if IP not configured
+
+		TenantSlug: slug,
+		BaseDomain: baseDomain,
 
 		// CNAME Delegation for automatic SSL certificate management
 		// Customer adds: _acme-challenge.theirdomain.com CNAME theirdomain-com.acme.tesserix.app

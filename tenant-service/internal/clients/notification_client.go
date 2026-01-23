@@ -63,10 +63,12 @@ type CustomDomainDNSConfig struct {
 	StorefrontHost string // Storefront host (e.g., "www.customdomain.com" or "customdomain.com")
 	APIHost        string // API host (e.g., "api.customdomain.com")
 
-	// Routing CNAME target - customers point their domain to this
-	// Using CNAME instead of IP is more secure (doesn't expose infrastructure IP)
-	// Example: proxy.tesserix.app or customers.tesserix.app
-	RoutingCNAMETarget string // CNAME target for routing (e.g., "proxy.tesserix.app")
+	// Routing configuration
+	// UseARecords: true = A records to IP, false = CNAME records
+	// Custom domains must use A records due to Cloudflare cross-account CNAME restrictions
+	UseARecords        bool   // If true, show A records instead of CNAME for routing
+	RoutingIP          string // LoadBalancer IP for A records (e.g., "34.151.169.37")
+	RoutingCNAMETarget string // CNAME target for routing (fallback if IP not set)
 
 	// Tenant identification
 	TenantSlug string // The tenant slug (e.g., "awesome-store")
@@ -75,12 +77,9 @@ type CustomDomainDNSConfig struct {
 	// CNAME Delegation for automatic SSL certificate management
 	// Customer adds: _acme-challenge.theirdomain.com CNAME theirdomain-com.acme.tesserix.app
 	// cert-manager follows the CNAME and creates TXT records in our Cloudflare zone
-	UseCNAMEDelegation    bool   // If true, show CNAME delegation option in email
-	ACMEChallengeHost     string // The _acme-challenge subdomain (e.g., "_acme-challenge.customdomain.com")
-	ACMECNAMETarget       string // The CNAME target for ACME challenges (e.g., "customdomain-com.acme.tesserix.app")
-
-	// Legacy: Gateway IP (deprecated - use RoutingCNAMETarget instead)
-	GatewayIP string // LoadBalancer IP - kept for backwards compatibility
+	UseCNAMEDelegation bool   // If true, show CNAME delegation option in email
+	ACMEChallengeHost  string // The _acme-challenge subdomain (e.g., "_acme-challenge.customdomain.com")
+	ACMECNAMETarget    string // The CNAME target for ACME challenges (e.g., "customdomain-com.acme.tesserix.app")
 }
 
 // SendVerificationLinkEmail sends an email with a verification link via notification-service
@@ -226,25 +225,49 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
                                 </div>
                                 {{end}}
 
-                                <!-- Routing CNAME target highlight -->
+                                <!-- Routing target highlight -->
                                 <div style="background-color: #ffffff; border-radius: 8px; padding: 20px; margin-bottom: 16px; text-align: center; border: 2px solid #6366f1;">
                                     <p style="color: #374151; font-size: 14px; margin: 0 0 8px;">All your domains should point to:</p>
+                                    {{if .UseARecords}}
+                                    <p style="color: #6366f1; font-size: 22px; font-weight: 700; font-family: monospace; margin: 0;">{{.RoutingIP}}</p>
+                                    <p style="color: #6b7280; font-size: 12px; margin: 8px 0 0;">(Use A records pointing to this IP address)</p>
+                                    {{else}}
                                     <p style="color: #6366f1; font-size: 22px; font-weight: 700; font-family: monospace; margin: 0;">{{.RoutingCNAMETarget}}</p>
+                                    {{end}}
                                 </div>
 
                                 <!-- Step-by-step Instructions for Routing -->
                                 <div style="background-color: #ffffff; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
                                     <p style="color: #1f2937; font-size: 14px; font-weight: 600; margin: 0 0 16px;">
-                                        📝 {{if .UseCNAMEDelegation}}Step 2: {{end}}Add these CNAME records for routing:
+                                        📝 {{if .UseCNAMEDelegation}}Step 2: {{end}}Add these {{if .UseARecords}}A{{else}}CNAME{{end}} records for routing:
                                     </p>
 
-                                    <!-- Storefront -->
+                                    <!-- Root domain -->
+                                    <div style="margin-bottom: 16px; padding-left: 12px; border-left: 3px solid #8b5cf6;">
+                                        <p style="color: #8b5cf6; font-size: 12px; font-weight: 600; margin: 0 0 4px; text-transform: uppercase;">Root Domain</p>
+                                        <table style="width: 100%; border-collapse: collapse; background-color: #f9fafb; border-radius: 6px;">
+                                            <tr>
+                                                <td style="padding: 8px 12px; font-size: 12px; color: #6b7280; width: 60px;">Type:</td>
+                                                <td style="padding: 8px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">{{if .UseARecords}}A{{else}}CNAME{{end}}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 8px 12px; font-size: 12px; color: #6b7280;">Name:</td>
+                                                <td style="padding: 8px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">@</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 8px 12px; font-size: 12px; color: #6b7280;">Value:</td>
+                                                <td style="padding: 8px 12px; font-size: 14px; font-family: monospace; color: #6366f1;"><strong>{{if .UseARecords}}{{.RoutingIP}}{{else}}{{.RoutingCNAMETarget}}{{end}}</strong></td>
+                                            </tr>
+                                        </table>
+                                    </div>
+
+                                    <!-- Storefront (www) -->
                                     <div style="margin-bottom: 16px; padding-left: 12px; border-left: 3px solid #6366f1;">
                                         <p style="color: #6366f1; font-size: 12px; font-weight: 600; margin: 0 0 4px; text-transform: uppercase;">Storefront (www)</p>
                                         <table style="width: 100%; border-collapse: collapse; background-color: #f9fafb; border-radius: 6px;">
                                             <tr>
                                                 <td style="padding: 8px 12px; font-size: 12px; color: #6b7280; width: 60px;">Type:</td>
-                                                <td style="padding: 8px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">CNAME</td>
+                                                <td style="padding: 8px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">{{if .UseARecords}}A{{else}}CNAME{{end}}</td>
                                             </tr>
                                             <tr>
                                                 <td style="padding: 8px 12px; font-size: 12px; color: #6b7280;">Name:</td>
@@ -252,7 +275,7 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
                                             </tr>
                                             <tr>
                                                 <td style="padding: 8px 12px; font-size: 12px; color: #6b7280;">Value:</td>
-                                                <td style="padding: 8px 12px; font-size: 14px; font-family: monospace; color: #6366f1;"><strong>{{.RoutingCNAMETarget}}</strong></td>
+                                                <td style="padding: 8px 12px; font-size: 14px; font-family: monospace; color: #6366f1;"><strong>{{if .UseARecords}}{{.RoutingIP}}{{else}}{{.RoutingCNAMETarget}}{{end}}</strong></td>
                                             </tr>
                                         </table>
                                     </div>
@@ -263,7 +286,7 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
                                         <table style="width: 100%; border-collapse: collapse; background-color: #f9fafb; border-radius: 6px;">
                                             <tr>
                                                 <td style="padding: 8px 12px; font-size: 12px; color: #6b7280; width: 60px;">Type:</td>
-                                                <td style="padding: 8px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">CNAME</td>
+                                                <td style="padding: 8px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">{{if .UseARecords}}A{{else}}CNAME{{end}}</td>
                                             </tr>
                                             <tr>
                                                 <td style="padding: 8px 12px; font-size: 12px; color: #6b7280;">Name:</td>
@@ -271,7 +294,7 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
                                             </tr>
                                             <tr>
                                                 <td style="padding: 8px 12px; font-size: 12px; color: #6b7280;">Value:</td>
-                                                <td style="padding: 8px 12px; font-size: 14px; font-family: monospace; color: #6366f1;"><strong>{{.RoutingCNAMETarget}}</strong></td>
+                                                <td style="padding: 8px 12px; font-size: 14px; font-family: monospace; color: #6366f1;"><strong>{{if .UseARecords}}{{.RoutingIP}}{{else}}{{.RoutingCNAMETarget}}{{end}}</strong></td>
                                             </tr>
                                         </table>
                                     </div>
@@ -282,7 +305,7 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
                                         <table style="width: 100%; border-collapse: collapse; background-color: #f9fafb; border-radius: 6px;">
                                             <tr>
                                                 <td style="padding: 8px 12px; font-size: 12px; color: #6b7280; width: 60px;">Type:</td>
-                                                <td style="padding: 8px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">CNAME</td>
+                                                <td style="padding: 8px 12px; font-size: 14px; font-family: monospace; font-weight: 600; color: #18181b;">{{if .UseARecords}}A{{else}}CNAME{{end}}</td>
                                             </tr>
                                             <tr>
                                                 <td style="padding: 8px 12px; font-size: 12px; color: #6b7280;">Name:</td>
@@ -290,7 +313,7 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
                                             </tr>
                                             <tr>
                                                 <td style="padding: 8px 12px; font-size: 12px; color: #6b7280;">Value:</td>
-                                                <td style="padding: 8px 12px; font-size: 14px; font-family: monospace; color: #6366f1;"><strong>{{.RoutingCNAMETarget}}</strong></td>
+                                                <td style="padding: 8px 12px; font-size: 14px; font-family: monospace; color: #6366f1;"><strong>{{if .UseARecords}}{{.RoutingIP}}{{else}}{{.RoutingCNAMETarget}}{{end}}</strong></td>
                                             </tr>
                                         </table>
                                     </div>
@@ -298,7 +321,7 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
 
                                 <!-- Summary table -->
                                 <div style="background-color: #ffffff; border-radius: 8px; padding: 16px; margin-bottom: 16px; border: 1px dashed #d1d5db;">
-                                    <p style="color: #374151; font-size: 13px; font-weight: 600; margin: 0 0 12px;">📋 Quick Reference - All CNAME Records</p>
+                                    <p style="color: #374151; font-size: 13px; font-weight: 600; margin: 0 0 12px;">📋 Quick Reference - All DNS Records</p>
                                     <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
                                         <tr style="background-color: #f3f4f6;">
                                             <th style="padding: 8px; text-align: left; color: #374151; border-bottom: 1px solid #e5e7eb;">Type</th>
@@ -313,19 +336,24 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
                                         </tr>
                                         {{end}}
                                         <tr>
-                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">CNAME</td>
-                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">www</td>
-                                            <td style="padding: 8px; font-family: monospace; color: #6366f1;">{{.RoutingCNAMETarget}}</td>
+                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">{{if .UseARecords}}A{{else}}CNAME{{end}}</td>
+                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">@</td>
+                                            <td style="padding: 8px; font-family: monospace; color: #6366f1;">{{if .UseARecords}}{{.RoutingIP}}{{else}}{{.RoutingCNAMETarget}}{{end}}</td>
                                         </tr>
                                         <tr style="background-color: #f9fafb;">
-                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">CNAME</td>
-                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">admin</td>
-                                            <td style="padding: 8px; font-family: monospace; color: #6366f1;">{{.RoutingCNAMETarget}}</td>
+                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">{{if .UseARecords}}A{{else}}CNAME{{end}}</td>
+                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">www</td>
+                                            <td style="padding: 8px; font-family: monospace; color: #6366f1;">{{if .UseARecords}}{{.RoutingIP}}{{else}}{{.RoutingCNAMETarget}}{{end}}</td>
                                         </tr>
                                         <tr>
-                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">CNAME</td>
+                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">{{if .UseARecords}}A{{else}}CNAME{{end}}</td>
+                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">admin</td>
+                                            <td style="padding: 8px; font-family: monospace; color: #6366f1;">{{if .UseARecords}}{{.RoutingIP}}{{else}}{{.RoutingCNAMETarget}}{{end}}</td>
+                                        </tr>
+                                        <tr style="background-color: #f9fafb;">
+                                            <td style="padding: 8px; font-family: monospace; color: #4b5563;">{{if .UseARecords}}A{{else}}CNAME{{end}}</td>
                                             <td style="padding: 8px; font-family: monospace; color: #4b5563;">api</td>
-                                            <td style="padding: 8px; font-family: monospace; color: #6366f1;">{{.RoutingCNAMETarget}}</td>
+                                            <td style="padding: 8px; font-family: monospace; color: #6366f1;">{{if .UseARecords}}{{.RoutingIP}}{{else}}{{.RoutingCNAMETarget}}{{end}}</td>
                                         </tr>
                                     </table>
                                 </div>
@@ -334,10 +362,17 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
                                 <div style="background-color: #ffffff; border-radius: 8px; padding: 12px; border-left: 4px solid #3b82f6;">
                                     <p style="color: #1e40af; font-size: 13px; margin: 0; line-height: 1.6;">
                                         💡 <strong>Tips:</strong><br>
+                                        {{if .UseARecords}}
+                                        • All records point to the <strong>same IP address</strong> - easy to configure!<br>
+                                        • DNS changes usually take <strong>5-30 minutes</strong> to propagate<br>
+                                        • We'll automatically provision your <strong>SSL certificate</strong><br>
+                                        • If using <strong>Cloudflare</strong>, set the proxy status to <strong>"DNS only"</strong> (grey cloud)
+                                        {{else}}
                                         • All subdomains use the <strong>same CNAME target</strong> - easy to configure!<br>
                                         • DNS changes usually take <strong>5-30 minutes</strong> to propagate<br>
                                         • We'll automatically provision your <strong>SSL certificate</strong><br>
                                         • If using <strong>Cloudflare</strong>, you can keep proxy mode enabled
+                                        {{end}}
                                     </p>
                                 </div>
                             </div>
@@ -387,7 +422,10 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
 		APIHost            string
 		TenantSlug         string
 		BaseDomain         string
-		RoutingCNAMETarget string // CNAME target for routing (e.g., "proxy.tesserix.app")
+		// Routing configuration - A records vs CNAME
+		UseARecords        bool   // If true, show A records instead of CNAME
+		RoutingIP          string // LoadBalancer IP for A records
+		RoutingCNAMETarget string // CNAME target for routing (fallback)
 		// CNAME Delegation fields for automatic SSL
 		UseCNAMEDelegation bool
 		ACMEChallengeHost  string // e.g., "_acme-challenge.customdomain.com"
@@ -408,6 +446,9 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
 		data.APIHost = dnsConfig.APIHost
 		data.TenantSlug = dnsConfig.TenantSlug
 		data.BaseDomain = dnsConfig.BaseDomain
+		// Routing configuration
+		data.UseARecords = dnsConfig.UseARecords
+		data.RoutingIP = dnsConfig.RoutingIP
 		data.RoutingCNAMETarget = dnsConfig.RoutingCNAMETarget
 		// CNAME Delegation fields for automatic SSL
 		data.UseCNAMEDelegation = dnsConfig.UseCNAMEDelegation

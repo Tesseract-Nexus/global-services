@@ -433,51 +433,93 @@ func (v *DNSVerifier) GetRequiredDNSRecords(domain *models.CustomDomain) []model
 		})
 	}
 
-	// Routing record - CNAME preferred for all domain types
-	// Modern DNS providers (Cloudflare, Route53, etc.) support CNAME flattening for apex domains
-	if domain.DomainType == models.DomainTypeApex {
-		// For apex domains: offer CNAME (preferred) with A record as fallback
+	// Routing records for custom domains
+	// Custom domains CANNOT use Cloudflare Tunnel CNAME due to cross-account restrictions
+	// They must use A records pointing to the custom-ingressgateway LoadBalancer IP
+	//
+	// Architecture:
+	// - Platform domains (*.tesserix.app): Use Cloudflare Tunnel (CNAME to tunnel)
+	// - Custom domains: Use LoadBalancer IP directly (A records)
+	//
+	// When Cloudflare Tunnel is enabled AND we have a ProxyIP configured,
+	// custom domains should use A records to bypass Cloudflare's cross-account CNAME ban (Error 1014)
+	useARecords := v.cfg.DNS.ProxyIP != ""
+
+	if useARecords {
+		// Custom domains: Use A records pointing to LoadBalancer IP
 		records = append(records, models.DNSRecord{
-			RecordType: "CNAME",
+			RecordType: "A",
 			Host:       domain.Domain,
-			Value:      cnameTarget,
+			Value:      v.cfg.DNS.ProxyIP,
 			TTL:        300,
-			Purpose:    fmt.Sprintf("routing (%s)", cnameDescription),
-			IsVerified: domain.CloudflareDNSConfigured || domain.DNSVerified,
+			Purpose:    "routing (LoadBalancer IP)",
+			IsVerified: domain.DNSVerified,
 		})
-		// A record fallback only for legacy mode (not Cloudflare Tunnel)
-		if !v.cfg.Cloudflare.Enabled && v.cfg.DNS.ProxyIP != "" {
+
+		// WWW record if enabled (also A record for consistency)
+		if domain.IncludeWWW && domain.DomainType == models.DomainTypeApex {
 			records = append(records, models.DNSRecord{
 				RecordType: "A",
-				Host:       domain.Domain,
+				Host:       "www." + domain.Domain,
 				Value:      v.cfg.DNS.ProxyIP,
 				TTL:        300,
-				Purpose:    "routing_fallback",
-				IsVerified: false,
+				Purpose:    "routing (LoadBalancer IP)",
+				IsVerified: domain.DNSVerified,
 			})
 		}
-	} else {
-		// Subdomains can always use CNAME
-		records = append(records, models.DNSRecord{
-			RecordType: "CNAME",
-			Host:       domain.Domain,
-			Value:      cnameTarget,
-			TTL:        300,
-			Purpose:    fmt.Sprintf("routing (%s)", cnameDescription),
-			IsVerified: domain.CloudflareDNSConfigured || domain.DNSVerified,
-		})
-	}
 
-	// WWW record if enabled (always CNAME)
-	if domain.IncludeWWW && domain.DomainType == models.DomainTypeApex {
+		// Admin subdomain
 		records = append(records, models.DNSRecord{
-			RecordType: "CNAME",
-			Host:       "www." + domain.Domain,
-			Value:      cnameTarget,
+			RecordType: "A",
+			Host:       "admin." + domain.Domain,
+			Value:      v.cfg.DNS.ProxyIP,
 			TTL:        300,
-			Purpose:    fmt.Sprintf("routing (%s)", cnameDescription),
-			IsVerified: domain.CloudflareDNSConfigured || domain.DNSVerified,
+			Purpose:    "routing (LoadBalancer IP)",
+			IsVerified: domain.DNSVerified,
 		})
+
+		// API subdomain
+		records = append(records, models.DNSRecord{
+			RecordType: "A",
+			Host:       "api." + domain.Domain,
+			Value:      v.cfg.DNS.ProxyIP,
+			TTL:        300,
+			Purpose:    "routing (LoadBalancer IP)",
+			IsVerified: domain.DNSVerified,
+		})
+	} else {
+		// Fallback: CNAME records (only works if not on Cloudflare or using same account)
+		if domain.DomainType == models.DomainTypeApex {
+			records = append(records, models.DNSRecord{
+				RecordType: "CNAME",
+				Host:       domain.Domain,
+				Value:      cnameTarget,
+				TTL:        300,
+				Purpose:    fmt.Sprintf("routing (%s)", cnameDescription),
+				IsVerified: domain.CloudflareDNSConfigured || domain.DNSVerified,
+			})
+		} else {
+			records = append(records, models.DNSRecord{
+				RecordType: "CNAME",
+				Host:       domain.Domain,
+				Value:      cnameTarget,
+				TTL:        300,
+				Purpose:    fmt.Sprintf("routing (%s)", cnameDescription),
+				IsVerified: domain.CloudflareDNSConfigured || domain.DNSVerified,
+			})
+		}
+
+		// WWW record if enabled
+		if domain.IncludeWWW && domain.DomainType == models.DomainTypeApex {
+			records = append(records, models.DNSRecord{
+				RecordType: "CNAME",
+				Host:       "www." + domain.Domain,
+				Value:      cnameTarget,
+				TTL:        300,
+				Purpose:    fmt.Sprintf("routing (%s)", cnameDescription),
+				IsVerified: domain.CloudflareDNSConfigured || domain.DNSVerified,
+			})
+		}
 	}
 
 	return records

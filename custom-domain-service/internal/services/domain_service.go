@@ -356,33 +356,77 @@ func (s *DomainService) ValidateDomain(ctx context.Context, req *ValidateDomainR
 	// Return both options in VerificationRecords
 	response.VerificationRecords = []models.DNSRecord{cnameRecord, txtRecord}
 
-	// Determine routing target (CNAME target for domain routing)
-	proxyTarget := s.cfg.DNS.ProxyDomain
-	if s.cfg.Cloudflare.Enabled && s.cfg.Cloudflare.TunnelID != "" {
-		proxyTarget = fmt.Sprintf("%s.cfargotunnel.com", s.cfg.Cloudflare.TunnelID)
-	}
-	response.ProxyTarget = proxyTarget
+	// Determine routing target for custom domains
+	// Custom domains CANNOT use Cloudflare Tunnel CNAME due to cross-account restrictions (Error 1014)
+	// They must use A records pointing to the custom-ingressgateway LoadBalancer IP
+	var routingRecords []models.DNSRecord
 
-	// Build routing records (CNAME records for traffic routing)
-	routingRecords := []models.DNSRecord{
-		{
-			RecordType: "CNAME",
-			Host:       domainName,
-			Value:      proxyTarget,
-			TTL:        300,
-			Purpose:    "routing",
-		},
-	}
+	if s.cfg.DNS.ProxyIP != "" {
+		// Use A records pointing to LoadBalancer IP
+		response.ProxyTarget = s.cfg.DNS.ProxyIP
 
-	// Add www subdomain if apex domain
-	if domainType == models.DomainTypeApex {
-		routingRecords = append(routingRecords, models.DNSRecord{
-			RecordType: "CNAME",
-			Host:       "www." + domainName,
-			Value:      proxyTarget,
-			TTL:        300,
-			Purpose:    "routing",
-		})
+		routingRecords = []models.DNSRecord{
+			{
+				RecordType: "A",
+				Host:       domainName,
+				Value:      s.cfg.DNS.ProxyIP,
+				TTL:        300,
+				Purpose:    "routing (LoadBalancer IP)",
+			},
+			{
+				RecordType: "A",
+				Host:       "admin." + domainName,
+				Value:      s.cfg.DNS.ProxyIP,
+				TTL:        300,
+				Purpose:    "routing (LoadBalancer IP)",
+			},
+			{
+				RecordType: "A",
+				Host:       "api." + domainName,
+				Value:      s.cfg.DNS.ProxyIP,
+				TTL:        300,
+				Purpose:    "routing (LoadBalancer IP)",
+			},
+		}
+
+		// Add www subdomain if apex domain
+		if domainType == models.DomainTypeApex {
+			routingRecords = append(routingRecords, models.DNSRecord{
+				RecordType: "A",
+				Host:       "www." + domainName,
+				Value:      s.cfg.DNS.ProxyIP,
+				TTL:        300,
+				Purpose:    "routing (LoadBalancer IP)",
+			})
+		}
+	} else {
+		// Fallback: CNAME records (only if ProxyIP not configured)
+		proxyTarget := s.cfg.DNS.ProxyDomain
+		if s.cfg.Cloudflare.Enabled && s.cfg.Cloudflare.TunnelID != "" {
+			proxyTarget = fmt.Sprintf("%s.cfargotunnel.com", s.cfg.Cloudflare.TunnelID)
+		}
+		response.ProxyTarget = proxyTarget
+
+		routingRecords = []models.DNSRecord{
+			{
+				RecordType: "CNAME",
+				Host:       domainName,
+				Value:      proxyTarget,
+				TTL:        300,
+				Purpose:    "routing",
+			},
+		}
+
+		// Add www subdomain if apex domain
+		if domainType == models.DomainTypeApex {
+			routingRecords = append(routingRecords, models.DNSRecord{
+				RecordType: "CNAME",
+				Host:       "www." + domainName,
+				Value:      proxyTarget,
+				TTL:        300,
+				Purpose:    "routing",
+			})
+		}
 	}
 	response.RoutingRecords = routingRecords
 
