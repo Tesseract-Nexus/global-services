@@ -9,6 +9,7 @@ import (
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	certmanagerclient "github.com/cert-manager/cert-manager/pkg/client/clientset/versioned"
+	"google.golang.org/protobuf/types/known/durationpb"
 	networkingv1beta1 "istio.io/api/networking/v1beta1"
 	securityv1beta1 "istio.io/api/security/v1beta1"
 	typev1beta1 "istio.io/api/type/v1beta1"
@@ -667,6 +668,39 @@ func (c *Client) createVirtualServiceWithGateway(ctx context.Context, slug, tena
 		customGatewayRef := fmt.Sprintf("%s/%s", c.config.Kubernetes.CustomDomainGatewayNS, gatewayName)
 		newVS.Spec.Gateways = []string{customGatewayRef}
 		log.Printf("[K8s] Using custom domain gateway %s for tenant %s", customGatewayRef, slug)
+
+		// Add ACME challenge route as the FIRST route for custom domains
+		// This is critical for Let's Encrypt HTTP-01 certificate validation
+		// The route must come BEFORE all other routes to ensure ACME challenges are not intercepted
+		acmeRoute := &networkingv1beta1.HTTPRoute{
+			Name: "acme-challenge",
+			Match: []*networkingv1beta1.HTTPMatchRequest{
+				{
+					Uri: &networkingv1beta1.StringMatch{
+						MatchType: &networkingv1beta1.StringMatch_Prefix{
+							Prefix: "/.well-known/acme-challenge/",
+						},
+					},
+				},
+			},
+			Route: []*networkingv1beta1.HTTPRouteDestination{
+				{
+					Destination: &networkingv1beta1.Destination{
+						Host: "acme-http-solver.istio-ingress.svc.cluster.local",
+						Port: &networkingv1beta1.PortSelector{
+							Number: 8089,
+						},
+					},
+				},
+			},
+			Retries: &networkingv1beta1.HTTPRetry{
+				Attempts: 0,
+			},
+			Timeout: &durationpb.Duration{Seconds: 30},
+		}
+		// Prepend ACME route to the beginning of the HTTP routes
+		newVS.Spec.Http = append([]*networkingv1beta1.HTTPRoute{acmeRoute}, newVS.Spec.Http...)
+		log.Printf("[K8s] Added ACME challenge route for custom domain %s", tenantHost)
 	}
 
 	// Build CORS origins for tenant isolation

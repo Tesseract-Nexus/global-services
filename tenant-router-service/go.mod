@@ -10,6 +10,7 @@ require (
 	github.com/nats-io/nats.go v1.31.0
 	github.com/redis/go-redis/v9 v9.17.2
 	golang.org/x/time v0.3.0
+	google.golang.org/protobuf v1.34.1
 	gorm.io/driver/postgres v1.5.6
 	gorm.io/gorm v1.25.7
 	istio.io/api v1.20.0-beta.0.0.20231031143729-871b2914253f
@@ -85,7 +86,6 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20231016165738-49dd2c1f3d0b // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20231030173426-d783a09b4405 // indirect
 	google.golang.org/grpc v1.59.0 // indirect
-	google.golang.org/protobuf v1.34.1 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
