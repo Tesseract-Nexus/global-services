@@ -40,25 +40,50 @@ const logoutQuerySchema = z.object({
   returnTo: z.string().optional(),
 });
 
-// Cookie helper
-const setSessionCookie = (reply: FastifyReply, sessionId: string) => {
+// Cookie helper with dynamic domain support for custom domains
+/**
+ * Determine the cookie domain based on the request host.
+ * For tesserix.app domains, use .tesserix.app to enable cross-subdomain cookies.
+ * For custom domains, don't set domain to let the browser default to the request host.
+ */
+const getCookieDomain = (forwardedHost: string | undefined): string | undefined => {
+  if (config.session.cookieDomain) {
+    return config.session.cookieDomain;
+  }
+  if (!forwardedHost) {
+    return undefined;
+  }
+  const hostname = forwardedHost.split(':')[0].toLowerCase();
+  if (hostname.endsWith('.tesserix.app') || hostname === 'tesserix.app') {
+    return '.tesserix.app';
+  }
+  if (hostname === 'localhost' || hostname.endsWith('.localhost')) {
+    return undefined;
+  }
+  logger.debug({ hostname }, 'Custom domain detected, not setting cookie domain');
+  return undefined;
+};
+
+const setSessionCookie = (reply: FastifyReply, sessionId: string, forwardedHost?: string) => {
+  const domain = getCookieDomain(forwardedHost);
   reply.setCookie(config.session.cookieName, sessionId, {
     httpOnly: true,
     secure: config.server.nodeEnv === 'production',
     sameSite: 'lax',
     path: '/',
     maxAge: config.session.maxAge,
-    domain: config.session.cookieDomain,
+    ...(domain ? { domain } : {}),
   });
 };
 
-const clearSessionCookie = (reply: FastifyReply) => {
+const clearSessionCookie = (reply: FastifyReply, forwardedHost?: string) => {
+  const domain = getCookieDomain(forwardedHost);
   reply.clearCookie(config.session.cookieName, {
     httpOnly: true,
     secure: config.server.nodeEnv === 'production',
     sameSite: 'lax',
     path: '/',
-    domain: config.session.cookieDomain,
+    ...(domain ? { domain } : {}),
   });
 };
 
@@ -215,10 +240,11 @@ export async function authRoutes(fastify: FastifyInstance) {
         userInfo,
       });
 
-      // Set session cookie
-      setSessionCookie(reply, session.id);
+      // Set session cookie with dynamic domain for custom domain support
+      const forwardedHost = request.headers['x-forwarded-host'] as string | undefined;
+      setSessionCookie(reply, session.id, forwardedHost);
 
-      logger.info({ userId: session.userId, sessionId: session.id }, 'Authentication successful');
+      logger.info({ userId: session.userId, sessionId: session.id, forwardedHost }, 'Authentication successful');
 
       // Publish login success event for notifications (non-blocking)
       // Only publish for customer logins (storefront) with tenant context
@@ -266,8 +292,9 @@ export async function authRoutes(fastify: FastifyInstance) {
       // Delete session
       await sessionStore.deleteSession(session.id);
 
-      // Clear cookie
-      clearSessionCookie(reply);
+      // Clear cookie with dynamic domain for custom domain support
+      const forwardedHost = request.headers['x-forwarded-host'] as string | undefined;
+      clearSessionCookie(reply, forwardedHost);
 
       // Revoke tokens with Keycloak (but don't redirect to Keycloak UI)
       if (session.refreshToken) {
@@ -300,7 +327,8 @@ export async function authRoutes(fastify: FastifyInstance) {
 
     if (session) {
       await sessionStore.deleteSession(session.id);
-      clearSessionCookie(reply);
+      const forwardedHost = request.headers['x-forwarded-host'] as string | undefined;
+      clearSessionCookie(reply, forwardedHost);
 
       // Revoke tokens with Keycloak (but don't redirect to Keycloak UI)
       if (session.refreshToken) {
@@ -340,7 +368,8 @@ export async function authRoutes(fastify: FastifyInstance) {
       // Session has expired - clear it
       logger.info({ sessionId: session.id }, 'Session expired');
       await sessionStore.deleteSession(session.id);
-      clearSessionCookie(reply);
+      const forwardedHost = request.headers['x-forwarded-host'] as string | undefined;
+      clearSessionCookie(reply, forwardedHost);
       return reply.code(401).send({ authenticated: false, error: 'session_expired' });
     }
 
@@ -391,7 +420,8 @@ export async function authRoutes(fastify: FastifyInstance) {
     } catch (error) {
       logger.error({ error }, 'Token refresh failed');
       await sessionStore.deleteSession(session.id);
-      clearSessionCookie(reply);
+      const forwardedHost = request.headers['x-forwarded-host'] as string | undefined;
+      clearSessionCookie(reply, forwardedHost);
       return reply.code(401).send({ error: 'refresh_failed' });
     }
   });
@@ -596,10 +626,11 @@ export async function authRoutes(fastify: FastifyInstance) {
       userInfo: transferData.userInfo,
     });
 
-    // Set session cookie for this domain
-    setSessionCookie(reply, session.id);
+    // Set session cookie for this domain with dynamic domain support
+    const forwardedHost = request.headers['x-forwarded-host'] as string | undefined;
+    setSessionCookie(reply, session.id, forwardedHost);
 
-    logger.info({ userId: session.userId, sessionId: session.id }, 'Session transfer accepted');
+    logger.info({ userId: session.userId, sessionId: session.id, forwardedHost }, 'Session transfer accepted');
 
     // Redirect to return URL or default dashboard
     return reply.redirect(returnTo || '/');

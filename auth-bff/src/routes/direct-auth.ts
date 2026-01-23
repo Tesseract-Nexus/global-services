@@ -123,15 +123,60 @@ function checkRateLimit(key: string): { allowed: boolean; remaining: number; res
 // Cookie Helper
 // ============================================================================
 
-const setSessionCookie = (reply: FastifyReply, sessionId: string, rememberMe: boolean = false) => {
+/**
+ * Determine the cookie domain based on the request host.
+ * For tesserix.app domains, use .tesserix.app to enable cross-subdomain cookies.
+ * For custom domains (e.g., admin.yahvismartfarm.com), don't set domain to let
+ * the browser default to the request host.
+ */
+const getCookieDomain = (forwardedHost: string | undefined): string | undefined => {
+  // If a static domain is configured, use it
+  if (config.session.cookieDomain) {
+    return config.session.cookieDomain;
+  }
+
+  // Dynamic domain determination based on X-Forwarded-Host
+  if (!forwardedHost) {
+    return undefined;
+  }
+
+  // Remove port if present
+  const hostname = forwardedHost.split(':')[0].toLowerCase();
+
+  // For tesserix.app domains, use .tesserix.app for cross-subdomain cookies
+  if (hostname.endsWith('.tesserix.app') || hostname === 'tesserix.app') {
+    return '.tesserix.app';
+  }
+
+  // For localhost, use undefined to let browser default
+  if (hostname === 'localhost' || hostname.endsWith('.localhost')) {
+    return undefined;
+  }
+
+  // For custom domains, don't set domain - let browser default to request host
+  // This is critical for custom domain authentication to work
+  logger.debug({ hostname }, 'Custom domain detected, not setting cookie domain');
+  return undefined;
+};
+
+const setSessionCookie = (
+  reply: FastifyReply,
+  sessionId: string,
+  forwardedHost: string | undefined,
+  rememberMe: boolean = false
+) => {
   const maxAge = rememberMe ? config.session.maxAge * 7 : config.session.maxAge; // 7 days if remember me
+  const domain = getCookieDomain(forwardedHost);
+
+  logger.debug({ domain, forwardedHost, sessionId: sessionId.substring(0, 8) + '...' }, 'Setting session cookie');
+
   reply.setCookie(config.session.cookieName, sessionId, {
     httpOnly: true,
     secure: config.server.nodeEnv === 'production',
     sameSite: 'lax',
     path: '/',
     maxAge,
-    domain: config.session.cookieDomain,
+    ...(domain ? { domain } : {}), // Only set domain if defined
   });
 };
 
@@ -351,13 +396,15 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
       },
     });
 
-    // Set session cookie
-    setSessionCookie(reply, session.id, remember_me);
+    // Set session cookie with dynamic domain based on request host
+    const forwardedHost = request.headers['x-forwarded-host'] as string | undefined;
+    setSessionCookie(reply, session.id, forwardedHost, remember_me);
 
     logger.info({
       userId: session.userId,
       sessionId: session.id,
       tenant_slug,
+      forwardedHost,
     }, 'Direct customer login successful');
 
     return reply.send({
@@ -524,13 +571,15 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
       },
     });
 
-    // Set session cookie
-    setSessionCookie(reply, session.id, remember_me);
+    // Set session cookie with dynamic domain based on request host
+    const forwardedHost = request.headers['x-forwarded-host'] as string | undefined;
+    setSessionCookie(reply, session.id, forwardedHost, remember_me);
 
     logger.info({
       userId: session.userId,
       sessionId: session.id,
       tenant_slug,
+      forwardedHost,
     }, 'Admin/Staff direct login successful');
 
     return reply.send({
@@ -800,13 +849,15 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
       },
     });
 
-    // Set session cookie
-    setSessionCookie(reply, session.id, false);
+    // Set session cookie with dynamic domain based on request host
+    const forwardedHost = request.headers['x-forwarded-host'] as string | undefined;
+    setSessionCookie(reply, session.id, forwardedHost, false);
 
     logger.info({
       userId: session.userId,
       sessionId: session.id,
       tenant_slug,
+      forwardedHost,
     }, 'Direct registration with auto-login successful');
 
     return reply.send({
