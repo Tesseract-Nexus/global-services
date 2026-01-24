@@ -359,7 +359,7 @@ func setupRouter(cfg *config.Config, auditHandlers *handlers.AuditHandlers, stat
 	api := router.Group("/api/v1")
 	api.Use(gosharedmw.IstioAuth(gosharedmw.IstioAuthConfig{
 		RequireAuth:        true,
-		AllowLegacyHeaders: true, // Allow X-Tenant-ID for internal service-to-service calls
+		AllowLegacyHeaders: false, // Never use legacy X-* headers - only trust Istio JWT claims
 		SkipPaths:          []string{"/health", "/ready", "/metrics", "/internal"},
 	}))
 	{
