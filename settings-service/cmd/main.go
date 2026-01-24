@@ -383,14 +383,8 @@ func setupRouter(settingsHandler *handlers.SettingsHandler, storefrontThemeHandl
 			currency.POST("/refresh", rbacMiddleware.RequirePermission(rbac.PermissionSettingsUpdate), currencyHandler.RefreshRates)
 			currency.GET("/status", rbacMiddleware.RequirePermission(rbac.PermissionSettingsRead), currencyHandler.GetUpdaterStatus)
 		}
-
-		// Tenant endpoints for audit configuration
-		// Used by audit-service to get tenant database config
-		tenants := v1.Group("/tenants")
-		{
-			tenants.GET("/audit-enabled", tenantHandler.ListAuditEnabledTenants)
-			tenants.GET("/:id/audit-config", tenantHandler.GetAuditConfig)
-		}
+		// Note: Tenant audit config endpoints are registered above in the internal service group
+		// to allow service-to-service calls without user authentication
 	}
 
 	// Swagger documentation
