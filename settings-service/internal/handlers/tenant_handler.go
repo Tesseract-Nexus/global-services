@@ -1,32 +1,75 @@
 package handlers
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 
 	"settings-service/internal/models"
-	"settings-service/internal/repository"
 )
 
 // TenantHandler handles tenant-related API endpoints
 type TenantHandler struct {
-	repo   *repository.TenantRepository
-	logger *logrus.Logger
+	tenantServiceURL string
+	httpClient       *http.Client
+	logger           *logrus.Logger
 }
 
 // NewTenantHandler creates a new tenant handler
-func NewTenantHandler(repo *repository.TenantRepository) *TenantHandler {
+func NewTenantHandler() *TenantHandler {
 	logger := logrus.New()
 	logger.SetFormatter(&logrus.JSONFormatter{})
+
+	tenantServiceURL := os.Getenv("TENANT_SERVICE_URL")
+	if tenantServiceURL == "" {
+		tenantServiceURL = "http://tenant-service:8080"
+	}
+
 	return &TenantHandler{
-		repo:   repo,
+		tenantServiceURL: tenantServiceURL,
+		httpClient: &http.Client{
+			Timeout: 10 * time.Second,
+		},
 		logger: logger,
 	}
+}
+
+// TenantServiceResponse is the response from tenant-service
+type TenantServiceResponse struct {
+	Success bool                   `json:"success"`
+	Data    TenantServiceTenant    `json:"data"`
+	Message string                 `json:"message,omitempty"`
+}
+
+// TenantServiceTenant is the tenant model from tenant-service
+type TenantServiceTenant struct {
+	ID              string    `json:"id"`
+	Name            string    `json:"name"`
+	Slug            string    `json:"slug"`
+	Subdomain       string    `json:"subdomain"`
+	DisplayName     string    `json:"display_name"`
+	BusinessType    string    `json:"business_type"`
+	Industry        string    `json:"industry"`
+	Status          string    `json:"status"`
+	BusinessModel   string    `json:"business_model"`
+	DefaultTimezone string    `json:"default_timezone"`
+	DefaultCurrency string    `json:"default_currency"`
+	PricingTier     string    `json:"pricing_tier"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+}
+
+// TenantListResponse is the response for listing tenants
+type TenantListResponse struct {
+	Success bool                  `json:"success"`
+	Data    []TenantServiceTenant `json:"data"`
 }
 
 // GetAuditConfig returns the audit configuration for a specific tenant
@@ -54,9 +97,10 @@ func (h *TenantHandler) GetAuditConfig(c *gin.Context) {
 		return
 	}
 
-	tenant, err := h.repo.GetByID(tenantID)
+	// Call tenant-service to get tenant info
+	tenant, err := h.getTenantFromService(tenantID.String())
 	if err != nil {
-		h.logger.WithError(err).WithField("tenant_id", tenantID).Error("Failed to get tenant")
+		h.logger.WithError(err).WithField("tenant_id", tenantID).Error("Failed to get tenant from tenant-service")
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"error":   "Failed to retrieve tenant",
@@ -97,7 +141,7 @@ func (h *TenantHandler) GetAuditConfig(c *gin.Context) {
 // @Failure 500 {object} map[string]interface{}
 // @Router /api/v1/tenants/audit-enabled [get]
 func (h *TenantHandler) ListAuditEnabledTenants(c *gin.Context) {
-	tenants, err := h.repo.GetAllActive()
+	tenants, err := h.getActiveTenants()
 	if err != nil {
 		h.logger.WithError(err).Error("Failed to list active tenants")
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -121,19 +165,94 @@ func (h *TenantHandler) ListAuditEnabledTenants(c *gin.Context) {
 	})
 }
 
+// getTenantFromService calls tenant-service to get tenant info
+func (h *TenantHandler) getTenantFromService(tenantID string) (*TenantServiceTenant, error) {
+	url := fmt.Sprintf("%s/api/v1/tenants/%s", h.tenantServiceURL, tenantID)
+
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Internal-Service", "settings-service")
+
+	resp, err := h.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call tenant-service: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, nil
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("tenant-service returned status %d", resp.StatusCode)
+	}
+
+	var response TenantServiceResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("tenant-service returned error: %s", response.Message)
+	}
+
+	return &response.Data, nil
+}
+
+// getActiveTenants calls tenant-service to list all active tenants
+func (h *TenantHandler) getActiveTenants() ([]TenantServiceTenant, error) {
+	url := fmt.Sprintf("%s/api/v1/tenants?status=active", h.tenantServiceURL)
+
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Internal-Service", "settings-service")
+
+	resp, err := h.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call tenant-service: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("tenant-service returned status %d", resp.StatusCode)
+	}
+
+	var response TenantListResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return response.Data, nil
+}
+
 // buildAuditConfig constructs the TenantAuditConfig from a Tenant record
-func (h *TenantHandler) buildAuditConfig(tenant *models.Tenant) models.TenantAuditConfig {
+func (h *TenantHandler) buildAuditConfig(tenant *TenantServiceTenant) models.TenantAuditConfig {
 	// Get database configuration from environment variables
 	// In production, each tenant could have its own database
 	// For now, we use the shared audit database configuration
 	dbConfig := h.getDatabaseConfig()
 
+	tenantUUID, _ := uuid.Parse(tenant.ID)
+
+	displayName := tenant.DisplayName
+	if displayName == "" {
+		displayName = tenant.Name
+	}
+
 	return models.TenantAuditConfig{
-		TenantID:       tenant.ID,
+		TenantID:       tenantUUID,
 		ProductID:      tenant.Slug, // Using slug as product ID
 		ProductName:    tenant.Name,
 		VendorID:       tenant.Slug, // Using slug as vendor ID
-		VendorName:     tenant.DisplayName,
+		VendorName:     displayName,
 		DatabaseConfig: dbConfig,
 		IsActive:       tenant.Status == "active",
 		CreatedAt:      tenant.CreatedAt,
@@ -164,7 +283,7 @@ func (h *TenantHandler) getDatabaseConfig() models.DatabaseConfig {
 }
 
 // getDefaultFeatures returns default audit feature settings based on tenant tier
-func (h *TenantHandler) getDefaultFeatures(tenant *models.Tenant) models.TenantFeatures {
+func (h *TenantHandler) getDefaultFeatures(tenant *TenantServiceTenant) models.TenantFeatures {
 	// Default features - can be customized per pricing tier
 	features := models.TenantFeatures{
 		AuditLogsEnabled: true,

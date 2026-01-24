@@ -116,8 +116,8 @@ func main() {
 	settingsHandler := handlers.NewSettingsHandler(settingsService)
 
 	// Initialize tenant dependencies (for audit config)
-	tenantRepo := repository.NewTenantRepository(db)
-	tenantHandler := handlers.NewTenantHandler(tenantRepo)
+	// TenantHandler calls tenant-service via HTTP to get tenant info
+	tenantHandler := handlers.NewTenantHandler()
 
 	// Initialize storefront theme dependencies
 	storefrontThemeRepo := repository.NewStorefrontThemeRepository(db)
