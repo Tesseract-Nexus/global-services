@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 
+	"github.com/Tesseract-Nexus/go-shared/secrets"
 	"settings-service/internal/models"
 )
 
@@ -262,20 +263,28 @@ func (h *TenantHandler) buildAuditConfig(tenant *TenantServiceTenant) models.Ten
 }
 
 // getDatabaseConfig returns the database configuration for audit logs
-// Uses environment variables for configuration
+// Uses environment variables for configuration, with database password from GCP Secret Manager
 func (h *TenantHandler) getDatabaseConfig() models.DatabaseConfig {
 	port, _ := strconv.Atoi(getEnvOrDefault("AUDIT_DB_PORT", "5432"))
 	maxOpenConns, _ := strconv.Atoi(getEnvOrDefault("AUDIT_DB_MAX_OPEN_CONNS", "25"))
 	maxIdleConns, _ := strconv.Atoi(getEnvOrDefault("AUDIT_DB_MAX_IDLE_CONNS", "5"))
 	maxLifetime, _ := strconv.Atoi(getEnvOrDefault("AUDIT_DB_MAX_LIFETIME", "300"))
 
+	// Get password from GCP Secret Manager (same as main database password)
+	// This uses the go-shared secrets package which handles GCP Secret Manager loading
+	password := getEnvOrDefault("AUDIT_DB_PASSWORD", "")
+	if password == "" {
+		// Fall back to the shared database password loaded from GCP Secret Manager
+		password = secrets.GetDBPassword()
+	}
+
 	return models.DatabaseConfig{
 		Host:         getEnvOrDefault("AUDIT_DB_HOST", getEnvOrDefault("DB_HOST", "postgresql.database.svc.cluster.local")),
 		Port:         port,
-		User:         getEnvOrDefault("AUDIT_DB_USER", getEnvOrDefault("DB_USER", "tesserix_user")),
-		Password:     getEnvOrDefault("AUDIT_DB_PASSWORD", getEnvOrDefault("DB_PASSWORD", "")),
+		User:         getEnvOrDefault("AUDIT_DB_USER", getEnvOrDefault("DB_USER", "postgres")),
+		Password:     password,
 		DatabaseName: getEnvOrDefault("AUDIT_DB_NAME", "audit_logs"),
-		SSLMode:      getEnvOrDefault("AUDIT_DB_SSL_MODE", "require"),
+		SSLMode:      getEnvOrDefault("AUDIT_DB_SSL_MODE", "disable"),
 		MaxOpenConns: maxOpenConns,
 		MaxIdleConns: maxIdleConns,
 		MaxLifetime:  maxLifetime,
