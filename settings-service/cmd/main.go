@@ -115,6 +115,10 @@ func main() {
 	settingsService := services.NewSettingsService(settingsRepo)
 	settingsHandler := handlers.NewSettingsHandler(settingsService)
 
+	// Initialize tenant dependencies (for audit config)
+	tenantRepo := repository.NewTenantRepository(db)
+	tenantHandler := handlers.NewTenantHandler(tenantRepo)
+
 	// Initialize storefront theme dependencies
 	storefrontThemeRepo := repository.NewStorefrontThemeRepository(db)
 	storefrontThemeService := services.NewStorefrontThemeService(storefrontThemeRepo)
@@ -143,7 +147,7 @@ func main() {
 	log.Println("✓ RBAC middleware initialized")
 
 	// Initialize Gin router
-	router := setupRouter(settingsHandler, storefrontThemeHandler, currencyHandler, healthChecker, rbacMiddleware, cfg, eventLogger, redisClient)
+	router := setupRouter(settingsHandler, storefrontThemeHandler, currencyHandler, tenantHandler, healthChecker, rbacMiddleware, cfg, eventLogger, redisClient)
 
 	// Mark service as ready
 	healthChecker.SetReady(true)
@@ -221,7 +225,7 @@ func runMigrations(db *gorm.DB) error {
 }
 
 // setupRouter configures the Gin router with middleware and routes
-func setupRouter(settingsHandler *handlers.SettingsHandler, storefrontThemeHandler *handlers.StorefrontThemeHandler, currencyHandler *handlers.CurrencyHandler, healthChecker *health.HealthChecker, rbacMiddleware *rbac.Middleware, cfg *config.Config, logger *logrus.Logger, redisClient *redis.Client) *gin.Engine {
+func setupRouter(settingsHandler *handlers.SettingsHandler, storefrontThemeHandler *handlers.StorefrontThemeHandler, currencyHandler *handlers.CurrencyHandler, tenantHandler *handlers.TenantHandler, healthChecker *health.HealthChecker, rbacMiddleware *rbac.Middleware, cfg *config.Config, logger *logrus.Logger, redisClient *redis.Client) *gin.Engine {
 	router := gin.New()
 
 	// Global middleware
@@ -365,6 +369,14 @@ func setupRouter(settingsHandler *handlers.SettingsHandler, storefrontThemeHandl
 			currency.GET("/supported", rbacMiddleware.RequirePermission(rbac.PermissionSettingsRead), currencyHandler.GetSupportedCurrencies)
 			currency.POST("/refresh", rbacMiddleware.RequirePermission(rbac.PermissionSettingsUpdate), currencyHandler.RefreshRates)
 			currency.GET("/status", rbacMiddleware.RequirePermission(rbac.PermissionSettingsRead), currencyHandler.GetUpdaterStatus)
+		}
+
+		// Tenant endpoints for audit configuration
+		// Used by audit-service to get tenant database config
+		tenants := v1.Group("/tenants")
+		{
+			tenants.GET("/audit-enabled", tenantHandler.ListAuditEnabledTenants)
+			tenants.GET("/:id/audit-config", tenantHandler.GetAuditConfig)
 		}
 	}
 
