@@ -100,3 +100,38 @@ func AuthMiddleware() gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+// InternalServiceMiddleware allows requests from internal services
+// Internal services identify themselves via X-Internal-Service header
+// This is protected at network level by Kubernetes network policies and Istio mTLS
+var allowedInternalServices = map[string]bool{
+	"audit-service":        true,
+	"notification-service": true,
+	"products-service":     true,
+	"orders-service":       true,
+	"categories-service":   true,
+}
+
+func InternalServiceMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		serviceName := c.GetHeader("X-Internal-Service")
+		if serviceName == "" {
+			c.AbortWithStatusJSON(401, gin.H{
+				"success": false,
+				"error":   "Internal service authentication required",
+			})
+			return
+		}
+
+		if !allowedInternalServices[serviceName] {
+			c.AbortWithStatusJSON(403, gin.H{
+				"success": false,
+				"error":   "Unauthorized service",
+			})
+			return
+		}
+
+		c.Set("internal_service", serviceName)
+		c.Next()
+	}
+}

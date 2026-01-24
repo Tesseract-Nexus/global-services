@@ -285,6 +285,19 @@ func setupRouter(settingsHandler *handlers.SettingsHandler, storefrontThemeHandl
 	router.GET("/metrics", health.MetricsHandler())
 
 	// ========================================
+	// Internal service-to-service API routes (no user auth required)
+	// These endpoints are called by other internal services via X-Internal-Service header
+	// Protected at network level by Kubernetes network policies and Istio mTLS
+	// ========================================
+	internalV1 := router.Group("/api/v1")
+	internalV1.Use(middleware.InternalServiceMiddleware()) // Only allows internal services
+	{
+		// Tenant audit config - used by audit-service to get tenant database config
+		internalV1.GET("/tenants/:id/audit-config", tenantHandler.GetAuditConfig)
+		internalV1.GET("/tenants/audit-enabled", tenantHandler.ListAuditEnabledTenants)
+	}
+
+	// ========================================
 	// Public API routes (no auth required)
 	// These are read-only endpoints for public storefronts
 	// ========================================
