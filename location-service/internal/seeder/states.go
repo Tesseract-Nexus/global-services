@@ -133,11 +133,166 @@ func getStatesData() []models.State {
 		{ID: "AU-NT", Name: "Northern Territory", Code: "NT", CountryID: "AU", Type: "territory", Latitude: float64Ptr(-12.4634), Longitude: float64Ptr(130.8456), Active: true},
 	}
 
+	// Nepal Provinces
+	nepalProvinces := []models.State{
+		{ID: "NP-P1", Name: "Koshi Province", Code: "P1", CountryID: "NP", Type: "province", Latitude: float64Ptr(27.0), Longitude: float64Ptr(87.3), Active: true},
+		{ID: "NP-P2", Name: "Madhesh Province", Code: "P2", CountryID: "NP", Type: "province", Latitude: float64Ptr(26.7), Longitude: float64Ptr(85.9), Active: true},
+		{ID: "NP-P3", Name: "Bagmati Province", Code: "P3", CountryID: "NP", Type: "province", Latitude: float64Ptr(27.7), Longitude: float64Ptr(85.3), Active: true},
+		{ID: "NP-P4", Name: "Gandaki Province", Code: "P4", CountryID: "NP", Type: "province", Latitude: float64Ptr(28.4), Longitude: float64Ptr(84.1), Active: true},
+		{ID: "NP-P5", Name: "Lumbini Province", Code: "P5", CountryID: "NP", Type: "province", Latitude: float64Ptr(27.8), Longitude: float64Ptr(82.9), Active: true},
+		{ID: "NP-P6", Name: "Karnali Province", Code: "P6", CountryID: "NP", Type: "province", Latitude: float64Ptr(29.4), Longitude: float64Ptr(82.4), Active: true},
+		{ID: "NP-P7", Name: "Sudurpashchim Province", Code: "P7", CountryID: "NP", Type: "province", Latitude: float64Ptr(29.3), Longitude: float64Ptr(80.6), Active: true},
+	}
+
+	// Bangladesh Divisions
+	bangladeshDivisions := []models.State{
+		{ID: "BD-A", Name: "Barisal", Code: "A", CountryID: "BD", Type: "division", Latitude: float64Ptr(22.7), Longitude: float64Ptr(90.4), Active: true},
+		{ID: "BD-B", Name: "Chittagong", Code: "B", CountryID: "BD", Type: "division", Latitude: float64Ptr(22.3), Longitude: float64Ptr(91.8), Active: true},
+		{ID: "BD-C", Name: "Dhaka", Code: "C", CountryID: "BD", Type: "division", Latitude: float64Ptr(23.8), Longitude: float64Ptr(90.4), Active: true},
+		{ID: "BD-D", Name: "Khulna", Code: "D", CountryID: "BD", Type: "division", Latitude: float64Ptr(22.8), Longitude: float64Ptr(89.5), Active: true},
+		{ID: "BD-E", Name: "Rajshahi", Code: "E", CountryID: "BD", Type: "division", Latitude: float64Ptr(24.4), Longitude: float64Ptr(88.6), Active: true},
+		{ID: "BD-F", Name: "Rangpur", Code: "F", CountryID: "BD", Type: "division", Latitude: float64Ptr(25.7), Longitude: float64Ptr(89.3), Active: true},
+		{ID: "BD-G", Name: "Sylhet", Code: "G", CountryID: "BD", Type: "division", Latitude: float64Ptr(24.9), Longitude: float64Ptr(91.9), Active: true},
+		{ID: "BD-H", Name: "Mymensingh", Code: "H", CountryID: "BD", Type: "division", Latitude: float64Ptr(24.7), Longitude: float64Ptr(90.4), Active: true},
+	}
+
+	// Sri Lanka Provinces
+	sriLankaProvinces := []models.State{
+		{ID: "LK-1", Name: "Western Province", Code: "1", CountryID: "LK", Type: "province", Latitude: float64Ptr(6.9), Longitude: float64Ptr(79.9), Active: true},
+		{ID: "LK-2", Name: "Central Province", Code: "2", CountryID: "LK", Type: "province", Latitude: float64Ptr(7.3), Longitude: float64Ptr(80.6), Active: true},
+		{ID: "LK-3", Name: "Southern Province", Code: "3", CountryID: "LK", Type: "province", Latitude: float64Ptr(6.1), Longitude: float64Ptr(80.5), Active: true},
+		{ID: "LK-4", Name: "Northern Province", Code: "4", CountryID: "LK", Type: "province", Latitude: float64Ptr(9.7), Longitude: float64Ptr(80.0), Active: true},
+		{ID: "LK-5", Name: "Eastern Province", Code: "5", CountryID: "LK", Type: "province", Latitude: float64Ptr(7.7), Longitude: float64Ptr(81.5), Active: true},
+		{ID: "LK-6", Name: "North Western Province", Code: "6", CountryID: "LK", Type: "province", Latitude: float64Ptr(7.8), Longitude: float64Ptr(80.0), Active: true},
+		{ID: "LK-7", Name: "North Central Province", Code: "7", CountryID: "LK", Type: "province", Latitude: float64Ptr(8.3), Longitude: float64Ptr(80.4), Active: true},
+		{ID: "LK-8", Name: "Uva Province", Code: "8", CountryID: "LK", Type: "province", Latitude: float64Ptr(6.8), Longitude: float64Ptr(81.1), Active: true},
+		{ID: "LK-9", Name: "Sabaragamuwa Province", Code: "9", CountryID: "LK", Type: "province", Latitude: float64Ptr(6.8), Longitude: float64Ptr(80.5), Active: true},
+	}
+
+	// Pakistan Provinces
+	pakistanProvinces := []models.State{
+		{ID: "PK-PB", Name: "Punjab", Code: "PB", CountryID: "PK", Type: "province", Latitude: float64Ptr(31.1), Longitude: float64Ptr(72.7), Active: true},
+		{ID: "PK-SD", Name: "Sindh", Code: "SD", CountryID: "PK", Type: "province", Latitude: float64Ptr(25.9), Longitude: float64Ptr(68.5), Active: true},
+		{ID: "PK-KP", Name: "Khyber Pakhtunkhwa", Code: "KP", CountryID: "PK", Type: "province", Latitude: float64Ptr(34.2), Longitude: float64Ptr(71.8), Active: true},
+		{ID: "PK-BA", Name: "Balochistan", Code: "BA", CountryID: "PK", Type: "province", Latitude: float64Ptr(28.5), Longitude: float64Ptr(65.1), Active: true},
+		{ID: "PK-IS", Name: "Islamabad Capital Territory", Code: "IS", CountryID: "PK", Type: "territory", Latitude: float64Ptr(33.7), Longitude: float64Ptr(73.1), Active: true},
+		{ID: "PK-GB", Name: "Gilgit-Baltistan", Code: "GB", CountryID: "PK", Type: "territory", Latitude: float64Ptr(35.8), Longitude: float64Ptr(74.9), Active: true},
+		{ID: "PK-JK", Name: "Azad Jammu and Kashmir", Code: "JK", CountryID: "PK", Type: "territory", Latitude: float64Ptr(33.9), Longitude: float64Ptr(73.8), Active: true},
+	}
+
+	// Indonesia Provinces (Major ones)
+	indonesiaProvinces := []models.State{
+		{ID: "ID-JK", Name: "Jakarta", Code: "JK", CountryID: "ID", Type: "province", Latitude: float64Ptr(-6.2), Longitude: float64Ptr(106.8), Active: true},
+		{ID: "ID-JB", Name: "West Java", Code: "JB", CountryID: "ID", Type: "province", Latitude: float64Ptr(-6.9), Longitude: float64Ptr(107.6), Active: true},
+		{ID: "ID-JT", Name: "Central Java", Code: "JT", CountryID: "ID", Type: "province", Latitude: float64Ptr(-7.2), Longitude: float64Ptr(110.4), Active: true},
+		{ID: "ID-JI", Name: "East Java", Code: "JI", CountryID: "ID", Type: "province", Latitude: float64Ptr(-7.5), Longitude: float64Ptr(112.8), Active: true},
+		{ID: "ID-YO", Name: "Yogyakarta", Code: "YO", CountryID: "ID", Type: "province", Latitude: float64Ptr(-7.8), Longitude: float64Ptr(110.4), Active: true},
+		{ID: "ID-BA", Name: "Bali", Code: "BA", CountryID: "ID", Type: "province", Latitude: float64Ptr(-8.4), Longitude: float64Ptr(115.2), Active: true},
+		{ID: "ID-SU", Name: "North Sumatra", Code: "SU", CountryID: "ID", Type: "province", Latitude: float64Ptr(2.1), Longitude: float64Ptr(99.5), Active: true},
+		{ID: "ID-SS", Name: "South Sumatra", Code: "SS", CountryID: "ID", Type: "province", Latitude: float64Ptr(-3.3), Longitude: float64Ptr(104.5), Active: true},
+		{ID: "ID-KS", Name: "South Kalimantan", Code: "KS", CountryID: "ID", Type: "province", Latitude: float64Ptr(-3.1), Longitude: float64Ptr(115.4), Active: true},
+		{ID: "ID-KT", Name: "East Kalimantan", Code: "KT", CountryID: "ID", Type: "province", Latitude: float64Ptr(1.0), Longitude: float64Ptr(116.4), Active: true},
+		{ID: "ID-SA", Name: "North Sulawesi", Code: "SA", CountryID: "ID", Type: "province", Latitude: float64Ptr(1.5), Longitude: float64Ptr(124.8), Active: true},
+		{ID: "ID-SN", Name: "South Sulawesi", Code: "SN", CountryID: "ID", Type: "province", Latitude: float64Ptr(-5.1), Longitude: float64Ptr(119.9), Active: true},
+	}
+
+	// Philippines Regions
+	philippinesRegions := []models.State{
+		{ID: "PH-NCR", Name: "Metro Manila", Code: "NCR", CountryID: "PH", Type: "region", Latitude: float64Ptr(14.6), Longitude: float64Ptr(121.0), Active: true},
+		{ID: "PH-01", Name: "Ilocos Region", Code: "01", CountryID: "PH", Type: "region", Latitude: float64Ptr(17.0), Longitude: float64Ptr(120.5), Active: true},
+		{ID: "PH-02", Name: "Cagayan Valley", Code: "02", CountryID: "PH", Type: "region", Latitude: float64Ptr(17.6), Longitude: float64Ptr(121.7), Active: true},
+		{ID: "PH-03", Name: "Central Luzon", Code: "03", CountryID: "PH", Type: "region", Latitude: float64Ptr(15.5), Longitude: float64Ptr(120.7), Active: true},
+		{ID: "PH-4A", Name: "Calabarzon", Code: "4A", CountryID: "PH", Type: "region", Latitude: float64Ptr(14.1), Longitude: float64Ptr(121.3), Active: true},
+		{ID: "PH-05", Name: "Bicol Region", Code: "05", CountryID: "PH", Type: "region", Latitude: float64Ptr(13.4), Longitude: float64Ptr(123.4), Active: true},
+		{ID: "PH-06", Name: "Western Visayas", Code: "06", CountryID: "PH", Type: "region", Latitude: float64Ptr(11.0), Longitude: float64Ptr(122.5), Active: true},
+		{ID: "PH-07", Name: "Central Visayas", Code: "07", CountryID: "PH", Type: "region", Latitude: float64Ptr(9.8), Longitude: float64Ptr(123.7), Active: true},
+		{ID: "PH-08", Name: "Eastern Visayas", Code: "08", CountryID: "PH", Type: "region", Latitude: float64Ptr(11.2), Longitude: float64Ptr(125.0), Active: true},
+		{ID: "PH-09", Name: "Zamboanga Peninsula", Code: "09", CountryID: "PH", Type: "region", Latitude: float64Ptr(7.8), Longitude: float64Ptr(123.4), Active: true},
+		{ID: "PH-10", Name: "Northern Mindanao", Code: "10", CountryID: "PH", Type: "region", Latitude: float64Ptr(8.0), Longitude: float64Ptr(124.7), Active: true},
+		{ID: "PH-11", Name: "Davao Region", Code: "11", CountryID: "PH", Type: "region", Latitude: float64Ptr(7.0), Longitude: float64Ptr(125.5), Active: true},
+	}
+
+	// Thailand Regions
+	thailandRegions := []models.State{
+		{ID: "TH-10", Name: "Bangkok", Code: "10", CountryID: "TH", Type: "province", Latitude: float64Ptr(13.8), Longitude: float64Ptr(100.5), Active: true},
+		{ID: "TH-50", Name: "Chiang Mai", Code: "50", CountryID: "TH", Type: "province", Latitude: float64Ptr(18.8), Longitude: float64Ptr(99.0), Active: true},
+		{ID: "TH-20", Name: "Chonburi", Code: "20", CountryID: "TH", Type: "province", Latitude: float64Ptr(13.4), Longitude: float64Ptr(101.0), Active: true},
+		{ID: "TH-83", Name: "Phuket", Code: "83", CountryID: "TH", Type: "province", Latitude: float64Ptr(7.9), Longitude: float64Ptr(98.4), Active: true},
+		{ID: "TH-40", Name: "Khon Kaen", Code: "40", CountryID: "TH", Type: "province", Latitude: float64Ptr(16.4), Longitude: float64Ptr(102.8), Active: true},
+		{ID: "TH-30", Name: "Nakhon Ratchasima", Code: "30", CountryID: "TH", Type: "province", Latitude: float64Ptr(14.9), Longitude: float64Ptr(102.1), Active: true},
+		{ID: "TH-90", Name: "Songkhla", Code: "90", CountryID: "TH", Type: "province", Latitude: float64Ptr(7.2), Longitude: float64Ptr(100.6), Active: true},
+		{ID: "TH-71", Name: "Kanchanaburi", Code: "71", CountryID: "TH", Type: "province", Latitude: float64Ptr(14.0), Longitude: float64Ptr(99.5), Active: true},
+	}
+
+	// Vietnam Regions
+	vietnamRegions := []models.State{
+		{ID: "VN-HN", Name: "Hanoi", Code: "HN", CountryID: "VN", Type: "municipality", Latitude: float64Ptr(21.0), Longitude: float64Ptr(105.9), Active: true},
+		{ID: "VN-SG", Name: "Ho Chi Minh City", Code: "SG", CountryID: "VN", Type: "municipality", Latitude: float64Ptr(10.8), Longitude: float64Ptr(106.6), Active: true},
+		{ID: "VN-DN", Name: "Da Nang", Code: "DN", CountryID: "VN", Type: "municipality", Latitude: float64Ptr(16.1), Longitude: float64Ptr(108.2), Active: true},
+		{ID: "VN-HP", Name: "Hai Phong", Code: "HP", CountryID: "VN", Type: "municipality", Latitude: float64Ptr(20.9), Longitude: float64Ptr(106.7), Active: true},
+		{ID: "VN-CT", Name: "Can Tho", Code: "CT", CountryID: "VN", Type: "municipality", Latitude: float64Ptr(10.0), Longitude: float64Ptr(105.8), Active: true},
+		{ID: "VN-01", Name: "Lai Chau", Code: "01", CountryID: "VN", Type: "province", Latitude: float64Ptr(22.4), Longitude: float64Ptr(103.5), Active: true},
+		{ID: "VN-44", Name: "Quang Binh", Code: "44", CountryID: "VN", Type: "province", Latitude: float64Ptr(17.5), Longitude: float64Ptr(106.3), Active: true},
+	}
+
+	// Malaysia States
+	malaysiaStates := []models.State{
+		{ID: "MY-14", Name: "Kuala Lumpur", Code: "14", CountryID: "MY", Type: "federal territory", Latitude: float64Ptr(3.1), Longitude: float64Ptr(101.7), Active: true},
+		{ID: "MY-01", Name: "Johor", Code: "01", CountryID: "MY", Type: "state", Latitude: float64Ptr(1.5), Longitude: float64Ptr(103.8), Active: true},
+		{ID: "MY-02", Name: "Kedah", Code: "02", CountryID: "MY", Type: "state", Latitude: float64Ptr(6.1), Longitude: float64Ptr(100.4), Active: true},
+		{ID: "MY-03", Name: "Kelantan", Code: "03", CountryID: "MY", Type: "state", Latitude: float64Ptr(5.3), Longitude: float64Ptr(102.0), Active: true},
+		{ID: "MY-04", Name: "Malacca", Code: "04", CountryID: "MY", Type: "state", Latitude: float64Ptr(2.2), Longitude: float64Ptr(102.2), Active: true},
+		{ID: "MY-05", Name: "Negeri Sembilan", Code: "05", CountryID: "MY", Type: "state", Latitude: float64Ptr(2.7), Longitude: float64Ptr(102.0), Active: true},
+		{ID: "MY-06", Name: "Pahang", Code: "06", CountryID: "MY", Type: "state", Latitude: float64Ptr(3.8), Longitude: float64Ptr(103.3), Active: true},
+		{ID: "MY-07", Name: "Penang", Code: "07", CountryID: "MY", Type: "state", Latitude: float64Ptr(5.4), Longitude: float64Ptr(100.3), Active: true},
+		{ID: "MY-08", Name: "Perak", Code: "08", CountryID: "MY", Type: "state", Latitude: float64Ptr(4.6), Longitude: float64Ptr(101.1), Active: true},
+		{ID: "MY-09", Name: "Perlis", Code: "09", CountryID: "MY", Type: "state", Latitude: float64Ptr(6.5), Longitude: float64Ptr(100.2), Active: true},
+		{ID: "MY-10", Name: "Selangor", Code: "10", CountryID: "MY", Type: "state", Latitude: float64Ptr(3.1), Longitude: float64Ptr(101.5), Active: true},
+		{ID: "MY-11", Name: "Terengganu", Code: "11", CountryID: "MY", Type: "state", Latitude: float64Ptr(5.3), Longitude: float64Ptr(103.1), Active: true},
+		{ID: "MY-12", Name: "Sabah", Code: "12", CountryID: "MY", Type: "state", Latitude: float64Ptr(5.4), Longitude: float64Ptr(116.8), Active: true},
+		{ID: "MY-13", Name: "Sarawak", Code: "13", CountryID: "MY", Type: "state", Latitude: float64Ptr(2.5), Longitude: float64Ptr(113.0), Active: true},
+	}
+
+	// Japan Prefectures (Major ones)
+	japanPrefectures := []models.State{
+		{ID: "JP-13", Name: "Tokyo", Code: "13", CountryID: "JP", Type: "prefecture", Latitude: float64Ptr(35.7), Longitude: float64Ptr(139.7), Active: true},
+		{ID: "JP-27", Name: "Osaka", Code: "27", CountryID: "JP", Type: "prefecture", Latitude: float64Ptr(34.7), Longitude: float64Ptr(135.5), Active: true},
+		{ID: "JP-23", Name: "Aichi", Code: "23", CountryID: "JP", Type: "prefecture", Latitude: float64Ptr(35.2), Longitude: float64Ptr(137.0), Active: true},
+		{ID: "JP-14", Name: "Kanagawa", Code: "14", CountryID: "JP", Type: "prefecture", Latitude: float64Ptr(35.5), Longitude: float64Ptr(139.6), Active: true},
+		{ID: "JP-28", Name: "Hyogo", Code: "28", CountryID: "JP", Type: "prefecture", Latitude: float64Ptr(34.7), Longitude: float64Ptr(135.2), Active: true},
+		{ID: "JP-40", Name: "Fukuoka", Code: "40", CountryID: "JP", Type: "prefecture", Latitude: float64Ptr(33.6), Longitude: float64Ptr(130.4), Active: true},
+		{ID: "JP-01", Name: "Hokkaido", Code: "01", CountryID: "JP", Type: "prefecture", Latitude: float64Ptr(43.1), Longitude: float64Ptr(141.3), Active: true},
+		{ID: "JP-26", Name: "Kyoto", Code: "26", CountryID: "JP", Type: "prefecture", Latitude: float64Ptr(35.0), Longitude: float64Ptr(135.8), Active: true},
+	}
+
+	// South Korea Provinces
+	southKoreaProvinces := []models.State{
+		{ID: "KR-11", Name: "Seoul", Code: "11", CountryID: "KR", Type: "special city", Latitude: float64Ptr(37.6), Longitude: float64Ptr(127.0), Active: true},
+		{ID: "KR-26", Name: "Busan", Code: "26", CountryID: "KR", Type: "metropolitan city", Latitude: float64Ptr(35.2), Longitude: float64Ptr(129.1), Active: true},
+		{ID: "KR-27", Name: "Daegu", Code: "27", CountryID: "KR", Type: "metropolitan city", Latitude: float64Ptr(35.9), Longitude: float64Ptr(128.6), Active: true},
+		{ID: "KR-28", Name: "Incheon", Code: "28", CountryID: "KR", Type: "metropolitan city", Latitude: float64Ptr(37.5), Longitude: float64Ptr(126.7), Active: true},
+		{ID: "KR-41", Name: "Gyeonggi", Code: "41", CountryID: "KR", Type: "province", Latitude: float64Ptr(37.4), Longitude: float64Ptr(127.5), Active: true},
+		{ID: "KR-42", Name: "Gangwon", Code: "42", CountryID: "KR", Type: "province", Latitude: float64Ptr(37.9), Longitude: float64Ptr(128.2), Active: true},
+		{ID: "KR-47", Name: "North Gyeongsang", Code: "47", CountryID: "KR", Type: "province", Latitude: float64Ptr(36.4), Longitude: float64Ptr(128.9), Active: true},
+		{ID: "KR-50", Name: "Jeju", Code: "50", CountryID: "KR", Type: "special self-governing province", Latitude: float64Ptr(33.4), Longitude: float64Ptr(126.5), Active: true},
+	}
+
 	// Combine all states
 	states = append(states, usStates...)
 	states = append(states, indiaStates...)
 	states = append(states, canadaProvinces...)
 	states = append(states, australiaStates...)
+	states = append(states, nepalProvinces...)
+	states = append(states, bangladeshDivisions...)
+	states = append(states, sriLankaProvinces...)
+	states = append(states, pakistanProvinces...)
+	states = append(states, indonesiaProvinces...)
+	states = append(states, philippinesRegions...)
+	states = append(states, thailandRegions...)
+	states = append(states, vietnamRegions...)
+	states = append(states, malaysiaStates...)
+	states = append(states, japanPrefectures...)
+	states = append(states, southKoreaProvinces...)
 
 	return states
 }

@@ -106,7 +106,7 @@ func seedCurrencies(db *gorm.DB) error {
 		// Use upsert: insert if not exists, update if exists
 		result := db.Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "code"}},
-			DoUpdates: clause.AssignmentColumns([]string{"name", "symbol", "decimal_digits", "active"}),
+			DoUpdates: clause.AssignmentColumns([]string{"name", "symbol", "decimal_places", "active"}),
 		}).Create(&currency)
 
 		if result.Error != nil {
