@@ -162,8 +162,7 @@ func (h *AuthHandler) GetUserTenantsForAuth(c *gin.Context) {
 
 	// Also get tenants from staff table (employees)
 	// This allows staff members to login even if they're not in tenant_users
-	// Staff-service now returns enriched tenant data (slug, name, logo_url) and
-	// filters out orphaned records where tenants have been deleted
+	// Staff-service returns tenant IDs and we enrich with slug/name from our database
 	if h.staffClient != nil {
 		staffTenants, err := h.staffClient.GetStaffTenants(c.Request.Context(), req.Email)
 		if err != nil {
@@ -178,16 +177,26 @@ func (h *AuthHandler) GetUserTenantsForAuth(c *gin.Context) {
 
 			for _, st := range staffTenants {
 				if !existingTenantIDs[st.ID] {
-					// Staff-service now returns enriched tenant data directly
-					// including slug, name, display_name, logo_url
-					tenants = append(tenants, services.TenantAuthInfo{
-						ID:          st.ID,
-						Slug:        st.Slug,
-						Name:        st.Name,
-						DisplayName: st.DisplayName,
-						LogoURL:     st.LogoURL,
-						Role:        st.Role,
-					})
+					// Staff-service returns basic tenant ID - we need to enrich with
+					// tenant slug, name, display_name from our database
+					tenantInfo := services.TenantAuthInfo{
+						ID:   st.ID,
+						Role: st.Role,
+					}
+
+					// Enrich with tenant details from local database
+					if enrichedInfo, err := h.authSvc.GetTenantBasicInfo(c.Request.Context(), st.ID); err == nil && enrichedInfo != nil {
+						tenantInfo.Slug = enrichedInfo.Slug
+						tenantInfo.Name = enrichedInfo.Name
+						tenantInfo.DisplayName = enrichedInfo.DisplayName
+						tenantInfo.LogoURL = enrichedInfo.LogoURL
+					} else {
+						log.Printf("[AuthHandler] Warning: Could not enrich tenant %s for staff: %v", st.ID, err)
+						// Skip this tenant if we can't enrich it - likely orphaned record
+						continue
+					}
+
+					tenants = append(tenants, tenantInfo)
 				}
 			}
 		}
