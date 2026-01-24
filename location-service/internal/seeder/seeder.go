@@ -130,7 +130,7 @@ func seedTimezones(db *gorm.DB) error {
 		// Use upsert: insert if not exists, update if exists
 		result := db.Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "id"}},
-			DoUpdates: clause.AssignmentColumns([]string{"name", "abbreviation", "offset", "offset_dst", "country_id"}),
+			DoUpdates: clause.AssignmentColumns([]string{"name", "abbreviation", "offset", "dst", "countries"}),
 		}).Create(&timezone)
 
 		if result.Error != nil {
