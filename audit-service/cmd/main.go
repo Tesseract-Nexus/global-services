@@ -322,14 +322,13 @@ func setupRouter(cfg *config.Config, auditHandlers *handlers.AuditHandlers, stat
 	// Setup middleware
 	router.Use(middleware.Recovery())
 	router.Use(middleware.RequestID())
-	router.Use(middleware.TenantID())
 	router.Use(middleware.SetupCORS())
 
 	// Add observability middleware (metrics + tracing)
 	router.Use(metrics.Middleware())
 	router.Use(tracing.GinMiddleware("audit-service"))
 
-	// Health check endpoints
+	// Health check endpoints (no auth required)
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "healthy", "service": "audit-service", "version": "2.0"})
 	})
@@ -354,10 +353,15 @@ func setupRouter(cfg *config.Config, auditHandlers *handlers.AuditHandlers, stat
 		c.JSON(200, stats)
 	})
 
-	// API routes - require tenant ID for multi-tenant data isolation
+	// API routes - use IstioAuth for trusted JWT claim extraction
+	// IstioAuth reads from x-jwt-claim-* headers (set by Istio ingress)
+	// and sets tenant_id, user_id, staff_id in gin context
 	api := router.Group("/api/v1")
-	api.Use(middleware.RequireTenantID())
-	api.Use(middleware.ValidateTenantUUID())
+	api.Use(gosharedmw.IstioAuth(gosharedmw.IstioAuthConfig{
+		RequireAuth:        true,
+		AllowLegacyHeaders: true, // Allow X-Tenant-ID for internal service-to-service calls
+		SkipPaths:          []string{"/health", "/ready", "/metrics", "/internal"},
+	}))
 	{
 		auditLogs := api.Group("/audit-logs")
 		{
