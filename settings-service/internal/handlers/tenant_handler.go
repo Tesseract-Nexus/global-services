@@ -166,8 +166,9 @@ func (h *TenantHandler) ListAuditEnabledTenants(c *gin.Context) {
 }
 
 // getTenantFromService calls tenant-service to get tenant info
+// Uses the internal endpoint that's designed for service-to-service calls
 func (h *TenantHandler) getTenantFromService(tenantID string) (*TenantServiceTenant, error) {
-	url := fmt.Sprintf("%s/api/v1/tenants/%s", h.tenantServiceURL, tenantID)
+	url := fmt.Sprintf("%s/internal/tenants/%s", h.tenantServiceURL, tenantID)
 
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
