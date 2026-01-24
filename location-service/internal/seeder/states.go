@@ -274,7 +274,7 @@ func getStatesData() []models.State {
 		{ID: "KR-41", Name: "Gyeonggi", Code: "41", CountryID: "KR", Type: "province", Latitude: float64Ptr(37.4), Longitude: float64Ptr(127.5), Active: true},
 		{ID: "KR-42", Name: "Gangwon", Code: "42", CountryID: "KR", Type: "province", Latitude: float64Ptr(37.9), Longitude: float64Ptr(128.2), Active: true},
 		{ID: "KR-47", Name: "North Gyeongsang", Code: "47", CountryID: "KR", Type: "province", Latitude: float64Ptr(36.4), Longitude: float64Ptr(128.9), Active: true},
-		{ID: "KR-50", Name: "Jeju", Code: "50", CountryID: "KR", Type: "special self-governing province", Latitude: float64Ptr(33.4), Longitude: float64Ptr(126.5), Active: true},
+		{ID: "KR-50", Name: "Jeju", Code: "50", CountryID: "KR", Type: "province", Latitude: float64Ptr(33.4), Longitude: float64Ptr(126.5), Active: true},
 	}
 
 	// Afghanistan Provinces (34)
