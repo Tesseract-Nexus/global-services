@@ -92,6 +92,20 @@ func (h *DocumentHandler) UploadDocument(c *gin.Context) {
 		return
 	}
 
+	// Get tenant ID from context
+	tenantIDVal, _ := c.Get("tenant_id")
+	tenantID := ""
+	if tenantIDVal != nil {
+		tenantID = tenantIDVal.(string)
+	}
+
+	// Get user ID from context
+	userIDVal, _ := c.Get("user_id")
+	userID := ""
+	if userIDVal != nil {
+		userID = userIDVal.(string)
+	}
+
 	request := models.UploadRequest{
 		Filename:  header.Filename,
 		Size:      header.Size,
@@ -99,8 +113,8 @@ func (h *DocumentHandler) UploadDocument(c *gin.Context) {
 		Bucket:    bucket,
 		Path:      c.PostForm("path"),
 		IsPublic:  c.PostForm("isPublic") == "true",
-		TenantID:  c.GetHeader("X-Tenant-ID"),
-		UserID:    c.GetHeader("X-User-ID"),
+		TenantID:  tenantID,
+		UserID:    userID,
 		ProductID: middleware.GetProductID(c),
 	}
 
@@ -329,8 +343,11 @@ func (h *DocumentHandler) ListDocuments(c *gin.Context) {
 		return
 	}
 
-	// Set tenant ID from header
-	request.TenantID = c.GetHeader("X-Tenant-ID")
+	// Get tenant ID from context
+	tenantIDVal, _ := c.Get("tenant_id")
+	if tenantIDVal != nil {
+		request.TenantID = tenantIDVal.(string)
+	}
 
 	ctx := c.Request.Context()
 	response, err := h.service.ListDocuments(ctx, request)
@@ -401,8 +418,11 @@ func (h *DocumentHandler) BatchDeleteDocuments(c *gin.Context) {
 		return
 	}
 
-	// Set tenant ID from header
-	request.TenantID = c.GetHeader("X-Tenant-ID")
+	// Get tenant ID from context
+	tenantIDVal, _ := c.Get("tenant_id")
+	if tenantIDVal != nil {
+		request.TenantID = tenantIDVal.(string)
+	}
 
 	ctx := c.Request.Context()
 	response, err := h.service.BatchDeleteDocuments(ctx, request)

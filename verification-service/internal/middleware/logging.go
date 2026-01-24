@@ -60,14 +60,11 @@ func StructuredLogger() gin.HandlerFunc {
 // TenantExtraction extracts tenant information and validates tenant access
 func TenantExtraction() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Get tenant ID from various sources
-		tenantID := c.GetHeader("X-Tenant-ID")
-
-		// If no tenant ID in header, check from JWT claims (set by auth middleware)
-		if tenantID == "" {
-			if jwtTenantID, exists := c.Get("tenant_id"); exists {
-				tenantID = jwtTenantID.(string)
-			}
+		// Get tenant ID from context (set by Istio auth middleware)
+		tenantIDVal, _ := c.Get("tenant_id")
+		tenantID := ""
+		if tenantIDVal != nil {
+			tenantID = tenantIDVal.(string)
 		}
 
 		// If still no tenant ID, check query parameter

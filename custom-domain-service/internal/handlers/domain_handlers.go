@@ -590,12 +590,11 @@ func (h *DomainHandlers) ValidateDomain(c *gin.Context) {
 		return
 	}
 
-	// If tenant_id not in body, try to get from headers
+	// If tenant_id not in body, try to get from context (set by Istio auth middleware)
 	if req.TenantID == "" {
-		if tenantID := c.GetHeader("X-Tenant-ID"); tenantID != "" {
-			req.TenantID = tenantID
-		} else if tenantID := c.GetHeader("x-tenant-id"); tenantID != "" {
-			req.TenantID = tenantID
+		tenantIDVal, _ := c.Get("tenant_id")
+		if tenantIDVal != nil {
+			req.TenantID = tenantIDVal.(string)
 		}
 	}
 

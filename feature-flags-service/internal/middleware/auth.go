@@ -10,7 +10,11 @@ import (
 // DevelopmentAuthMiddleware is a simple auth middleware for development
 func DevelopmentAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		userID := c.GetHeader("X-User-ID")
+		userIDVal, _ := c.Get("user_id")
+		userID := ""
+		if userIDVal != nil {
+			userID = userIDVal.(string)
+		}
 		if userID == "" {
 			userID = "00000000-0000-0000-0000-000000000001" // Valid UUID for dev
 		}
@@ -50,7 +54,11 @@ func AzureADAuthMiddleware(tenantID, applicationID string) gin.HandlerFunc {
 		}
 
 		// TODO: Validate JWT token with Azure AD
-		userID := c.GetHeader("X-User-ID")
+		userIDVal, _ := c.Get("user_id")
+		userID := ""
+		if userIDVal != nil {
+			userID = userIDVal.(string)
+		}
 		if userID == "" {
 			userID = "00000000-0000-0000-0000-000000000001" // Valid UUID for dev
 		}

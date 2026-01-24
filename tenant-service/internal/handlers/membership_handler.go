@@ -39,14 +39,15 @@ func NewMembershipHandlerWithStaff(membershipSvc *services.MembershipService, st
 // For platform_owner users, returns all tenants in the platform
 // GET /api/v1/users/me/tenants
 func (h *MembershipHandler) GetUserTenants(c *gin.Context) {
-	// Get user ID from Istio-validated JWT claims (trusted)
-	// Falls back to X-User-ID header for legacy compatibility during migration
-	userIDStr := c.GetHeader("x-jwt-claim-sub")
-	if userIDStr == "" {
-		userIDStr = c.GetString("user_id") // Set by IstioAuth middleware
+	// Get user ID from IstioAuth context (set by IstioAuth middleware from JWT claims)
+	userIDVal, _ := c.Get("user_id")
+	userIDStr := ""
+	if userIDVal != nil {
+		userIDStr = userIDVal.(string)
 	}
+	// Fallback to Istio JWT claim header
 	if userIDStr == "" {
-		userIDStr = c.GetHeader("X-User-ID") // Legacy fallback
+		userIDStr = c.GetHeader("x-jwt-claim-sub")
 	}
 	if userIDStr == "" {
 		ErrorResponse(c, http.StatusUnauthorized, "User not authenticated", nil)
@@ -171,7 +172,12 @@ func (h *MembershipHandler) GetUserTenants(c *gin.Context) {
 // GetUserDefaultTenant returns the user's default tenant
 // GET /api/v1/users/me/tenants/default
 func (h *MembershipHandler) GetUserDefaultTenant(c *gin.Context) {
-	userIDStr := c.GetHeader("X-User-ID")
+	// Get user ID from context (set by IstioAuth middleware from JWT claims)
+	userIDVal, _ := c.Get("user_id")
+	userIDStr := ""
+	if userIDVal != nil {
+		userIDStr = userIDVal.(string)
+	}
 	if userIDStr == "" {
 		ErrorResponse(c, http.StatusUnauthorized, "User not authenticated", nil)
 		return
@@ -213,7 +219,12 @@ func (h *MembershipHandler) GetUserDefaultTenant(c *gin.Context) {
 // SetUserDefaultTenant sets the user's default tenant
 // PUT /api/v1/users/me/tenants/default
 func (h *MembershipHandler) SetUserDefaultTenant(c *gin.Context) {
-	userIDStr := c.GetHeader("X-User-ID")
+	// Get user ID from context (set by IstioAuth middleware from JWT claims)
+	userIDVal, _ := c.Get("user_id")
+	userIDStr := ""
+	if userIDVal != nil {
+		userIDStr = userIDVal.(string)
+	}
 	if userIDStr == "" {
 		ErrorResponse(c, http.StatusUnauthorized, "User not authenticated", nil)
 		return
@@ -260,7 +271,12 @@ func (h *MembershipHandler) SetUserDefaultTenant(c *gin.Context) {
 // GetTenantContext returns the context for accessing a specific tenant
 // GET /api/v1/tenants/:slug/context
 func (h *MembershipHandler) GetTenantContext(c *gin.Context) {
-	userIDStr := c.GetHeader("X-User-ID")
+	// Get user ID from context (set by IstioAuth middleware from JWT claims)
+	userIDVal, _ := c.Get("user_id")
+	userIDStr := ""
+	if userIDVal != nil {
+		userIDStr = userIDVal.(string)
+	}
 	if userIDStr == "" {
 		ErrorResponse(c, http.StatusUnauthorized, "User not authenticated", nil)
 		return
@@ -292,7 +308,12 @@ func (h *MembershipHandler) GetTenantContext(c *gin.Context) {
 // VerifyTenantAccess checks if the user has access to a tenant
 // GET /api/v1/tenants/:id/access
 func (h *MembershipHandler) VerifyTenantAccess(c *gin.Context) {
-	userIDStr := c.GetHeader("X-User-ID")
+	// Get user ID from context (set by IstioAuth middleware from JWT claims)
+	userIDVal, _ := c.Get("user_id")
+	userIDStr := ""
+	if userIDVal != nil {
+		userIDStr = userIDVal.(string)
+	}
 	if userIDStr == "" {
 		ErrorResponse(c, http.StatusUnauthorized, "User not authenticated", nil)
 		return
@@ -325,7 +346,12 @@ func (h *MembershipHandler) VerifyTenantAccess(c *gin.Context) {
 // InviteMember invites a new member to a tenant
 // POST /api/v1/tenants/:tenantId/members/invite
 func (h *MembershipHandler) InviteMember(c *gin.Context) {
-	userIDStr := c.GetHeader("X-User-ID")
+	// Get user ID from context (set by IstioAuth middleware from JWT claims)
+	userIDVal, _ := c.Get("user_id")
+	userIDStr := ""
+	if userIDVal != nil {
+		userIDStr = userIDVal.(string)
+	}
 	if userIDStr == "" {
 		ErrorResponse(c, http.StatusUnauthorized, "User not authenticated", nil)
 		return
@@ -375,7 +401,12 @@ func (h *MembershipHandler) InviteMember(c *gin.Context) {
 // AcceptInvitation accepts a member invitation
 // POST /api/v1/invitations/accept
 func (h *MembershipHandler) AcceptInvitation(c *gin.Context) {
-	userIDStr := c.GetHeader("X-User-ID")
+	// Get user ID from context (set by IstioAuth middleware from JWT claims)
+	userIDVal, _ := c.Get("user_id")
+	userIDStr := ""
+	if userIDVal != nil {
+		userIDStr = userIDVal.(string)
+	}
 	if userIDStr == "" {
 		ErrorResponse(c, http.StatusUnauthorized, "User not authenticated", nil)
 		return
@@ -409,7 +440,12 @@ func (h *MembershipHandler) AcceptInvitation(c *gin.Context) {
 // RemoveMember removes a member from a tenant
 // DELETE /api/v1/tenants/:tenantId/members/:memberId
 func (h *MembershipHandler) RemoveMember(c *gin.Context) {
-	userIDStr := c.GetHeader("X-User-ID")
+	// Get user ID from context (set by IstioAuth middleware from JWT claims)
+	userIDVal, _ := c.Get("user_id")
+	userIDStr := ""
+	if userIDVal != nil {
+		userIDStr = userIDVal.(string)
+	}
 	if userIDStr == "" {
 		ErrorResponse(c, http.StatusUnauthorized, "User not authenticated", nil)
 		return
@@ -446,7 +482,12 @@ func (h *MembershipHandler) RemoveMember(c *gin.Context) {
 // UpdateMemberRole updates a member's role
 // PUT /api/v1/tenants/:tenantId/members/:memberId/role
 func (h *MembershipHandler) UpdateMemberRole(c *gin.Context) {
-	userIDStr := c.GetHeader("X-User-ID")
+	// Get user ID from context (set by IstioAuth middleware from JWT claims)
+	userIDVal, _ := c.Get("user_id")
+	userIDStr := ""
+	if userIDVal != nil {
+		userIDStr = userIDVal.(string)
+	}
 	if userIDStr == "" {
 		ErrorResponse(c, http.StatusUnauthorized, "User not authenticated", nil)
 		return

@@ -59,15 +59,17 @@ func StructuredLogger() gin.HandlerFunc {
 
 // TenantExtraction extracts tenant information and validates tenant access
 // Supports multiple tenant identification methods:
-// 1. X-Tenant-ID header (UUID)
+// 1. IstioAuth context (tenant_id from JWT claims - preferred)
 // 2. X-Tenant-Slug header (slug string)
-// 3. JWT claims (tenant_id from auth)
-// 4. Query parameter (tenant_id or slug)
-// 5. URL path parameter (:slug in routes)
+// 3. Query parameter (tenant_id or slug)
+// 4. URL path parameter (:slug in routes)
 func TenantExtraction() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Get tenant ID from various sources
-		tenantID := c.GetHeader("X-Tenant-ID")
+		// Get tenant ID from IstioAuth context first (set by IstioAuth middleware from JWT claims)
+		var tenantID string
+		if tenantIDVal, exists := c.Get("tenant_id"); exists && tenantIDVal != nil {
+			tenantID = tenantIDVal.(string)
+		}
 		tenantSlug := c.GetHeader("X-Tenant-Slug")
 
 		// If no tenant ID in header, check from JWT claims (set by auth middleware)
@@ -130,14 +132,12 @@ func GetTenantSlug(c *gin.Context) string {
 	return ""
 }
 
-// GetUserID extracts user ID from gin context
+// GetUserID extracts user ID from gin context (set by IstioAuth middleware from JWT claims)
 func GetUserID(c *gin.Context) string {
-	// First check context
-	if id, exists := c.Get(UserIDKey); exists {
+	if id, exists := c.Get(UserIDKey); exists && id != nil {
 		return id.(string)
 	}
-	// Then check header (set by API gateway/auth)
-	return c.GetHeader("X-User-ID")
+	return ""
 }
 
 // GetUserRole extracts user role from gin context

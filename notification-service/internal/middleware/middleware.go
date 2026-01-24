@@ -56,14 +56,23 @@ func CORS() gin.HandlerFunc {
 	}
 }
 
-// TenantAuth extracts tenant and user IDs from headers
+// TenantAuth extracts tenant and user IDs from IstioAuth context keys
 func TenantAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		tenantID := c.GetHeader("X-Tenant-ID")
-		userID := c.GetHeader("X-User-ID")
+		tenantIDVal, _ := c.Get("tenant_id")
+		tenantID := ""
+		if tenantIDVal != nil {
+			tenantID = tenantIDVal.(string)
+		}
+
+		userIDVal, _ := c.Get("user_id")
+		userID := ""
+		if userIDVal != nil {
+			userID = userIDVal.(string)
+		}
 
 		if tenantID == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing X-Tenant-ID header"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing tenant_id in context"})
 			c.Abort()
 			return
 		}

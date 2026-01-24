@@ -44,6 +44,12 @@ func Logger() gin.HandlerFunc {
 
 		duration := time.Since(startTime)
 
+		tenantIDVal, _ := c.Get("tenant_id")
+		tenantID := ""
+		if tenantIDVal != nil {
+			tenantID = tenantIDVal.(string)
+		}
+
 		logrus.WithFields(logrus.Fields{
 			"request_id": c.GetString("request_id"),
 			"method":     c.Request.Method,
@@ -52,7 +58,7 @@ func Logger() gin.HandlerFunc {
 			"duration":   duration.String(),
 			"client_ip":  c.ClientIP(),
 			"user_agent": c.Request.UserAgent(),
-			"tenant_id":  c.GetHeader("X-Tenant-ID"),
+			"tenant_id":  tenantID,
 		}).Info("Request completed")
 	}
 }
@@ -81,7 +87,11 @@ func RateLimiter(requestsPerSecond int) gin.HandlerFunc {
 
 func TenantExtractor() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		tenantID := c.GetHeader("X-Tenant-ID")
+		tenantIDVal, _ := c.Get("tenant_id")
+		tenantID := ""
+		if tenantIDVal != nil {
+			tenantID = tenantIDVal.(string)
+		}
 		if tenantID != "" {
 			c.Set("tenant_id", tenantID)
 		}

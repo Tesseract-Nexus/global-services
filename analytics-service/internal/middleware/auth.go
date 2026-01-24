@@ -17,10 +17,11 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// Extract user ID from headers (set by gateway/proxy)
-		userID := c.GetHeader("X-User-ID")
-		if userID == "" {
-			userID = c.GetHeader("X-Staff-ID")
+		// Extract user ID from context (set by IstioAuth middleware)
+		userIDVal, _ := c.Get("user_id")
+		userID := ""
+		if userIDVal != nil {
+			userID = userIDVal.(string)
 		}
 
 		// Set user context for RBAC middleware

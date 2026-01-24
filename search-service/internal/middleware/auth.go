@@ -11,7 +11,11 @@ import (
 func DevelopmentAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// In development, we'll use simple header-based auth
-		userID := c.GetHeader("X-User-ID")
+		userIDVal, _ := c.Get("user_id")
+		userID := ""
+		if userIDVal != nil {
+			userID = userIDVal.(string)
+		}
 		if userID == "" {
 			userID = "00000000-0000-0000-0000-000000000001" // Valid UUID for dev
 		}
@@ -56,8 +60,12 @@ func AzureADAuthMiddleware(tenantID, applicationID string) gin.HandlerFunc {
 		// token := authHeader[7:]
 		// claims, err := validateAzureADToken(token, tenantID, applicationID)
 
-		// For now, extract user ID from header or set default
-		userID := c.GetHeader("X-User-ID")
+		// For now, extract user ID from context or set default
+		userIDVal, _ := c.Get("user_id")
+		userID := ""
+		if userIDVal != nil {
+			userID = userIDVal.(string)
+		}
 		if userID == "" {
 			userID = "00000000-0000-0000-0000-000000000001" // Valid UUID for dev
 		}

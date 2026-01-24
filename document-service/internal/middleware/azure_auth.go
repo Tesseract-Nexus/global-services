@@ -248,9 +248,13 @@ func DevelopmentAuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// In development, prefer X-User-ID header if provided (for testing with real IDs)
+		// In development, prefer user_id from context if provided (for testing with real IDs)
 		// Otherwise use a valid dev UUID
-		userID := c.GetHeader("X-User-ID")
+		userIDVal, _ := c.Get("user_id")
+		userID := ""
+		if userIDVal != nil {
+			userID = userIDVal.(string)
+		}
 		if userID == "" {
 			userID = "00000000-0000-0000-0000-000000000001" // Valid UUID for dev
 		}

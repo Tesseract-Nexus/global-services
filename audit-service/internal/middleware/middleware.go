@@ -77,10 +77,14 @@ func generateRequestID() string {
 	return fmt.Sprintf("%d", time.Now().UnixNano())
 }
 
-// TenantID middleware extracts tenant ID from headers
+// TenantID middleware extracts tenant ID from context (set by Istio auth middleware)
 func TenantID() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		tenantID := c.GetHeader("X-Tenant-ID")
+		tenantIDVal, _ := c.Get("tenant_id")
+		tenantID := ""
+		if tenantIDVal != nil {
+			tenantID = tenantIDVal.(string)
+		}
 		if tenantID == "" {
 			tenantID = c.Query("tenantId")
 		}
@@ -94,14 +98,18 @@ func TenantID() gin.HandlerFunc {
 // RequireTenantID middleware requires tenant ID for all requests
 func RequireTenantID() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		tenantID := c.GetHeader("X-Tenant-ID")
+		tenantIDVal, _ := c.Get("tenant_id")
+		tenantID := ""
+		if tenantIDVal != nil {
+			tenantID = tenantIDVal.(string)
+		}
 		if tenantID == "" {
 			tenantID = c.Query("tenantId")
 		}
 		if tenantID == "" {
 			c.AbortWithStatusJSON(400, gin.H{
 				"error":   "MISSING_TENANT_ID",
-				"message": "X-Tenant-ID header is required for multi-tenant isolation",
+				"message": "Tenant ID is required for multi-tenant isolation",
 			})
 			return
 		}

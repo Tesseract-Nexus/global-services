@@ -16,11 +16,10 @@ func TenantMiddleware(logger *logrus.Logger) gin.HandlerFunc {
 			return
 		}
 
-		// Try to get tenant ID from JWT claims (set by auth middleware)
+		// Get tenant ID from context (set by Istio auth middleware)
 		tenantID, exists := c.Get("tenant_id")
 		if !exists {
-			// Fallback to header
-			tenantID = c.GetHeader("X-Tenant-ID")
+			tenantID = nil
 		}
 
 		// SECURITY: No default fallback - fail closed

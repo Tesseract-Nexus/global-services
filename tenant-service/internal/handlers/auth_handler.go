@@ -216,8 +216,12 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 		return
 	}
 
-	// Get user ID from context (set by auth middleware)
-	userIDStr := c.GetHeader("X-User-ID")
+	// Get user ID from context (set by IstioAuth middleware from JWT claims)
+	userIDVal, _ := c.Get("user_id")
+	userIDStr := ""
+	if userIDVal != nil {
+		userIDStr = userIDVal.(string)
+	}
 	if userIDStr == "" {
 		ErrorResponse(c, http.StatusUnauthorized, "User not authenticated", nil)
 		return
@@ -260,8 +264,12 @@ func (h *AuthHandler) SetPassword(c *gin.Context) {
 		return
 	}
 
-	// Get user ID from context (set by auth middleware after token validation)
-	userIDStr := c.GetHeader("X-User-ID")
+	// Get user ID from context (set by IstioAuth middleware from JWT claims)
+	userIDVal, _ := c.Get("user_id")
+	userIDStr := ""
+	if userIDVal != nil {
+		userIDStr = userIDVal.(string)
+	}
 	if userIDStr == "" {
 		ErrorResponse(c, http.StatusUnauthorized, "User not authenticated", nil)
 		return
@@ -303,8 +311,12 @@ func (h *AuthHandler) UnlockAccount(c *gin.Context) {
 		return
 	}
 
-	// Get admin user ID from context
-	adminUserIDStr := c.GetHeader("X-User-ID")
+	// Get admin user ID from context (set by IstioAuth middleware from JWT claims)
+	adminUserIDVal, _ := c.Get("user_id")
+	adminUserIDStr := ""
+	if adminUserIDVal != nil {
+		adminUserIDStr = adminUserIDVal.(string)
+	}
 	if adminUserIDStr == "" {
 		ErrorResponse(c, http.StatusUnauthorized, "User not authenticated", nil)
 		return
@@ -828,8 +840,12 @@ func (h *AuthHandler) ListLockedAccounts(c *gin.Context) {
 		return
 	}
 
-	// Get admin user ID from context
-	adminUserIDStr := c.GetHeader("X-User-ID")
+	// Get admin user ID from context (set by IstioAuth middleware from JWT claims)
+	adminUserIDVal, _ := c.Get("user_id")
+	adminUserIDStr := ""
+	if adminUserIDVal != nil {
+		adminUserIDStr = adminUserIDVal.(string)
+	}
 	if adminUserIDStr == "" {
 		ErrorResponse(c, http.StatusUnauthorized, "User not authenticated", nil)
 		return
@@ -884,8 +900,12 @@ func (h *AuthHandler) GetLockoutStatus(c *gin.Context) {
 		return
 	}
 
-	// Get admin user ID from context
-	adminUserIDStr := c.GetHeader("X-User-ID")
+	// Get admin user ID from context (set by IstioAuth middleware from JWT claims)
+	adminUserIDVal, _ := c.Get("user_id")
+	adminUserIDStr := ""
+	if adminUserIDVal != nil {
+		adminUserIDStr = adminUserIDVal.(string)
+	}
 	if adminUserIDStr == "" {
 		ErrorResponse(c, http.StatusUnauthorized, "User not authenticated", nil)
 		return
@@ -941,8 +961,12 @@ func (h *AuthHandler) GetSecurityPolicy(c *gin.Context) {
 		return
 	}
 
-	// Get admin user ID from context
-	adminUserIDStr := c.GetHeader("X-User-ID")
+	// Get admin user ID from context (set by IstioAuth middleware from JWT claims)
+	adminUserIDVal, _ := c.Get("user_id")
+	adminUserIDStr := ""
+	if adminUserIDVal != nil {
+		adminUserIDStr = adminUserIDVal.(string)
+	}
 	if adminUserIDStr == "" {
 		ErrorResponse(c, http.StatusUnauthorized, "User not authenticated", nil)
 		return

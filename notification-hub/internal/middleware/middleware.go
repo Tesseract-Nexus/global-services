@@ -121,9 +121,15 @@ func TenantAuth() gin.HandlerFunc {
 		// Check if request is from within the cluster (has mesh identity)
 		// This allows internal services to set headers directly
 		if meshPrincipal := c.GetHeader("x-forwarded-client-cert"); meshPrincipal != "" {
-			// Request is from within the service mesh, trust X-* headers
-			tenantID = c.GetHeader("X-Tenant-ID")
-			userID = c.GetHeader("X-User-ID")
+			// Request is from within the service mesh, use IstioAuth context keys
+			tenantIDVal, _ := c.Get("tenant_id")
+			if tenantIDVal != nil {
+				tenantID = tenantIDVal.(string)
+			}
+			userIDVal, _ := c.Get("user_id")
+			if userIDVal != nil {
+				userID = userIDVal.(string)
+			}
 
 			if tenantID != "" && userID != "" {
 				c.Set("tenant_id", tenantID)
@@ -158,12 +164,14 @@ func OptionalTenantAuth() gin.HandlerFunc {
 				c.Set("tenant_id", tenantID)
 			}
 		} else if meshPrincipal := c.GetHeader("x-forwarded-client-cert"); meshPrincipal != "" {
-			// Internal service-to-service call
-			if tenantID := c.GetHeader("X-Tenant-ID"); tenantID != "" {
-				c.Set("tenant_id", tenantID)
+			// Internal service-to-service call - use IstioAuth context keys
+			tenantIDVal, _ := c.Get("tenant_id")
+			if tenantIDVal != nil {
+				c.Set("tenant_id", tenantIDVal.(string))
 			}
-			if userID := c.GetHeader("X-User-ID"); userID != "" {
-				c.Set("user_id", userID)
+			userIDVal, _ := c.Get("user_id")
+			if userIDVal != nil {
+				c.Set("user_id", userIDVal.(string))
 			}
 		}
 

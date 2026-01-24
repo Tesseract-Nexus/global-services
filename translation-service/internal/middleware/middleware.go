@@ -9,10 +9,14 @@ import (
 	"github.com/google/uuid"
 )
 
-// TenantID extracts tenant ID from headers (optional)
+// TenantID extracts tenant ID from IstioAuth context (optional)
 func TenantID() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		tenantID := c.GetHeader("X-Tenant-ID")
+		tenantIDVal, _ := c.Get("tenant_id")
+		tenantID := ""
+		if tenantIDVal != nil {
+			tenantID = tenantIDVal.(string)
+		}
 		if tenantID != "" {
 			c.Set("tenant_id", tenantID)
 		}
@@ -23,11 +27,15 @@ func TenantID() gin.HandlerFunc {
 // RequireTenantID ensures tenant ID is present
 func RequireTenantID() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		tenantID := c.GetHeader("X-Tenant-ID")
+		tenantIDVal, _ := c.Get("tenant_id")
+		tenantID := ""
+		if tenantIDVal != nil {
+			tenantID = tenantIDVal.(string)
+		}
 		if tenantID == "" {
 			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
 				"error":   "MISSING_TENANT_ID",
-				"message": "X-Tenant-ID header is required",
+				"message": "tenant_id is required in context",
 			})
 			return
 		}
@@ -163,19 +171,15 @@ func (rl *RateLimiter) Middleware() gin.HandlerFunc {
 
 // GetTenantID retrieves tenant ID from context
 func GetTenantID(c *gin.Context) (string, bool) {
-	tenantID, exists := c.Get("tenant_id")
-	if !exists {
-		// Fallback to headers for BFF calls
-		tenantIDStr := c.GetHeader("X-Tenant-ID")
-		if tenantIDStr == "" {
-			tenantIDStr = c.GetHeader("x-jwt-claim-tenant-id")
-		}
-		if tenantIDStr != "" {
-			return tenantIDStr, true
-		}
+	tenantIDVal, _ := c.Get("tenant_id")
+	tenantID := ""
+	if tenantIDVal != nil {
+		tenantID = tenantIDVal.(string)
+	}
+	if tenantID == "" {
 		return "", false
 	}
-	return tenantID.(string), true
+	return tenantID, true
 }
 
 // GetRequestID retrieves request ID from context
@@ -187,10 +191,14 @@ func GetRequestID(c *gin.Context) string {
 	return requestID.(string)
 }
 
-// UserID extracts user ID from headers (optional)
+// UserID extracts user ID from IstioAuth context (optional)
 func UserID() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		userIDStr := c.GetHeader("X-User-ID")
+		userIDVal, _ := c.Get("user_id")
+		userIDStr := ""
+		if userIDVal != nil {
+			userIDStr = userIDVal.(string)
+		}
 		if userIDStr != "" {
 			userID, err := uuid.Parse(userIDStr)
 			if err == nil {
@@ -204,11 +212,15 @@ func UserID() gin.HandlerFunc {
 // RequireUserID ensures user ID is present
 func RequireUserID() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		userIDStr := c.GetHeader("X-User-ID")
+		userIDVal, _ := c.Get("user_id")
+		userIDStr := ""
+		if userIDVal != nil {
+			userIDStr = userIDVal.(string)
+		}
 		if userIDStr == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 				"error":   "MISSING_USER_ID",
-				"message": "X-User-ID header is required",
+				"message": "user_id is required in context",
 			})
 			return
 		}
@@ -216,7 +228,7 @@ func RequireUserID() gin.HandlerFunc {
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
 				"error":   "INVALID_USER_ID",
-				"message": "X-User-ID must be a valid UUID",
+				"message": "user_id must be a valid UUID",
 			})
 			return
 		}
@@ -227,28 +239,16 @@ func RequireUserID() gin.HandlerFunc {
 
 // GetUserID retrieves user ID from context
 func GetUserID(c *gin.Context) (uuid.UUID, bool) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		// Try to parse from header as fallback
-		userIDStr := c.GetHeader("X-User-ID")
-		if userIDStr == "" {
-			userIDStr = c.GetHeader("x-jwt-claim-sub")
-		}
-		if userIDStr != "" {
-			if parsed, err := uuid.Parse(userIDStr); err == nil {
-				return parsed, true
-			}
-		}
+	userIDVal, _ := c.Get("user_id")
+	userIDStr := ""
+	if userIDVal != nil {
+		userIDStr = userIDVal.(string)
+	}
+	if userIDStr == "" {
 		return uuid.Nil, false
 	}
-	// Handle both uuid.UUID and string types (go-shared sets string)
-	switch v := userID.(type) {
-	case uuid.UUID:
-		return v, true
-	case string:
-		if parsed, err := uuid.Parse(v); err == nil {
-			return parsed, true
-		}
+	if parsed, err := uuid.Parse(userIDStr); err == nil {
+		return parsed, true
 	}
 	return uuid.Nil, false
 }

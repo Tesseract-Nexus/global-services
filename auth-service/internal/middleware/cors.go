@@ -60,14 +60,18 @@ type TenantResolver interface {
 	ResolveTenantIdentifier(ctx context.Context, identifier string) (string, error)
 }
 
-// TenantMiddleware extracts tenant ID from headers or token
-// Accepts either UUID or slug in X-Tenant-ID header
+// TenantMiddleware extracts tenant ID from context (set by Istio auth middleware)
+// Accepts either UUID or slug
 func TenantMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Try to get tenant ID from header first
-		tenantID := c.GetHeader("X-Tenant-ID")
+		// Get tenant ID from context (set by Istio auth middleware)
+		tenantIDVal, _ := c.Get("tenant_id")
+		tenantID := ""
+		if tenantIDVal != nil {
+			tenantID = tenantIDVal.(string)
+		}
 
-		// If not in header, it will be set by auth middleware from token
+		// If found, also set as request_tenant_id for backward compatibility
 		if tenantID != "" {
 			c.Set("request_tenant_id", tenantID)
 		}
@@ -76,21 +80,19 @@ func TenantMiddleware() gin.HandlerFunc {
 	}
 }
 
-// TenantMiddlewareWithResolver extracts tenant ID from headers and resolves slugs to UUIDs
-// This is the production-ready version that accepts either UUID or slug in X-Tenant-ID
+// TenantMiddlewareWithResolver extracts tenant ID from context and resolves slugs to UUIDs
+// This is the production-ready version that accepts either UUID or slug
 func TenantMiddlewareWithResolver(resolver TenantResolver) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Try to get tenant identifier from header (can be UUID or slug)
-		tenantIdentifier := c.GetHeader("X-Tenant-ID")
-
-		if tenantIdentifier == "" {
-			// Also check X-Tenant-Slug header for explicit slug
-			tenantIdentifier = c.GetHeader("X-Tenant-Slug")
+		// Get tenant identifier from context (set by Istio auth middleware)
+		tenantIDVal, _ := c.Get("tenant_id")
+		tenantIdentifier := ""
+		if tenantIDVal != nil {
+			tenantIdentifier = tenantIDVal.(string)
 		}
 
-		// If not in header, it will be set by auth middleware from token
+		// If found, resolve the identifier to a UUID (handles both UUID and slug)
 		if tenantIdentifier != "" {
-			// Resolve the identifier to a UUID (handles both UUID and slug)
 			tenantID, err := resolver.ResolveTenantIdentifier(c.Request.Context(), tenantIdentifier)
 			if err != nil {
 				log.Printf("[TenantMiddleware] Failed to resolve tenant '%s': %v", tenantIdentifier, err)

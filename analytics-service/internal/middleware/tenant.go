@@ -11,12 +11,11 @@ import (
 // TenantMiddlewareWithResolver creates a tenant middleware with slug resolution
 func TenantMiddlewareWithResolver(tenantClient clients.TenantClient) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Try to get tenant ID from X-Vendor-ID header first (standard)
-		tenantSlugOrID := c.GetHeader("X-Vendor-ID")
-
-		// Fall back to X-Tenant-ID header (legacy)
-		if tenantSlugOrID == "" {
-			tenantSlugOrID = c.GetHeader("X-Tenant-ID")
+		// Try to get tenant ID from context first (set by IstioAuth)
+		tenantIDVal, _ := c.Get("tenant_id")
+		tenantSlugOrID := ""
+		if tenantIDVal != nil {
+			tenantSlugOrID = tenantIDVal.(string)
 		}
 
 		// Require tenant ID for all analytics requests
@@ -59,12 +58,11 @@ func TenantMiddlewareWithResolver(tenantClient clients.TenantClient) gin.Handler
 // TenantMiddleware extracts and validates tenant information (legacy - no resolution)
 func TenantMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Try to get tenant ID from X-Vendor-ID header first (standard)
-		tenantID := c.GetHeader("X-Vendor-ID")
-
-		// Fall back to X-Tenant-ID header (legacy)
-		if tenantID == "" {
-			tenantID = c.GetHeader("X-Tenant-ID")
+		// Try to get tenant ID from context first (set by IstioAuth)
+		tenantIDVal, _ := c.Get("tenant_id")
+		tenantID := ""
+		if tenantIDVal != nil {
+			tenantID = tenantIDVal.(string)
 		}
 
 		// Require tenant ID for all analytics requests

@@ -79,7 +79,11 @@ func Recovery() gin.HandlerFunc {
 func TenantMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// For now, just pass through - in production, you'd validate tenant access
-		tenantID := c.GetHeader("X-Tenant-ID")
+		tenantIDVal, _ := c.Get("tenant_id")
+		tenantID := ""
+		if tenantIDVal != nil {
+			tenantID = tenantIDVal.(string)
+		}
 		if tenantID != "" {
 			c.Set("tenant_id", tenantID)
 		}
@@ -90,9 +94,13 @@ func TenantMiddleware() gin.HandlerFunc {
 // AuthMiddleware handles authentication (simplified for demo)
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// For development/demo purposes, accept user ID from header
+		// For development/demo purposes, accept user ID from context
 		// In production, this would validate JWT tokens
-		userID := c.GetHeader("X-User-ID")
+		userIDVal, _ := c.Get("user_id")
+		userID := ""
+		if userIDVal != nil {
+			userID = userIDVal.(string)
+		}
 		if userID != "" {
 			c.Set("user_id", userID)
 			c.Set("staff_id", userID) // RBAC middleware checks staff_id first

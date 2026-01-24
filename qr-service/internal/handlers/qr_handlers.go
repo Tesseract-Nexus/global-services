@@ -51,7 +51,10 @@ func (h *QRHandlers) GenerateQRCode(c *gin.Context) {
 	}
 
 	if req.TenantID == "" {
-		req.TenantID = c.GetHeader("X-Tenant-ID")
+		tenantIDVal, _ := c.Get("tenant_id")
+		if tenantIDVal != nil {
+			req.TenantID = tenantIDVal.(string)
+		}
 	}
 
 	response, err := h.qrService.GenerateQRCode(c.Request.Context(), &req)
@@ -416,10 +419,14 @@ func (h *QRHandlers) UploadQRCode(c *gin.Context) {
 		return
 	}
 
-	tenantID := c.GetHeader("X-Tenant-ID")
+	tenantIDVal, _ := c.Get("tenant_id")
+	tenantID := ""
+	if tenantIDVal != nil {
+		tenantID = tenantIDVal.(string)
+	}
 	if tenantID == "" {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error:     "X-Tenant-ID header is required",
+			Error:     "tenant_id is required in context",
 			Code:      "MISSING_TENANT_ID",
 			RequestID: c.GetString("request_id"),
 		})
