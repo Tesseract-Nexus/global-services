@@ -125,10 +125,9 @@ func (h *TenantHandler) GetAuditConfig(c *gin.Context) {
 		"tenant_name": tenant.Name,
 	}).Info("Audit config retrieved successfully")
 
-	c.JSON(http.StatusOK, models.TenantAuditConfigResponse{
-		Success: true,
-		Data:    config,
-	})
+	// Return config directly without wrapper for internal service-to-service calls
+	// The audit-service expects TenantInfo struct directly, not wrapped in {success, data}
+	c.JSON(http.StatusOK, config)
 }
 
 // ListAuditEnabledTenants returns all tenants with audit logging enabled
