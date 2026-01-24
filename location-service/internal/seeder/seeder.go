@@ -3,102 +3,145 @@ package seeder
 import (
 	"log"
 
-	"location-service/internal/models"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+	"location-service/internal/models"
 )
 
-// SeedDatabase seeds the database with initial data
+// SeedDatabase seeds the database with initial data using upsert logic
+// This allows adding missing data without failing on duplicates
 func SeedDatabase(db *gorm.DB) error {
-	// Check if countries already exist
-	var count int64
-	if err := db.Model(&models.Country{}).Count(&count).Error; err != nil {
-		return err
-	}
-
-	if count > 0 {
-		log.Printf("Database already seeded with %d countries, skipping...", count)
-		return nil
-	}
+	// Always run seeding with upsert to ensure all reference data exists
+	// This is safe to run multiple times and will add missing data
 
 	// Seed countries
-	log.Println("Seeding countries...")
+	log.Println("Seeding/updating countries...")
 	if err := seedCountries(db); err != nil {
-		return err
+		log.Printf("Warning: Failed to seed countries: %v", err)
 	}
 
 	// Seed states
-	log.Println("Seeding states...")
+	log.Println("Seeding/updating states...")
 	if err := seedStates(db); err != nil {
-		return err
+		log.Printf("Warning: Failed to seed states: %v", err)
 	}
 
 	// Seed currencies
-	log.Println("Seeding currencies...")
+	log.Println("Seeding/updating currencies...")
 	if err := seedCurrencies(db); err != nil {
-		return err
+		log.Printf("Warning: Failed to seed currencies: %v", err)
 	}
 
 	// Seed timezones
-	log.Println("Seeding timezones...")
+	log.Println("Seeding/updating timezones...")
 	if err := seedTimezones(db); err != nil {
-		return err
+		log.Printf("Warning: Failed to seed timezones: %v", err)
 	}
+
+	// Log final counts
+	var countryCount, stateCount, currencyCount, timezoneCount int64
+	db.Model(&models.Country{}).Count(&countryCount)
+	db.Model(&models.State{}).Count(&stateCount)
+	db.Model(&models.Currency{}).Count(&currencyCount)
+	db.Model(&models.Timezone{}).Count(&timezoneCount)
+	log.Printf("Seeding complete - Countries: %d, States: %d, Currencies: %d, Timezones: %d",
+		countryCount, stateCount, currencyCount, timezoneCount)
 
 	return nil
 }
 
 func seedCountries(db *gorm.DB) error {
 	countries := getCountriesData()
+	inserted, updated := 0, 0
 
 	for _, country := range countries {
-		if err := db.Create(&country).Error; err != nil {
-			log.Printf("Failed to seed country %s: %v", country.Name, err)
-			// Continue with other countries even if one fails
+		// Use upsert: insert if not exists, update if exists
+		result := db.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "id"}},
+			DoUpdates: clause.AssignmentColumns([]string{"name", "native_name", "capital", "region", "subregion", "currency", "languages", "calling_code", "flag_emoji", "latitude", "longitude", "active"}),
+		}).Create(&country)
+
+		if result.Error != nil {
+			log.Printf("Failed to upsert country %s: %v", country.Name, result.Error)
+		} else if result.RowsAffected > 0 {
+			inserted++
+		} else {
+			updated++
 		}
 	}
 
-	log.Printf("Seeded %d countries", len(countries))
+	log.Printf("Countries: %d inserted, %d updated", inserted, updated)
 	return nil
 }
 
 func seedStates(db *gorm.DB) error {
 	states := getStatesData()
+	inserted, updated := 0, 0
 
 	for _, state := range states {
-		if err := db.Create(&state).Error; err != nil {
-			log.Printf("Failed to seed state %s: %v", state.Name, err)
-			// Continue with other states even if one fails
+		// Use upsert: insert if not exists, update if exists
+		result := db.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "id"}},
+			DoUpdates: clause.AssignmentColumns([]string{"name", "code", "country_id", "type", "latitude", "longitude", "active"}),
+		}).Create(&state)
+
+		if result.Error != nil {
+			log.Printf("Failed to upsert state %s: %v", state.Name, result.Error)
+		} else if result.RowsAffected > 0 {
+			inserted++
+		} else {
+			updated++
 		}
 	}
 
-	log.Printf("Seeded %d states", len(states))
+	log.Printf("States: %d inserted, %d updated", inserted, updated)
 	return nil
 }
 
 func seedCurrencies(db *gorm.DB) error {
 	currencies := getCurrenciesData()
+	inserted, updated := 0, 0
 
 	for _, currency := range currencies {
-		if err := db.Create(&currency).Error; err != nil {
-			log.Printf("Failed to seed currency %s: %v", currency.Name, err)
-			// Continue with other currencies even if one fails
+		// Use upsert: insert if not exists, update if exists
+		result := db.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "code"}},
+			DoUpdates: clause.AssignmentColumns([]string{"name", "symbol", "decimal_digits", "active"}),
+		}).Create(&currency)
+
+		if result.Error != nil {
+			log.Printf("Failed to upsert currency %s: %v", currency.Name, result.Error)
+		} else if result.RowsAffected > 0 {
+			inserted++
+		} else {
+			updated++
 		}
 	}
 
-	log.Printf("Seeded %d currencies", len(currencies))
+	log.Printf("Currencies: %d inserted, %d updated", inserted, updated)
 	return nil
 }
 
 func seedTimezones(db *gorm.DB) error {
 	timezones := getTimezonesData()
+	inserted, updated := 0, 0
 
 	for _, timezone := range timezones {
-		if err := db.Create(&timezone).Error; err != nil {
-			log.Printf("Failed to seed timezone %s: %v", timezone.Name, err)
-			// Continue with other timezones even if one fails
+		// Use upsert: insert if not exists, update if exists
+		result := db.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "id"}},
+			DoUpdates: clause.AssignmentColumns([]string{"name", "abbreviation", "offset", "offset_dst", "country_id"}),
+		}).Create(&timezone)
+
+		if result.Error != nil {
+			log.Printf("Failed to upsert timezone %s: %v", timezone.Name, result.Error)
+		} else if result.RowsAffected > 0 {
+			inserted++
+		} else {
+			updated++
 		}
 	}
 
-	log.Printf("Seeded %d timezones", len(timezones))
+	log.Printf("Timezones: %d inserted, %d updated", inserted, updated)
 	return nil
 }

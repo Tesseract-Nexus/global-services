@@ -27,6 +27,7 @@ import (
 	"location-service/internal/migration"
 	"location-service/internal/models"
 	"location-service/internal/repository"
+	"location-service/internal/seeder"
 	"location-service/internal/services"
 	"location-service/internal/worker"
 	"github.com/Tesseract-Nexus/go-shared/metrics"
@@ -52,6 +53,11 @@ func main() {
 			log.Printf("Warning: Failed to migrate database: %v", err)
 		} else {
 			log.Println("Database initialized successfully")
+		}
+
+		// Run seeder to populate reference data (countries, states, currencies, timezones)
+		if err := seeder.SeedDatabase(db); err != nil {
+			log.Printf("Warning: Failed to seed database: %v", err)
 		}
 	}
 
