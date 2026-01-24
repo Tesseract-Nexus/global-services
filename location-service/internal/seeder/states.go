@@ -277,6 +277,315 @@ func getStatesData() []models.State {
 		{ID: "KR-50", Name: "Jeju", Code: "50", CountryID: "KR", Type: "special self-governing province", Latitude: float64Ptr(33.4), Longitude: float64Ptr(126.5), Active: true},
 	}
 
+	// Afghanistan Provinces (34)
+	afghanistanProvinces := []models.State{
+		{ID: "AF-BAL", Name: "Balkh", Code: "BAL", CountryID: "AF", Type: "province", Latitude: float64Ptr(36.8), Longitude: float64Ptr(66.9), Active: true},
+		{ID: "AF-BAM", Name: "Bamyan", Code: "BAM", CountryID: "AF", Type: "province", Latitude: float64Ptr(34.8), Longitude: float64Ptr(67.8), Active: true},
+		{ID: "AF-BDG", Name: "Badghis", Code: "BDG", CountryID: "AF", Type: "province", Latitude: float64Ptr(35.2), Longitude: float64Ptr(63.8), Active: true},
+		{ID: "AF-BDS", Name: "Badakhshan", Code: "BDS", CountryID: "AF", Type: "province", Latitude: float64Ptr(36.7), Longitude: float64Ptr(70.8), Active: true},
+		{ID: "AF-BGL", Name: "Baghlan", Code: "BGL", CountryID: "AF", Type: "province", Latitude: float64Ptr(36.1), Longitude: float64Ptr(68.7), Active: true},
+		{ID: "AF-DAY", Name: "Daykundi", Code: "DAY", CountryID: "AF", Type: "province", Latitude: float64Ptr(33.7), Longitude: float64Ptr(66.0), Active: true},
+		{ID: "AF-FRA", Name: "Farah", Code: "FRA", CountryID: "AF", Type: "province", Latitude: float64Ptr(32.5), Longitude: float64Ptr(62.1), Active: true},
+		{ID: "AF-FYB", Name: "Faryab", Code: "FYB", CountryID: "AF", Type: "province", Latitude: float64Ptr(36.1), Longitude: float64Ptr(64.9), Active: true},
+		{ID: "AF-GHA", Name: "Ghazni", Code: "GHA", CountryID: "AF", Type: "province", Latitude: float64Ptr(33.5), Longitude: float64Ptr(68.4), Active: true},
+		{ID: "AF-GHO", Name: "Ghor", Code: "GHO", CountryID: "AF", Type: "province", Latitude: float64Ptr(34.5), Longitude: float64Ptr(64.9), Active: true},
+		{ID: "AF-HEL", Name: "Helmand", Code: "HEL", CountryID: "AF", Type: "province", Latitude: float64Ptr(31.6), Longitude: float64Ptr(64.4), Active: true},
+		{ID: "AF-HER", Name: "Herat", Code: "HER", CountryID: "AF", Type: "province", Latitude: float64Ptr(34.3), Longitude: float64Ptr(62.2), Active: true},
+		{ID: "AF-JOW", Name: "Jowzjan", Code: "JOW", CountryID: "AF", Type: "province", Latitude: float64Ptr(36.9), Longitude: float64Ptr(65.7), Active: true},
+		{ID: "AF-KAB", Name: "Kabul", Code: "KAB", CountryID: "AF", Type: "province", Latitude: float64Ptr(34.5), Longitude: float64Ptr(69.2), Active: true},
+		{ID: "AF-KAN", Name: "Kandahar", Code: "KAN", CountryID: "AF", Type: "province", Latitude: float64Ptr(31.6), Longitude: float64Ptr(65.7), Active: true},
+		{ID: "AF-KAP", Name: "Kapisa", Code: "KAP", CountryID: "AF", Type: "province", Latitude: float64Ptr(34.9), Longitude: float64Ptr(69.6), Active: true},
+		{ID: "AF-KDZ", Name: "Kunduz", Code: "KDZ", CountryID: "AF", Type: "province", Latitude: float64Ptr(36.7), Longitude: float64Ptr(68.9), Active: true},
+		{ID: "AF-KHO", Name: "Khost", Code: "KHO", CountryID: "AF", Type: "province", Latitude: float64Ptr(33.3), Longitude: float64Ptr(69.9), Active: true},
+		{ID: "AF-KNR", Name: "Kunar", Code: "KNR", CountryID: "AF", Type: "province", Latitude: float64Ptr(35.0), Longitude: float64Ptr(71.1), Active: true},
+		{ID: "AF-LAG", Name: "Laghman", Code: "LAG", CountryID: "AF", Type: "province", Latitude: float64Ptr(34.7), Longitude: float64Ptr(70.1), Active: true},
+		{ID: "AF-LOG", Name: "Logar", Code: "LOG", CountryID: "AF", Type: "province", Latitude: float64Ptr(34.0), Longitude: float64Ptr(69.0), Active: true},
+		{ID: "AF-NAN", Name: "Nangarhar", Code: "NAN", CountryID: "AF", Type: "province", Latitude: float64Ptr(34.2), Longitude: float64Ptr(70.6), Active: true},
+		{ID: "AF-NIM", Name: "Nimroz", Code: "NIM", CountryID: "AF", Type: "province", Latitude: float64Ptr(31.0), Longitude: float64Ptr(62.0), Active: true},
+		{ID: "AF-NUR", Name: "Nuristan", Code: "NUR", CountryID: "AF", Type: "province", Latitude: float64Ptr(35.3), Longitude: float64Ptr(70.9), Active: true},
+		{ID: "AF-PAN", Name: "Panjshir", Code: "PAN", CountryID: "AF", Type: "province", Latitude: float64Ptr(35.3), Longitude: float64Ptr(70.1), Active: true},
+		{ID: "AF-PAR", Name: "Parwan", Code: "PAR", CountryID: "AF", Type: "province", Latitude: float64Ptr(35.0), Longitude: float64Ptr(68.8), Active: true},
+		{ID: "AF-PIA", Name: "Paktia", Code: "PIA", CountryID: "AF", Type: "province", Latitude: float64Ptr(33.7), Longitude: float64Ptr(69.4), Active: true},
+		{ID: "AF-PKA", Name: "Paktika", Code: "PKA", CountryID: "AF", Type: "province", Latitude: float64Ptr(32.3), Longitude: float64Ptr(68.5), Active: true},
+		{ID: "AF-SAM", Name: "Samangan", Code: "SAM", CountryID: "AF", Type: "province", Latitude: float64Ptr(36.3), Longitude: float64Ptr(68.0), Active: true},
+		{ID: "AF-SAR", Name: "Sar-e Pol", Code: "SAR", CountryID: "AF", Type: "province", Latitude: float64Ptr(36.2), Longitude: float64Ptr(65.9), Active: true},
+		{ID: "AF-TAK", Name: "Takhar", Code: "TAK", CountryID: "AF", Type: "province", Latitude: float64Ptr(36.7), Longitude: float64Ptr(69.5), Active: true},
+		{ID: "AF-URU", Name: "Uruzgan", Code: "URU", CountryID: "AF", Type: "province", Latitude: float64Ptr(32.9), Longitude: float64Ptr(66.6), Active: true},
+		{ID: "AF-WAR", Name: "Wardak", Code: "WAR", CountryID: "AF", Type: "province", Latitude: float64Ptr(34.0), Longitude: float64Ptr(68.2), Active: true},
+		{ID: "AF-ZAB", Name: "Zabul", Code: "ZAB", CountryID: "AF", Type: "province", Latitude: float64Ptr(32.1), Longitude: float64Ptr(67.2), Active: true},
+	}
+
+	// Brunei Districts (4)
+	bruneiDistricts := []models.State{
+		{ID: "BN-BE", Name: "Belait", Code: "BE", CountryID: "BN", Type: "district", Latitude: float64Ptr(4.6), Longitude: float64Ptr(114.4), Active: true},
+		{ID: "BN-BM", Name: "Brunei-Muara", Code: "BM", CountryID: "BN", Type: "district", Latitude: float64Ptr(4.9), Longitude: float64Ptr(114.9), Active: true},
+		{ID: "BN-TE", Name: "Temburong", Code: "TE", CountryID: "BN", Type: "district", Latitude: float64Ptr(4.6), Longitude: float64Ptr(115.1), Active: true},
+		{ID: "BN-TU", Name: "Tutong", Code: "TU", CountryID: "BN", Type: "district", Latitude: float64Ptr(4.8), Longitude: float64Ptr(114.6), Active: true},
+	}
+
+	// Albania Counties (12)
+	albaniaCounties := []models.State{
+		{ID: "AL-01", Name: "Berat", Code: "01", CountryID: "AL", Type: "county", Latitude: float64Ptr(40.7), Longitude: float64Ptr(19.9), Active: true},
+		{ID: "AL-09", Name: "Dibër", Code: "09", CountryID: "AL", Type: "county", Latitude: float64Ptr(41.6), Longitude: float64Ptr(20.2), Active: true},
+		{ID: "AL-02", Name: "Durrës", Code: "02", CountryID: "AL", Type: "county", Latitude: float64Ptr(41.3), Longitude: float64Ptr(19.5), Active: true},
+		{ID: "AL-03", Name: "Elbasan", Code: "03", CountryID: "AL", Type: "county", Latitude: float64Ptr(41.1), Longitude: float64Ptr(20.1), Active: true},
+		{ID: "AL-04", Name: "Fier", Code: "04", CountryID: "AL", Type: "county", Latitude: float64Ptr(40.7), Longitude: float64Ptr(19.6), Active: true},
+		{ID: "AL-05", Name: "Gjirokastër", Code: "05", CountryID: "AL", Type: "county", Latitude: float64Ptr(40.1), Longitude: float64Ptr(20.1), Active: true},
+		{ID: "AL-06", Name: "Korçë", Code: "06", CountryID: "AL", Type: "county", Latitude: float64Ptr(40.6), Longitude: float64Ptr(20.8), Active: true},
+		{ID: "AL-07", Name: "Kukës", Code: "07", CountryID: "AL", Type: "county", Latitude: float64Ptr(42.1), Longitude: float64Ptr(20.4), Active: true},
+		{ID: "AL-08", Name: "Lezhë", Code: "08", CountryID: "AL", Type: "county", Latitude: float64Ptr(41.8), Longitude: float64Ptr(19.6), Active: true},
+		{ID: "AL-10", Name: "Shkodër", Code: "10", CountryID: "AL", Type: "county", Latitude: float64Ptr(42.1), Longitude: float64Ptr(19.5), Active: true},
+		{ID: "AL-11", Name: "Tirana", Code: "11", CountryID: "AL", Type: "county", Latitude: float64Ptr(41.3), Longitude: float64Ptr(19.8), Active: true},
+		{ID: "AL-12", Name: "Vlorë", Code: "12", CountryID: "AL", Type: "county", Latitude: float64Ptr(40.5), Longitude: float64Ptr(19.5), Active: true},
+	}
+
+	// Argentina Provinces (24)
+	argentinaProvinces := []models.State{
+		{ID: "AR-C", Name: "Buenos Aires (City)", Code: "C", CountryID: "AR", Type: "autonomous city", Latitude: float64Ptr(-34.6), Longitude: float64Ptr(-58.4), Active: true},
+		{ID: "AR-B", Name: "Buenos Aires (Province)", Code: "B", CountryID: "AR", Type: "province", Latitude: float64Ptr(-36.7), Longitude: float64Ptr(-60.0), Active: true},
+		{ID: "AR-K", Name: "Catamarca", Code: "K", CountryID: "AR", Type: "province", Latitude: float64Ptr(-28.5), Longitude: float64Ptr(-65.8), Active: true},
+		{ID: "AR-H", Name: "Chaco", Code: "H", CountryID: "AR", Type: "province", Latitude: float64Ptr(-26.4), Longitude: float64Ptr(-60.4), Active: true},
+		{ID: "AR-U", Name: "Chubut", Code: "U", CountryID: "AR", Type: "province", Latitude: float64Ptr(-43.8), Longitude: float64Ptr(-68.5), Active: true},
+		{ID: "AR-X", Name: "Córdoba", Code: "X", CountryID: "AR", Type: "province", Latitude: float64Ptr(-31.4), Longitude: float64Ptr(-64.2), Active: true},
+		{ID: "AR-W", Name: "Corrientes", Code: "W", CountryID: "AR", Type: "province", Latitude: float64Ptr(-27.5), Longitude: float64Ptr(-58.8), Active: true},
+		{ID: "AR-E", Name: "Entre Ríos", Code: "E", CountryID: "AR", Type: "province", Latitude: float64Ptr(-31.8), Longitude: float64Ptr(-59.0), Active: true},
+		{ID: "AR-P", Name: "Formosa", Code: "P", CountryID: "AR", Type: "province", Latitude: float64Ptr(-24.9), Longitude: float64Ptr(-59.9), Active: true},
+		{ID: "AR-Y", Name: "Jujuy", Code: "Y", CountryID: "AR", Type: "province", Latitude: float64Ptr(-23.3), Longitude: float64Ptr(-65.8), Active: true},
+		{ID: "AR-L", Name: "La Pampa", Code: "L", CountryID: "AR", Type: "province", Latitude: float64Ptr(-36.6), Longitude: float64Ptr(-64.3), Active: true},
+		{ID: "AR-F", Name: "La Rioja", Code: "F", CountryID: "AR", Type: "province", Latitude: float64Ptr(-29.4), Longitude: float64Ptr(-66.9), Active: true},
+		{ID: "AR-M", Name: "Mendoza", Code: "M", CountryID: "AR", Type: "province", Latitude: float64Ptr(-34.6), Longitude: float64Ptr(-68.6), Active: true},
+		{ID: "AR-N", Name: "Misiones", Code: "N", CountryID: "AR", Type: "province", Latitude: float64Ptr(-26.9), Longitude: float64Ptr(-54.4), Active: true},
+		{ID: "AR-Q", Name: "Neuquén", Code: "Q", CountryID: "AR", Type: "province", Latitude: float64Ptr(-38.9), Longitude: float64Ptr(-70.1), Active: true},
+		{ID: "AR-R", Name: "Río Negro", Code: "R", CountryID: "AR", Type: "province", Latitude: float64Ptr(-40.8), Longitude: float64Ptr(-67.0), Active: true},
+		{ID: "AR-A", Name: "Salta", Code: "A", CountryID: "AR", Type: "province", Latitude: float64Ptr(-24.8), Longitude: float64Ptr(-65.4), Active: true},
+		{ID: "AR-J", Name: "San Juan", Code: "J", CountryID: "AR", Type: "province", Latitude: float64Ptr(-31.5), Longitude: float64Ptr(-68.5), Active: true},
+		{ID: "AR-D", Name: "San Luis", Code: "D", CountryID: "AR", Type: "province", Latitude: float64Ptr(-33.3), Longitude: float64Ptr(-66.4), Active: true},
+		{ID: "AR-Z", Name: "Santa Cruz", Code: "Z", CountryID: "AR", Type: "province", Latitude: float64Ptr(-48.8), Longitude: float64Ptr(-69.2), Active: true},
+		{ID: "AR-S", Name: "Santa Fe", Code: "S", CountryID: "AR", Type: "province", Latitude: float64Ptr(-31.6), Longitude: float64Ptr(-60.7), Active: true},
+		{ID: "AR-G", Name: "Santiago del Estero", Code: "G", CountryID: "AR", Type: "province", Latitude: float64Ptr(-27.8), Longitude: float64Ptr(-64.3), Active: true},
+		{ID: "AR-V", Name: "Tierra del Fuego", Code: "V", CountryID: "AR", Type: "province", Latitude: float64Ptr(-54.3), Longitude: float64Ptr(-67.7), Active: true},
+		{ID: "AR-T", Name: "Tucumán", Code: "T", CountryID: "AR", Type: "province", Latitude: float64Ptr(-26.8), Longitude: float64Ptr(-65.2), Active: true},
+	}
+
+	// Bhutan Districts (20)
+	bhutanDistricts := []models.State{
+		{ID: "BT-33", Name: "Bumthang", Code: "33", CountryID: "BT", Type: "district", Latitude: float64Ptr(27.5), Longitude: float64Ptr(90.7), Active: true},
+		{ID: "BT-12", Name: "Chhukha", Code: "12", CountryID: "BT", Type: "district", Latitude: float64Ptr(27.0), Longitude: float64Ptr(89.5), Active: true},
+		{ID: "BT-22", Name: "Dagana", Code: "22", CountryID: "BT", Type: "district", Latitude: float64Ptr(27.1), Longitude: float64Ptr(89.9), Active: true},
+		{ID: "BT-GA", Name: "Gasa", Code: "GA", CountryID: "BT", Type: "district", Latitude: float64Ptr(28.0), Longitude: float64Ptr(89.7), Active: true},
+		{ID: "BT-13", Name: "Haa", Code: "13", CountryID: "BT", Type: "district", Latitude: float64Ptr(27.4), Longitude: float64Ptr(89.3), Active: true},
+		{ID: "BT-44", Name: "Lhuentse", Code: "44", CountryID: "BT", Type: "district", Latitude: float64Ptr(27.7), Longitude: float64Ptr(91.2), Active: true},
+		{ID: "BT-42", Name: "Mongar", Code: "42", CountryID: "BT", Type: "district", Latitude: float64Ptr(27.3), Longitude: float64Ptr(91.2), Active: true},
+		{ID: "BT-11", Name: "Paro", Code: "11", CountryID: "BT", Type: "district", Latitude: float64Ptr(27.4), Longitude: float64Ptr(89.4), Active: true},
+		{ID: "BT-43", Name: "Pemagatshel", Code: "43", CountryID: "BT", Type: "district", Latitude: float64Ptr(27.0), Longitude: float64Ptr(91.4), Active: true},
+		{ID: "BT-23", Name: "Punakha", Code: "23", CountryID: "BT", Type: "district", Latitude: float64Ptr(27.6), Longitude: float64Ptr(89.9), Active: true},
+		{ID: "BT-45", Name: "Samdrup Jongkhar", Code: "45", CountryID: "BT", Type: "district", Latitude: float64Ptr(26.8), Longitude: float64Ptr(91.5), Active: true},
+		{ID: "BT-14", Name: "Samtse", Code: "14", CountryID: "BT", Type: "district", Latitude: float64Ptr(27.0), Longitude: float64Ptr(89.1), Active: true},
+		{ID: "BT-31", Name: "Sarpang", Code: "31", CountryID: "BT", Type: "district", Latitude: float64Ptr(27.0), Longitude: float64Ptr(90.3), Active: true},
+		{ID: "BT-15", Name: "Thimphu", Code: "15", CountryID: "BT", Type: "district", Latitude: float64Ptr(27.5), Longitude: float64Ptr(89.6), Active: true},
+		{ID: "BT-41", Name: "Trashigang", Code: "41", CountryID: "BT", Type: "district", Latitude: float64Ptr(27.3), Longitude: float64Ptr(91.6), Active: true},
+		{ID: "BT-TY", Name: "Trashiyangtse", Code: "TY", CountryID: "BT", Type: "district", Latitude: float64Ptr(27.6), Longitude: float64Ptr(91.5), Active: true},
+		{ID: "BT-32", Name: "Trongsa", Code: "32", CountryID: "BT", Type: "district", Latitude: float64Ptr(27.5), Longitude: float64Ptr(90.5), Active: true},
+		{ID: "BT-21", Name: "Tsirang", Code: "21", CountryID: "BT", Type: "district", Latitude: float64Ptr(27.0), Longitude: float64Ptr(90.1), Active: true},
+		{ID: "BT-24", Name: "Wangdue Phodrang", Code: "24", CountryID: "BT", Type: "district", Latitude: float64Ptr(27.5), Longitude: float64Ptr(90.1), Active: true},
+		{ID: "BT-34", Name: "Zhemgang", Code: "34", CountryID: "BT", Type: "district", Latitude: float64Ptr(27.2), Longitude: float64Ptr(90.7), Active: true},
+	}
+
+	// Germany States (16)
+	germanyStates := []models.State{
+		{ID: "DE-BW", Name: "Baden-Württemberg", Code: "BW", CountryID: "DE", Type: "state", Latitude: float64Ptr(48.7), Longitude: float64Ptr(9.1), Active: true},
+		{ID: "DE-BY", Name: "Bavaria", Code: "BY", CountryID: "DE", Type: "state", Latitude: float64Ptr(48.8), Longitude: float64Ptr(11.4), Active: true},
+		{ID: "DE-BE", Name: "Berlin", Code: "BE", CountryID: "DE", Type: "state", Latitude: float64Ptr(52.5), Longitude: float64Ptr(13.4), Active: true},
+		{ID: "DE-BB", Name: "Brandenburg", Code: "BB", CountryID: "DE", Type: "state", Latitude: float64Ptr(52.4), Longitude: float64Ptr(13.1), Active: true},
+		{ID: "DE-HB", Name: "Bremen", Code: "HB", CountryID: "DE", Type: "state", Latitude: float64Ptr(53.1), Longitude: float64Ptr(8.8), Active: true},
+		{ID: "DE-HH", Name: "Hamburg", Code: "HH", CountryID: "DE", Type: "state", Latitude: float64Ptr(53.6), Longitude: float64Ptr(10.0), Active: true},
+		{ID: "DE-HE", Name: "Hesse", Code: "HE", CountryID: "DE", Type: "state", Latitude: float64Ptr(50.7), Longitude: float64Ptr(9.0), Active: true},
+		{ID: "DE-MV", Name: "Mecklenburg-Vorpommern", Code: "MV", CountryID: "DE", Type: "state", Latitude: float64Ptr(53.6), Longitude: float64Ptr(12.4), Active: true},
+		{ID: "DE-NI", Name: "Lower Saxony", Code: "NI", CountryID: "DE", Type: "state", Latitude: float64Ptr(52.6), Longitude: float64Ptr(9.8), Active: true},
+		{ID: "DE-NW", Name: "North Rhine-Westphalia", Code: "NW", CountryID: "DE", Type: "state", Latitude: float64Ptr(51.4), Longitude: float64Ptr(7.7), Active: true},
+		{ID: "DE-RP", Name: "Rhineland-Palatinate", Code: "RP", CountryID: "DE", Type: "state", Latitude: float64Ptr(50.1), Longitude: float64Ptr(7.3), Active: true},
+		{ID: "DE-SL", Name: "Saarland", Code: "SL", CountryID: "DE", Type: "state", Latitude: float64Ptr(49.4), Longitude: float64Ptr(7.0), Active: true},
+		{ID: "DE-SN", Name: "Saxony", Code: "SN", CountryID: "DE", Type: "state", Latitude: float64Ptr(51.1), Longitude: float64Ptr(13.2), Active: true},
+		{ID: "DE-ST", Name: "Saxony-Anhalt", Code: "ST", CountryID: "DE", Type: "state", Latitude: float64Ptr(51.9), Longitude: float64Ptr(11.5), Active: true},
+		{ID: "DE-SH", Name: "Schleswig-Holstein", Code: "SH", CountryID: "DE", Type: "state", Latitude: float64Ptr(54.2), Longitude: float64Ptr(9.7), Active: true},
+		{ID: "DE-TH", Name: "Thuringia", Code: "TH", CountryID: "DE", Type: "state", Latitude: float64Ptr(50.9), Longitude: float64Ptr(11.0), Active: true},
+	}
+
+	// United Kingdom Countries (4)
+	ukCountries := []models.State{
+		{ID: "GB-ENG", Name: "England", Code: "ENG", CountryID: "GB", Type: "country", Latitude: float64Ptr(52.4), Longitude: float64Ptr(-1.2), Active: true},
+		{ID: "GB-SCT", Name: "Scotland", Code: "SCT", CountryID: "GB", Type: "country", Latitude: float64Ptr(56.5), Longitude: float64Ptr(-4.2), Active: true},
+		{ID: "GB-WLS", Name: "Wales", Code: "WLS", CountryID: "GB", Type: "country", Latitude: float64Ptr(52.1), Longitude: float64Ptr(-3.8), Active: true},
+		{ID: "GB-NIR", Name: "Northern Ireland", Code: "NIR", CountryID: "GB", Type: "country", Latitude: float64Ptr(54.6), Longitude: float64Ptr(-6.7), Active: true},
+	}
+
+	// France Regions (13)
+	franceRegions := []models.State{
+		{ID: "FR-IDF", Name: "Île-de-France", Code: "IDF", CountryID: "FR", Type: "region", Latitude: float64Ptr(48.8), Longitude: float64Ptr(2.3), Active: true},
+		{ID: "FR-ARA", Name: "Auvergne-Rhône-Alpes", Code: "ARA", CountryID: "FR", Type: "region", Latitude: float64Ptr(45.4), Longitude: float64Ptr(4.4), Active: true},
+		{ID: "FR-HDF", Name: "Hauts-de-France", Code: "HDF", CountryID: "FR", Type: "region", Latitude: float64Ptr(49.9), Longitude: float64Ptr(2.8), Active: true},
+		{ID: "FR-NAQ", Name: "Nouvelle-Aquitaine", Code: "NAQ", CountryID: "FR", Type: "region", Latitude: float64Ptr(45.7), Longitude: float64Ptr(0.2), Active: true},
+		{ID: "FR-OCC", Name: "Occitanie", Code: "OCC", CountryID: "FR", Type: "region", Latitude: float64Ptr(43.9), Longitude: float64Ptr(2.4), Active: true},
+		{ID: "FR-GES", Name: "Grand Est", Code: "GES", CountryID: "FR", Type: "region", Latitude: float64Ptr(48.7), Longitude: float64Ptr(6.2), Active: true},
+		{ID: "FR-PAC", Name: "Provence-Alpes-Côte d'Azur", Code: "PAC", CountryID: "FR", Type: "region", Latitude: float64Ptr(43.9), Longitude: float64Ptr(6.0), Active: true},
+		{ID: "FR-PDL", Name: "Pays de la Loire", Code: "PDL", CountryID: "FR", Type: "region", Latitude: float64Ptr(47.5), Longitude: float64Ptr(-1.0), Active: true},
+		{ID: "FR-BRE", Name: "Brittany", Code: "BRE", CountryID: "FR", Type: "region", Latitude: float64Ptr(48.2), Longitude: float64Ptr(-2.9), Active: true},
+		{ID: "FR-NOR", Name: "Normandy", Code: "NOR", CountryID: "FR", Type: "region", Latitude: float64Ptr(49.2), Longitude: float64Ptr(-0.4), Active: true},
+		{ID: "FR-BFC", Name: "Bourgogne-Franche-Comté", Code: "BFC", CountryID: "FR", Type: "region", Latitude: float64Ptr(47.3), Longitude: float64Ptr(5.0), Active: true},
+		{ID: "FR-CVL", Name: "Centre-Val de Loire", Code: "CVL", CountryID: "FR", Type: "region", Latitude: float64Ptr(47.8), Longitude: float64Ptr(1.7), Active: true},
+		{ID: "FR-COR", Name: "Corsica", Code: "COR", CountryID: "FR", Type: "region", Latitude: float64Ptr(42.0), Longitude: float64Ptr(9.0), Active: true},
+	}
+
+	// Spain Autonomous Communities (17)
+	spainCommunities := []models.State{
+		{ID: "ES-MD", Name: "Madrid", Code: "MD", CountryID: "ES", Type: "autonomous community", Latitude: float64Ptr(40.4), Longitude: float64Ptr(-3.7), Active: true},
+		{ID: "ES-CT", Name: "Catalonia", Code: "CT", CountryID: "ES", Type: "autonomous community", Latitude: float64Ptr(41.6), Longitude: float64Ptr(1.5), Active: true},
+		{ID: "ES-AN", Name: "Andalusia", Code: "AN", CountryID: "ES", Type: "autonomous community", Latitude: float64Ptr(37.4), Longitude: float64Ptr(-4.8), Active: true},
+		{ID: "ES-VC", Name: "Valencia", Code: "VC", CountryID: "ES", Type: "autonomous community", Latitude: float64Ptr(39.5), Longitude: float64Ptr(-0.5), Active: true},
+		{ID: "ES-GA", Name: "Galicia", Code: "GA", CountryID: "ES", Type: "autonomous community", Latitude: float64Ptr(42.6), Longitude: float64Ptr(-7.9), Active: true},
+		{ID: "ES-CL", Name: "Castile and León", Code: "CL", CountryID: "ES", Type: "autonomous community", Latitude: float64Ptr(41.8), Longitude: float64Ptr(-4.0), Active: true},
+		{ID: "ES-PV", Name: "Basque Country", Code: "PV", CountryID: "ES", Type: "autonomous community", Latitude: float64Ptr(42.9), Longitude: float64Ptr(-2.6), Active: true},
+		{ID: "ES-CM", Name: "Castilla-La Mancha", Code: "CM", CountryID: "ES", Type: "autonomous community", Latitude: float64Ptr(39.3), Longitude: float64Ptr(-3.0), Active: true},
+		{ID: "ES-CN", Name: "Canary Islands", Code: "CN", CountryID: "ES", Type: "autonomous community", Latitude: float64Ptr(28.3), Longitude: float64Ptr(-15.8), Active: true},
+		{ID: "ES-MU", Name: "Murcia", Code: "MU", CountryID: "ES", Type: "autonomous community", Latitude: float64Ptr(37.9), Longitude: float64Ptr(-1.1), Active: true},
+		{ID: "ES-AR", Name: "Aragon", Code: "AR", CountryID: "ES", Type: "autonomous community", Latitude: float64Ptr(41.6), Longitude: float64Ptr(-0.9), Active: true},
+		{ID: "ES-IB", Name: "Balearic Islands", Code: "IB", CountryID: "ES", Type: "autonomous community", Latitude: float64Ptr(39.6), Longitude: float64Ptr(2.9), Active: true},
+		{ID: "ES-EX", Name: "Extremadura", Code: "EX", CountryID: "ES", Type: "autonomous community", Latitude: float64Ptr(39.2), Longitude: float64Ptr(-6.2), Active: true},
+		{ID: "ES-AS", Name: "Asturias", Code: "AS", CountryID: "ES", Type: "autonomous community", Latitude: float64Ptr(43.4), Longitude: float64Ptr(-5.8), Active: true},
+		{ID: "ES-NC", Name: "Navarra", Code: "NC", CountryID: "ES", Type: "autonomous community", Latitude: float64Ptr(42.7), Longitude: float64Ptr(-1.7), Active: true},
+		{ID: "ES-CB", Name: "Cantabria", Code: "CB", CountryID: "ES", Type: "autonomous community", Latitude: float64Ptr(43.2), Longitude: float64Ptr(-4.0), Active: true},
+		{ID: "ES-RI", Name: "La Rioja", Code: "RI", CountryID: "ES", Type: "autonomous community", Latitude: float64Ptr(42.3), Longitude: float64Ptr(-2.4), Active: true},
+	}
+
+	// Italy Regions (20)
+	italyRegions := []models.State{
+		{ID: "IT-25", Name: "Lombardy", Code: "25", CountryID: "IT", Type: "region", Latitude: float64Ptr(45.5), Longitude: float64Ptr(9.9), Active: true},
+		{ID: "IT-62", Name: "Lazio", Code: "62", CountryID: "IT", Type: "region", Latitude: float64Ptr(41.9), Longitude: float64Ptr(12.8), Active: true},
+		{ID: "IT-72", Name: "Campania", Code: "72", CountryID: "IT", Type: "region", Latitude: float64Ptr(40.8), Longitude: float64Ptr(14.6), Active: true},
+		{ID: "IT-82", Name: "Sicily", Code: "82", CountryID: "IT", Type: "region", Latitude: float64Ptr(37.6), Longitude: float64Ptr(14.0), Active: true},
+		{ID: "IT-34", Name: "Veneto", Code: "34", CountryID: "IT", Type: "region", Latitude: float64Ptr(45.7), Longitude: float64Ptr(11.6), Active: true},
+		{ID: "IT-21", Name: "Piedmont", Code: "21", CountryID: "IT", Type: "region", Latitude: float64Ptr(45.1), Longitude: float64Ptr(7.6), Active: true},
+		{ID: "IT-45", Name: "Emilia-Romagna", Code: "45", CountryID: "IT", Type: "region", Latitude: float64Ptr(44.5), Longitude: float64Ptr(11.3), Active: true},
+		{ID: "IT-75", Name: "Apulia", Code: "75", CountryID: "IT", Type: "region", Latitude: float64Ptr(41.0), Longitude: float64Ptr(16.5), Active: true},
+		{ID: "IT-52", Name: "Tuscany", Code: "52", CountryID: "IT", Type: "region", Latitude: float64Ptr(43.4), Longitude: float64Ptr(11.1), Active: true},
+		{ID: "IT-78", Name: "Calabria", Code: "78", CountryID: "IT", Type: "region", Latitude: float64Ptr(39.1), Longitude: float64Ptr(16.6), Active: true},
+		{ID: "IT-88", Name: "Sardinia", Code: "88", CountryID: "IT", Type: "region", Latitude: float64Ptr(40.1), Longitude: float64Ptr(9.0), Active: true},
+		{ID: "IT-42", Name: "Liguria", Code: "42", CountryID: "IT", Type: "region", Latitude: float64Ptr(44.4), Longitude: float64Ptr(8.9), Active: true},
+		{ID: "IT-57", Name: "Marche", Code: "57", CountryID: "IT", Type: "region", Latitude: float64Ptr(43.6), Longitude: float64Ptr(13.5), Active: true},
+		{ID: "IT-65", Name: "Abruzzo", Code: "65", CountryID: "IT", Type: "region", Latitude: float64Ptr(42.2), Longitude: float64Ptr(13.6), Active: true},
+		{ID: "IT-36", Name: "Friuli Venezia Giulia", Code: "36", CountryID: "IT", Type: "region", Latitude: float64Ptr(46.0), Longitude: float64Ptr(13.2), Active: true},
+		{ID: "IT-32", Name: "Trentino-Alto Adige", Code: "32", CountryID: "IT", Type: "region", Latitude: float64Ptr(46.4), Longitude: float64Ptr(11.3), Active: true},
+		{ID: "IT-55", Name: "Umbria", Code: "55", CountryID: "IT", Type: "region", Latitude: float64Ptr(42.9), Longitude: float64Ptr(12.6), Active: true},
+		{ID: "IT-77", Name: "Basilicata", Code: "77", CountryID: "IT", Type: "region", Latitude: float64Ptr(40.5), Longitude: float64Ptr(16.3), Active: true},
+		{ID: "IT-67", Name: "Molise", Code: "67", CountryID: "IT", Type: "region", Latitude: float64Ptr(41.7), Longitude: float64Ptr(14.4), Active: true},
+		{ID: "IT-23", Name: "Aosta Valley", Code: "23", CountryID: "IT", Type: "region", Latitude: float64Ptr(45.7), Longitude: float64Ptr(7.3), Active: true},
+	}
+
+	// Brazil States (27)
+	brazilStates := []models.State{
+		{ID: "BR-SP", Name: "São Paulo", Code: "SP", CountryID: "BR", Type: "state", Latitude: float64Ptr(-23.6), Longitude: float64Ptr(-46.6), Active: true},
+		{ID: "BR-RJ", Name: "Rio de Janeiro", Code: "RJ", CountryID: "BR", Type: "state", Latitude: float64Ptr(-22.9), Longitude: float64Ptr(-43.2), Active: true},
+		{ID: "BR-MG", Name: "Minas Gerais", Code: "MG", CountryID: "BR", Type: "state", Latitude: float64Ptr(-18.5), Longitude: float64Ptr(-44.3), Active: true},
+		{ID: "BR-BA", Name: "Bahia", Code: "BA", CountryID: "BR", Type: "state", Latitude: float64Ptr(-12.6), Longitude: float64Ptr(-41.7), Active: true},
+		{ID: "BR-RS", Name: "Rio Grande do Sul", Code: "RS", CountryID: "BR", Type: "state", Latitude: float64Ptr(-30.0), Longitude: float64Ptr(-51.2), Active: true},
+		{ID: "BR-PR", Name: "Paraná", Code: "PR", CountryID: "BR", Type: "state", Latitude: float64Ptr(-25.3), Longitude: float64Ptr(-49.3), Active: true},
+		{ID: "BR-PE", Name: "Pernambuco", Code: "PE", CountryID: "BR", Type: "state", Latitude: float64Ptr(-8.3), Longitude: float64Ptr(-36.5), Active: true},
+		{ID: "BR-CE", Name: "Ceará", Code: "CE", CountryID: "BR", Type: "state", Latitude: float64Ptr(-5.5), Longitude: float64Ptr(-39.3), Active: true},
+		{ID: "BR-PA", Name: "Pará", Code: "PA", CountryID: "BR", Type: "state", Latitude: float64Ptr(-3.8), Longitude: float64Ptr(-52.5), Active: true},
+		{ID: "BR-SC", Name: "Santa Catarina", Code: "SC", CountryID: "BR", Type: "state", Latitude: float64Ptr(-27.3), Longitude: float64Ptr(-49.5), Active: true},
+		{ID: "BR-GO", Name: "Goiás", Code: "GO", CountryID: "BR", Type: "state", Latitude: float64Ptr(-16.0), Longitude: float64Ptr(-49.3), Active: true},
+		{ID: "BR-MA", Name: "Maranhão", Code: "MA", CountryID: "BR", Type: "state", Latitude: float64Ptr(-5.4), Longitude: float64Ptr(-45.4), Active: true},
+		{ID: "BR-AM", Name: "Amazonas", Code: "AM", CountryID: "BR", Type: "state", Latitude: float64Ptr(-3.4), Longitude: float64Ptr(-65.9), Active: true},
+		{ID: "BR-ES", Name: "Espírito Santo", Code: "ES", CountryID: "BR", Type: "state", Latitude: float64Ptr(-19.2), Longitude: float64Ptr(-40.3), Active: true},
+		{ID: "BR-PB", Name: "Paraíba", Code: "PB", CountryID: "BR", Type: "state", Latitude: float64Ptr(-7.2), Longitude: float64Ptr(-36.8), Active: true},
+		{ID: "BR-MT", Name: "Mato Grosso", Code: "MT", CountryID: "BR", Type: "state", Latitude: float64Ptr(-12.6), Longitude: float64Ptr(-56.1), Active: true},
+		{ID: "BR-RN", Name: "Rio Grande do Norte", Code: "RN", CountryID: "BR", Type: "state", Latitude: float64Ptr(-5.7), Longitude: float64Ptr(-36.5), Active: true},
+		{ID: "BR-PI", Name: "Piauí", Code: "PI", CountryID: "BR", Type: "state", Latitude: float64Ptr(-7.7), Longitude: float64Ptr(-42.7), Active: true},
+		{ID: "BR-AL", Name: "Alagoas", Code: "AL", CountryID: "BR", Type: "state", Latitude: float64Ptr(-9.6), Longitude: float64Ptr(-36.8), Active: true},
+		{ID: "BR-MS", Name: "Mato Grosso do Sul", Code: "MS", CountryID: "BR", Type: "state", Latitude: float64Ptr(-20.5), Longitude: float64Ptr(-54.6), Active: true},
+		{ID: "BR-DF", Name: "Federal District", Code: "DF", CountryID: "BR", Type: "federal district", Latitude: float64Ptr(-15.8), Longitude: float64Ptr(-47.9), Active: true},
+		{ID: "BR-SE", Name: "Sergipe", Code: "SE", CountryID: "BR", Type: "state", Latitude: float64Ptr(-10.6), Longitude: float64Ptr(-37.4), Active: true},
+		{ID: "BR-RO", Name: "Rondônia", Code: "RO", CountryID: "BR", Type: "state", Latitude: float64Ptr(-10.8), Longitude: float64Ptr(-63.6), Active: true},
+		{ID: "BR-TO", Name: "Tocantins", Code: "TO", CountryID: "BR", Type: "state", Latitude: float64Ptr(-10.2), Longitude: float64Ptr(-48.3), Active: true},
+		{ID: "BR-AC", Name: "Acre", Code: "AC", CountryID: "BR", Type: "state", Latitude: float64Ptr(-9.0), Longitude: float64Ptr(-70.8), Active: true},
+		{ID: "BR-AP", Name: "Amapá", Code: "AP", CountryID: "BR", Type: "state", Latitude: float64Ptr(1.4), Longitude: float64Ptr(-51.8), Active: true},
+		{ID: "BR-RR", Name: "Roraima", Code: "RR", CountryID: "BR", Type: "state", Latitude: float64Ptr(2.8), Longitude: float64Ptr(-61.4), Active: true},
+	}
+
+	// Mexico States (32)
+	mexicoStates := []models.State{
+		{ID: "MX-CMX", Name: "Mexico City", Code: "CMX", CountryID: "MX", Type: "federal district", Latitude: float64Ptr(19.4), Longitude: float64Ptr(-99.1), Active: true},
+		{ID: "MX-JAL", Name: "Jalisco", Code: "JAL", CountryID: "MX", Type: "state", Latitude: float64Ptr(20.7), Longitude: float64Ptr(-103.3), Active: true},
+		{ID: "MX-MEX", Name: "State of Mexico", Code: "MEX", CountryID: "MX", Type: "state", Latitude: float64Ptr(19.4), Longitude: float64Ptr(-99.7), Active: true},
+		{ID: "MX-NLE", Name: "Nuevo León", Code: "NLE", CountryID: "MX", Type: "state", Latitude: float64Ptr(25.6), Longitude: float64Ptr(-99.9), Active: true},
+		{ID: "MX-VER", Name: "Veracruz", Code: "VER", CountryID: "MX", Type: "state", Latitude: float64Ptr(19.2), Longitude: float64Ptr(-96.1), Active: true},
+		{ID: "MX-PUE", Name: "Puebla", Code: "PUE", CountryID: "MX", Type: "state", Latitude: float64Ptr(19.0), Longitude: float64Ptr(-98.2), Active: true},
+		{ID: "MX-GUA", Name: "Guanajuato", Code: "GUA", CountryID: "MX", Type: "state", Latitude: float64Ptr(21.0), Longitude: float64Ptr(-101.3), Active: true},
+		{ID: "MX-CHH", Name: "Chihuahua", Code: "CHH", CountryID: "MX", Type: "state", Latitude: float64Ptr(28.6), Longitude: float64Ptr(-106.1), Active: true},
+		{ID: "MX-MIC", Name: "Michoacán", Code: "MIC", CountryID: "MX", Type: "state", Latitude: float64Ptr(19.6), Longitude: float64Ptr(-101.7), Active: true},
+		{ID: "MX-OAX", Name: "Oaxaca", Code: "OAX", CountryID: "MX", Type: "state", Latitude: float64Ptr(17.1), Longitude: float64Ptr(-96.7), Active: true},
+		{ID: "MX-SIN", Name: "Sinaloa", Code: "SIN", CountryID: "MX", Type: "state", Latitude: float64Ptr(24.8), Longitude: float64Ptr(-107.4), Active: true},
+		{ID: "MX-SON", Name: "Sonora", Code: "SON", CountryID: "MX", Type: "state", Latitude: float64Ptr(29.1), Longitude: float64Ptr(-110.9), Active: true},
+		{ID: "MX-GRO", Name: "Guerrero", Code: "GRO", CountryID: "MX", Type: "state", Latitude: float64Ptr(17.4), Longitude: float64Ptr(-99.5), Active: true},
+		{ID: "MX-TAM", Name: "Tamaulipas", Code: "TAM", CountryID: "MX", Type: "state", Latitude: float64Ptr(24.3), Longitude: float64Ptr(-98.8), Active: true},
+		{ID: "MX-COA", Name: "Coahuila", Code: "COA", CountryID: "MX", Type: "state", Latitude: float64Ptr(27.3), Longitude: float64Ptr(-102.0), Active: true},
+		{ID: "MX-BCN", Name: "Baja California", Code: "BCN", CountryID: "MX", Type: "state", Latitude: float64Ptr(30.8), Longitude: float64Ptr(-115.3), Active: true},
+	}
+
+	// UAE Emirates (7)
+	uaeEmirates := []models.State{
+		{ID: "AE-AZ", Name: "Abu Dhabi", Code: "AZ", CountryID: "AE", Type: "emirate", Latitude: float64Ptr(24.5), Longitude: float64Ptr(54.4), Active: true},
+		{ID: "AE-DU", Name: "Dubai", Code: "DU", CountryID: "AE", Type: "emirate", Latitude: float64Ptr(25.3), Longitude: float64Ptr(55.3), Active: true},
+		{ID: "AE-SH", Name: "Sharjah", Code: "SH", CountryID: "AE", Type: "emirate", Latitude: float64Ptr(25.4), Longitude: float64Ptr(55.5), Active: true},
+		{ID: "AE-AJ", Name: "Ajman", Code: "AJ", CountryID: "AE", Type: "emirate", Latitude: float64Ptr(25.4), Longitude: float64Ptr(55.5), Active: true},
+		{ID: "AE-UQ", Name: "Umm Al Quwain", Code: "UQ", CountryID: "AE", Type: "emirate", Latitude: float64Ptr(25.6), Longitude: float64Ptr(55.6), Active: true},
+		{ID: "AE-RK", Name: "Ras Al Khaimah", Code: "RK", CountryID: "AE", Type: "emirate", Latitude: float64Ptr(25.8), Longitude: float64Ptr(55.9), Active: true},
+		{ID: "AE-FU", Name: "Fujairah", Code: "FU", CountryID: "AE", Type: "emirate", Latitude: float64Ptr(25.1), Longitude: float64Ptr(56.3), Active: true},
+	}
+
+	// South Africa Provinces (9)
+	southAfricaProvinces := []models.State{
+		{ID: "ZA-GP", Name: "Gauteng", Code: "GP", CountryID: "ZA", Type: "province", Latitude: float64Ptr(-26.3), Longitude: float64Ptr(28.1), Active: true},
+		{ID: "ZA-KZN", Name: "KwaZulu-Natal", Code: "KZN", CountryID: "ZA", Type: "province", Latitude: float64Ptr(-28.5), Longitude: float64Ptr(30.5), Active: true},
+		{ID: "ZA-WC", Name: "Western Cape", Code: "WC", CountryID: "ZA", Type: "province", Latitude: float64Ptr(-33.2), Longitude: float64Ptr(18.8), Active: true},
+		{ID: "ZA-EC", Name: "Eastern Cape", Code: "EC", CountryID: "ZA", Type: "province", Latitude: float64Ptr(-32.0), Longitude: float64Ptr(26.5), Active: true},
+		{ID: "ZA-LP", Name: "Limpopo", Code: "LP", CountryID: "ZA", Type: "province", Latitude: float64Ptr(-23.9), Longitude: float64Ptr(29.4), Active: true},
+		{ID: "ZA-MP", Name: "Mpumalanga", Code: "MP", CountryID: "ZA", Type: "province", Latitude: float64Ptr(-25.6), Longitude: float64Ptr(30.5), Active: true},
+		{ID: "ZA-NW", Name: "North West", Code: "NW", CountryID: "ZA", Type: "province", Latitude: float64Ptr(-25.9), Longitude: float64Ptr(25.6), Active: true},
+		{ID: "ZA-FS", Name: "Free State", Code: "FS", CountryID: "ZA", Type: "province", Latitude: float64Ptr(-29.1), Longitude: float64Ptr(26.2), Active: true},
+		{ID: "ZA-NC", Name: "Northern Cape", Code: "NC", CountryID: "ZA", Type: "province", Latitude: float64Ptr(-29.0), Longitude: float64Ptr(21.9), Active: true},
+	}
+
+	// European Countries with N/A (small countries without subdivisions)
+	europeanNA := []models.State{
+		{ID: "AD-NA", Name: "N/A", Code: "NA", CountryID: "AD", Type: "N/A", Latitude: float64Ptr(42.5), Longitude: float64Ptr(1.5), Active: true},
+		{ID: "LI-NA", Name: "N/A", Code: "NA", CountryID: "LI", Type: "N/A", Latitude: float64Ptr(47.2), Longitude: float64Ptr(9.5), Active: true},
+		{ID: "LU-NA", Name: "N/A", Code: "NA", CountryID: "LU", Type: "N/A", Latitude: float64Ptr(49.8), Longitude: float64Ptr(6.1), Active: true},
+		{ID: "MC-NA", Name: "N/A", Code: "NA", CountryID: "MC", Type: "N/A", Latitude: float64Ptr(43.7), Longitude: float64Ptr(7.4), Active: true},
+		{ID: "MT-NA", Name: "N/A", Code: "NA", CountryID: "MT", Type: "N/A", Latitude: float64Ptr(35.9), Longitude: float64Ptr(14.4), Active: true},
+		{ID: "SM-NA", Name: "N/A", Code: "NA", CountryID: "SM", Type: "N/A", Latitude: float64Ptr(43.9), Longitude: float64Ptr(12.5), Active: true},
+		{ID: "VA-NA", Name: "N/A", Code: "NA", CountryID: "VA", Type: "N/A", Latitude: float64Ptr(41.9), Longitude: float64Ptr(12.5), Active: true},
+		{ID: "SG-NA", Name: "N/A", Code: "NA", CountryID: "SG", Type: "N/A", Latitude: float64Ptr(1.4), Longitude: float64Ptr(103.8), Active: true},
+		{ID: "HK-NA", Name: "N/A", Code: "NA", CountryID: "HK", Type: "N/A", Latitude: float64Ptr(22.3), Longitude: float64Ptr(114.2), Active: true},
+		{ID: "MO-NA", Name: "N/A", Code: "NA", CountryID: "MO", Type: "N/A", Latitude: float64Ptr(22.2), Longitude: float64Ptr(113.5), Active: true},
+	}
+
+	// Netherlands Provinces (12)
+	netherlandsProvinces := []models.State{
+		{ID: "NL-NH", Name: "North Holland", Code: "NH", CountryID: "NL", Type: "province", Latitude: float64Ptr(52.5), Longitude: float64Ptr(4.8), Active: true},
+		{ID: "NL-ZH", Name: "South Holland", Code: "ZH", CountryID: "NL", Type: "province", Latitude: float64Ptr(52.0), Longitude: float64Ptr(4.4), Active: true},
+		{ID: "NL-NB", Name: "North Brabant", Code: "NB", CountryID: "NL", Type: "province", Latitude: float64Ptr(51.5), Longitude: float64Ptr(5.1), Active: true},
+		{ID: "NL-GE", Name: "Gelderland", Code: "GE", CountryID: "NL", Type: "province", Latitude: float64Ptr(52.0), Longitude: float64Ptr(5.9), Active: true},
+		{ID: "NL-LI", Name: "Limburg", Code: "LI", CountryID: "NL", Type: "province", Latitude: float64Ptr(51.2), Longitude: float64Ptr(5.9), Active: true},
+		{ID: "NL-OV", Name: "Overijssel", Code: "OV", CountryID: "NL", Type: "province", Latitude: float64Ptr(52.4), Longitude: float64Ptr(6.5), Active: true},
+		{ID: "NL-FL", Name: "Flevoland", Code: "FL", CountryID: "NL", Type: "province", Latitude: float64Ptr(52.5), Longitude: float64Ptr(5.5), Active: true},
+		{ID: "NL-UT", Name: "Utrecht", Code: "UT", CountryID: "NL", Type: "province", Latitude: float64Ptr(52.1), Longitude: float64Ptr(5.1), Active: true},
+		{ID: "NL-FR", Name: "Friesland", Code: "FR", CountryID: "NL", Type: "province", Latitude: float64Ptr(53.2), Longitude: float64Ptr(5.8), Active: true},
+		{ID: "NL-GR", Name: "Groningen", Code: "GR", CountryID: "NL", Type: "province", Latitude: float64Ptr(53.2), Longitude: float64Ptr(6.6), Active: true},
+		{ID: "NL-DR", Name: "Drenthe", Code: "DR", CountryID: "NL", Type: "province", Latitude: float64Ptr(52.9), Longitude: float64Ptr(6.6), Active: true},
+		{ID: "NL-ZE", Name: "Zeeland", Code: "ZE", CountryID: "NL", Type: "province", Latitude: float64Ptr(51.5), Longitude: float64Ptr(3.8), Active: true},
+	}
+
 	// Combine all states
 	states = append(states, usStates...)
 	states = append(states, indiaStates...)
@@ -293,6 +602,22 @@ func getStatesData() []models.State {
 	states = append(states, malaysiaStates...)
 	states = append(states, japanPrefectures...)
 	states = append(states, southKoreaProvinces...)
+	states = append(states, afghanistanProvinces...)
+	states = append(states, bruneiDistricts...)
+	states = append(states, albaniaCounties...)
+	states = append(states, argentinaProvinces...)
+	states = append(states, bhutanDistricts...)
+	states = append(states, germanyStates...)
+	states = append(states, ukCountries...)
+	states = append(states, franceRegions...)
+	states = append(states, spainCommunities...)
+	states = append(states, italyRegions...)
+	states = append(states, brazilStates...)
+	states = append(states, mexicoStates...)
+	states = append(states, uaeEmirates...)
+	states = append(states, southAfricaProvinces...)
+	states = append(states, europeanNA...)
+	states = append(states, netherlandsProvinces...)
 
 	return states
 }
