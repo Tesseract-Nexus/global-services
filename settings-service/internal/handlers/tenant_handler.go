@@ -284,7 +284,7 @@ func (h *TenantHandler) getDatabaseConfig() models.DatabaseConfig {
 		User:         getEnvOrDefault("AUDIT_DB_USER", getEnvOrDefault("DB_USER", "postgres")),
 		Password:     password,
 		DatabaseName: getEnvOrDefault("AUDIT_DB_NAME", "audit_logs"),
-		SSLMode:      getEnvOrDefault("AUDIT_DB_SSL_MODE", "disable"),
+		SSLMode:      getEnvOrDefault("AUDIT_DB_SSL_MODE", "require"),
 		MaxOpenConns: maxOpenConns,
 		MaxIdleConns: maxIdleConns,
 		MaxLifetime:  maxLifetime,
