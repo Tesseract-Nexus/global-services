@@ -405,35 +405,162 @@ Response:
 
 ## Data Coverage
 
-### Countries (70+)
+### Countries (127+)
 | Region | Countries |
 |--------|-----------|
-| Americas | US, CA, MX, BR, AR, CL, CO, PE, VE, EC, UY, PA, CR, PR, JM, DO |
-| Europe | GB, DE, FR, IT, ES, NL, SE, CH, IE, AT, BE, CZ, DK, FI, GR, HU, NO, PL, PT, RO, RU, UA |
-| Asia | IN, JP, CN, SG, KR, AE, IL, SA, TR, QA, KW, BH, OM, TH, VN, BD, PK, LK, NP, MY, ID, PH, HK, TW |
-| Africa | ZA, EG, NG, KE, GH, MA, TN, TZ, UG, ET |
-| Oceania | AU, NZ, FJ |
+| **Americas** | US, CA, MX, BR, AR, CL, CO, PE, VE, EC, UY, PY, BO, PA, CR, PR, JM, DO, CU, GT, HN, SV, NI |
+| **Europe** | GB, DE, FR, IT, ES, NL, SE, CH, IE, AT, BE, CZ, DK, FI, GR, HU, NO, PL, PT, RO, RU, UA, BG, HR, SK, SI, EE, LV, LT, AL, RS, BA, MK, ME, IS, LU, MT, MC, AD, LI, SM, VA |
+| **Asia** | IN, JP, CN, SG, KR, AE, IL, SA, TR, QA, KW, BH, OM, TH, VN, BD, PK, LK, NP, MY, ID, PH, HK, TW, AF, BT, BN, KH, MM, LA, MN, KZ, UZ, IR, IQ, JO, LB, SY, YE |
+| **Africa** | ZA, EG, NG, KE, GH, MA, TN, TZ, UG, ET, DZ, LY, SD, AO, CM, CI, SN, ZW, RW, MU |
+| **Oceania** | AU, NZ, FJ, PG, WS, TO, VU, SB |
 
-### States/Regions
-- **United States**: All 50 states + DC
-- **India**: All 36 states and union territories
-- **Canada**: All 13 provinces and territories
-- **Australia**: All 8 states and territories
-- **United Kingdom**: 4 constituent countries
-- **Germany**: All 16 Bundesländer
-- **France**: All 13 régions
-- **Japan**: 10 major prefectures
-- **Brazil**: 10 major states
-- **Mexico**: 10 major states
-- **UAE**: All 7 emirates
-- **Spain**: All 17 autonomous communities
-- **Italy**: All 20 regions
+### States/Provinces (450+)
+| Country | Subdivisions | Type |
+|---------|--------------|------|
+| **United States** | 50 | States |
+| **India** | 36 | States & Union Territories |
+| **Canada** | 13 | Provinces & Territories |
+| **Australia** | 8 | States & Territories |
+| **United Kingdom** | 4 | Countries |
+| **Germany** | 16 | Bundesländer (States) |
+| **France** | 13 | Régions |
+| **Spain** | 17 | Autonomous Communities |
+| **Italy** | 20 | Regions |
+| **Brazil** | 27 | States |
+| **Mexico** | 16 | States (Major) |
+| **Argentina** | 24 | Provinces |
+| **Japan** | 8 | Prefectures (Major) |
+| **South Korea** | 8 | Provinces & Cities |
+| **Indonesia** | 12 | Provinces (Major) |
+| **Philippines** | 12 | Regions |
+| **Thailand** | 8 | Provinces (Major) |
+| **Vietnam** | 7 | Municipalities & Provinces |
+| **Malaysia** | 14 | States & Territories |
+| **Pakistan** | 7 | Provinces & Territories |
+| **Bangladesh** | 8 | Divisions |
+| **Nepal** | 7 | Provinces |
+| **Sri Lanka** | 9 | Provinces |
+| **Afghanistan** | 34 | Provinces |
+| **Bhutan** | 20 | Districts (Dzongkhags) |
+| **Brunei** | 4 | Districts |
+| **Albania** | 12 | Counties |
+| **Netherlands** | 12 | Provinces |
+| **UAE** | 7 | Emirates |
+| **South Africa** | 9 | Provinces |
 
-### Currencies (50+)
-USD, EUR, GBP, JPY, CAD, AUD, CHF, CNY, INR, SGD, NZD, ZAR, AED, BRL, MXN, KRW, SEK, PHP, MYR, IDR, CZK, DKK, HUF, NOK, PLN, TRY, THB, VND, PKR, and more...
+**N/A Entries** for small countries without subdivisions:
+- Andorra, Liechtenstein, Luxembourg, Monaco, Malta, San Marino, Vatican City
+- Singapore, Hong Kong, Macau
 
-### Timezones (70+)
-All major world timezones including America/*, Europe/*, Asia/*, Africa/*, Australia/*, Pacific/*
+### Currencies (104+)
+| Region | Currencies |
+|--------|-----------|
+| **Major** | USD, EUR, GBP, JPY, CNY, CHF, CAD, AUD, NZD |
+| **Americas** | BRL, MXN, ARS, CLP, COP, PEN, UYU, BOB, PYG, VES |
+| **Europe** | SEK, NOK, DKK, PLN, CZK, HUF, RON, BGN, HRK, RSD, ALL, UAH, RUB |
+| **Asia** | INR, PKR, BDT, NPR, LKR, SGD, MYR, THB, VND, IDR, PHP, KRW, TWD, HKD |
+| **Middle East** | AED, SAR, QAR, KWD, BHD, OMR, ILS, TRY, IRR, IQD, JOD, LBP |
+| **Africa** | ZAR, EGP, NGN, KES, GHS, MAD, TND, TZS, UGX, ETB |
+| **Oceania** | FJD, PGK, WST, TOP, VUV, SBD |
+
+### Timezones (77+)
+| Region | Coverage |
+|--------|----------|
+| **Americas** | US (7), Canada (6), Mexico (3), South America (10), Central America (5) |
+| **Europe** | Western (3), Central (14), Eastern (7) |
+| **Asia** | Middle East (7), South Asia (5), Southeast Asia (10), East Asia (5), Central Asia (2) |
+| **Oceania** | Australia (6), Pacific (3) |
+| **Africa** | 5 major timezones |
+
+All IANA timezone IDs: `America/*`, `Europe/*`, `Asia/*`, `Africa/*`, `Australia/*`, `Pacific/*`
+
+## PII Masking & Production Logging
+
+The location service includes built-in **PII (Personally Identifiable Information) masking** for production-safe logging, ensuring compliance with GDPR and privacy regulations.
+
+### Sanitized Logger
+
+All logs are automatically sanitized using the `SanitizedLogger`:
+
+```go
+import "location-service/internal/utils"
+
+// Use the global sanitized logger
+utils.Log.Info("Processing request")
+utils.Log.WithFields(logrus.Fields{
+    "ip": clientIP,           // Automatically masked: 192.168.***.***
+    "email": userEmail,       // Automatically masked: j***n@e*****e.com
+    "phone": phoneNumber,     // Automatically masked: +1-555-***-****
+}).Info("User location detected")
+```
+
+### Automatic PII Detection
+
+The logger automatically detects and masks sensitive fields:
+
+| Field Keys | Masking Applied |
+|------------|-----------------|
+| `ip`, `ip_address`, `ipAddress`, `client_ip`, `clientIp`, `remote_addr` | IP masking: `192.168.***.***` |
+| `email`, `user_email`, `userEmail` | Email masking: `j***n@e*****e.com` |
+| `phone`, `phone_number`, `phoneNumber`, `mobile` | Phone masking: `+1-555-***-****` |
+| `address`, `street`, `location` | Address masking: `****** City, State` |
+
+### Pattern-Based Masking
+
+The `PIIMasker` also scans free-form text for PII patterns:
+
+```go
+// All PII in text is automatically masked
+utils.Log.Infof("Request from %s for user %s", clientIP, userEmail)
+// Output: "Request from 192.168.***.*** for user j***n@e*****e.com"
+```
+
+### Masked PII Types
+
+| PII Type | Pattern | Masked Output |
+|----------|---------|---------------|
+| **IPv4** | `192.168.1.100` | `192.168.***.***` |
+| **IPv6** | `2001:0db8:...` | `2001:0db8:****:****:...` |
+| **Email** | `john@example.com` | `j***n@e*****e.com` |
+| **Phone** | `+1-555-123-4567` | `+1-555-***-****` |
+| **Credit Card** | `4111-1111-1111-1111` | `****-****-****-****` |
+| **SSN** | `123-45-6789` | `***-**-****` |
+| **Coordinates** | `40.7128,-74.0060` | `[COORDS_MASKED]` |
+
+### Utility Functions
+
+```go
+import "location-service/internal/utils"
+
+// Mask specific data types
+maskedIP := utils.MaskIP("192.168.1.100")           // "192.168.***.***"
+maskedEmail := utils.MaskEmail("john@example.com")  // "j***n@e*****e.com"
+maskedPhone := utils.MaskPhone("+1-555-123-4567")   // "+1-555-***-****"
+maskedAddr := utils.MaskAddress("123 Main St, NYC") // "****** Main St, NYC"
+
+// Mask all PII in a string
+safeText := utils.MaskAll("User john@example.com from 192.168.1.100")
+// "User j***n@e*****e.com from 192.168.***.***"
+
+// Log-safe versions for convenience
+safeIP := utils.LogSafeIP(clientIP)
+safeAddr := utils.LogSafeAddress(userAddress)
+```
+
+### Log Output Format
+
+Production logs are JSON-formatted for easy parsing:
+
+```json
+{
+  "timestamp": "2026-01-24T10:15:30.000Z",
+  "level": "info",
+  "message": "Location detected for user",
+  "ip": "157.49.***.***",
+  "country": "IN",
+  "state": "MH"
+}
+```
 
 ## Environment Variables
 
@@ -800,23 +927,192 @@ location-service/
 │   ├── migration/              # Database migrations
 │   │   └── sql/               # SQL migration files
 │   ├── models/                 # Data models
+│   │   └── location.go        # Country, State, Currency, Timezone models
 │   ├── repository/             # Database repositories
 │   │   ├── country_repository.go
 │   │   ├── state_repository.go
 │   │   ├── currency_repository.go
 │   │   ├── timezone_repository.go
 │   │   └── location_cache_repository.go
-│   ├── seeder/                 # Data seeders
-│   └── services/               # Business logic
-│       ├── location_service.go
-│       ├── geolocation_service.go
-│       └── address_service.go    # Address lookup providers
+│   ├── seeder/                 # Data seeders (comprehensive world data)
+│   │   ├── seeder.go          # Main seeder orchestrator
+│   │   ├── countries.go       # 127+ countries
+│   │   ├── states.go          # 450+ states/provinces
+│   │   ├── currencies.go      # 104+ currencies
+│   │   └── timezones.go       # 77+ timezones
+│   ├── services/               # Business logic
+│   │   ├── location_service.go
+│   │   ├── geolocation_service.go
+│   │   └── address_service.go  # Address lookup providers
+│   └── utils/                  # Utilities
+│       ├── pii.go             # PII masking utilities
+│       └── logger.go          # Sanitized logger with auto-masking
 ├── Dockerfile
 ├── docker-compose.yml
 ├── go.mod
 ├── go.sum
 └── README.md
 ```
+
+## Seeding Architecture
+
+The location service uses an **idempotent upsert pattern** for database seeding, ensuring data consistency across deployments.
+
+### Seeding Flow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Application Startup                          │
+├─────────────────────────────────────────────────────────────────┤
+│  1. Database Connection                                         │
+│  2. Auto-Migrations (GORM)                                      │
+│  3. Data Seeding (Upsert)                                       │
+│     ├── Countries (127+) → Upsert on ID                         │
+│     ├── States (450+) → Upsert on ID                            │
+│     ├── Currencies (104+) → Upsert on Code                      │
+│     └── Timezones (77+) → Upsert on ID                          │
+│  4. Service Ready                                               │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Upsert Pattern
+
+```go
+// Seeding uses GORM's OnConflict clause for idempotent operations
+db.Clauses(clause.OnConflict{
+    Columns:   []clause.Column{{Name: "id"}},
+    DoUpdates: clause.AssignmentColumns([]string{"name", "capital", "currency", ...}),
+}).Create(&country)
+```
+
+**Benefits:**
+- ✅ Safe to run multiple times
+- ✅ Adds missing data automatically
+- ✅ Updates existing data with new values
+- ✅ No duplicate key errors
+- ✅ Zero-downtime deployments
+
+### Seeding Data Files
+
+| File | Data | Records |
+|------|------|---------|
+| `seeder/countries.go` | World countries with metadata | 127+ |
+| `seeder/states.go` | States, provinces, districts | 450+ |
+| `seeder/currencies.go` | World currencies | 104+ |
+| `seeder/timezones.go` | IANA timezones | 77+ |
+
+### Adding New Data
+
+To add a new country with states:
+
+```go
+// In countries.go
+{ID: "XX", Name: "New Country", NativeName: "Nouveau Pays", Capital: "Capital City",
+ Region: "Europe", Subregion: "Western Europe", Currency: "EUR",
+ Languages: `["en","fr"]`, CallingCode: "+99", FlagEmoji: "🏳️", Active: true}
+
+// In states.go
+{ID: "XX-01", Name: "State One", Code: "01", CountryID: "XX", Type: "state", Active: true}
+{ID: "XX-02", Name: "State Two", Code: "02", CountryID: "XX", Type: "state", Active: true}
+```
+
+## Frontend Integration
+
+### Admin Portal Integration
+
+The Admin portal (`marketplace-clients/admin`) integrates with the location service for:
+
+1. **Store Settings** - Country, currency, timezone, language selection
+2. **Regional Settings Auto-Sync** - Auto-fills based on country selection
+
+```typescript
+// lib/constants/settings.ts
+import {
+  COUNTRY_OPTIONS,
+  CURRENCY_OPTIONS,
+  TIMEZONE_OPTIONS,
+  LANGUAGE_OPTIONS,
+  getAutoSyncedSettings,
+  getLanguageOptionsForCountry
+} from '@/lib/constants/settings';
+
+// Auto-sync regional settings when country changes
+const handleCountryChange = (countryCode: string) => {
+  const autoSynced = getAutoSyncedSettings(countryCode);
+  form.setValue('currency', autoSynced.currency);
+  form.setValue('timezone', autoSynced.timezone);
+  form.setValue('dateFormat', autoSynced.dateFormat);
+  form.setValue('language', 'en'); // English always default
+};
+
+// Get available languages for a country
+const languageOptions = getLanguageOptionsForCountry('IN');
+// Returns: [{ value: 'en', label: 'English' }, { value: 'hi', label: 'Hindi' }, ...]
+```
+
+### Onboarding App Integration
+
+The Onboarding app (`marketplace-clients/tenant-onboarding`) uses the same settings:
+
+```typescript
+// lib/config/settings.ts (mirrors admin settings)
+export const COUNTRY_OPTIONS = [...];      // 127+ countries
+export const CURRENCY_OPTIONS = [...];     // 104+ currencies
+export const TIMEZONE_OPTIONS = [...];     // 77+ timezones
+export const LANGUAGE_OPTIONS = [...];     // 32 languages
+
+// Country-to-settings mapping
+export const COUNTRY_SETTINGS_MAP: Record<string, CountrySettings> = {
+  US: { currency: 'USD', timezone: 'America/New_York', dateFormat: 'MM/DD/YYYY', languages: ['en', 'es'] },
+  IN: { currency: 'INR', timezone: 'Asia/Kolkata', dateFormat: 'DD/MM/YYYY', languages: ['en', 'hi', 'bn', ...] },
+  // ... 127+ countries
+};
+```
+
+### Language Auto-Selection
+
+When a country is selected:
+1. **English is always the default** language
+2. **Regional languages** are available based on country
+3. User can override to any available language
+
+```typescript
+// Example: India selected
+const settings = getAutoSyncedSettings('IN');
+// { currency: 'INR', timezone: 'Asia/Kolkata', dateFormat: 'DD/MM/YYYY', primaryLanguage: 'en' }
+
+const languages = getLanguageOptionsForCountry('IN');
+// [
+//   { value: 'en', label: 'English', nativeName: 'English' },  // Always first
+//   { value: 'hi', label: 'Hindi', nativeName: 'हिन्दी' },
+//   { value: 'bn', label: 'Bengali', nativeName: 'বাংলা' },
+//   { value: 'ta', label: 'Tamil', nativeName: 'தமிழ்' },
+//   { value: 'te', label: 'Telugu', nativeName: 'తెలుగు' },
+//   { value: 'mr', label: 'Marathi', nativeName: 'मराठी' },
+// ]
+```
+
+### BFF Pattern
+
+The frontend apps use a **Backend-for-Frontend (BFF)** pattern:
+
+```
+┌─────────────┐     ┌─────────────┐     ┌──────────────────┐
+│   Browser   │────▶│   Next.js   │────▶│ Location Service │
+│  (Client)   │     │   BFF API   │     │   (Microservice) │
+└─────────────┘     └─────────────┘     └──────────────────┘
+                          │
+                          ▼
+                    ┌─────────────┐
+                    │  Constants  │  (Fallback/Cache)
+                    │ settings.ts │
+                    └─────────────┘
+```
+
+**Benefits:**
+- Fast initial load (constants available immediately)
+- Server-side validation against live data
+- Graceful degradation if service unavailable
 
 ## Integration with Frontend
 
