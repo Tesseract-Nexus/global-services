@@ -474,10 +474,18 @@ func (c *DomainEventConsumer) mapEventToAudit(eventType string) (models.AuditAct
 	// Ticket events
 	case "ticket.created":
 		return models.ActionCreate, models.ResourceTicket, models.SeverityLow
-	case "ticket.updated", "ticket.assigned", "ticket.status_changed":
+	case "ticket.updated", "ticket.assigned", "ticket.unassigned", "ticket.status_changed":
 		return models.ActionUpdate, models.ResourceTicket, models.SeverityLow
+	case "ticket.deleted":
+		return models.ActionDelete, models.ResourceTicket, models.SeverityMedium
 	case "ticket.resolved", "ticket.closed":
 		return models.ActionUpdate, models.ResourceTicket, models.SeverityLow
+	case "ticket.comment_added", "ticket.comment_updated", "ticket.comment_deleted":
+		return models.ActionUpdate, models.ResourceTicket, models.SeverityLow
+	case "ticket.escalated":
+		return models.ActionUpdate, models.ResourceTicket, models.SeverityHigh
+	case "ticket.reopened":
+		return models.ActionUpdate, models.ResourceTicket, models.SeverityMedium
 
 	// Tenant events
 	case "tenant.created":
