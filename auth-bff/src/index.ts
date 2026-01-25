@@ -6,9 +6,13 @@
  */
 
 import { initializeSecrets } from './secrets';
-import { createLogger } from './logger';
+import pino from 'pino';
 
-const logger = createLogger('bootstrap');
+// Use a simple logger that doesn't depend on config (to avoid circular dependency)
+const logger = pino({
+  level: process.env.LOG_LEVEL || 'info',
+  base: { service: 'auth-bff', module: 'bootstrap' },
+});
 
 async function bootstrap() {
   logger.info('Starting application bootstrap...');
