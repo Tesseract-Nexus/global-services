@@ -92,7 +92,7 @@ async function callVerificationService(
   const baseUrl = config.verificationServiceUrl;
   const apiKey = config.verificationServiceApiKey;
 
-  logger.info({ baseUrl, hasApiKey: !!apiKey, apiKeyLength: apiKey?.length || 0, endpoint }, 'Calling verification service');
+  logger.debug({ baseUrl, hasApiKey: !!apiKey, endpoint }, 'Calling verification service');
 
   let url = baseUrl + '/api/v1' + endpoint;
   if (queryParams) {

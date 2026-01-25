@@ -101,7 +101,7 @@ export async function loadSecrets(): Promise<Record<string, string>> {
     try {
       const value = await getSecret(secretName);
       secrets[envVar] = value;
-      logger.info({ envVar, secretName, valueLength: value?.length || 0 }, 'Loaded secret from GCP');
+      logger.debug({ envVar, secretName }, 'Loaded secret from GCP');
       logger.debug({ envVar, secretName }, 'Loaded secret from GCP');
     } catch (error) {
       // Some secrets might be optional
