@@ -308,9 +308,16 @@ func (c *DomainEventConsumer) convertToAuditLog(subject string, event *BaseEvent
 	// Extract resource info
 	auditLog.ResourceID, auditLog.ResourceName = c.extractResourceInfo(event.EventType, eventData)
 
-	// Extract IP if present
-	if ip, ok := eventData["ipAddress"].(string); ok {
+	// Extract IP if present - check multiple field names for compatibility
+	if ip, ok := eventData["clientIp"].(string); ok && ip != "" {
 		auditLog.IPAddress = ip
+	} else if ip, ok := eventData["ipAddress"].(string); ok && ip != "" {
+		auditLog.IPAddress = ip
+	}
+
+	// Extract User-Agent if present
+	if ua, ok := eventData["userAgent"].(string); ok && ua != "" {
+		auditLog.UserAgent = ua
 	}
 
 	// Set description
