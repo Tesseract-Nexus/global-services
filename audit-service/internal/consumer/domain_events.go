@@ -259,8 +259,15 @@ func (c *DomainEventConsumer) convertToAuditLog(subject string, event *BaseEvent
 		RequestID:   event.CorrelationID,
 	}
 
-	// Extract user info if present
-	if userID, ok := eventData["userId"].(string); ok {
+	// Extract user info if present - check multiple field names for compatibility
+	// First try actorId (used by products-service, categories-service)
+	if actorID, ok := eventData["actorId"].(string); ok && actorID != "" {
+		if uid, err := uuid.Parse(actorID); err == nil {
+			auditLog.UserID = uid
+		}
+	}
+	// Then try userId
+	if userID, ok := eventData["userId"].(string); ok && auditLog.UserID == uuid.Nil {
 		if uid, err := uuid.Parse(userID); err == nil {
 			auditLog.UserID = uid
 		}
@@ -276,14 +283,22 @@ func (c *DomainEventConsumer) convertToAuditLog(subject string, event *BaseEvent
 		}
 	}
 
-	// Extract username/email
-	if email, ok := eventData["customerEmail"].(string); ok {
+	// Extract username/email - check multiple field names for compatibility
+	// First try actorEmail (used by products-service)
+	if email, ok := eventData["actorEmail"].(string); ok && email != "" {
+		auditLog.UserEmail = email
+	}
+	if email, ok := eventData["customerEmail"].(string); ok && auditLog.UserEmail == "" {
 		auditLog.UserEmail = email
 	}
 	if email, ok := eventData["email"].(string); ok && auditLog.UserEmail == "" {
 		auditLog.UserEmail = email
 	}
-	if name, ok := eventData["customerName"].(string); ok {
+	// First try actorName (used by products-service, categories-service)
+	if name, ok := eventData["actorName"].(string); ok && name != "" {
+		auditLog.Username = name
+	}
+	if name, ok := eventData["customerName"].(string); ok && auditLog.Username == "" {
 		auditLog.Username = name
 	}
 	if name, ok := eventData["staffName"].(string); ok && auditLog.Username == "" {
