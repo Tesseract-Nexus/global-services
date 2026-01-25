@@ -30,6 +30,12 @@ func (h *VerificationHandler) SendCode(c *gin.Context) {
 
 	response, err := h.verificationService.SendVerificationCode(c.Request.Context(), &req)
 	if err != nil {
+		// Check for rate limit errors
+		errMsg := err.Error()
+		if errMsg == "rate limit exceeded: too many verification codes sent" {
+			ErrorResponse(c, http.StatusTooManyRequests, errMsg, nil)
+			return
+		}
 		ErrorResponse(c, http.StatusInternalServerError, "Failed to send verification code", err)
 		return
 	}
@@ -73,6 +79,12 @@ func (h *VerificationHandler) ResendCode(c *gin.Context) {
 
 	response, err := h.verificationService.ResendCode(c.Request.Context(), &req)
 	if err != nil {
+		// Check for business logic errors that should return 429 instead of 500
+		errMsg := err.Error()
+		if errMsg == "cannot resend code yet: code is still valid" || errMsg == "rate limit exceeded: too many verification codes sent" {
+			ErrorResponse(c, http.StatusTooManyRequests, errMsg, nil)
+			return
+		}
 		ErrorResponse(c, http.StatusInternalServerError, "Failed to resend verification code", err)
 		return
 	}
