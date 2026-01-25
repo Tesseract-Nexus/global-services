@@ -10,6 +10,7 @@ import { logger, createLogger } from './logger';
 import { authRoutes } from './routes/auth';
 import { directAuthRoutes } from './routes/direct-auth';
 import { apiProxyRoutes } from './routes/api-proxy';
+import { otpRoutes } from './routes/otp';
 import { sessionStore } from './session-store';
 import { oidcClient } from './oidc-client';
 
@@ -123,6 +124,7 @@ async function buildApp() {
   // Register routes
   await fastify.register(authRoutes);
   await fastify.register(directAuthRoutes); // Multi-tenant direct login
+  await fastify.register(otpRoutes); // OTP verification for customer email
   await fastify.register(apiProxyRoutes);
 
   // Error handler

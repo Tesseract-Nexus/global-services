@@ -51,12 +51,25 @@ func getEnvOrDefault(key, defaultValue string) string {
 
 // FormatVerificationEmail formats the verification email content
 func FormatVerificationEmail(code, purpose string) (string, string) {
+	return FormatVerificationEmailWithBranding(code, purpose, "", 10)
+}
+
+// FormatVerificationEmailWithBranding formats verification email with store branding
+func FormatVerificationEmailWithBranding(code, purpose, businessName string, expiryMinutes int) (string, string) {
 	var subject, htmlBody string
 
 	switch purpose {
+	case "customer_email_verification":
+		// Customer OTP - uses store branding
+		if s, h, err := templates.RenderCustomerOTPDefault("", code, businessName, expiryMinutes); err == nil {
+			return s, h
+		}
+		// Fallback to standard email verification
+		fallthrough
+
 	case "email_verification":
 		// Try new template first
-		if s, h, err := templates.RenderEmailVerificationDefault("", code, "", 10); err == nil {
+		if s, h, err := templates.RenderEmailVerificationDefault("", code, businessName, expiryMinutes); err == nil {
 			return s, h
 		}
 		// Fallback to legacy template

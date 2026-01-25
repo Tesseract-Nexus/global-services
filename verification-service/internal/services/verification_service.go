@@ -3,10 +3,12 @@ package services
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/google/uuid"
 	"verification-service/internal/config"
+	"verification-service/internal/events"
 	"verification-service/internal/models"
 	"verification-service/internal/providers"
 	"verification-service/internal/repository"
@@ -242,6 +244,29 @@ func (s *VerificationService) VerifyCode(ctx context.Context, req *models.Verify
 		VerificationCodeID: verificationCode.ID,
 		Success:            true,
 	})
+
+	// Publish verification success event via NATS
+	// This allows other services (like customers-service) to react to email verification
+	if publisher := events.GetPublisher(); publisher != nil {
+		tenantIDStr := ""
+		if verificationCode.TenantID != nil {
+			tenantIDStr = verificationCode.TenantID.String()
+		}
+		if err := publisher.PublishVerified(
+			ctx,
+			tenantIDStr,
+			verificationCode.ID.String(),
+			verificationCode.Purpose,
+			"", // userID not available at this level
+			verificationCode.Recipient,
+			"", // phone
+		); err != nil {
+			// Log but don't fail - verification itself was successful
+			log.Printf("[VerificationService] Warning: Failed to publish verification event: %v", err)
+		} else {
+			log.Printf("[VerificationService] Published verification.verified event for %s (purpose: %s)", verificationCode.Recipient, verificationCode.Purpose)
+		}
+	}
 
 	now := time.Now()
 	return &models.VerifyCodeResponse{

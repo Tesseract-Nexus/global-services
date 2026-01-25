@@ -1104,21 +1104,9 @@ func (s *TenantAuthService) RegisterCustomer(ctx context.Context, req *RegisterC
 		}()
 	}
 
-	// Send welcome email
-	if s.notificationClient != nil {
-		go func() {
-			sendCtx := context.Background()
-			storeName := tenant.Name
-			if storeName == "" {
-				storeName = tenant.Slug
-			}
-			if err := s.notificationClient.SendCustomerWelcomeEmail(sendCtx, req.Email, req.FirstName, storeName); err != nil {
-				log.Printf("[TenantAuthService] Warning: Failed to send welcome email: %v", err)
-			} else {
-				log.Printf("[TenantAuthService] Welcome email sent to %s", security.MaskEmail(req.Email))
-			}
-		}()
-	}
+	// NOTE: Welcome email is now sent ONLY after email verification (OTP verified)
+	// This ensures customers receive the welcome email only once their email is confirmed
+	// The welcome email is triggered by the verification-service upon successful OTP verification
 
 	response := &RegisterCustomerResponse{
 		Success:        true,

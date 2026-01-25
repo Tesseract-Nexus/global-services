@@ -55,6 +55,7 @@ func NewRenderer() (*Renderer, error) {
 		"verification_link",
 		"password_reset",
 		"welcome_pack",
+		"customer_otp",
 	}
 
 	for _, name := range templateNames {
@@ -193,6 +194,30 @@ func (r *Renderer) RenderWelcomePack(email, firstName, businessName, adminURL, s
 	return subject, body, nil
 }
 
+// RenderCustomerOTP renders the customer OTP verification template
+func (r *Renderer) RenderCustomerOTP(email, code, businessName string, expiryMinutes int) (string, string, error) {
+	subject := "Verify your email address"
+	if businessName != "" {
+		subject = fmt.Sprintf("Verify your email - %s", businessName)
+	}
+
+	data := &EmailData{
+		Subject:       subject,
+		Preheader:     fmt.Sprintf("Your verification code is %s - expires in %d minutes", code, expiryMinutes),
+		Email:         email,
+		Code:          code,
+		BusinessName:  businessName,
+		ExpiryMinutes: expiryMinutes,
+	}
+
+	body, err := r.Render("customer_otp", data)
+	if err != nil {
+		return "", "", err
+	}
+
+	return subject, body, nil
+}
+
 // DefaultRenderer is a package-level renderer instance
 var defaultRenderer *Renderer
 
@@ -246,4 +271,14 @@ func RenderWelcomePackDefault(email, firstName, businessName, adminURL, storefro
 		}
 	}
 	return defaultRenderer.RenderWelcomePack(email, firstName, businessName, adminURL, storefrontURL)
+}
+
+// RenderCustomerOTPDefault renders customer OTP using the default renderer
+func RenderCustomerOTPDefault(email, code, businessName string, expiryMinutes int) (string, string, error) {
+	if defaultRenderer == nil {
+		if err := Init(); err != nil {
+			return "", "", err
+		}
+	}
+	return defaultRenderer.RenderCustomerOTP(email, code, businessName, expiryMinutes)
 }

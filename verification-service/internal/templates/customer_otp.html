@@ -1,0 +1,157 @@
+{{define "header"}}
+<!-- Store Logo/Name -->
+<tr>
+    <td style="text-align: center; padding-bottom: 24px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+            <tr>
+                <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
+                    <span style="color: #ffffff; font-size: 24px; font-weight: 700;">{{if .BusinessName}}{{slice .BusinessName 0 1}}{{else}}S{{end}}</span>
+                </td>
+            </tr>
+        </table>
+        <p style="margin: 12px 0 0 0; font-size: 18px; font-weight: 600; color: #18181b; letter-spacing: -0.3px;">{{if .BusinessName}}{{.BusinessName}}{{else}}Your Store{{end}}</p>
+    </td>
+</tr>
+{{end}}
+
+{{define "content"}}
+<!-- Main Card -->
+<tr>
+    <td>
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1);">
+            <!-- Icon Header -->
+            <tr>
+                <td style="padding: 40px 40px 0 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="width: 72px; height: 72px; background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); border-radius: 50%; text-align: center; vertical-align: middle;">
+                                <span style="font-size: 32px;">&#128274;</span>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- Title -->
+            <tr>
+                <td style="padding: 24px 40px 0 40px; text-align: center;" class="mobile-padding">
+                    <h1 style="margin: 0; font-size: 24px; font-weight: 700; color: #18181b; line-height: 1.3;">
+                        Verify your email address
+                    </h1>
+                </td>
+            </tr>
+
+            <!-- Description -->
+            <tr>
+                <td style="padding: 16px 40px 0 40px; text-align: center;" class="mobile-padding">
+                    <p style="margin: 0; font-size: 16px; color: #52525b; line-height: 1.6;">
+                        Thanks for creating an account{{if .BusinessName}} at <strong style="color: #18181b;">{{.BusinessName}}</strong>{{end}}! Enter the code below to verify your email:
+                    </p>
+                </td>
+            </tr>
+
+            <!-- Verification Code - Large and prominent -->
+            <tr>
+                <td style="padding: 32px 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-radius: 16px; border: 2px solid #86efac;">
+                        <tr>
+                            <td style="padding: 32px; text-align: center;">
+                                <p style="margin: 0 0 8px 0; font-size: 12px; color: #16a34a; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Your verification code</p>
+                                <span style="font-family: 'SF Mono', 'Roboto Mono', 'Courier New', monospace; font-size: 42px; font-weight: 700; color: #059669; letter-spacing: 16px;">{{.Code}}</span>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- Expiry Notice -->
+            <tr>
+                <td style="padding: 0 40px 24px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="background-color: #fef3c7; padding: 10px 20px; border-radius: 24px;">
+                                <span style="font-size: 13px; color: #92400e; font-weight: 600;">
+                                    &#9201; Code expires in {{.ExpiryMinutes}} minutes
+                                </span>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- Divider -->
+            <tr>
+                <td style="padding: 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                        <tr>
+                            <td style="height: 1px; background-color: #e2e8f0;"></td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- Tips Section -->
+            <tr>
+                <td style="padding: 24px 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                        <tr>
+                            <td>
+                                <p style="margin: 0 0 12px 0; font-size: 14px; font-weight: 600; color: #18181b;">
+                                    &#128161; Tips:
+                                </p>
+                                <ul style="margin: 0; padding-left: 20px; font-size: 13px; color: #52525b; line-height: 1.8;">
+                                    <li>Enter the 6-digit code exactly as shown above</li>
+                                    <li>The code is case-sensitive</li>
+                                    <li>If the code expires, you can request a new one</li>
+                                </ul>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- Security Notice -->
+            <tr>
+                <td style="padding: 0 40px 40px 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f8fafc; border-radius: 8px; padding: 16px;">
+                        <tr>
+                            <td style="padding: 16px;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 24px; vertical-align: top; padding-right: 12px;">
+                                            <span style="font-size: 16px;">&#128737;</span>
+                                        </td>
+                                        <td style="vertical-align: top;">
+                                            <p style="margin: 0; font-size: 13px; color: #71717a; line-height: 1.5;">
+                                                <strong style="color: #52525b;">Didn't create an account?</strong><br>
+                                                If you didn't sign up for an account, please ignore this email. Your email address won't be used.
+                                            </p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </td>
+</tr>
+{{end}}
+
+{{define "footer"}}
+<!-- Footer -->
+<tr>
+    <td style="padding: 32px 20px; text-align: center;">
+        <p style="margin: 0 0 8px 0; font-size: 13px; color: #a1a1aa;">
+            This email was sent to <span style="color: #71717a;">{{.Email}}</span>
+        </p>
+        <p style="margin: 0 0 8px 0; font-size: 12px; color: #d4d4d8;">
+            You're receiving this because you created an account{{if .BusinessName}} at {{.BusinessName}}{{end}}.
+        </p>
+        <p style="margin: 0; font-size: 12px; color: #d4d4d8;">
+            &copy; {{.Year}} {{if .BusinessName}}{{.BusinessName}}{{else}}Your Store{{end}}. All rights reserved.
+        </p>
+    </td>
+</tr>
+{{end}}
