@@ -108,7 +108,7 @@ async function callVerificationService(
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
 
-    const data = await response.json().catch(() => null);
+    const data = await response.json().catch(() => null) as { message?: string } | null;
 
     return {
       success: response.ok,
