@@ -305,6 +305,32 @@ func (c *DomainEventConsumer) convertToAuditLog(subject string, event *BaseEvent
 		auditLog.Username = name
 	}
 
+	// Extract approval-specific user info (approver for granted/rejected, requester for requested)
+	// For approval.granted and approval.rejected, the actor is the approver
+	if approverID, ok := eventData["approverId"].(string); ok && auditLog.UserID == uuid.Nil {
+		if uid, err := uuid.Parse(approverID); err == nil {
+			auditLog.UserID = uid
+		}
+	}
+	if approverEmail, ok := eventData["approverEmail"].(string); ok && auditLog.UserEmail == "" {
+		auditLog.UserEmail = approverEmail
+	}
+	if approverName, ok := eventData["approverName"].(string); ok && auditLog.Username == "" {
+		auditLog.Username = approverName
+	}
+	// Fallback to requester info if no approver (e.g., approval.requested event)
+	if requesterID, ok := eventData["requesterId"].(string); ok && auditLog.UserID == uuid.Nil {
+		if uid, err := uuid.Parse(requesterID); err == nil {
+			auditLog.UserID = uid
+		}
+	}
+	if requesterEmail, ok := eventData["requesterEmail"].(string); ok && auditLog.UserEmail == "" {
+		auditLog.UserEmail = requesterEmail
+	}
+	if requesterName, ok := eventData["requesterName"].(string); ok && auditLog.Username == "" {
+		auditLog.Username = requesterName
+	}
+
 	// Extract resource info
 	auditLog.ResourceID, auditLog.ResourceName = c.extractResourceInfo(event.EventType, eventData)
 
@@ -686,6 +712,51 @@ func (c *DomainEventConsumer) generateDescription(eventType string, data map[str
 			return fmt.Sprintf("Shipping rate '%s' was updated", name)
 		}
 		return "Shipping rate was updated"
+	// Approval events
+	case "approval.requested":
+		actionType, _ := data["actionType"].(string)
+		resourceType, _ := data["resourceType"].(string)
+		requesterName, _ := data["requesterName"].(string)
+		if requesterName != "" && resourceType != "" {
+			return fmt.Sprintf("%s requested approval for %s %s", requesterName, resourceType, actionType)
+		}
+		if resourceType != "" {
+			return fmt.Sprintf("Approval requested for %s %s", resourceType, actionType)
+		}
+		return "Approval request submitted"
+	case "approval.granted":
+		actionType, _ := data["actionType"].(string)
+		resourceType, _ := data["resourceType"].(string)
+		approverName, _ := data["approverName"].(string)
+		if approverName != "" && resourceType != "" {
+			return fmt.Sprintf("%s approved %s %s", approverName, resourceType, actionType)
+		}
+		if resourceType != "" {
+			return fmt.Sprintf("%s %s was approved", resourceType, actionType)
+		}
+		return "Approval granted"
+	case "approval.rejected":
+		actionType, _ := data["actionType"].(string)
+		resourceType, _ := data["resourceType"].(string)
+		approverName, _ := data["approverName"].(string)
+		decisionNotes, _ := data["decisionNotes"].(string)
+		if approverName != "" && resourceType != "" {
+			if decisionNotes != "" {
+				return fmt.Sprintf("%s rejected %s %s: %s", approverName, resourceType, actionType, decisionNotes)
+			}
+			return fmt.Sprintf("%s rejected %s %s", approverName, resourceType, actionType)
+		}
+		return "Approval rejected"
+	case "approval.cancelled":
+		resourceType, _ := data["resourceType"].(string)
+		requesterName, _ := data["requesterName"].(string)
+		if requesterName != "" {
+			return fmt.Sprintf("%s cancelled their %s approval request", requesterName, resourceType)
+		}
+		return "Approval request cancelled"
+	case "approval.escalated":
+		resourceType, _ := data["resourceType"].(string)
+		return fmt.Sprintf("%s approval escalated to higher authority", resourceType)
 	default:
 		// Generate generic description from event type
 		return fmt.Sprintf("Event: %s", eventType)
