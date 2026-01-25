@@ -18,7 +18,8 @@ async function bootstrap() {
 
   // Now import and start the application
   // Dynamic import ensures config.ts sees the updated process.env
-  const { startServer } = await import('./server');
+  // Note: Use .js extension for TypeScript's node16/nodenext module resolution
+  const { startServer } = await import('./server.js');
   await startServer();
 }
 
