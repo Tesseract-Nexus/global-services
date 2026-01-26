@@ -240,6 +240,10 @@ func (s *TenantAuthService) ValidateCredentials(ctx context.Context, req *Valida
 	}
 	if isLocked {
 		s.logFailedAuthEvent(ctx, tenant.ID, &user.ID, req.Email, req.IPAddress, req.UserAgent, "ACCOUNT_LOCKED")
+		errorMessage := "Account is permanently locked. Please contact support."
+		if lockedUntil != nil {
+			errorMessage = fmt.Sprintf("Account is locked until %s", lockedUntil.Format(time.RFC3339))
+		}
 		return &ValidateCredentialsResponse{
 			Valid:         false,
 			UserID:        &user.ID,
@@ -248,7 +252,7 @@ func (s *TenantAuthService) ValidateCredentials(ctx context.Context, req *Valida
 			AccountLocked: true,
 			LockedUntil:   lockedUntil,
 			ErrorCode:     "ACCOUNT_LOCKED",
-			ErrorMessage:  fmt.Sprintf("Account is locked until %s", lockedUntil.Format(time.RFC3339)),
+			ErrorMessage:  errorMessage,
 		}, nil
 	}
 
