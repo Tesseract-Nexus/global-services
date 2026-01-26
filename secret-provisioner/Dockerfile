@@ -44,8 +44,8 @@ WORKDIR /app
 # Copy the binary from builder
 COPY --from=builder /build/secret-provisioner .
 
-# Copy migrations if they exist
-COPY --from=builder /build/migrations ./migrations/ 2>/dev/null || true
+# Copy migrations
+COPY --from=builder /build/migrations ./migrations/
 
 # Change ownership to non-root user
 RUN chown -R appuser:appgroup /app
