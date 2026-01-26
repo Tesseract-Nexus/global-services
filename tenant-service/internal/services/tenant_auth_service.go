@@ -31,6 +31,12 @@ type TenantAuthService struct {
 	staffClient        StaffClientInterface          // For staff member credential validation
 	notificationClient *clients.NotificationClient   // For sending emails
 	verificationClient *clients.VerificationClient   // For email verification
+	natsClient         NATSClientInterface           // For publishing customer events
+}
+
+// NATSClientInterface defines the interface for NATS event publishing
+type NATSClientInterface interface {
+	PublishCustomerRegistered(ctx context.Context, event interface{}) error
 }
 
 // StaffClientInterface defines the interface for staff-service client
@@ -69,6 +75,11 @@ func (s *TenantAuthService) SetNotificationClient(client *clients.NotificationCl
 // SetVerificationClient sets the verification client for email verification
 func (s *TenantAuthService) SetVerificationClient(client *clients.VerificationClient) {
 	s.verificationClient = client
+}
+
+// SetNATSClient sets the NATS client for publishing customer events
+func (s *TenantAuthService) SetNATSClient(client NATSClientInterface) {
+	s.natsClient = client
 }
 
 // GetUserByKeycloakOrLocalID resolves a user by either Keycloak ID or local ID
@@ -1066,6 +1077,29 @@ func (s *TenantAuthService) RegisterCustomer(ctx context.Context, req *RegisterC
 		}
 	}
 
+	// Publish customer.registered event for customers-service to create customer record
+	if s.natsClient != nil && user.ID != uuid.Nil {
+		go func() {
+			publishCtx := context.Background()
+			event := map[string]interface{}{
+				"eventType":     "customer.registered",
+				"tenantId":      tenant.ID.String(),
+				"customerId":    user.ID.String(),
+				"customerEmail": req.Email,
+				"customerName":  req.FirstName + " " + req.LastName,
+				"customerPhone": req.Phone,
+				"firstName":     req.FirstName,
+				"lastName":      req.LastName,
+				"tenantSlug":    tenant.Slug,
+			}
+			if err := s.natsClient.PublishCustomerRegistered(publishCtx, event); err != nil {
+				log.Printf("[TenantAuthService] Warning: Failed to publish customer.registered event: %v", err)
+			} else {
+				log.Printf("[TenantAuthService] Published customer.registered event for %s", security.MaskEmail(req.Email))
+			}
+		}()
+	}
+
 	// Log registration event
 	auditLog := &models.TenantAuthAuditLog{
 		TenantID:    tenant.ID,
@@ -1263,4 +1297,76 @@ func (s *TenantAuthService) GetSecurityPolicy(ctx context.Context, tenantID uuid
 		LockoutResetHours:           policy.LockoutResetHours,
 		MFARequired:                 policy.MFARequired,
 	}, nil
+}
+
+// SyncExistingCustomersToEvents queries all existing customer users and publishes
+// customer.registered events for them. This is used for one-time sync when deploying
+// the customer registration event flow to production.
+func (s *TenantAuthService) SyncExistingCustomersToEvents(ctx context.Context, tenantID *uuid.UUID) (int, error) {
+	if s.natsClient == nil {
+		return 0, fmt.Errorf("NATS client not configured")
+	}
+
+	// Query all customer users (those with 'customer' role in memberships)
+	query := s.db.Model(&models.User{}).
+		Joins("JOIN user_tenant_memberships ON user_tenant_memberships.user_id = tenant_users.id").
+		Where("user_tenant_memberships.role = ?", "customer")
+
+	// Optionally filter by tenant
+	if tenantID != nil {
+		query = query.Where("user_tenant_memberships.tenant_id = ?", *tenantID)
+	}
+
+	var users []struct {
+		ID        uuid.UUID `gorm:"column:id"`
+		Email     string    `gorm:"column:email"`
+		FirstName string    `gorm:"column:first_name"`
+		LastName  string    `gorm:"column:last_name"`
+		Phone     string    `gorm:"column:phone"`
+		TenantID  uuid.UUID `gorm:"column:tenant_id"`
+		CreatedAt time.Time `gorm:"column:created_at"`
+	}
+
+	// Select user info with tenant ID from membership
+	if err := query.Select("tenant_users.id, tenant_users.email, tenant_users.first_name, tenant_users.last_name, tenant_users.phone, user_tenant_memberships.tenant_id, tenant_users.created_at").
+		Find(&users).Error; err != nil {
+		return 0, fmt.Errorf("failed to query customer users: %w", err)
+	}
+
+	log.Printf("[TenantAuthService] Found %d customer users to sync", len(users))
+
+	syncCount := 0
+	for _, user := range users {
+		// Get tenant info for slug
+		var tenant models.Tenant
+		if err := s.db.Where("id = ?", user.TenantID).First(&tenant).Error; err != nil {
+			log.Printf("[TenantAuthService] Warning: Failed to get tenant for user %s: %v", user.Email, err)
+			continue
+		}
+
+		// Publish customer.registered event
+		event := map[string]interface{}{
+			"eventType":     "customer.registered",
+			"tenantId":      user.TenantID.String(),
+			"customerId":    user.ID.String(),
+			"customerEmail": user.Email,
+			"customerName":  user.FirstName + " " + user.LastName,
+			"customerPhone": user.Phone,
+			"firstName":     user.FirstName,
+			"lastName":      user.LastName,
+			"tenantSlug":    tenant.Slug,
+			"timestamp":     user.CreatedAt.UTC().Format(time.RFC3339),
+		}
+
+		if err := s.natsClient.PublishCustomerRegistered(ctx, event); err != nil {
+			log.Printf("[TenantAuthService] Warning: Failed to publish event for user %s: %v", user.Email, err)
+			continue
+		}
+
+		syncCount++
+		log.Printf("[TenantAuthService] Published customer.registered event for %s", security.MaskEmail(user.Email))
+	}
+
+	log.Printf("[TenantAuthService] Synced %d/%d customer users to events", syncCount, len(users))
+	return syncCount, nil
 }

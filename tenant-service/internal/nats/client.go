@@ -20,6 +20,7 @@ const (
 	EventSessionCompleted            = "tenant.session_completed"
 	EventTenantVerificationRequested = "tenant.verification.requested"
 	EventTenantOnboardingCompleted   = "tenant.onboarding.completed"
+	EventCustomerRegistered          = "customer.registered"
 )
 
 // TenantCreatedEvent is published when a new tenant is created
@@ -81,6 +82,21 @@ type TenantVerificationRequestedEvent struct {
 	VerificationLink   string    `json:"verification_link"`
 	VerificationExpiry string    `json:"verification_expiry"` // RFC3339 format
 	Timestamp          time.Time `json:"timestamp"`
+}
+
+// CustomerRegisteredEvent is published when a new customer registers on a storefront
+// This triggers customers-service to create a customer record
+type CustomerRegisteredEvent struct {
+	EventType     string    `json:"eventType"`
+	TenantID      string    `json:"tenantId"`
+	Timestamp     time.Time `json:"timestamp"`
+	CustomerID    string    `json:"customerId"`
+	CustomerEmail string    `json:"customerEmail"`
+	CustomerName  string    `json:"customerName"`
+	CustomerPhone string    `json:"customerPhone,omitempty"`
+	FirstName     string    `json:"firstName"`
+	LastName      string    `json:"lastName"`
+	TenantSlug    string    `json:"tenantSlug,omitempty"`
 }
 
 // Client wraps the NATS connection
@@ -301,6 +317,46 @@ func (c *Client) PublishTenantVerificationRequested(ctx context.Context, event *
 	}
 
 	log.Printf("[NATS] Published %s event for session %s (seq: %d)", EventTenantVerificationRequested, event.SessionID, ack.Sequence)
+	return nil
+}
+
+// PublishCustomerRegistered publishes a customer registered event
+// This notifies customers-service to create a customer record
+// Accepts interface{} to allow flexible event data from services
+func (c *Client) PublishCustomerRegistered(ctx context.Context, event interface{}) error {
+	if c == nil || c.js == nil {
+		log.Printf("[NATS] Client not initialized, skipping customer.registered publish")
+		return nil
+	}
+
+	// Marshal the event data directly
+	data, err := json.Marshal(event)
+	if err != nil {
+		return fmt.Errorf("failed to marshal event: %w", err)
+	}
+
+	// Ensure CUSTOMER_EVENTS stream exists
+	_, err = c.js.AddStream(&nats.StreamConfig{
+		Name:        "CUSTOMER_EVENTS",
+		Description: "Stream for customer lifecycle events",
+		Subjects:    []string{"customer.>"},
+		Storage:     nats.FileStorage,
+		Retention:   nats.LimitsPolicy,
+		MaxAge:      24 * time.Hour * 7, // 7 days
+		MaxMsgs:     100000,
+		Discard:     nats.DiscardOld,
+	})
+	if err != nil && err != nats.ErrStreamNameAlreadyInUse {
+		log.Printf("[NATS] Warning: Could not create CUSTOMER_EVENTS stream: %v", err)
+	}
+
+	// Publish with JetStream for guaranteed delivery
+	ack, err := c.js.Publish(EventCustomerRegistered, data)
+	if err != nil {
+		return fmt.Errorf("failed to publish event: %w", err)
+	}
+
+	log.Printf("[NATS] Published %s event (seq: %d)", EventCustomerRegistered, ack.Sequence)
 	return nil
 }
 

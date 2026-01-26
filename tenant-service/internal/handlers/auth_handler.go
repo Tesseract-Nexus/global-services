@@ -1010,3 +1010,40 @@ func (h *AuthHandler) GetSecurityPolicy(c *gin.Context) {
 
 	SuccessResponse(c, http.StatusOK, "Security policy retrieved", policy)
 }
+
+// SyncCustomersToEventsRequest represents a request to sync existing customers to events
+type SyncCustomersToEventsRequest struct {
+	TenantID string `json:"tenant_id"` // Optional - if empty, syncs all customers
+}
+
+// SyncCustomersToEvents triggers sync of existing customer users to customer.registered events
+// POST /internal/sync-customers
+// This is an internal endpoint used for one-time migration when deploying to production
+func (h *AuthHandler) SyncCustomersToEvents(c *gin.Context) {
+	var req SyncCustomersToEventsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		// Allow empty body - will sync all customers
+		req = SyncCustomersToEventsRequest{}
+	}
+
+	var tenantID *uuid.UUID
+	if req.TenantID != "" {
+		parsed, err := uuid.Parse(req.TenantID)
+		if err != nil {
+			ErrorResponse(c, http.StatusBadRequest, "Invalid tenant ID format", err)
+			return
+		}
+		tenantID = &parsed
+	}
+
+	count, err := h.authSvc.SyncExistingCustomersToEvents(c.Request.Context(), tenantID)
+	if err != nil {
+		log.Printf("[AuthHandler] Failed to sync customers to events: %v", err)
+		ErrorResponse(c, http.StatusInternalServerError, "Failed to sync customers", err)
+		return
+	}
+
+	SuccessResponse(c, http.StatusOK, "Customers synced to events", map[string]interface{}{
+		"synced_count": count,
+	})
+}

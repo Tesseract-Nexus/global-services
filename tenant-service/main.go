@@ -224,6 +224,12 @@ func main() {
 	tenantAuthSvc.SetVerificationClient(verificationClient)
 	log.Println("Verification client wired to TenantAuthService for customer email verification")
 
+	// Wire NATS client to auth service for publishing customer.registered events
+	if nc != nil {
+		tenantAuthSvc.SetNATSClient(nc)
+		log.Println("NATS client wired to TenantAuthService for customer registration events")
+	}
+
 	// Initialize customer deactivation service for self-service account deactivation
 	var customerDeactivationSvc *services.CustomerDeactivationService
 	if keycloakClient != nil {
@@ -586,6 +592,8 @@ func setupRouter(
 		{
 			internal.GET("/tenants/:id", tenantHandler.GetTenantInfo)
 			internal.GET("/tenants/by-slug/:slug", tenantHandler.GetTenantBySlug)
+			// Sync existing customers to customer.registered events (one-time migration)
+			internal.POST("/sync-customers", authHandler.SyncCustomersToEvents)
 		}
 
 		// Draft persistence endpoints (optional - only if draftHandler is available)
