@@ -165,9 +165,11 @@ func (r *CredentialRepository) UpdatePassword(ctx context.Context, userID, tenan
 }
 
 // RecordLoginAttempt records a login attempt and handles progressive lockout logic
-// Strict 2-tier progressive lockout:
-// - Tier 1 (5 attempts): 30 minutes lockout
-// - Tier 2 (7 attempts): Permanent lockout (requires admin unlock or password reset)
+// Time-based progressive lockout (NO permanent locks):
+// - Tier 1 (5 attempts): 10 minutes lockout
+// - Tier 2 (10 attempts): 1 hour lockout
+// - Tier 3 (15 attempts): 6 hours lockout
+// - Tier 4 (20+ attempts): 24 hours lockout (auto-unlocks after)
 func (r *CredentialRepository) RecordLoginAttempt(ctx context.Context, userID, tenantID uuid.UUID, success bool, ipAddress, userAgent string) error {
 	credential, err := r.GetCredential(ctx, userID, tenantID)
 	if err != nil {
@@ -177,9 +179,9 @@ func (r *CredentialRepository) RecordLoginAttempt(ctx context.Context, userID, t
 		return nil // No credential to update
 	}
 
-	// Don't process if permanently locked
-	if credential.PermanentlyLocked {
-		return nil
+	// Check if time-locked (skip permanent lock check - we don't use permanent locks anymore)
+	if credential.LockedUntil != nil && credential.LockedUntil.After(time.Now()) {
+		return nil // Still locked, don't update
 	}
 
 	// Get tenant's auth policy
@@ -188,21 +190,23 @@ func (r *CredentialRepository) RecordLoginAttempt(ctx context.Context, userID, t
 		return err
 	}
 
-	// Default policy values - strict 2-tier system
+	// Default policy values - time-based progressive system (NO permanent locks)
 	maxAttempts := 5         // First lockout at 5 attempts
 	enableProgressive := true
-	tier1Minutes := 30       // 30 minute temporary lockout
-	permanentThreshold := 7  // Permanent lockout at 7 attempts (5 + 2 more after unlock)
-	lockoutResetHours := 24
+	tier1Minutes := 10       // 10 minute lockout (Tier 1)
+	tier2Minutes := 60       // 1 hour lockout (Tier 2)
+	tier3Minutes := 360      // 6 hour lockout (Tier 3)
+	tier4Minutes := 1440     // 24 hour lockout (Tier 4 - max, NOT permanent)
+	tier2Threshold := 10     // Tier 2 at 10 attempts
+	tier3Threshold := 15     // Tier 3 at 15 attempts
+	tier4Threshold := 20     // Tier 4 at 20+ attempts
+	lockoutResetHours := 48  // Reset counters after 48 hours of no failures
 
 	if policy != nil {
 		maxAttempts = policy.MaxLoginAttempts
 		enableProgressive = policy.EnableProgressiveLockout
 		if policy.Tier1LockoutMinutes > 0 {
 			tier1Minutes = policy.Tier1LockoutMinutes
-		}
-		if policy.PermanentLockoutThreshold > 0 {
-			permanentThreshold = policy.PermanentLockoutThreshold
 		}
 		if policy.LockoutResetHours > 0 {
 			lockoutResetHours = policy.LockoutResetHours
@@ -244,22 +248,43 @@ func (r *CredentialRepository) RecordLoginAttempt(ctx context.Context, userID, t
 		updates["total_failed_attempts"] = totalFailed
 		updates["last_login_attempt_at"] = now
 
-		// Check for permanent lockout first (total attempts >= threshold)
-		if enableProgressive && totalFailed >= permanentThreshold {
-			// Permanent lockout - customer must create support ticket or reset password
-			updates["lockout_count"] = credential.LockoutCount + 1
-			updates["current_tier"] = 2
-			updates["permanently_locked"] = true
-			updates["permanent_locked_at"] = now
-			updates["locked_until"] = nil // Not time-based
-		} else if newAttempts >= maxAttempts {
-			// Tier 1: Temporary lockout
+		// Time-based progressive lockout (NO permanent locks - all lockouts auto-unlock)
+		if newAttempts >= maxAttempts {
 			lockoutCount := credential.LockoutCount + 1
 			updates["lockout_count"] = lockoutCount
-			updates["current_tier"] = 1
 
-			lockedUntil := now.Add(time.Duration(tier1Minutes) * time.Minute)
+			// Determine lockout duration based on total failed attempts across sessions
+			var lockoutMinutes int
+			var tier int
+
+			if enableProgressive {
+				if totalFailed >= tier4Threshold {
+					// Tier 4: Maximum lockout (24 hours) - still auto-unlocks
+					lockoutMinutes = tier4Minutes
+					tier = 4
+				} else if totalFailed >= tier3Threshold {
+					// Tier 3: 6 hour lockout
+					lockoutMinutes = tier3Minutes
+					tier = 3
+				} else if totalFailed >= tier2Threshold {
+					// Tier 2: 1 hour lockout
+					lockoutMinutes = tier2Minutes
+					tier = 2
+				} else {
+					// Tier 1: 10 minute lockout
+					lockoutMinutes = tier1Minutes
+					tier = 1
+				}
+			} else {
+				// Progressive disabled - use tier 1 lockout
+				lockoutMinutes = tier1Minutes
+				tier = 1
+			}
+
+			updates["current_tier"] = tier
+			lockedUntil := now.Add(time.Duration(lockoutMinutes) * time.Minute)
 			updates["locked_until"] = lockedUntil
+			// Never set permanently_locked = true - all lockouts are time-based
 		}
 	}
 
