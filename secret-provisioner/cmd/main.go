@@ -98,16 +98,38 @@ func main() {
 		log,
 	)
 
-	// Run naming migration on startup to fix any inconsistent secret names
-	log.Info("running startup naming migration check")
-	if result, err := migrationService.RunMigration(ctx, false); err != nil {
-		log.WithError(err).Warn("naming migration check failed, continuing startup")
+	// Run naming migration on startup if enabled
+	if cfg.Migration.EnableStartupMigration {
+		log.Info("running startup naming migration check")
+		if cfg.Migration.DryRunOnly {
+			// Dry-run mode: only check what would be migrated
+			if result, err := migrationService.CheckMigration(ctx); err != nil {
+				log.WithError(err).Warn("naming migration check failed, continuing startup")
+			} else {
+				log.WithFields(logrus.Fields{
+					"scanned":            result.SecretsScanned,
+					"pending_migrations": len(result.PendingMigrations),
+					"skipped":            result.SecretsSkipped,
+					"dry_run":            true,
+				}).Info("naming migration check completed (dry-run)")
+				if len(result.PendingMigrations) > 0 {
+					log.WithField("pending", result.PendingMigrations).Info("secrets that would be migrated")
+				}
+			}
+		} else {
+			// Actually run the migration (without deleting old secrets for safety)
+			if result, err := migrationService.RunMigration(ctx, false); err != nil {
+				log.WithError(err).Warn("naming migration failed, continuing startup")
+			} else {
+				log.WithFields(logrus.Fields{
+					"scanned":  result.SecretsScanned,
+					"migrated": result.SecretsMigrated,
+					"skipped":  result.SecretsSkipped,
+				}).Info("naming migration completed")
+			}
+		}
 	} else {
-		log.WithFields(logrus.Fields{
-			"scanned":  result.SecretsScanned,
-			"migrated": result.SecretsMigrated,
-			"skipped":  result.SecretsSkipped,
-		}).Info("naming migration check completed")
+		log.Info("startup naming migration disabled")
 	}
 
 	// Initialize handlers

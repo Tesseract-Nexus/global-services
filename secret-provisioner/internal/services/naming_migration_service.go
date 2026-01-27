@@ -32,6 +32,8 @@ type MigrationResult struct {
 	Errors           []string `json:"errors,omitempty"`
 	MigratedSecrets  []string `json:"migrated_secrets,omitempty"`
 	DeletedOldNames  []string `json:"deleted_old_names,omitempty"`
+	DryRun           bool     `json:"dry_run,omitempty"`
+	PendingMigrations []string `json:"pending_migrations,omitempty"`
 }
 
 // NewNamingMigrationService creates a new naming migration service
@@ -65,6 +67,58 @@ var knownKeyPatterns = map[string]string{
 // secretNamePattern matches our secret naming convention
 // Format: {env}-tenant-{tenant_id}[-vendor-{vendor_id}]-{provider}-{key_name}
 var secretNamePattern = regexp.MustCompile(`^(devtest|staging|prod)-tenant-([a-f0-9-]+)(?:-vendor-([a-f0-9-]+))?-(\w+)-(.+)$`)
+
+// CheckMigration performs a dry-run scan to see what secrets need migration without making any changes
+func (s *NamingMigrationService) CheckMigration(ctx context.Context) (*MigrationResult, error) {
+	result := &MigrationResult{DryRun: true}
+
+	s.logger.Info("starting secret naming migration dry-run check")
+
+	// List all secrets in the project with our environment prefix
+	env := s.cfg.Server.Environment
+	filter := fmt.Sprintf("name:%s-tenant-", env)
+
+	secrets, err := s.gcpClient.ListSecrets(ctx, filter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list secrets: %w", err)
+	}
+
+	result.SecretsScanned = len(secrets)
+	s.logger.WithField("count", len(secrets)).Info("found secrets to scan (dry-run)")
+
+	for _, secretName := range secrets {
+		// Check if this secret has underscore naming that needs migration
+		if needsMigration, newName := s.checkNeedsMigration(secretName); needsMigration {
+			// Check if new name already exists
+			exists, err := s.gcpClient.SecretExists(ctx, newName)
+			if err != nil {
+				errMsg := fmt.Sprintf("failed to check if %s exists: %v", newName, err)
+				result.Errors = append(result.Errors, errMsg)
+				continue
+			}
+
+			if exists {
+				s.logger.WithField("secret", newName).Debug("correctly named secret already exists")
+				result.SecretsSkipped++
+				continue
+			}
+
+			// Would need migration
+			result.PendingMigrations = append(result.PendingMigrations, fmt.Sprintf("%s -> %s", secretName, newName))
+		} else {
+			result.SecretsSkipped++
+		}
+	}
+
+	s.logger.WithFields(logrus.Fields{
+		"scanned":            result.SecretsScanned,
+		"pending_migrations": len(result.PendingMigrations),
+		"skipped":            result.SecretsSkipped,
+		"errors":             len(result.Errors),
+	}).Info("naming migration dry-run check completed")
+
+	return result, nil
+}
 
 // RunMigration scans GCP secrets and migrates any with underscore naming to hyphenated format
 func (s *NamingMigrationService) RunMigration(ctx context.Context, deleteOldSecrets bool) (*MigrationResult, error) {

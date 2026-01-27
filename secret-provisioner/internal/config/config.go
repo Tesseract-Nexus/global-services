@@ -9,12 +9,13 @@ import (
 
 // Config holds all configuration for the secret provisioner service
 type Config struct {
-	Server   ServerConfig
-	Database DatabaseConfig
-	GCP      GCPConfig
-	NATS     NATSConfig
-	Auth     AuthConfig
-	Cache    CacheConfig
+	Server    ServerConfig
+	Database  DatabaseConfig
+	GCP       GCPConfig
+	NATS      NATSConfig
+	Auth      AuthConfig
+	Cache     CacheConfig
+	Migration MigrationConfig
 }
 
 // ServerConfig holds HTTP server configuration
@@ -58,6 +59,12 @@ type CacheConfig struct {
 	SecretTTL time.Duration
 }
 
+// MigrationConfig holds secret naming migration configuration
+type MigrationConfig struct {
+	EnableStartupMigration bool // Whether to run migration check on startup
+	DryRunOnly             bool // If true, only log what would be migrated without making changes
+}
+
 // NewConfig creates a new Config from environment variables
 func NewConfig() *Config {
 	return &Config{
@@ -88,6 +95,10 @@ func NewConfig() *Config {
 		},
 		Cache: CacheConfig{
 			SecretTTL: getDurationEnv("SECRET_CACHE_TTL", 10*time.Minute),
+		},
+		Migration: MigrationConfig{
+			EnableStartupMigration: getBoolEnv("ENABLE_STARTUP_MIGRATION", true),
+			DryRunOnly:             getBoolEnv("MIGRATION_DRY_RUN_ONLY", false),
 		},
 	}
 }
@@ -129,6 +140,18 @@ func getDurationEnv(key string, fallback time.Duration) time.Duration {
 	if value, exists := os.LookupEnv(key); exists {
 		if duration, err := time.ParseDuration(value); err == nil {
 			return duration
+		}
+	}
+	return fallback
+}
+
+func getBoolEnv(key string, fallback bool) bool {
+	if value, exists := os.LookupEnv(key); exists {
+		switch strings.ToLower(value) {
+		case "true", "1", "yes", "on":
+			return true
+		case "false", "0", "no", "off":
+			return false
 		}
 	}
 	return fallback

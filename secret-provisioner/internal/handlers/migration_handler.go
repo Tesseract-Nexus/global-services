@@ -55,12 +55,12 @@ func (h *MigrationHandler) RunMigration(c *gin.Context) {
 }
 
 // CheckMigration handles GET /api/v1/admin/migration/naming/check
-// This endpoint performs a dry-run check to see what would be migrated
+// This endpoint performs a true dry-run check without making any changes
 func (h *MigrationHandler) CheckMigration(c *gin.Context) {
-	h.logger.Info("checking for secrets that need naming migration")
+	h.logger.Info("checking for secrets that need naming migration (dry-run)")
 
-	// Run migration with delete=false to just check
-	result, err := h.migrationService.RunMigration(c.Request.Context(), false)
+	// Use the dedicated dry-run method that doesn't make any changes
+	result, err := h.migrationService.CheckMigration(c.Request.Context())
 	if err != nil {
 		h.logger.WithError(err).Error("migration check failed")
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -70,14 +70,15 @@ func (h *MigrationHandler) CheckMigration(c *gin.Context) {
 		return
 	}
 
-	// Return as a check result without actually migrating
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data": gin.H{
-			"secrets_scanned":     result.SecretsScanned,
-			"secrets_to_migrate":  result.SecretsMigrated, // These were actually migrated in dry-run
-			"secrets_up_to_date":  result.SecretsSkipped,
-			"potential_migrations": result.MigratedSecrets,
+			"dry_run":              true,
+			"secrets_scanned":      result.SecretsScanned,
+			"secrets_up_to_date":   result.SecretsSkipped,
+			"pending_migrations":   result.PendingMigrations,
+			"migration_count":      len(result.PendingMigrations),
+			"errors":               result.Errors,
 		},
 	})
 }

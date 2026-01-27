@@ -299,7 +299,9 @@ func (s *ProvisionerService) buildSecretName(req *models.ProvisionSecretsRequest
 		parts = append(parts, "vendor", sanitize(*req.ScopeID))
 	}
 
-	parts = append(parts, sanitize(req.Provider), sanitize(keyName))
+	// Normalize key name to use hyphens instead of underscores for consistency
+	normalizedKeyName := normalizeKeyName(keyName)
+	parts = append(parts, sanitize(req.Provider), sanitize(normalizedKeyName))
 	return strings.Join(parts, "-")
 }
 
@@ -343,16 +345,46 @@ func (s *ProvisionerService) logAudit(ctx context.Context, tenantID, secretName 
 	}
 }
 
+// knownKeyPatterns maps underscore patterns to their correct hyphenated versions
+// This is shared with naming_migration_service.go for consistency
+var keyPatternNormalizations = map[string]string{
+	"key_id":         "key-id",
+	"key_secret":     "key-secret",
+	"webhook_secret": "webhook-secret",
+	"api_key":        "api-key",
+	"secret_key":     "secret-key",
+	"public_key":     "public-key",
+	"private_key":    "private-key",
+	"client_id":      "client-id",
+	"client_secret":  "client-secret",
+	"merchant_id":    "merchant-id",
+	"salt_key":       "salt-key",
+	"salt_index":     "salt-index",
+}
+
+// normalizeKeyName ensures key names use hyphens instead of underscores
+// for consistent naming across all secrets
+func normalizeKeyName(keyName string) string {
+	normalized := keyName
+	for underscorePattern, hyphenPattern := range keyPatternNormalizations {
+		normalized = strings.ReplaceAll(normalized, underscorePattern, hyphenPattern)
+	}
+	return normalized
+}
+
 // sanitize cleans a string for use in secret names
 func sanitize(s string) string {
 	s = strings.ToLower(s)
 	s = strings.ReplaceAll(s, " ", "-")
-	// Keep only alphanumeric, underscore, and dash
+	// Keep only alphanumeric and dash (no underscores for consistency)
 	result := make([]byte, 0, len(s))
 	for i := 0; i < len(s); i++ {
 		c := s[i]
-		if (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' || c == '-' {
+		if (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' {
 			result = append(result, c)
+		} else if c == '_' {
+			// Convert underscores to hyphens for consistency
+			result = append(result, '-')
 		} else {
 			result = append(result, '-')
 		}
