@@ -44,7 +44,8 @@ const logoutQuerySchema = z.object({
 /**
  * Determine the cookie domain based on the request host.
  * For tesserix.app domains, use .tesserix.app to enable cross-subdomain cookies.
- * For custom domains, don't set domain to let the browser default to the request host.
+ * For custom domains, extract the base domain (e.g., .yahvismartfarm.com) so
+ * cookies work across both www and non-www variants.
  */
 const getCookieDomain = (forwardedHost: string | undefined): string | undefined => {
   if (config.session.cookieDomain) {
@@ -60,8 +61,12 @@ const getCookieDomain = (forwardedHost: string | undefined): string | undefined 
   if (hostname === 'localhost' || hostname.endsWith('.localhost')) {
     return undefined;
   }
-  logger.debug({ hostname }, 'Custom domain detected, not setting cookie domain');
-  return undefined;
+  // Custom domains: set cookie on the base domain so it works across
+  // both www.example.com and example.com. Strip "www." prefix and prepend
+  // with "." to enable subdomain sharing.
+  const baseDomain = hostname.startsWith('www.') ? hostname.substring(4) : hostname;
+  logger.debug({ hostname, cookieDomain: `.${baseDomain}` }, 'Custom domain detected, using base domain for cookie');
+  return `.${baseDomain}`;
 };
 
 const setSessionCookie = (reply: FastifyReply, sessionId: string, forwardedHost?: string) => {
