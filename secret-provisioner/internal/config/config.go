@@ -91,7 +91,7 @@ func NewConfig() *Config {
 			URL: getEnv("NATS_URL", "nats://nats:4222"),
 		},
 		Auth: AuthConfig{
-			AllowedServices: getSliceEnv("ALLOWED_SERVICES", []string{"admin-bff", "payment-service"}),
+			AllowedServices: getSliceEnv("AUTHORIZED_SERVICES", []string{"admin-bff", "payment-service"}),
 		},
 		Cache: CacheConfig{
 			SecretTTL: getDurationEnv("SECRET_CACHE_TTL", 10*time.Minute),
