@@ -326,6 +326,16 @@ func setupRouter(settingsHandler *handlers.SettingsHandler, storefrontThemeHandl
 	// API v1 routes with RBAC
 	v1 := router.Group("/api/v1")
 
+	// DEBUG: Log v1 group requests with headers (TEMPORARY)
+	v1.Use(func(c *gin.Context) {
+		log.Printf("[V1-DEBUG] path=%s sub=%q tenant=%q email=%q",
+			c.Request.URL.Path,
+			c.GetHeader("x-jwt-claim-sub"),
+			c.GetHeader("x-jwt-claim-tenant-id"),
+			c.GetHeader("x-jwt-claim-email"))
+		c.Next()
+	})
+
 	// Authentication middleware
 	// In development: use legacy header extraction for local testing
 	// In production: use IstioAuth which reads x-jwt-claim-* headers from Istio
