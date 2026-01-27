@@ -57,3 +57,6 @@ temp/
 *-secret.yaml
 secrets/
 tenant-service/migrate-organizations
+node_modules/
+auth-bff/node_modules/*
+**/node_modules/**
