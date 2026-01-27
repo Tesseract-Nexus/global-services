@@ -749,13 +749,14 @@ func (c *Client) createVirtualServiceWithGateway(ctx context.Context, slug, tena
 			if newVS.Spec.Http[i].Headers.Request.Set == nil {
 				newVS.Spec.Http[i].Headers.Request.Set = make(map[string]string)
 			}
-			// Set tenant identification headers
-			// X-Vendor-ID: Tenant UUID for API services
-			newVS.Spec.Http[i].Headers.Request.Set["X-Vendor-ID"] = tenantID
-			// X-Tenant-ID: Tenant UUID (same as Vendor-ID, for compatibility)
-			newVS.Spec.Http[i].Headers.Request.Set["X-Tenant-ID"] = tenantID
-			// X-Tenant-Slug: Tenant slug for storefront resolution
-			newVS.Spec.Http[i].Headers.Request.Set["X-Tenant-Slug"] = slug
+			// Set tenant identification headers using Istio JWT claim format
+			// These headers are consumed by IstioAuth middleware and RBAC middleware
+			// x-jwt-claim-vendor-id: Tenant UUID for API services
+			newVS.Spec.Http[i].Headers.Request.Set["x-jwt-claim-vendor-id"] = tenantID
+			// x-jwt-claim-tenant-id: Tenant UUID for tenant isolation
+			newVS.Spec.Http[i].Headers.Request.Set["x-jwt-claim-tenant-id"] = tenantID
+			// x-jwt-claim-tenant-slug: Tenant slug for storefront resolution
+			newVS.Spec.Http[i].Headers.Request.Set["x-jwt-claim-tenant-slug"] = slug
 			// X-Custom-Domain: Set the custom domain host if this is a custom domain VS
 			if isCustomDomain {
 				newVS.Spec.Http[i].Headers.Request.Set["X-Custom-Domain"] = tenantHost
