@@ -341,6 +341,16 @@ func setupRouter(settingsHandler *handlers.SettingsHandler, storefrontThemeHandl
 	// In production: use IstioAuth which reads x-jwt-claim-* headers from Istio
 	if cfg.Server.Mode == gin.ReleaseMode {
 		v1.Use(istioAuth)
+		// DEBUG: Log context values AFTER istioAuth (TEMPORARY)
+		v1.Use(func(c *gin.Context) {
+			log.Printf("[ISTIO-POST] path=%s context_tenant=%q context_user=%q header_tenant=%q header_sub=%q",
+				c.Request.URL.Path,
+				c.GetString("tenant_id"),
+				c.GetString("user_id"),
+				c.GetHeader("x-jwt-claim-tenant-id"),
+				c.GetHeader("x-jwt-claim-sub"))
+			c.Next()
+		})
 	} else {
 		// Development mode: use header extraction middleware
 		v1.Use(middleware.TenantMiddleware())
