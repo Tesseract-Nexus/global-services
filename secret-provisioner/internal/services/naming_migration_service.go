@@ -19,8 +19,8 @@ import (
 type NamingMigrationService struct {
 	cfg          *config.Config
 	gcpClient    *clients.GCPSecretManagerClient
-	metadataRepo *repository.SecretMetadataRepository
-	auditRepo    *repository.AuditRepository
+	metadataRepo repository.SecretMetadataRepository
+	auditRepo    repository.AuditRepository
 	logger       *logrus.Entry
 }
 
@@ -38,8 +38,8 @@ type MigrationResult struct {
 func NewNamingMigrationService(
 	cfg *config.Config,
 	gcpClient *clients.GCPSecretManagerClient,
-	metadataRepo *repository.SecretMetadataRepository,
-	auditRepo *repository.AuditRepository,
+	metadataRepo repository.SecretMetadataRepository,
+	auditRepo repository.AuditRepository,
 	logger *logrus.Entry,
 ) *NamingMigrationService {
 	return &NamingMigrationService{
