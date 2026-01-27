@@ -109,6 +109,23 @@ func AuthMiddleware() gin.HandlerFunc {
 	}
 }
 
+// DebugHeadersMiddleware logs x-jwt-claim-* headers for debugging
+// TEMPORARY: Remove after fixing the 403 issue
+func DebugHeadersMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.Request.URL.Path == "/health" || c.Request.URL.Path == "/readyz" || c.Request.URL.Path == "/livez" {
+			c.Next()
+			return
+		}
+		sub := c.GetHeader("x-jwt-claim-sub")
+		tenantID := c.GetHeader("x-jwt-claim-tenant-id")
+		email := c.GetHeader("x-jwt-claim-email")
+		fmt.Printf("[DEBUG] %s %s - Headers: x-jwt-claim-sub=%q, x-jwt-claim-tenant-id=%q, x-jwt-claim-email=%q\n",
+			c.Request.Method, c.Request.URL.Path, sub, tenantID, email)
+		c.Next()
+	}
+}
+
 // InternalServiceMiddleware allows requests from internal services
 // Internal services identify themselves via X-Internal-Service header
 // This is protected at network level by Kubernetes network policies and Istio mTLS

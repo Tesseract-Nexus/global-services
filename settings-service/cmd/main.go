@@ -231,6 +231,7 @@ func setupRouter(settingsHandler *handlers.SettingsHandler, storefrontThemeHandl
 	// Global middleware
 	router.Use(middleware.RequestLogger())
 	router.Use(middleware.Recovery())
+	router.Use(middleware.DebugHeadersMiddleware()) // TEMPORARY: Debug 403 issue
 
 	// Security headers middleware
 	router.Use(gosharedmw.SecurityHeaders())
