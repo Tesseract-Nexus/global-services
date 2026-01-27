@@ -343,12 +343,23 @@ func setupRouter(settingsHandler *handlers.SettingsHandler, storefrontThemeHandl
 		v1.Use(istioAuth)
 		// DEBUG: Log context values AFTER istioAuth (TEMPORARY)
 		v1.Use(func(c *gin.Context) {
-			log.Printf("[ISTIO-POST] path=%s context_tenant=%q context_user=%q header_tenant=%q header_sub=%q",
+			// Get auth context to see what IstioAuth parsed
+			authCtxVal, authCtxExists := c.Get("auth_context")
+			authCtxInfo := "nil"
+			if authCtxExists && authCtxVal != nil {
+				if ctx, ok := authCtxVal.(*gosharedmw.AuthContext); ok && ctx != nil {
+					authCtxInfo = fmt.Sprintf("UserID=%q TenantID=%q Email=%q", ctx.UserID, ctx.TenantID, ctx.Email)
+				} else {
+					authCtxInfo = "exists but wrong type"
+				}
+			}
+			log.Printf("[ISTIO-POST] path=%s context_tenant=%q context_user=%q header_tenant=%q header_sub=%q auth_context={%s}",
 				c.Request.URL.Path,
 				c.GetString("tenant_id"),
 				c.GetString("user_id"),
 				c.GetHeader("x-jwt-claim-tenant-id"),
-				c.GetHeader("x-jwt-claim-sub"))
+				c.GetHeader("x-jwt-claim-sub"),
+				authCtxInfo)
 			c.Next()
 		})
 	} else {
