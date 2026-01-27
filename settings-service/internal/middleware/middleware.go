@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -106,23 +105,6 @@ func AuthMiddleware() gin.HandlerFunc {
 			c.Set("user_id", userID)
 			c.Set("staff_id", userID) // RBAC middleware checks staff_id first
 		}
-		c.Next()
-	}
-}
-
-// DebugHeadersMiddleware logs x-jwt-claim-* headers for debugging
-// TEMPORARY: Remove after fixing the 403 issue
-func DebugHeadersMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		if c.Request.URL.Path == "/health" || c.Request.URL.Path == "/readyz" || c.Request.URL.Path == "/livez" || c.Request.URL.Path == "/metrics" {
-			c.Next()
-			return
-		}
-		sub := c.GetHeader("x-jwt-claim-sub")
-		tenantID := c.GetHeader("x-jwt-claim-tenant-id")
-		email := c.GetHeader("x-jwt-claim-email")
-		// Use log.Printf for consistent logging
-		log.Printf("[DEBUG-HEADERS] %s %s - sub=%q tenant=%q email=%q", c.Request.Method, c.Request.URL.Path, sub, tenantID, email)
 		c.Next()
 	}
 }

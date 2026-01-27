@@ -231,7 +231,6 @@ func setupRouter(settingsHandler *handlers.SettingsHandler, storefrontThemeHandl
 	// Global middleware
 	router.Use(middleware.RequestLogger())
 	router.Use(middleware.Recovery())
-	router.Use(middleware.DebugHeadersMiddleware()) // TEMPORARY: Debug 403 issue
 
 	// Security headers middleware
 	router.Use(gosharedmw.SecurityHeaders())
@@ -326,42 +325,11 @@ func setupRouter(settingsHandler *handlers.SettingsHandler, storefrontThemeHandl
 	// API v1 routes with RBAC
 	v1 := router.Group("/api/v1")
 
-	// DEBUG: Log v1 group requests with headers (TEMPORARY)
-	v1.Use(func(c *gin.Context) {
-		log.Printf("[V1-DEBUG] path=%s sub=%q tenant=%q email=%q",
-			c.Request.URL.Path,
-			c.GetHeader("x-jwt-claim-sub"),
-			c.GetHeader("x-jwt-claim-tenant-id"),
-			c.GetHeader("x-jwt-claim-email"))
-		c.Next()
-	})
-
 	// Authentication middleware
 	// In development: use legacy header extraction for local testing
 	// In production: use IstioAuth which reads x-jwt-claim-* headers from Istio
 	if cfg.Server.Mode == gin.ReleaseMode {
 		v1.Use(istioAuth)
-		// DEBUG: Log context values AFTER istioAuth (TEMPORARY)
-		v1.Use(func(c *gin.Context) {
-			// Get auth context to see what IstioAuth parsed
-			authCtxVal, authCtxExists := c.Get("auth_context")
-			authCtxInfo := "nil"
-			if authCtxExists && authCtxVal != nil {
-				if ctx, ok := authCtxVal.(*gosharedmw.AuthContext); ok && ctx != nil {
-					authCtxInfo = fmt.Sprintf("UserID=%q TenantID=%q Email=%q", ctx.UserID, ctx.TenantID, ctx.Email)
-				} else {
-					authCtxInfo = "exists but wrong type"
-				}
-			}
-			log.Printf("[ISTIO-POST] path=%s context_tenant=%q context_user=%q header_tenant=%q header_sub=%q auth_context={%s}",
-				c.Request.URL.Path,
-				c.GetString("tenant_id"),
-				c.GetString("user_id"),
-				c.GetHeader("x-jwt-claim-tenant-id"),
-				c.GetHeader("x-jwt-claim-sub"),
-				authCtxInfo)
-			c.Next()
-		})
 	} else {
 		// Development mode: use header extraction middleware
 		v1.Use(middleware.TenantMiddleware())

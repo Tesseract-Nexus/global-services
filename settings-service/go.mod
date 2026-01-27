@@ -3,7 +3,7 @@ module settings-service
 go 1.25.5
 
 require (
-	github.com/Tesseract-Nexus/go-shared v0.3.1-0.20260127223854-a5214d3e3351
+	github.com/Tesseract-Nexus/go-shared v0.3.1-0.20260127225318-db8616120408
 	github.com/gin-contrib/cors v1.4.0
 	github.com/gin-gonic/gin v1.10.0
 	github.com/google/uuid v1.6.0
