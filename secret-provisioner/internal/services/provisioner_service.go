@@ -360,13 +360,18 @@ func sanitize(s string) string {
 	return string(result)
 }
 
-// sanitizeLabel cleans a string for use in GCP labels
-func sanitizeLabel(s string) string {
+// SanitizeLabel cleans a string for use in GCP labels (exported for use by migration service)
+func SanitizeLabel(s string) string {
 	s = sanitize(s)
 	if len(s) > 63 {
 		s = s[:63]
 	}
 	return s
+}
+
+// sanitizeLabel is an alias for backward compatibility within this package
+func sanitizeLabel(s string) string {
+	return SanitizeLabel(s)
 }
 
 // MetadataToJSON converts metadata to JSON for audit logs

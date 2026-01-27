@@ -89,12 +89,34 @@ func main() {
 		log,
 	)
 
+	// Initialize naming migration service
+	migrationService := services.NewNamingMigrationService(
+		cfg,
+		gcpClient,
+		metadataRepo,
+		auditRepo,
+		log,
+	)
+
+	// Run naming migration on startup to fix any inconsistent secret names
+	log.Info("running startup naming migration check")
+	if result, err := migrationService.RunMigration(ctx, false); err != nil {
+		log.WithError(err).Warn("naming migration check failed, continuing startup")
+	} else {
+		log.WithFields(logrus.Fields{
+			"scanned":  result.SecretsScanned,
+			"migrated": result.SecretsMigrated,
+			"skipped":  result.SecretsSkipped,
+		}).Info("naming migration check completed")
+	}
+
 	// Initialize handlers
 	secretHandler := handlers.NewSecretHandler(provisionerService, log)
 	healthHandler := handlers.NewHealthHandler(db)
+	migrationHandler := handlers.NewMigrationHandler(migrationService, log)
 
 	// Setup router
-	router := setupRouter(cfg, secretHandler, healthHandler, log)
+	router := setupRouter(cfg, secretHandler, healthHandler, migrationHandler, log)
 
 	// Create HTTP server
 	srv := &http.Server{
@@ -168,7 +190,7 @@ func runMigrations(db *gorm.DB) error {
 	)
 }
 
-func setupRouter(cfg *config.Config, secretHandler *handlers.SecretHandler, healthHandler *handlers.HealthHandler, log *logrus.Entry) *gin.Engine {
+func setupRouter(cfg *config.Config, secretHandler *handlers.SecretHandler, healthHandler *handlers.HealthHandler, migrationHandler *handlers.MigrationHandler, log *logrus.Entry) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Recovery())
 	router.Use(middleware.RequestID())
@@ -192,6 +214,18 @@ func setupRouter(cfg *config.Config, secretHandler *handlers.SecretHandler, heal
 			secrets.GET("/metadata", secretHandler.GetMetadata)
 			secrets.GET("/providers", secretHandler.ListProviders)
 			secrets.DELETE("/:name", secretHandler.DeleteSecret)
+		}
+
+		// Admin endpoints for maintenance operations
+		admin := v1.Group("/admin")
+		{
+			migration := admin.Group("/migration")
+			{
+				// Check what secrets need migration (dry-run)
+				migration.GET("/naming/check", migrationHandler.CheckMigration)
+				// Run the naming migration
+				migration.POST("/naming", migrationHandler.RunMigration)
+			}
 		}
 	}
 

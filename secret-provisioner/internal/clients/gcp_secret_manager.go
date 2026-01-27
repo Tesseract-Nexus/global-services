@@ -203,6 +203,82 @@ func (c *GCPSecretManagerClient) Close() error {
 	return c.client.Close()
 }
 
+// ListSecrets lists secrets matching a filter
+func (c *GCPSecretManagerClient) ListSecrets(ctx context.Context, filter string) ([]string, error) {
+	parent := fmt.Sprintf("projects/%s", c.projectID)
+
+	req := &secretmanagerpb.ListSecretsRequest{
+		Parent: parent,
+		Filter: filter,
+	}
+
+	var secrets []string
+	it := c.client.ListSecrets(ctx, req)
+	for {
+		secret, err := it.Next()
+		if err != nil {
+			// Check for end of iteration
+			if err.Error() == "no more items in iterator" {
+				break
+			}
+			// Check for actual iterator done
+			if status.Code(err) == codes.OK {
+				break
+			}
+			return nil, err
+		}
+		if secret == nil {
+			break
+		}
+		// Extract just the secret ID from the full name
+		// Format: projects/PROJECT/secrets/SECRET_ID
+		name := secret.Name
+		const prefix = "/secrets/"
+		if idx := len(name) - 1; idx >= 0 {
+			for idx >= 0 && name[idx] != '/' {
+				idx--
+			}
+			if idx >= 0 {
+				secrets = append(secrets, name[idx+1:])
+			}
+		}
+	}
+
+	return secrets, nil
+}
+
+// AccessSecretVersion accesses a specific version of a secret
+func (c *GCPSecretManagerClient) AccessSecretVersion(ctx context.Context, secretID, version string) ([]byte, error) {
+	name := fmt.Sprintf("projects/%s/secrets/%s/versions/%s", c.projectID, secretID, version)
+
+	req := &secretmanagerpb.AccessSecretVersionRequest{
+		Name: name,
+	}
+
+	result, err := c.client.AccessSecretVersion(ctx, req)
+	if err != nil {
+		c.logger.WithFields(logrus.Fields{
+			"secret_id": secretID,
+			"version":   version,
+			"operation": "access",
+			"status":    "failed",
+			"error":     err.Error(),
+		}).Error("failed to access secret version")
+		return nil, err
+	}
+
+	return result.Payload.Data, nil
+}
+
+// GetSecretLabels retrieves the labels for a secret
+func (c *GCPSecretManagerClient) GetSecretLabels(ctx context.Context, secretID string) (map[string]string, error) {
+	secret, err := c.GetSecret(ctx, secretID)
+	if err != nil {
+		return nil, err
+	}
+	return secret.Labels, nil
+}
+
 // ExtractVersion extracts the version number from a version name
 func ExtractVersion(versionName string) string {
 	// Version name format: projects/PROJECT/secrets/SECRET/versions/VERSION
