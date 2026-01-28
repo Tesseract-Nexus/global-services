@@ -87,8 +87,11 @@ func (h *LocationHandler) GetCountries(c *gin.Context) {
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 
 	// Validate pagination parameters
-	if limit < 1 || limit > 100 {
+	// Countries max is 250 (there are ~250 countries worldwide)
+	if limit < 1 {
 		limit = 50
+	} else if limit > 250 {
+		limit = 250
 	}
 	if offset < 0 {
 		offset = 0
@@ -218,8 +221,11 @@ func (h *LocationHandler) GetAllStates(c *gin.Context) {
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 
 	// Validate pagination parameters
-	if limit < 1 || limit > 100 {
+	// States max is 500 (to accommodate countries with many subdivisions)
+	if limit < 1 {
 		limit = 50
+	} else if limit > 500 {
+		limit = 500
 	}
 	if offset < 0 {
 		offset = 0
