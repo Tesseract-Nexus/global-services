@@ -69,7 +69,7 @@
                         Order Update
                         {{end}}
                     </h1>
-                    <p style="margin: 8px 0 0 0; font-size: 15px; color: rgba(255,255,255,0.9);">
+                    <p style="margin: 8px 0 0 0; font-size: 15px; color: #ffffff;">
                         Order #{{.OrderNumber}}
                         {{if eq .OrderStatus "CONFIRMED"}} has been confirmed
                         {{else if eq .OrderStatus "SHIPPED"}} has been shipped
@@ -207,16 +207,16 @@
                             <!-- Step 3: In Transit -->
                             <td style="width: 25%; text-align: center;">
                                 <div style="width: 32px; height: 32px; margin: 0 auto; background-color: #E2E8F0; border-radius: 50%; line-height: 32px;">
-                                    <span style="color: #94A3B8; font-size: 14px;">3</span>
+                                    <span style="color: #64748B; font-size: 14px;">3</span>
                                 </div>
-                                <p style="margin: 8px 0 0 0; font-size: 12px; color: #94A3B8;">In Transit</p>
+                                <p style="margin: 8px 0 0 0; font-size: 12px; color: #64748B;">In Transit</p>
                             </td>
                             <!-- Step 4: Delivered -->
                             <td style="width: 25%; text-align: center;">
                                 <div style="width: 32px; height: 32px; margin: 0 auto; background-color: #E2E8F0; border-radius: 50%; line-height: 32px;">
-                                    <span style="color: #94A3B8; font-size: 14px;">4</span>
+                                    <span style="color: #64748B; font-size: 14px;">4</span>
                                 </div>
-                                <p style="margin: 8px 0 0 0; font-size: 12px; color: #94A3B8;">Delivered</p>
+                                <p style="margin: 8px 0 0 0; font-size: 12px; color: #64748B;">Delivered</p>
                             </td>
                         </tr>
                     </table>
@@ -601,7 +601,7 @@
             Questions? Contact us at <a href="mailto:{{.SupportEmail}}" style="color: #0F172A; text-decoration: none; font-weight: 600;">{{.SupportEmail}}</a>
             {{end}}
         </p>
-        <p style="margin: 0; font-size: 12px; color: #94A3B8;">
+        <p style="margin: 0; font-size: 12px; color: #64748B;">
             &copy; {{.Year}} {{.BusinessName}}. All rights reserved.
         </p>
     </td>
