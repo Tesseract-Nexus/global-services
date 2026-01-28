@@ -79,6 +79,15 @@ export interface MfaSessionData {
   rememberMe?: boolean;
 }
 
+// Device trust for MFA bypass on remembered devices
+export interface DeviceTrustData {
+  userId: string;
+  tenantId: string;
+  userAgent: string;
+  ipAddress: string;
+  createdAt: number;
+}
+
 class SessionStore {
   private redis: Redis;
   private readonly SESSION_PREFIX = 'bff:session:';
@@ -86,11 +95,13 @@ class SessionStore {
   private readonly WS_TICKET_PREFIX = 'bff:ws_ticket:';
   private readonly SESSION_TRANSFER_PREFIX = 'bff:session_transfer:';
   private readonly MFA_SESSION_PREFIX = 'bff:mfa_session:';
+  private readonly DEVICE_TRUST_PREFIX = 'bff:device_trust:';
   private readonly SESSION_TTL = config.session.maxAge;
   private readonly AUTH_FLOW_TTL = 600; // 10 minutes for auth flow state
   private readonly WS_TICKET_TTL = 30; // 30 seconds for WebSocket tickets
   private readonly SESSION_TRANSFER_TTL = 60; // 60 seconds for session transfer
   private readonly MFA_SESSION_TTL = 300; // 5 minutes for MFA session
+  private readonly DEVICE_TRUST_TTL = 2592000; // 30 days for device trust
 
   constructor() {
     if (config.redis.url) {
@@ -338,6 +349,27 @@ class SessionStore {
 
   async deleteMfaSession(sessionId: string): Promise<boolean> {
     const result = await this.redis.del(this.MFA_SESSION_PREFIX + sessionId);
+    return result > 0;
+  }
+
+  // Device Trust Management
+  async saveDeviceTrust(token: string, data: DeviceTrustData): Promise<void> {
+    await this.redis.setex(
+      this.DEVICE_TRUST_PREFIX + token,
+      this.DEVICE_TRUST_TTL,
+      JSON.stringify(data)
+    );
+    logger.debug({ token: token.slice(0, 8), userId: data.userId }, 'Device trust saved');
+  }
+
+  async getDeviceTrust(token: string): Promise<DeviceTrustData | null> {
+    const data = await this.redis.get(this.DEVICE_TRUST_PREFIX + token);
+    if (!data) return null;
+    return JSON.parse(data) as DeviceTrustData;
+  }
+
+  async deleteDeviceTrust(token: string): Promise<boolean> {
+    const result = await this.redis.del(this.DEVICE_TRUST_PREFIX + token);
     return result > 0;
   }
 

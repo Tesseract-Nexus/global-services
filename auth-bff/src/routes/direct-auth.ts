@@ -509,8 +509,7 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
       });
     }
 
-    // MANDATORY MFA: All admin logins require email OTP verification
-    // Store tokens in MFA session for deferred session creation after OTP
+    // Check if we received tokens from tenant-service
     if (!data.access_token) {
       logger.error({ email: maskEmail(email), tenant_slug }, 'No tokens received from tenant-service for staff');
       return reply.code(500).send({
@@ -520,6 +519,66 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
       });
     }
 
+    // Check for trusted device — skip MFA if valid
+    const deviceTrustToken = request.cookies?.['device_trust'];
+    if (deviceTrustToken) {
+      const deviceTrust = await sessionStore.getDeviceTrust(deviceTrustToken);
+      if (deviceTrust && deviceTrust.userId === data.user_id && deviceTrust.tenantId === data.tenant_id) {
+        logger.info({ email: maskEmail(email), tenant_slug }, 'Trusted device detected, skipping MFA');
+
+        const sessionExpirySeconds = 86400;
+        const session = await sessionStore.createSession({
+          userId: data.user_id!,
+          tenantId: data.tenant_id,
+          tenantSlug: data.tenant_slug,
+          clientType: 'customer',
+          accessToken: data.access_token,
+          idToken: data.id_token,
+          refreshToken: data.refresh_token,
+          expiresAt: Math.floor(Date.now() / 1000) + sessionExpirySeconds,
+          userInfo: {
+            sub: data.keycloak_user_id || data.user_id,
+            email: data.email,
+            given_name: data.first_name,
+            family_name: data.last_name,
+            name: data.first_name && data.last_name
+              ? `${data.first_name} ${data.last_name}`
+              : data.email,
+            tenant_id: data.tenant_id,
+            tenant_slug: data.tenant_slug,
+            role: data.role,
+            is_staff: true,
+            realm_access: {
+              roles: data.role ? [data.role] : [],
+            },
+          },
+        });
+
+        const forwardedHost = request.headers['x-forwarded-host'] as string || request.hostname;
+        setSessionCookie(reply, session.id, forwardedHost, remember_me);
+
+        return reply.send({
+          success: true,
+          authenticated: true,
+          user: {
+            id: data.user_id,
+            email: data.email,
+            first_name: data.first_name,
+            last_name: data.last_name,
+            tenant_id: data.tenant_id,
+            tenant_slug: data.tenant_slug,
+            role: data.role,
+            is_staff: true,
+          },
+          session: {
+            expires_at: session.expiresAt,
+            csrf_token: session.csrfToken,
+          },
+        });
+      }
+    }
+
+    // MANDATORY MFA: No trusted device — require email OTP
     const mfaSessionId = uuidv4();
     await sessionStore.saveMfaSession(mfaSessionId, {
       userId: data.user_id!,
@@ -601,9 +660,10 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
       mfa_session: string;
       code: string;
       method?: 'totp' | 'email' | 'sms';
+      trust_device?: boolean;
     };
   }>('/auth/direct/mfa/verify', async (request, reply) => {
-    const { mfa_session, code, method = 'totp' } = request.body;
+    const { mfa_session, code, method = 'totp', trust_device = false } = request.body;
 
     if (!mfa_session || !code) {
       return reply.code(400).send({
@@ -690,6 +750,30 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
 
     // Clean up MFA session
     await sessionStore.deleteMfaSession(mfa_session);
+
+    // Set device trust cookie if requested
+    if (trust_device) {
+      const trustToken = uuidv4();
+      await sessionStore.saveDeviceTrust(trustToken, {
+        userId: mfaData.userId,
+        tenantId: mfaData.tenantId,
+        userAgent: request.headers['user-agent'] || 'unknown',
+        ipAddress: request.ip,
+        createdAt: Date.now(),
+      });
+
+      const domain = getCookieDomain(forwardedHost);
+      reply.setCookie('device_trust', trustToken, {
+        httpOnly: true,
+        secure: config.server.nodeEnv === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 2592000, // 30 days
+        ...(domain ? { domain } : {}),
+      });
+
+      logger.info({ userId: mfaData.userId, tenantSlug: mfaData.tenantSlug }, 'Device trust token set (30 days)');
+    }
 
     logger.info({
       userId: session.userId,
