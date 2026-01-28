@@ -715,6 +715,7 @@ func (s *TenantAuthService) GetUserTenants(ctx context.Context, email string) ([
 				Name:        m.Tenant.Name,
 				DisplayName: m.Tenant.DisplayName,
 				LogoURL:     m.Tenant.LogoURL,
+				FaviconURL:  m.Tenant.FaviconURL,
 				Role:        m.Role,
 				IsDefault:   m.IsDefault,
 			})
@@ -737,6 +738,7 @@ func (s *TenantAuthService) GetTenantBasicInfo(ctx context.Context, tenantID uui
 		Name:        tenant.Name,
 		DisplayName: tenant.DisplayName,
 		LogoURL:     tenant.LogoURL,
+		FaviconURL:  tenant.FaviconURL,
 	}, nil
 }
 
@@ -747,6 +749,7 @@ type TenantAuthInfo struct {
 	Name        string    `json:"name"`
 	DisplayName string    `json:"display_name,omitempty"`
 	LogoURL     string    `json:"logo_url,omitempty"`
+	FaviconURL  string    `json:"favicon_url,omitempty"`
 	Role        string    `json:"role"`
 	IsDefault   bool      `json:"is_default"`
 }

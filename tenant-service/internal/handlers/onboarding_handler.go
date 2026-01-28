@@ -21,6 +21,7 @@ type StoreSetup struct {
 	Language                   string `json:"language,omitempty"`
 	BusinessModel              string `json:"business_model,omitempty"`
 	LogoURL                    string `json:"logo_url,omitempty"`
+	FaviconURL                 string `json:"favicon_url,omitempty"`
 	PrimaryColor               string `json:"primary_color,omitempty"`
 	SecondaryColor             string `json:"secondary_color,omitempty"`
 	UseCustomDomain            bool   `json:"use_custom_domain,omitempty"`
@@ -272,6 +273,7 @@ type UpdateStoreSetupRequest struct {
 	Language                  string `json:"language"`
 	BusinessModel             string `json:"business_model"`
 	LogoURL                   string `json:"logo_url"`
+	FaviconURL                string `json:"favicon_url"`
 	PrimaryColor              string `json:"primary_color"`
 	SecondaryColor            string `json:"secondary_color"`
 	UseCustomDomain           bool   `json:"use_custom_domain"`

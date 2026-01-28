@@ -537,6 +537,7 @@ type OnboardingStoreSetup struct {
 	Language        string `json:"language"`
 	BusinessModel   string `json:"business_model,omitempty"`
 	LogoURL         string `json:"logo_url,omitempty"`
+	FaviconURL      string `json:"favicon_url,omitempty"`
 	PrimaryColor    string `json:"primary_color,omitempty"`
 	SecondaryColor  string `json:"secondary_color,omitempty"`
 	UseCustomDomain bool   `json:"use_custom_domain,omitempty"`
@@ -597,6 +598,7 @@ func (s *TenantService) GetTenantOnboardingData(ctx context.Context, tenantID uu
 				Timezone:       timezone,
 				Language:       "en",
 				LogoURL:        tenant.LogoURL,
+				FaviconURL:     tenant.FaviconURL,
 				PrimaryColor:   tenant.PrimaryColor,
 				SecondaryColor: tenant.SecondaryColor,
 			},
@@ -670,6 +672,7 @@ func (s *TenantService) GetTenantOnboardingData(ctx context.Context, tenantID uu
 			Timezone:       tenantModel.DefaultTimezone,
 			Language:       "en", // Default - could be added to tenant model
 			LogoURL:        tenantModel.LogoURL,
+			FaviconURL:     tenantModel.FaviconURL,
 			PrimaryColor:   tenantModel.PrimaryColor,
 			SecondaryColor: tenantModel.SecondaryColor,
 		}

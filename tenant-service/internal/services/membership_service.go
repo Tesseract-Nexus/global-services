@@ -90,6 +90,7 @@ type UserTenantSummary struct {
 	Name           string     `json:"name"`
 	DisplayName    string     `json:"display_name"`
 	LogoURL        string     `json:"logo_url,omitempty"`
+	FaviconURL     string     `json:"favicon_url,omitempty"`
 	Role           string     `json:"role"`
 	IsDefault      bool       `json:"is_default"`
 	IsOwner        bool       `json:"is_owner"`
@@ -141,6 +142,7 @@ func (s *MembershipService) GetUserTenants(ctx context.Context, userID uuid.UUID
 			Name:            m.Tenant.Name,
 			DisplayName:     m.Tenant.DisplayName,
 			LogoURL:         m.Tenant.LogoURL,
+			FaviconURL:      m.Tenant.FaviconURL,
 			Role:            m.Role,
 			IsDefault:       m.IsDefault,
 			IsOwner:         m.Role == models.MembershipRoleOwner,
@@ -176,6 +178,7 @@ func (s *MembershipService) GetAllTenants(ctx context.Context) ([]UserTenantSumm
 			Name:            t.Name,
 			DisplayName:     t.DisplayName,
 			LogoURL:         t.LogoURL,
+			FaviconURL:      t.FaviconURL,
 			Role:            "platform_admin", // Indicate platform-level access
 			IsDefault:       false,
 			IsOwner:         false,
@@ -210,6 +213,7 @@ func (s *MembershipService) GetUserDefaultTenant(ctx context.Context, userID uui
 		Name:           membership.Tenant.Name,
 		DisplayName:    membership.Tenant.DisplayName,
 		LogoURL:        membership.Tenant.LogoURL,
+		FaviconURL:     membership.Tenant.FaviconURL,
 		Role:           membership.Role,
 		IsDefault:      membership.IsDefault,
 		IsOwner:        membership.Role == models.MembershipRoleOwner,
@@ -246,6 +250,7 @@ type CreateTenantRequest struct {
 	BusinessType    string    `json:"business_type,omitempty"`
 	Industry        string    `json:"industry,omitempty"`
 	LogoURL         string    `json:"logo_url,omitempty"`
+	FaviconURL      string    `json:"favicon_url,omitempty"`
 	PrimaryColor    string    `json:"primary_color,omitempty"`
 	SecondaryColor  string    `json:"secondary_color,omitempty"`
 	DefaultTimezone string    `json:"default_timezone,omitempty"`
@@ -309,6 +314,7 @@ func (s *MembershipService) CreateTenantWithOwner(ctx context.Context, req *Crea
 		Subdomain:       slug, // Use slug as subdomain initially
 		DisplayName:     displayName,
 		LogoURL:         req.LogoURL,
+		FaviconURL:      req.FaviconURL,
 		BusinessType:    req.BusinessType,
 		Industry:        req.Industry,
 		Status:          "active",

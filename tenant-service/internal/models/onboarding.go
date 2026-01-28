@@ -385,6 +385,7 @@ type Tenant struct {
 	Subdomain    string    `json:"subdomain" gorm:"unique;not null" validate:"required"`
 	DisplayName  string    `json:"display_name" gorm:"size:255"`
 	LogoURL      string    `json:"logo_url"`
+	FaviconURL   string    `json:"favicon_url"`
 	BusinessType string    `json:"business_type"`
 	Industry     string    `json:"industry"`
 	Status       string    `json:"status" gorm:"default:'creating';index" validate:"oneof=creating active inactive suspended"`
