@@ -39,7 +39,12 @@ type TenantCreatedEvent struct {
 	APIHost           string `json:"api_host"`            // e.g., "mystore-api.tesserix.app" or "api.customdomain.com"
 	BaseDomain        string `json:"base_domain"`         // e.g., "tesserix.app"
 	IsCustomDomain    bool   `json:"is_custom_domain"`    // true if using custom domain
-	Timestamp         time.Time `json:"timestamp"`
+	// Business address for tax nexus configuration
+	Country       string `json:"country,omitempty"`        // e.g., "IN", "US", "GB"
+	StateProvince string `json:"state_province,omitempty"` // e.g., "MH", "CA", "NY"
+	City          string `json:"city,omitempty"`
+	PostalCode    string `json:"postal_code,omitempty"`
+	Timestamp     time.Time `json:"timestamp"`
 }
 
 // TenantDeletedEvent is published when a tenant is deleted

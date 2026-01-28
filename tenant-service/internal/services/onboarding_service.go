@@ -1837,6 +1837,16 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 			BaseDomain:        baseDomain,
 			IsCustomDomain:    isCustomDomainUsed,
 		}
+		// Add business address for tax nexus configuration
+		for _, addr := range session.BusinessAddresses {
+			if addr.IsPrimary || addr.AddressType == "business" {
+				event.Country = addr.Country
+				event.StateProvince = addr.StateProvince
+				event.City = addr.City
+				event.PostalCode = addr.PostalCode
+				break
+			}
+		}
 		// Use a context with timeout for event publishing
 		publishCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
