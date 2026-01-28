@@ -169,7 +169,7 @@ GET /api/v1/secrets/metadata?tenant_id=t_123&category=payment&provider=stripe
 {
   "secrets": [
     {
-      "name": "prod-tenant-t_123-stripe-api-key",
+      "name": "prod-tenant-t_123-payment-stripe-api-key",
       "category": "payment",
       "provider": "stripe",
       "key_name": "api-key",
@@ -289,20 +289,26 @@ All errors follow this format:
 
 Secrets in GCP Secret Manager follow this naming pattern:
 
-**Tenant-level:**
+**Tenant-level (with category):**
+```
+{env}-tenant-{tenantId}-{category}-{provider}-{keyName}
+```
+
+**Vendor-level (with category):**
+```
+{env}-tenant-{tenantId}-vendor-{vendorId}-{category}-{provider}-{keyName}
+```
+
+**Tenant-level (without category):**
 ```
 {env}-tenant-{tenantId}-{provider}-{keyName}
 ```
 
-**Vendor-level:**
-```
-{env}-tenant-{tenantId}-vendor-{vendorId}-{provider}-{keyName}
-```
-
 **Examples:**
-- `prod-tenant-t_123-stripe-api-key`
-- `prod-tenant-t_123-vendor-v_99-razorpay-key-id`
-- `devtest-tenant-t_456-stripe-webhook-secret`
+- `prod-tenant-t_123-payment-stripe-api-key`
+- `devtest-tenant-t_456-shipping-delhivery-api-token`
+- `prod-tenant-t_123-vendor-v_99-payment-razorpay-key-id`
+- `devtest-tenant-t_456-integration-mautic-api-key`
 
 ---
 

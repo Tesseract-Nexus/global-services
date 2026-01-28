@@ -299,6 +299,11 @@ func (s *ProvisionerService) buildSecretName(req *models.ProvisionSecretsRequest
 		parts = append(parts, "vendor", sanitize(*req.ScopeID))
 	}
 
+	// Include category in secret name if provided (e.g., "shipping", "payment")
+	if req.Category != "" {
+		parts = append(parts, sanitize(string(req.Category)))
+	}
+
 	// Normalize key name to use hyphens instead of underscores for consistency
 	normalizedKeyName := normalizeKeyName(keyName)
 	parts = append(parts, sanitize(req.Provider), sanitize(normalizedKeyName))
