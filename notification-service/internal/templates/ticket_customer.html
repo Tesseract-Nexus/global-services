@@ -396,7 +396,7 @@
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
                         <tr>
                             <td style="background-color: {{if .BrandPrimaryColor}}{{.BrandPrimaryColor}}{{else}}#0F172A{{end}}; border-radius: 10px;">
-                                <a href="{{.TicketURL}}" style="display: inline-block; padding: 14px 32px; font-size: 14px; font-weight: 600; color: {{if .BrandTextColor}}{{.BrandTextColor}}{{else}}#ffffff{{end}}; text-decoration: none;">
+                                <a href="{{.TicketURL}}" aria-label="View ticket #{{.TicketNumber}}" style="display: inline-block; padding: 14px 32px; font-size: 14px; font-weight: 600; color: {{if .BrandTextColor}}{{.BrandTextColor}}{{else}}#ffffff{{end}}; text-decoration: none;">
                                     View Ticket &#8594;
                                 </a>
                             </td>

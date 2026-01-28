@@ -548,33 +548,33 @@
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
                         <tr>
                             {{if eq .OrderStatus "DELIVERED"}}
-                            <!-- Two buttons for delivered: Review + View Order -->
+                            <!-- Two buttons for delivered: Review (primary) + View Order (secondary) -->
                             <td style="background-color: #0F172A; border-radius: 8px;">
-                                <a href="{{.ReviewURL}}" style="display: inline-block; padding: 12px 24px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
+                                <a href="{{.ReviewURL}}" aria-label="Write a review for order #{{.OrderNumber}}" style="display: inline-block; padding: 14px 32px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
                                     Write a Review &#11088;
                                 </a>
                             </td>
                             <td style="width: 12px;"></td>
                             <td style="border: 1px solid #E2E8F0; border-radius: 8px;">
-                                <a href="{{.OrderDetailsURL}}" style="display: inline-block; padding: 12px 24px; font-size: 14px; font-weight: 600; color: #334155; text-decoration: none;">
+                                <a href="{{.OrderDetailsURL}}" aria-label="View details for order #{{.OrderNumber}}" style="display: inline-block; padding: 14px 24px; font-size: 14px; font-weight: 600; color: #334155; text-decoration: none;">
                                     View Order
                                 </a>
                             </td>
                             {{else if eq .OrderStatus "CANCELLED"}}
                             <td style="background-color: #0F172A; border-radius: 8px;">
-                                <a href="{{.ShopURL}}" style="display: inline-block; padding: 12px 24px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
+                                <a href="{{.ShopURL}}" aria-label="Continue shopping at {{.BusinessName}}" style="display: inline-block; padding: 14px 32px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
                                     Continue Shopping &#8594;
                                 </a>
                             </td>
                             {{else if eq .OrderStatus "SHIPPED"}}
                             <td style="background-color: #3B82F6; border-radius: 8px; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);">
-                                <a href="{{.TrackingURL}}" style="display: inline-block; padding: 12px 32px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
+                                <a href="{{.TrackingURL}}" aria-label="Track package for order #{{.OrderNumber}}" style="display: inline-block; padding: 14px 32px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
                                     Track Package &#8594;
                                 </a>
                             </td>
                             {{else}}
                             <td style="background-color: #0F172A; border-radius: 8px;">
-                                <a href="{{if .TrackingURL}}{{.TrackingURL}}{{else}}{{.OrderDetailsURL}}{{end}}" style="display: inline-block; padding: 12px 24px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
+                                <a href="{{if .TrackingURL}}{{.TrackingURL}}{{else}}{{.OrderDetailsURL}}{{end}}" aria-label="{{if eq .OrderStatus "CONFIRMED"}}Track order{{else}}View order{{end}} #{{.OrderNumber}}" style="display: inline-block; padding: 14px 32px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
                                     {{if eq .OrderStatus "CONFIRMED"}}Track Your Order{{else}}View Order{{end}} &#8594;
                                 </a>
                             </td>
