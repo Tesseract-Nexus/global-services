@@ -248,6 +248,15 @@ type EmailData struct {
 	DomainSettingsURL    string // URL to manage domain settings
 	OwnerEmail           string // Domain owner's email
 	OwnerName            string // Domain owner's name
+
+	// Storefront branding fields - for tenant-branded customer emails
+	// These colors come from the tenant's storefront settings
+	// If not provided, templates fall back to default slate palette
+	BrandPrimaryColor   string // Primary brand color (e.g., "#3B82F6")
+	BrandSecondaryColor string // Secondary brand color
+	BrandAccentColor    string // Accent color for highlights
+	BrandTextColor      string // Text color on brand backgrounds (usually "#FFFFFF")
+	BrandLogoURL        string // Tenant's logo URL for email header
 }
 
 // NewRenderer creates a new template renderer

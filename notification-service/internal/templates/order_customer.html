@@ -4,26 +4,35 @@
     <td style="text-align: center; padding-bottom: 24px;">
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
             <tr>
-                {{/* Dynamic gradient based on order status */}}
-                {{if eq .OrderStatus "CONFIRMED"}}
-                <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
-                {{else if eq .OrderStatus "SHIPPED"}}
-                <td style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
-                {{else if eq .OrderStatus "DELIVERED"}}
-                <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
-                {{else if eq .OrderStatus "CANCELLED"}}
-                <td style="background: linear-gradient(135deg, #71717a 0%, #52525b 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
-                {{else if eq .OrderStatus "REFUNDED"}}
-                <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
-                {{else}}
-                <td style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
-                {{end}}
-                    <span style="color: #ffffff; font-size: 24px; font-weight: 700;">{{if .BusinessInitial}}{{.BusinessInitial}}{{else}}T{{end}}</span>
+                {{/* Use tenant logo if available, otherwise show initial */}}
+                {{if .BrandLogoURL}}
+                <td style="text-align: center; vertical-align: middle;">
+                    <img src="{{.BrandLogoURL}}" alt="{{.BusinessName}}" height="48" style="max-height: 48px; width: auto;">
                 </td>
+                {{else}}
+                {{/* Use brand color if available, otherwise status-based colors */}}
+                {{if .BrandPrimaryColor}}
+                <td style="background-color: {{.BrandPrimaryColor}}; width: 48px; height: 48px; border-radius: 8px; text-align: center; vertical-align: middle;">
+                {{else if eq .OrderStatus "CONFIRMED"}}
+                <td style="background-color: #10B981; width: 48px; height: 48px; border-radius: 8px; text-align: center; vertical-align: middle;">
+                {{else if eq .OrderStatus "SHIPPED"}}
+                <td style="background-color: #3B82F6; width: 48px; height: 48px; border-radius: 8px; text-align: center; vertical-align: middle;">
+                {{else if eq .OrderStatus "DELIVERED"}}
+                <td style="background-color: #10B981; width: 48px; height: 48px; border-radius: 8px; text-align: center; vertical-align: middle;">
+                {{else if eq .OrderStatus "CANCELLED"}}
+                <td style="background-color: #64748B; width: 48px; height: 48px; border-radius: 8px; text-align: center; vertical-align: middle;">
+                {{else if eq .OrderStatus "REFUNDED"}}
+                <td style="background-color: #10B981; width: 48px; height: 48px; border-radius: 8px; text-align: center; vertical-align: middle;">
+                {{else}}
+                <td style="background-color: #0F172A; width: 48px; height: 48px; border-radius: 8px; text-align: center; vertical-align: middle;">
+                {{end}}
+                    <span style="color: {{if .BrandTextColor}}{{.BrandTextColor}}{{else}}#ffffff{{end}}; font-size: 24px; font-weight: 700;">{{if .BusinessInitial}}{{.BusinessInitial}}{{else}}T{{end}}</span>
+                </td>
+                {{end}}
             </tr>
         </table>
         {{if .BusinessName}}
-        <p style="margin: 12px 0 0 0; font-size: 18px; font-weight: 600; color: #18181b; letter-spacing: -0.3px;">{{.BusinessName}}</p>
+        <p style="margin: 12px 0 0 0; font-size: 18px; font-weight: 600; color: #0F172A; letter-spacing: -0.3px;">{{.BusinessName}}</p>
         {{end}}
     </td>
 </tr>
@@ -33,22 +42,22 @@
 <!-- Main Card -->
 <tr>
     <td>
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1); overflow: hidden;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ffffff; border-radius: 10px; border: 1px solid #E2E8F0; box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1); overflow: hidden;">
 
-            <!-- Header - Dynamic gradient based on order status -->
+            <!-- Header - Use brand color for default, semantic colors for statuses -->
             <tr>
                 {{if eq .OrderStatus "CONFIRMED"}}
-                <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 40px 40px; text-align: center;" class="mobile-padding">
+                <td style="background-color: #10B981; padding: 40px 40px; text-align: center;" class="mobile-padding">
                 {{else if eq .OrderStatus "SHIPPED"}}
-                <td style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); padding: 40px 40px; text-align: center;" class="mobile-padding">
+                <td style="background-color: #3B82F6; padding: 40px 40px; text-align: center;" class="mobile-padding">
                 {{else if eq .OrderStatus "DELIVERED"}}
-                <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 40px 40px; text-align: center;" class="mobile-padding">
+                <td style="background-color: #10B981; padding: 40px 40px; text-align: center;" class="mobile-padding">
                 {{else if eq .OrderStatus "CANCELLED"}}
-                <td style="background: linear-gradient(135deg, #71717a 0%, #52525b 100%); padding: 40px 40px; text-align: center;" class="mobile-padding">
+                <td style="background-color: #64748B; padding: 40px 40px; text-align: center;" class="mobile-padding">
                 {{else if eq .OrderStatus "REFUNDED"}}
-                <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 40px 40px; text-align: center;" class="mobile-padding">
+                <td style="background-color: #10B981; padding: 40px 40px; text-align: center;" class="mobile-padding">
                 {{else}}
-                <td style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); padding: 40px 40px; text-align: center;" class="mobile-padding">
+                <td style="background-color: {{if .BrandPrimaryColor}}{{.BrandPrimaryColor}}{{else}}#0F172A{{end}}; padding: 40px 40px; text-align: center;" class="mobile-padding">
                 {{end}}
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
                         <tr>
@@ -124,22 +133,22 @@
             <!-- Order Info Box -->
             <tr>
                 <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f8fafc; border-radius: 12px;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #F8FAFC; border-radius: 8px; border: 1px solid #E2E8F0;">
                         <tr>
                             <td style="padding: 20px;">
                                 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                                     <tr>
                                         <td style="width: 50%;">
-                                            <p style="margin: 0 0 4px 0; font-size: 11px; font-weight: 600; color: #71717a; text-transform: uppercase; letter-spacing: 0.5px;">Order Number</p>
-                                            <p style="margin: 0; font-size: 16px; font-weight: 700; color: #18181b;">{{.OrderNumber}}</p>
+                                            <p style="margin: 0 0 4px 0; font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Order Number</p>
+                                            <p style="margin: 0; font-size: 16px; font-weight: 700; color: #0F172A;">{{.OrderNumber}}</p>
                                         </td>
                                         <td style="width: 50%; text-align: right;">
-                                            <p style="margin: 0 0 4px 0; font-size: 11px; font-weight: 600; color: #71717a; text-transform: uppercase; letter-spacing: 0.5px;">
+                                            <p style="margin: 0 0 4px 0; font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">
                                                 {{if eq .OrderStatus "CANCELLED"}}Cancelled On
                                                 {{else if eq .OrderStatus "DELIVERED"}}Delivered On
                                                 {{else}}Order Date{{end}}
                                             </p>
-                                            <p style="margin: 0; font-size: 14px; color: #3f3f46;">
+                                            <p style="margin: 0; font-size: 14px; color: #334155;">
                                                 {{if eq .OrderStatus "CANCELLED"}}{{.CancelledDate}}
                                                 {{else if eq .OrderStatus "DELIVERED"}}{{.DeliveryDate}}
                                                 {{else}}{{.OrderDate}}{{end}}
@@ -159,11 +168,11 @@
             {{if .EstimatedDelivery}}
             <tr>
                 <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-radius: 12px; border: 1px solid #bfdbfe;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #DBEAFE; border-radius: 8px; border: 1px solid #93C5FD;">
                         <tr>
                             <td style="padding: 24px; text-align: center;">
-                                <p style="margin: 0 0 4px 0; font-size: 11px; font-weight: 600; color: #3b82f6; text-transform: uppercase; letter-spacing: 1px;">Estimated Delivery</p>
-                                <p style="margin: 0; font-size: 24px; font-weight: 700; color: #1e40af;">{{.EstimatedDelivery}}</p>
+                                <p style="margin: 0 0 4px 0; font-size: 12px; font-weight: 600; color: #3B82F6; text-transform: uppercase; letter-spacing: 1px;">Estimated Delivery</p>
+                                <p style="margin: 0; font-size: 24px; font-weight: 700; color: #1E40AF;">{{.EstimatedDelivery}}</p>
                             </td>
                         </tr>
                     </table>
@@ -175,20 +184,20 @@
             {{if .TrackingNumber}}
             <tr>
                 <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f8fafc; border-radius: 12px;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #F8FAFC; border-radius: 8px; border: 1px solid #E2E8F0;">
                         <tr>
                             <td style="padding: 20px;">
                                 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                                     <tr>
                                         <td>
-                                            <p style="margin: 0 0 4px 0; font-size: 11px; font-weight: 600; color: #71717a; text-transform: uppercase; letter-spacing: 0.5px;">Carrier</p>
-                                            <p style="margin: 0 0 16px 0; font-size: 14px; font-weight: 600; color: #18181b;">{{.Carrier}}</p>
+                                            <p style="margin: 0 0 4px 0; font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Carrier</p>
+                                            <p style="margin: 0 0 16px 0; font-size: 14px; font-weight: 600; color: #0F172A;">{{.Carrier}}</p>
                                         </td>
                                     </tr>
                                     <tr>
                                         <td>
-                                            <p style="margin: 0 0 4px 0; font-size: 11px; font-weight: 600; color: #71717a; text-transform: uppercase; letter-spacing: 0.5px;">Tracking Number</p>
-                                            <p style="margin: 0; font-family: 'SF Mono', 'Roboto Mono', monospace; font-size: 14px; font-weight: 600; color: #3b82f6; letter-spacing: 1px;">{{.TrackingNumber}}</p>
+                                            <p style="margin: 0 0 4px 0; font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Tracking Number</p>
+                                            <p style="margin: 0; font-family: 'JetBrains Mono', 'SFMono-Regular', 'Menlo', monospace; font-size: 14px; font-weight: 600; color: #3B82F6; letter-spacing: 1px;">{{.TrackingNumber}}</p>
                                         </td>
                                     </tr>
                                 </table>
@@ -202,38 +211,38 @@
             <!-- Shipment Progress -->
             <tr>
                 <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
-                    <p style="margin: 0 0 16px 0; font-size: 14px; font-weight: 600; color: #18181b;">
+                    <p style="margin: 0 0 16px 0; font-size: 14px; font-weight: 600; color: #0F172A;">
                         Shipment Progress
                     </p>
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                         <tr>
                             <!-- Step 1: Confirmed -->
                             <td style="width: 25%; text-align: center;">
-                                <div style="width: 32px; height: 32px; margin: 0 auto; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; line-height: 32px;">
+                                <div style="width: 32px; height: 32px; margin: 0 auto; background-color: #10B981; border-radius: 50%; line-height: 32px;">
                                     <span style="color: #ffffff; font-size: 14px;">&#10003;</span>
                                 </div>
-                                <p style="margin: 8px 0 0 0; font-size: 11px; color: #059669; font-weight: 500;">Confirmed</p>
+                                <p style="margin: 8px 0 0 0; font-size: 12px; color: #059669; font-weight: 500;">Confirmed</p>
                             </td>
                             <!-- Step 2: Shipped -->
                             <td style="width: 25%; text-align: center;">
-                                <div style="width: 32px; height: 32px; margin: 0 auto; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border-radius: 50%; line-height: 32px;">
+                                <div style="width: 32px; height: 32px; margin: 0 auto; background-color: #3B82F6; border-radius: 50%; line-height: 32px;">
                                     <span style="color: #ffffff; font-size: 14px;">&#10003;</span>
                                 </div>
-                                <p style="margin: 8px 0 0 0; font-size: 11px; color: #2563eb; font-weight: 600;">Shipped</p>
+                                <p style="margin: 8px 0 0 0; font-size: 12px; color: #2563EB; font-weight: 600;">Shipped</p>
                             </td>
                             <!-- Step 3: In Transit -->
                             <td style="width: 25%; text-align: center;">
-                                <div style="width: 32px; height: 32px; margin: 0 auto; background-color: #e2e8f0; border-radius: 50%; line-height: 32px;">
-                                    <span style="color: #94a3b8; font-size: 14px;">3</span>
+                                <div style="width: 32px; height: 32px; margin: 0 auto; background-color: #E2E8F0; border-radius: 50%; line-height: 32px;">
+                                    <span style="color: #94A3B8; font-size: 14px;">3</span>
                                 </div>
-                                <p style="margin: 8px 0 0 0; font-size: 11px; color: #94a3b8;">In Transit</p>
+                                <p style="margin: 8px 0 0 0; font-size: 12px; color: #94A3B8;">In Transit</p>
                             </td>
                             <!-- Step 4: Delivered -->
                             <td style="width: 25%; text-align: center;">
-                                <div style="width: 32px; height: 32px; margin: 0 auto; background-color: #e2e8f0; border-radius: 50%; line-height: 32px;">
-                                    <span style="color: #94a3b8; font-size: 14px;">4</span>
+                                <div style="width: 32px; height: 32px; margin: 0 auto; background-color: #E2E8F0; border-radius: 50%; line-height: 32px;">
+                                    <span style="color: #94A3B8; font-size: 14px;">4</span>
                                 </div>
-                                <p style="margin: 8px 0 0 0; font-size: 11px; color: #94a3b8;">Delivered</p>
+                                <p style="margin: 8px 0 0 0; font-size: 12px; color: #94A3B8;">Delivered</p>
                             </td>
                         </tr>
                     </table>
@@ -246,7 +255,7 @@
             <!-- Delivery Confirmation -->
             <tr>
                 <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); border-radius: 12px; border: 1px solid #86efac;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #D1FAE5; border-radius: 8px; border: 1px solid #6EE7B7;">
                         <tr>
                             <td style="padding: 24px; text-align: center;">
                                 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
@@ -255,7 +264,7 @@
                                             <span style="font-size: 24px;">&#10003;</span>
                                         </td>
                                         <td style="vertical-align: middle; text-align: left;">
-                                            <p style="margin: 0 0 2px 0; font-size: 11px; font-weight: 600; color: #059669; text-transform: uppercase; letter-spacing: 0.5px;">Delivered On</p>
+                                            <p style="margin: 0 0 2px 0; font-size: 12px; font-weight: 600; color: #059669; text-transform: uppercase; letter-spacing: 0.5px;">Delivered On</p>
                                             <p style="margin: 0; font-size: 18px; font-weight: 700; color: #166534;">{{.DeliveryDate}}</p>
                                         </td>
                                     </tr>
@@ -270,7 +279,7 @@
             <!-- Delivery Location -->
             <tr>
                 <td style="padding: 16px 40px 0 40px;" class="mobile-padding">
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f8fafc; border-radius: 10px;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #F8FAFC; border-radius: 8px; border: 1px solid #E2E8F0;">
                         <tr>
                             <td style="padding: 16px 20px;">
                                 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
@@ -279,8 +288,8 @@
                                             <span style="font-size: 18px;">&#128205;</span>
                                         </td>
                                         <td style="vertical-align: top;">
-                                            <p style="margin: 0 0 4px 0; font-size: 12px; font-weight: 600; color: #71717a;">Delivered To</p>
-                                            <p style="margin: 0; font-size: 13px; color: #3f3f46;">{{.DeliveryLocation}}</p>
+                                            <p style="margin: 0 0 4px 0; font-size: 12px; font-weight: 600; color: #64748B;">Delivered To</p>
+                                            <p style="margin: 0; font-size: 14px; color: #334155;">{{.DeliveryLocation}}</p>
                                         </td>
                                     </tr>
                                 </table>
@@ -297,28 +306,28 @@
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                         <tr>
                             <td style="width: 25%; text-align: center;">
-                                <div style="width: 28px; height: 28px; margin: 0 auto; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; line-height: 28px;">
+                                <div style="width: 28px; height: 28px; margin: 0 auto; background-color: #10B981; border-radius: 50%; line-height: 28px;">
                                     <span style="color: #ffffff; font-size: 12px;">&#10003;</span>
                                 </div>
-                                <p style="margin: 6px 0 0 0; font-size: 10px; color: #059669; font-weight: 500;">Confirmed</p>
+                                <p style="margin: 6px 0 0 0; font-size: 12px; color: #059669; font-weight: 500;">Confirmed</p>
                             </td>
                             <td style="width: 25%; text-align: center;">
-                                <div style="width: 28px; height: 28px; margin: 0 auto; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; line-height: 28px;">
+                                <div style="width: 28px; height: 28px; margin: 0 auto; background-color: #10B981; border-radius: 50%; line-height: 28px;">
                                     <span style="color: #ffffff; font-size: 12px;">&#10003;</span>
                                 </div>
-                                <p style="margin: 6px 0 0 0; font-size: 10px; color: #059669; font-weight: 500;">Shipped</p>
+                                <p style="margin: 6px 0 0 0; font-size: 12px; color: #059669; font-weight: 500;">Shipped</p>
                             </td>
                             <td style="width: 25%; text-align: center;">
-                                <div style="width: 28px; height: 28px; margin: 0 auto; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; line-height: 28px;">
+                                <div style="width: 28px; height: 28px; margin: 0 auto; background-color: #10B981; border-radius: 50%; line-height: 28px;">
                                     <span style="color: #ffffff; font-size: 12px;">&#10003;</span>
                                 </div>
-                                <p style="margin: 6px 0 0 0; font-size: 10px; color: #059669; font-weight: 500;">In Transit</p>
+                                <p style="margin: 6px 0 0 0; font-size: 12px; color: #059669; font-weight: 500;">In Transit</p>
                             </td>
                             <td style="width: 25%; text-align: center;">
-                                <div style="width: 28px; height: 28px; margin: 0 auto; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; line-height: 28px;">
+                                <div style="width: 28px; height: 28px; margin: 0 auto; background-color: #10B981; border-radius: 50%; line-height: 28px;">
                                     <span style="color: #ffffff; font-size: 12px;">&#10003;</span>
                                 </div>
-                                <p style="margin: 6px 0 0 0; font-size: 10px; color: #059669; font-weight: 600;">Delivered</p>
+                                <p style="margin: 6px 0 0 0; font-size: 12px; color: #059669; font-weight: 600;">Delivered</p>
                             </td>
                         </tr>
                     </table>
@@ -328,7 +337,7 @@
             <!-- Review Request -->
             <tr>
                 <td style="padding: 32px 40px 0 40px;" class="mobile-padding">
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 12px; border: 1px solid #fcd34d;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #FEF3C7; border-radius: 8px; border: 1px solid #FCD34D;">
                         <tr>
                             <td style="padding: 24px;">
                                 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
@@ -337,8 +346,8 @@
                                             <span style="font-size: 24px;">&#11088;</span>
                                         </td>
                                         <td style="vertical-align: top;">
-                                            <p style="margin: 0 0 4px 0; font-size: 14px; font-weight: 600; color: #92400e;">How was your order?</p>
-                                            <p style="margin: 0; font-size: 13px; color: #a16207; line-height: 1.5;">
+                                            <p style="margin: 0 0 4px 0; font-size: 14px; font-weight: 600; color: #92400E;">How was your order?</p>
+                                            <p style="margin: 0; font-size: 14px; color: #A16207; line-height: 1.5;">
                                                 We'd love to hear your feedback! Your review helps other customers make informed decisions.
                                             </p>
                                         </td>
@@ -380,7 +389,7 @@
             <!-- Refund Info for cancelled orders -->
             <tr>
                 <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); border-radius: 12px; border: 1px solid #86efac;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #D1FAE5; border-radius: 8px; border: 1px solid #6EE7B7;">
                         <tr>
                             <td style="padding: 24px;">
                                 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
@@ -390,7 +399,7 @@
                                         </td>
                                         <td style="vertical-align: middle;">
                                             <p style="margin: 0 0 4px 0; font-size: 14px; font-weight: 600; color: #166534;">Refund Information</p>
-                                            <p style="margin: 0; font-size: 13px; color: #15803d; line-height: 1.5;">
+                                            <p style="margin: 0; font-size: 14px; color: #15803D; line-height: 1.5;">
                                                 {{if .RefundAmount}}
                                                 A refund of <strong>{{.Currency}}{{.RefundAmount}}</strong> will be processed to your original payment method within {{if .RefundDays}}{{.RefundDays}}{{else}}5-7{{end}} business days.
                                                 {{else}}
@@ -411,7 +420,7 @@
             {{if eq .OrderStatus "REFUNDED"}}
             <tr>
                 <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); border-radius: 12px; border: 1px solid #86efac;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #D1FAE5; border-radius: 8px; border: 1px solid #6EE7B7;">
                         <tr>
                             <td style="padding: 24px;">
                                 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
@@ -421,7 +430,7 @@
                                         </td>
                                         <td style="vertical-align: middle;">
                                             <p style="margin: 0 0 4px 0; font-size: 14px; font-weight: 600; color: #166534;">Refund Completed</p>
-                                            <p style="margin: 0; font-size: 13px; color: #15803d; line-height: 1.5;">
+                                            <p style="margin: 0; font-size: 14px; color: #15803D; line-height: 1.5;">
                                                 {{if .RefundAmount}}
                                                 <strong>{{.Currency}}{{.RefundAmount}}</strong> has been refunded to your original payment method.
                                                 {{else}}
@@ -484,34 +493,34 @@
             {{if eq .OrderStatus "CONFIRMED"}}
             <tr>
                 <td style="padding: 16px 40px;" class="mobile-padding">
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f8fafc; border-radius: 10px;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #F8FAFC; border-radius: 8px; border: 1px solid #E2E8F0;">
                         <tr>
                             <td style="padding: 16px 20px;">
                                 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                                     <tr>
-                                        <td><p style="margin: 0; font-size: 13px; color: #71717a;">Subtotal</p></td>
-                                        <td style="text-align: right;"><p style="margin: 0; font-size: 13px; color: #3f3f46;">{{.Currency}}{{.Subtotal}}</p></td>
+                                        <td><p style="margin: 0; font-size: 14px; color: #64748B;">Subtotal</p></td>
+                                        <td style="text-align: right;"><p style="margin: 0; font-size: 14px; color: #334155;">{{.Currency}}{{.Subtotal}}</p></td>
                                     </tr>
                                     {{if .Discount}}
                                     <tr>
-                                        <td><p style="margin: 8px 0 0 0; font-size: 13px; color: #10b981;">Discount</p></td>
-                                        <td style="text-align: right;"><p style="margin: 8px 0 0 0; font-size: 13px; color: #10b981;">-{{.Currency}}{{.Discount}}</p></td>
+                                        <td><p style="margin: 8px 0 0 0; font-size: 14px; color: #10B981;">Discount</p></td>
+                                        <td style="text-align: right;"><p style="margin: 8px 0 0 0; font-size: 14px; color: #10B981;">-{{.Currency}}{{.Discount}}</p></td>
                                     </tr>
                                     {{end}}
                                     <tr>
-                                        <td><p style="margin: 8px 0 0 0; font-size: 13px; color: #71717a;">Shipping</p></td>
-                                        <td style="text-align: right;"><p style="margin: 8px 0 0 0; font-size: 13px; color: #3f3f46;">{{if eq .Shipping "0.00"}}Free{{else}}{{.Currency}}{{.Shipping}}{{end}}</p></td>
+                                        <td><p style="margin: 8px 0 0 0; font-size: 14px; color: #64748B;">Shipping</p></td>
+                                        <td style="text-align: right;"><p style="margin: 8px 0 0 0; font-size: 14px; color: #334155;">{{if eq .Shipping "0.00"}}Free{{else}}{{.Currency}}{{.Shipping}}{{end}}</p></td>
                                     </tr>
                                     <tr>
-                                        <td><p style="margin: 8px 0 0 0; font-size: 13px; color: #71717a;">Tax</p></td>
-                                        <td style="text-align: right;"><p style="margin: 8px 0 0 0; font-size: 13px; color: #3f3f46;">{{.Currency}}{{.Tax}}</p></td>
+                                        <td><p style="margin: 8px 0 0 0; font-size: 14px; color: #64748B;">Tax</p></td>
+                                        <td style="text-align: right;"><p style="margin: 8px 0 0 0; font-size: 14px; color: #334155;">{{.Currency}}{{.Tax}}</p></td>
                                     </tr>
                                     <tr>
-                                        <td colspan="2" style="padding-top: 12px; border-top: 1px solid #e2e8f0;">
+                                        <td colspan="2" style="padding-top: 12px; border-top: 1px solid #E2E8F0;">
                                             <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                                                 <tr>
-                                                    <td><p style="margin: 0; font-size: 16px; font-weight: 700; color: #18181b;">Total</p></td>
-                                                    <td style="text-align: right;"><p style="margin: 0; font-size: 18px; font-weight: 700; color: #18181b;">{{.Currency}}{{.Total}}</p></td>
+                                                    <td><p style="margin: 0; font-size: 16px; font-weight: 700; color: #0F172A;">Total</p></td>
+                                                    <td style="text-align: right;"><p style="margin: 0; font-size: 18px; font-weight: 700; color: #0F172A;">{{.Currency}}{{.Total}}</p></td>
                                                 </tr>
                                             </table>
                                         </td>
@@ -529,7 +538,7 @@
             {{if .ShippingAddress}}
             <tr>
                 <td style="padding: 8px 40px 24px 40px;" class="mobile-padding">
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f8fafc; border-radius: 10px;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #F8FAFC; border-radius: 8px; border: 1px solid #E2E8F0;">
                         <tr>
                             <td style="padding: 16px 20px;">
                                 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
@@ -538,10 +547,10 @@
                                             <span style="font-size: 18px;">&#128205;</span>
                                         </td>
                                         <td style="vertical-align: top;">
-                                            <p style="margin: 0 0 4px 0; font-size: 12px; font-weight: 600; color: #71717a;">
+                                            <p style="margin: 0 0 4px 0; font-size: 12px; font-weight: 600; color: #64748B;">
                                                 {{if eq .OrderStatus "SHIPPED"}}Delivering To{{else}}Shipping To{{end}}
                                             </p>
-                                            <p style="margin: 0; font-size: 13px; color: #3f3f46; line-height: 1.5;">
+                                            <p style="margin: 0; font-size: 14px; color: #334155; line-height: 1.5;">
                                                 {{.ShippingAddress.Name}}<br>
                                                 {{.ShippingAddress.Line1}}<br>
                                                 {{if .ShippingAddress.Line2}}{{.ShippingAddress.Line2}}<br>{{end}}
@@ -566,32 +575,32 @@
                         <tr>
                             {{if eq .OrderStatus "DELIVERED"}}
                             <!-- Two buttons for delivered: Review + View Order -->
-                            <td style="background: linear-gradient(135deg, #18181b 0%, #27272a 100%); border-radius: 10px;">
-                                <a href="{{.ReviewURL}}" style="display: inline-block; padding: 14px 32px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
+                            <td style="background-color: #0F172A; border-radius: 8px;">
+                                <a href="{{.ReviewURL}}" style="display: inline-block; padding: 12px 24px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
                                     Write a Review &#11088;
                                 </a>
                             </td>
                             <td style="width: 12px;"></td>
-                            <td style="border: 2px solid #e2e8f0; border-radius: 10px;">
-                                <a href="{{.OrderDetailsURL}}" style="display: inline-block; padding: 12px 24px; font-size: 14px; font-weight: 600; color: #3f3f46; text-decoration: none;">
+                            <td style="border: 1px solid #E2E8F0; border-radius: 8px;">
+                                <a href="{{.OrderDetailsURL}}" style="display: inline-block; padding: 12px 24px; font-size: 14px; font-weight: 600; color: #334155; text-decoration: none;">
                                     View Order
                                 </a>
                             </td>
                             {{else if eq .OrderStatus "CANCELLED"}}
-                            <td style="background: linear-gradient(135deg, #18181b 0%, #27272a 100%); border-radius: 10px;">
-                                <a href="{{.ShopURL}}" style="display: inline-block; padding: 14px 32px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
+                            <td style="background-color: #0F172A; border-radius: 8px;">
+                                <a href="{{.ShopURL}}" style="display: inline-block; padding: 12px 24px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
                                     Continue Shopping &#8594;
                                 </a>
                             </td>
                             {{else if eq .OrderStatus "SHIPPED"}}
-                            <td style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border-radius: 10px; box-shadow: 0 4px 14px rgba(59,130,246,0.3);">
-                                <a href="{{.TrackingURL}}" style="display: inline-block; padding: 16px 40px; font-size: 15px; font-weight: 600; color: #ffffff; text-decoration: none;">
+                            <td style="background-color: #3B82F6; border-radius: 8px; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);">
+                                <a href="{{.TrackingURL}}" style="display: inline-block; padding: 12px 32px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
                                     Track Package &#8594;
                                 </a>
                             </td>
                             {{else}}
-                            <td style="background: linear-gradient(135deg, #18181b 0%, #27272a 100%); border-radius: 10px;">
-                                <a href="{{if .TrackingURL}}{{.TrackingURL}}{{else}}{{.OrderDetailsURL}}{{end}}" style="display: inline-block; padding: 14px 32px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
+                            <td style="background-color: #0F172A; border-radius: 8px;">
+                                <a href="{{if .TrackingURL}}{{.TrackingURL}}{{else}}{{.OrderDetailsURL}}{{end}}" style="display: inline-block; padding: 12px 24px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
                                     {{if eq .OrderStatus "CONFIRMED"}}Track Your Order{{else}}View Order{{end}} &#8594;
                                 </a>
                             </td>
@@ -609,16 +618,16 @@
 <!-- Footer -->
 <tr>
     <td style="padding: 32px 20px; text-align: center;">
-        <p style="margin: 0 0 8px 0; font-size: 13px; color: #71717a;">
+        <p style="margin: 0 0 8px 0; font-size: 14px; color: #64748B;">
             {{if eq .OrderStatus "DELIVERED"}}
-            Have an issue with your order? <a href="mailto:{{.SupportEmail}}" style="color: #6366f1; text-decoration: none; font-weight: 500;">Contact Support</a>
+            Have an issue with your order? <a href="mailto:{{.SupportEmail}}" style="color: #0F172A; text-decoration: none; font-weight: 600;">Contact Support</a>
             {{else if eq .OrderStatus "CANCELLED"}}
-            Questions about your refund? <a href="mailto:{{.SupportEmail}}" style="color: #6366f1; text-decoration: none; font-weight: 500;">Contact Support</a>
+            Questions about your refund? <a href="mailto:{{.SupportEmail}}" style="color: #0F172A; text-decoration: none; font-weight: 600;">Contact Support</a>
             {{else}}
-            Questions? Contact us at <a href="mailto:{{.SupportEmail}}" style="color: #6366f1; text-decoration: none; font-weight: 500;">{{.SupportEmail}}</a>
+            Questions? Contact us at <a href="mailto:{{.SupportEmail}}" style="color: #0F172A; text-decoration: none; font-weight: 600;">{{.SupportEmail}}</a>
             {{end}}
         </p>
-        <p style="margin: 0; font-size: 12px; color: #a1a1aa;">
+        <p style="margin: 0; font-size: 12px; color: #94A3B8;">
             &copy; {{.Year}} {{.BusinessName}}. All rights reserved.
         </p>
     </td>

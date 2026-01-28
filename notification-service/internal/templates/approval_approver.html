@@ -5,20 +5,20 @@
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
             <tr>
                 {{if eq .ApprovalPriority "urgent"}}
-                <td style="background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
+                <td style="background-color: #dc2626; width: 48px; height: 48px; border-radius: 8px; text-align: center; vertical-align: middle;">
                 {{else if eq .ApprovalPriority "high"}}
-                <td style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
+                <td style="background-color: #F59E0B; width: 48px; height: 48px; border-radius: 8px; text-align: center; vertical-align: middle;">
                 {{else if eq .ApprovalStatus "ESCALATED"}}
-                <td style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
+                <td style="background-color: #7c3aed; width: 48px; height: 48px; border-radius: 8px; text-align: center; vertical-align: middle;">
                 {{else}}
-                <td style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
+                <td style="background-color: #3B82F6; width: 48px; height: 48px; border-radius: 8px; text-align: center; vertical-align: middle;">
                 {{end}}
                     <span style="color: #ffffff; font-size: 24px; font-weight: 700;">{{if .BusinessInitial}}{{.BusinessInitial}}{{else}}A{{end}}</span>
                 </td>
             </tr>
         </table>
         {{if .BusinessName}}
-        <p style="margin: 12px 0 0 0; font-size: 18px; font-weight: 600; color: #18181b; letter-spacing: -0.3px;">{{.BusinessName}}</p>
+        <p style="margin: 12px 0 0 0; font-size: 18px; font-weight: 600; color: #0F172A; letter-spacing: -0.3px;">{{.BusinessName}}</p>
         {{end}}
     </td>
 </tr>
@@ -28,12 +28,12 @@
 <!-- Main Card -->
 <tr>
     <td>
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1); overflow: hidden;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ffffff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1); overflow: hidden;">
 
             <!-- Dynamic Header based on Priority/Status -->
             <tr>
                 {{if eq .ApprovalPriority "urgent"}}
-                <td style="background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); padding: 32px 40px; text-align: center;" class="mobile-padding">
+                <td style="background-color: #dc2626; padding: 32px 40px; text-align: center;" class="mobile-padding">
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
                         <tr>
                             <td style="width: 64px; height: 64px; background-color: rgba(255,255,255,0.2); border-radius: 50%; text-align: center; vertical-align: middle;">
@@ -49,7 +49,7 @@
                     </p>
                 </td>
                 {{else if eq .ApprovalPriority "high"}}
-                <td style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding: 32px 40px; text-align: center;" class="mobile-padding">
+                <td style="background-color: #F59E0B; padding: 32px 40px; text-align: center;" class="mobile-padding">
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
                         <tr>
                             <td style="width: 64px; height: 64px; background-color: rgba(255,255,255,0.2); border-radius: 50%; text-align: center; vertical-align: middle;">
@@ -65,7 +65,7 @@
                     </p>
                 </td>
                 {{else if eq .ApprovalStatus "ESCALATED"}}
-                <td style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); padding: 32px 40px; text-align: center;" class="mobile-padding">
+                <td style="background-color: #7c3aed; padding: 32px 40px; text-align: center;" class="mobile-padding">
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
                         <tr>
                             <td style="width: 64px; height: 64px; background-color: rgba(255,255,255,0.2); border-radius: 50%; text-align: center; vertical-align: middle;">
@@ -81,7 +81,7 @@
                     </p>
                 </td>
                 {{else}}
-                <td style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); padding: 32px 40px; text-align: center;" class="mobile-padding">
+                <td style="background-color: #3B82F6; padding: 32px 40px; text-align: center;" class="mobile-padding">
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
                         <tr>
                             <td style="width: 64px; height: 64px; background-color: rgba(255,255,255,0.2); border-radius: 50%; text-align: center; vertical-align: middle;">
@@ -102,10 +102,10 @@
             <!-- Greeting -->
             <tr>
                 <td style="padding: 32px 40px 0 40px;" class="mobile-padding">
-                    <p style="margin: 0; font-size: 15px; color: #3f3f46; line-height: 1.6;">
+                    <p style="margin: 0; font-size: 14px; color: #334155; line-height: 1.6;">
                         Hi {{.ApproverName}},
                     </p>
-                    <p style="margin: 16px 0 0 0; font-size: 15px; color: #3f3f46; line-height: 1.6;">
+                    <p style="margin: 16px 0 0 0; font-size: 14px; color: #334155; line-height: 1.6;">
                         {{if eq .ApprovalStatus "ESCALATED"}}
                         An approval request has been <strong>escalated</strong> to you for review. {{if .EscalatedFromName}}This was escalated from <strong>{{.EscalatedFromName}}</strong>.{{end}}
                         {{else}}
@@ -118,17 +118,17 @@
             <!-- Request Details -->
             <tr>
                 <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #F8FAFC; border-radius: 8px; border: 1px solid #e2e8f0;">
                         <tr>
                             <td style="padding: 20px;">
-                                <p style="margin: 0 0 16px 0; font-size: 14px; font-weight: 600; color: #18181b;">Request Details</p>
+                                <p style="margin: 0 0 16px 0; font-size: 14px; font-weight: 600; color: #0F172A;">Request Details</p>
                                 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                                     <tr>
                                         <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">
                                             <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                                                 <tr>
-                                                    <td style="width: 120px; font-size: 13px; color: #71717a;">Action Type</td>
-                                                    <td style="font-size: 14px; font-weight: 500; color: #18181b;">{{.ActionTypeDisplay}}</td>
+                                                    <td style="width: 120px; font-size: 14px; color: #64748B;">Action Type</td>
+                                                    <td style="font-size: 14px; font-weight: 500; color: #0F172A;">{{.ActionTypeDisplay}}</td>
                                                 </tr>
                                             </table>
                                         </td>
@@ -138,8 +138,8 @@
                                         <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">
                                             <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                                                 <tr>
-                                                    <td style="width: 120px; font-size: 13px; color: #71717a;">Resource</td>
-                                                    <td style="font-size: 14px; font-weight: 500; color: #18181b;">{{.ResourceType}} {{if .ResourceID}}({{.ResourceID}}){{end}}</td>
+                                                    <td style="width: 120px; font-size: 14px; color: #64748B;">Resource</td>
+                                                    <td style="font-size: 14px; font-weight: 500; color: #0F172A;">{{.ResourceType}} {{if .ResourceID}}({{.ResourceID}}){{end}}</td>
                                                 </tr>
                                             </table>
                                         </td>
@@ -149,8 +149,8 @@
                                         <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">
                                             <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                                                 <tr>
-                                                    <td style="width: 120px; font-size: 13px; color: #71717a;">Requester</td>
-                                                    <td style="font-size: 14px; font-weight: 500; color: #18181b;">{{.RequesterName}}{{if .RequesterEmail}} ({{.RequesterEmail}}){{end}}</td>
+                                                    <td style="width: 120px; font-size: 14px; color: #64748B;">Requester</td>
+                                                    <td style="font-size: 14px; font-weight: 500; color: #0F172A;">{{.RequesterName}}{{if .RequesterEmail}} ({{.RequesterEmail}}){{end}}</td>
                                                 </tr>
                                             </table>
                                         </td>
@@ -159,14 +159,14 @@
                                         <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">
                                             <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                                                 <tr>
-                                                    <td style="width: 120px; font-size: 13px; color: #71717a;">Priority</td>
+                                                    <td style="width: 120px; font-size: 14px; color: #64748B;">Priority</td>
                                                     <td style="font-size: 14px; font-weight: 500;">
                                                         {{if eq .ApprovalPriority "urgent"}}
                                                         <span style="color: #dc2626;">Urgent</span>
                                                         {{else if eq .ApprovalPriority "high"}}
                                                         <span style="color: #f59e0b;">High</span>
                                                         {{else}}
-                                                        <span style="color: #18181b;">Normal</span>
+                                                        <span style="color: #0F172A;">Normal</span>
                                                         {{end}}
                                                     </td>
                                                 </tr>
@@ -177,8 +177,8 @@
                                         <td style="padding: 8px 0;">
                                             <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                                                 <tr>
-                                                    <td style="width: 120px; font-size: 13px; color: #71717a;">Expires</td>
-                                                    <td style="font-size: 14px; font-weight: 500; color: #18181b;">{{.ApprovalExpiresAt}}</td>
+                                                    <td style="width: 120px; font-size: 14px; color: #64748B;">Expires</td>
+                                                    <td style="font-size: 14px; font-weight: 500; color: #0F172A;">{{.ApprovalExpiresAt}}</td>
                                                 </tr>
                                             </table>
                                         </td>
@@ -194,10 +194,10 @@
             {{if .ApprovalReason}}
             <tr>
                 <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f0f9ff; border-radius: 12px; border: 1px solid #bae6fd;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f0f9ff; border-radius: 8px; border: 1px solid #bae6fd;">
                         <tr>
                             <td style="padding: 20px;">
-                                <p style="margin: 0 0 8px 0; font-size: 11px; font-weight: 600; color: #0369a1; text-transform: uppercase; letter-spacing: 0.5px;">Reason Provided</p>
+                                <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 600; color: #0369a1; text-transform: uppercase; letter-spacing: 0.5px;">Reason Provided</p>
                                 <p style="margin: 0; font-size: 14px; color: #0c4a6e; line-height: 1.5;">{{.ApprovalReason}}</p>
                             </td>
                         </tr>
@@ -211,14 +211,14 @@
                 <td style="padding: 24px 40px 32px 40px; text-align: center;" class="mobile-padding">
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
                         <tr>
-                            <td style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border-radius: 10px;">
+                            <td style="background-color: #3B82F6; border-radius: 10px;">
                                 <a href="{{.ApprovalURL}}" style="display: inline-block; padding: 14px 32px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
                                     Review &amp; Decide &#8594;
                                 </a>
                             </td>
                         </tr>
                     </table>
-                    <p style="margin: 16px 0 0 0; font-size: 13px; color: #71717a;">
+                    <p style="margin: 16px 0 0 0; font-size: 14px; color: #64748B;">
                         Please review this request before it expires.
                     </p>
                 </td>
@@ -232,10 +232,10 @@
 <!-- Footer -->
 <tr>
     <td style="padding: 32px 20px; text-align: center;">
-        <p style="margin: 0 0 8px 0; font-size: 13px; color: #71717a;">
+        <p style="margin: 0 0 8px 0; font-size: 14px; color: #64748B;">
             Questions? Contact us at <a href="mailto:{{.SupportEmail}}" style="color: #3b82f6; text-decoration: none; font-weight: 500;">{{.SupportEmail}}</a>
         </p>
-        <p style="margin: 0; font-size: 12px; color: #a1a1aa;">
+        <p style="margin: 0; font-size: 12px; color: #94A3B8;">
             &copy; {{.Year}} {{.BusinessName}}. All rights reserved.
         </p>
     </td>

@@ -1,16 +1,22 @@
 {{define "header"}}
-<!-- Logo -->
+<!-- Logo with tenant branding support -->
 <tr>
     <td style="text-align: center; padding-bottom: 24px;">
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
             <tr>
-                <td style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
-                    <span style="color: #ffffff; font-size: 24px; font-weight: 700;">{{if .BusinessInitial}}{{.BusinessInitial}}{{else}}T{{end}}</span>
+                {{if .BrandLogoURL}}
+                <td style="text-align: center;">
+                    <img src="{{.BrandLogoURL}}" alt="{{.BusinessName}}" height="48" style="height: 48px; max-width: 200px; display: block; margin: 0 auto;">
                 </td>
+                {{else}}
+                <td style="background-color: {{if .BrandPrimaryColor}}{{.BrandPrimaryColor}}{{else}}#0F172A{{end}}; width: 48px; height: 48px; border-radius: 8px; text-align: center; vertical-align: middle;">
+                    <span style="color: {{if .BrandTextColor}}{{.BrandTextColor}}{{else}}#ffffff{{end}}; font-size: 24px; font-weight: 700;">{{if .BusinessInitial}}{{.BusinessInitial}}{{else}}T{{end}}</span>
+                </td>
+                {{end}}
             </tr>
         </table>
         {{if .BusinessName}}
-        <p style="margin: 12px 0 0 0; font-size: 18px; font-weight: 600; color: #18181b; letter-spacing: -0.3px;">{{.BusinessName}}</p>
+        <p style="margin: 12px 0 0 0; font-size: 18px; font-weight: 600; color: #0F172A; letter-spacing: -0.3px;">{{.BusinessName}}</p>
         {{end}}
     </td>
 </tr>
@@ -20,13 +26,13 @@
 <!-- Main Card -->
 <tr>
     <td>
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1);">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ffffff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1);">
             <!-- Icon Header -->
             <tr>
                 <td style="padding: 48px 40px 0 40px; text-align: center;" class="mobile-padding">
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
                         <tr>
-                            <td style="width: 80px; height: 80px; background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); border-radius: 50%; text-align: center; vertical-align: middle;">
+                            <td style="width: 80px; height: 80px; background-color: #dbeafe; border-radius: 50%; text-align: center; vertical-align: middle;">
                                 <span style="font-size: 40px;">&#9993;</span>
                             </td>
                         </tr>
@@ -37,7 +43,7 @@
             <!-- Title -->
             <tr>
                 <td style="padding: 28px 40px 0 40px; text-align: center;" class="mobile-padding">
-                    <h1 style="margin: 0; font-size: 26px; font-weight: 700; color: #18181b; line-height: 1.3;">
+                    <h1 style="margin: 0; font-size: 26px; font-weight: 700; color: #0F172A; line-height: 1.3;">
                         Verify your email address
                     </h1>
                 </td>
@@ -46,10 +52,10 @@
             <!-- Greeting -->
             <tr>
                 <td style="padding: 16px 40px 0 40px; text-align: center;" class="mobile-padding">
-                    <p style="margin: 0; font-size: 16px; color: #52525b; line-height: 1.6;">
+                    <p style="margin: 0; font-size: 16px; color: #475569; line-height: 1.6;">
                         {{if .CustomerName}}Hi {{.CustomerName}},{{else}}Hi there,{{end}}
                     </p>
-                    <p style="margin: 12px 0 0 0; font-size: 16px; color: #52525b; line-height: 1.6;">
+                    <p style="margin: 12px 0 0 0; font-size: 16px; color: #475569; line-height: 1.6;">
                         Please verify your email address to complete your account setup and unlock all features.
                     </p>
                 </td>
@@ -60,8 +66,8 @@
                 <td style="padding: 32px 40px; text-align: center;" class="mobile-padding">
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
                         <tr>
-                            <td style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); border-radius: 10px; box-shadow: 0 4px 14px rgba(99,102,241,0.3);">
-                                <a href="{{.VerificationLink}}" style="display: inline-block; padding: 18px 48px; font-size: 16px; font-weight: 600; color: #ffffff; text-decoration: none;">
+                            <td style="background-color: {{if .BrandPrimaryColor}}{{.BrandPrimaryColor}}{{else}}#0F172A{{end}}; border-radius: 10px;">
+                                <a href="{{.VerificationLink}}" style="display: inline-block; padding: 18px 48px; font-size: 16px; font-weight: 600; color: {{if .BrandTextColor}}{{.BrandTextColor}}{{else}}#ffffff{{end}}; text-decoration: none;">
                                     Verify Email Address
                                 </a>
                             </td>
@@ -73,29 +79,29 @@
             <!-- Benefits -->
             <tr>
                 <td style="padding: 0 40px;" class="mobile-padding">
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f8fafc; border-radius: 12px;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #F8FAFC; border-radius: 8px;">
                         <tr>
                             <td style="padding: 20px 24px;">
-                                <p style="margin: 0 0 12px 0; font-size: 14px; font-weight: 600; color: #18181b;">
+                                <p style="margin: 0 0 12px 0; font-size: 14px; font-weight: 600; color: #0F172A;">
                                     Once verified, you can:
                                 </p>
                                 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                                     <tr>
                                         <td style="padding: 6px 0;">
                                             <span style="color: #22c55e; font-size: 14px;">&#10003;</span>
-                                            <span style="margin-left: 8px; font-size: 14px; color: #52525b;">Complete checkout faster</span>
+                                            <span style="margin-left: 8px; font-size: 14px; color: #475569;">Complete checkout faster</span>
                                         </td>
                                     </tr>
                                     <tr>
                                         <td style="padding: 6px 0;">
                                             <span style="color: #22c55e; font-size: 14px;">&#10003;</span>
-                                            <span style="margin-left: 8px; font-size: 14px; color: #52525b;">Track your orders in real-time</span>
+                                            <span style="margin-left: 8px; font-size: 14px; color: #475569;">Track your orders in real-time</span>
                                         </td>
                                     </tr>
                                     <tr>
                                         <td style="padding: 6px 0;">
                                             <span style="color: #22c55e; font-size: 14px;">&#10003;</span>
-                                            <span style="margin-left: 8px; font-size: 14px; color: #52525b;">Receive exclusive offers and updates</span>
+                                            <span style="margin-left: 8px; font-size: 14px; color: #475569;">Receive exclusive offers and updates</span>
                                         </td>
                                     </tr>
                                 </table>
@@ -119,13 +125,13 @@
             <!-- Alternative Link -->
             <tr>
                 <td style="padding: 24px 40px;" class="mobile-padding">
-                    <p style="margin: 0 0 12px 0; font-size: 13px; color: #71717a; text-align: center;">
+                    <p style="margin: 0 0 12px 0; font-size: 14px; color: #64748B; text-align: center;">
                         Or copy this link into your browser:
                     </p>
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #F8FAFC; border-radius: 8px; border: 1px solid #e2e8f0;">
                         <tr>
                             <td style="padding: 14px 16px;">
-                                <p style="margin: 0; font-size: 12px; color: #6366f1; text-align: center; word-break: break-all; font-family: 'SF Mono', 'Roboto Mono', monospace;">
+                                <p style="margin: 0; font-size: 12px; color: #0F172A; text-align: center; word-break: break-all; font-family: 'JetBrains Mono', 'SFMono-Regular', 'Menlo', monospace;">
                                     {{.VerificationLink}}
                                 </p>
                             </td>
@@ -146,7 +152,7 @@
                                             <span style="font-size: 18px;">&#9888;</span>
                                         </td>
                                         <td style="vertical-align: top;">
-                                            <p style="margin: 0 0 4px 0; font-size: 13px; font-weight: 600; color: #92400e;">This link expires in 24 hours</p>
+                                            <p style="margin: 0 0 4px 0; font-size: 14px; font-weight: 600; color: #92400e;">This link expires in 24 hours</p>
                                             <p style="margin: 0; font-size: 12px; color: #a16207; line-height: 1.5;">
                                                 If you didn't create an account, you can safely ignore this email.
                                             </p>
@@ -167,10 +173,10 @@
 <!-- Footer -->
 <tr>
     <td style="padding: 32px 20px; text-align: center;">
-        <p style="margin: 0 0 12px 0; font-size: 13px; color: #71717a;">
-            Need help? <a href="mailto:{{.SupportEmail}}" style="color: #6366f1; text-decoration: none; font-weight: 500;">Contact us</a>
+        <p style="margin: 0 0 12px 0; font-size: 14px; color: #64748B;">
+            Need help? <a href="mailto:{{.SupportEmail}}" style="color: #0F172A; text-decoration: none; font-weight: 500;">Contact us</a>
         </p>
-        <p style="margin: 0; font-size: 12px; color: #a1a1aa;">
+        <p style="margin: 0; font-size: 12px; color: #94A3B8;">
             &copy; {{.Year}} {{if .BusinessName}}{{.BusinessName}}{{else}}Tesseract Hub{{end}}. All rights reserved.
         </p>
     </td>

@@ -1,16 +1,22 @@
 {{define "header"}}
-<!-- Logo -->
+<!-- Logo with tenant branding support -->
 <tr>
     <td style="text-align: center; padding-bottom: 24px;">
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
             <tr>
-                <td style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
-                    <span style="color: #ffffff; font-size: 24px; font-weight: 700;">{{if .BusinessInitial}}{{.BusinessInitial}}{{else}}T{{end}}</span>
+                {{if .BrandLogoURL}}
+                <td style="text-align: center;">
+                    <img src="{{.BrandLogoURL}}" alt="{{.BusinessName}}" height="48" style="height: 48px; max-width: 200px; display: block; margin: 0 auto;">
                 </td>
+                {{else}}
+                <td style="background-color: {{if .BrandPrimaryColor}}{{.BrandPrimaryColor}}{{else}}#0F172A{{end}}; width: 48px; height: 48px; border-radius: 8px; text-align: center; vertical-align: middle;">
+                    <span style="color: {{if .BrandTextColor}}{{.BrandTextColor}}{{else}}#ffffff{{end}}; font-size: 24px; font-weight: 700;">{{if .BusinessInitial}}{{.BusinessInitial}}{{else}}T{{end}}</span>
+                </td>
+                {{end}}
             </tr>
         </table>
         {{if .BusinessName}}
-        <p style="margin: 12px 0 0 0; font-size: 18px; font-weight: 600; color: #18181b; letter-spacing: -0.3px;">{{.BusinessName}}</p>
+        <p style="margin: 12px 0 0 0; font-size: 18px; font-weight: 600; color: #0F172A; letter-spacing: -0.3px;">{{.BusinessName}}</p>
         {{end}}
     </td>
 </tr>
@@ -20,13 +26,13 @@
 <!-- Main Card -->
 <tr>
     <td>
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1); overflow: hidden;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ffffff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1); overflow: hidden;">
 
             <!-- Welcome Header -->
             <tr>
-                <td style="background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 50%, #4f46e5 100%); padding: 48px 40px; text-align: center;" class="mobile-padding">
+                <td style="background-color: {{if .BrandPrimaryColor}}{{.BrandPrimaryColor}}{{else}}#0F172A{{end}}; padding: 48px 40px; text-align: center;" class="mobile-padding">
                     <span style="font-size: 56px; display: block; margin-bottom: 16px;">&#128075;</span>
-                    <h1 style="margin: 0 0 8px 0; font-size: 28px; font-weight: 700; color: #ffffff; line-height: 1.2;">
+                    <h1 style="margin: 0 0 8px 0; font-size: 28px; font-weight: 700; color: {{if .BrandTextColor}}{{.BrandTextColor}}{{else}}#ffffff{{end}}; line-height: 1.2;">
                         Welcome{{if .CustomerName}}, {{.CustomerName}}{{end}}!
                     </h1>
                     <p style="margin: 0; font-size: 16px; color: rgba(255,255,255,0.9);">
@@ -38,7 +44,7 @@
             <!-- Welcome Message -->
             <tr>
                 <td style="padding: 32px 40px 0 40px;" class="mobile-padding">
-                    <p style="margin: 0; font-size: 16px; color: #3f3f46; line-height: 1.6;">
+                    <p style="margin: 0; font-size: 16px; color: #334155; line-height: 1.6;">
                         We're thrilled to have you! Your account has been created successfully. Here's what you can do now:
                     </p>
                 </td>
@@ -51,13 +57,13 @@
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 16px;">
                         <tr>
                             <td style="width: 48px; vertical-align: top;">
-                                <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); border-radius: 10px; text-align: center; line-height: 40px;">
+                                <div style="width: 40px; height: 40px; background-color: #D1FAE5; border-radius: 10px; text-align: center; line-height: 40px;">
                                     <span style="font-size: 20px;">&#128722;</span>
                                 </div>
                             </td>
                             <td style="vertical-align: top; padding-left: 12px;">
-                                <p style="margin: 0 0 4px 0; font-size: 14px; font-weight: 600; color: #18181b;">Browse our products</p>
-                                <p style="margin: 0; font-size: 13px; color: #71717a; line-height: 1.4;">Discover amazing products tailored just for you</p>
+                                <p style="margin: 0 0 4px 0; font-size: 14px; font-weight: 600; color: #0F172A;">Browse our products</p>
+                                <p style="margin: 0; font-size: 14px; color: #64748B; line-height: 1.4;">Discover amazing products tailored just for you</p>
                             </td>
                         </tr>
                     </table>
@@ -66,13 +72,13 @@
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 16px;">
                         <tr>
                             <td style="width: 48px; vertical-align: top;">
-                                <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); border-radius: 10px; text-align: center; line-height: 40px;">
+                                <div style="width: 40px; height: 40px; background-color: #dbeafe; border-radius: 10px; text-align: center; line-height: 40px;">
                                     <span style="font-size: 20px;">&#10084;</span>
                                 </div>
                             </td>
                             <td style="vertical-align: top; padding-left: 12px;">
-                                <p style="margin: 0 0 4px 0; font-size: 14px; font-weight: 600; color: #18181b;">Save your favorites</p>
-                                <p style="margin: 0; font-size: 13px; color: #71717a; line-height: 1.4;">Create wishlists and save items for later</p>
+                                <p style="margin: 0 0 4px 0; font-size: 14px; font-weight: 600; color: #0F172A;">Save your favorites</p>
+                                <p style="margin: 0; font-size: 14px; color: #64748B; line-height: 1.4;">Create wishlists and save items for later</p>
                             </td>
                         </tr>
                     </table>
@@ -81,13 +87,13 @@
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 16px;">
                         <tr>
                             <td style="width: 48px; vertical-align: top;">
-                                <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 10px; text-align: center; line-height: 40px;">
+                                <div style="width: 40px; height: 40px; background-color: #FEF3C7; border-radius: 10px; text-align: center; line-height: 40px;">
                                     <span style="font-size: 20px;">&#127873;</span>
                                 </div>
                             </td>
                             <td style="vertical-align: top; padding-left: 12px;">
-                                <p style="margin: 0 0 4px 0; font-size: 14px; font-weight: 600; color: #18181b;">Earn rewards</p>
-                                <p style="margin: 0; font-size: 13px; color: #71717a; line-height: 1.4;">Get points on every purchase and unlock exclusive deals</p>
+                                <p style="margin: 0 0 4px 0; font-size: 14px; font-weight: 600; color: #0F172A;">Earn rewards</p>
+                                <p style="margin: 0; font-size: 14px; color: #64748B; line-height: 1.4;">Get points on every purchase and unlock exclusive deals</p>
                             </td>
                         </tr>
                     </table>
@@ -96,13 +102,13 @@
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                         <tr>
                             <td style="width: 48px; vertical-align: top;">
-                                <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%); border-radius: 10px; text-align: center; line-height: 40px;">
+                                <div style="width: 40px; height: 40px; background-color: #fce7f3; border-radius: 10px; text-align: center; line-height: 40px;">
                                     <span style="font-size: 20px;">&#128230;</span>
                                 </div>
                             </td>
                             <td style="vertical-align: top; padding-left: 12px;">
-                                <p style="margin: 0 0 4px 0; font-size: 14px; font-weight: 600; color: #18181b;">Track your orders</p>
-                                <p style="margin: 0; font-size: 13px; color: #71717a; line-height: 1.4;">Real-time updates on all your purchases</p>
+                                <p style="margin: 0 0 4px 0; font-size: 14px; font-weight: 600; color: #0F172A;">Track your orders</p>
+                                <p style="margin: 0; font-size: 14px; color: #64748B; line-height: 1.4;">Real-time updates on all your purchases</p>
                             </td>
                         </tr>
                     </table>
@@ -113,11 +119,11 @@
             <!-- Welcome Offer -->
             <tr>
                 <td style="padding: 32px 40px 0 40px;" class="mobile-padding">
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 16px; border: 2px dashed #f59e0b;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #FEF3C7; border-radius: 10px; border: 2px dashed #f59e0b;">
                         <tr>
                             <td style="padding: 24px; text-align: center;">
                                 <span style="font-size: 32px; display: block; margin-bottom: 8px;">&#127881;</span>
-                                <p style="margin: 0 0 4px 0; font-size: 11px; font-weight: 700; color: #92400e; text-transform: uppercase; letter-spacing: 1px;">Welcome Gift</p>
+                                <p style="margin: 0 0 4px 0; font-size: 12px; font-weight: 700; color: #92400e; text-transform: uppercase; letter-spacing: 1px;">Welcome Gift</p>
                                 <p style="margin: 0 0 8px 0; font-size: 28px; font-weight: 700; color: #78350f;">{{.WelcomeOffer}}</p>
                                 {{if .PromoCode}}
                                 <p style="margin: 0; font-size: 12px; color: #92400e;">
@@ -136,8 +142,8 @@
                 <td style="padding: 32px 40px; text-align: center;" class="mobile-padding">
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
                         <tr>
-                            <td style="background: linear-gradient(135deg, #18181b 0%, #27272a 100%); border-radius: 10px; box-shadow: 0 4px 14px rgba(0,0,0,0.15);">
-                                <a href="{{.ShopURL}}" style="display: inline-block; padding: 16px 40px; font-size: 15px; font-weight: 600; color: #ffffff; text-decoration: none;">
+                            <td style="background-color: {{if .BrandPrimaryColor}}{{.BrandPrimaryColor}}{{else}}#0F172A{{end}}; border-radius: 10px; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);">
+                                <a href="{{.ShopURL}}" style="display: inline-block; padding: 16px 40px; font-size: 14px; font-weight: 600; color: {{if .BrandTextColor}}{{.BrandTextColor}}{{else}}#ffffff{{end}}; text-decoration: none;">
                                     Start Shopping &#8594;
                                 </a>
                             </td>
@@ -154,10 +160,10 @@
 <!-- Footer -->
 <tr>
     <td style="padding: 32px 20px; text-align: center;">
-        <p style="margin: 0 0 12px 0; font-size: 13px; color: #71717a;">
-            Need help? <a href="mailto:{{.SupportEmail}}" style="color: #6366f1; text-decoration: none; font-weight: 500;">Contact us</a>
+        <p style="margin: 0 0 12px 0; font-size: 14px; color: #64748B;">
+            Need help? <a href="mailto:{{.SupportEmail}}" style="color: #0F172A; text-decoration: none; font-weight: 500;">Contact us</a>
         </p>
-        <p style="margin: 0; font-size: 12px; color: #a1a1aa;">
+        <p style="margin: 0; font-size: 12px; color: #94A3B8;">
             &copy; {{.Year}} {{.BusinessName}}. All rights reserved.
         </p>
     </td>

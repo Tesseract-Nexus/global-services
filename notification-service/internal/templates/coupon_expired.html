@@ -4,13 +4,13 @@
     <td style="text-align: center; padding-bottom: 24px;">
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
             <tr>
-                <td style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
+                <td style="background-color: #0F172A; width: 48px; height: 48px; border-radius: 8px; text-align: center; vertical-align: middle;">
                     <span style="color: #ffffff; font-size: 24px; font-weight: 700;">{{if .BusinessInitial}}{{.BusinessInitial}}{{else}}T{{end}}</span>
                 </td>
             </tr>
         </table>
         {{if .BusinessName}}
-        <p style="margin: 12px 0 0 0; font-size: 18px; font-weight: 600; color: #18181b; letter-spacing: -0.3px;">{{.BusinessName}}</p>
+        <p style="margin: 12px 0 0 0; font-size: 18px; font-weight: 600; color: #0F172A; letter-spacing: -0.3px;">{{.BusinessName}}</p>
         {{end}}
     </td>
 </tr>
@@ -20,11 +20,11 @@
 <!-- Main Card -->
 <tr>
     <td>
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1); overflow: hidden;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ffffff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1); overflow: hidden;">
 
             <!-- Header Banner -->
             <tr>
-                <td style="background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%); padding: 32px 40px; text-align: center;" class="mobile-padding">
+                <td style="background-color: #6b7280; padding: 32px 40px; text-align: center;" class="mobile-padding">
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
                         <tr>
                             <td style="width: 64px; height: 64px; background-color: rgba(255,255,255,0.2); border-radius: 50%; text-align: center; vertical-align: middle;">
@@ -44,10 +44,10 @@
             <!-- Coupon Details -->
             <tr>
                 <td style="padding: 32px 40px 0 40px;" class="mobile-padding">
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f3f4f6; border-radius: 12px; border: 1px solid #e5e7eb;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f3f4f6; border-radius: 8px; border: 1px solid #e5e7eb;">
                         <tr>
                             <td style="padding: 24px; text-align: center;">
-                                <p style="margin: 0 0 8px 0; font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 1px;">Expired Coupon</p>
+                                <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 1px;">Expired Coupon</p>
                                 <p style="margin: 0; font-size: 24px; font-weight: 700; color: #374151; letter-spacing: 2px; text-decoration: line-through;">{{.CouponCode}}</p>
                             </td>
                         </tr>
@@ -61,13 +61,13 @@
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                         <tr>
                             <td style="width: 50%; vertical-align: top; padding-right: 12px;">
-                                <p style="margin: 0 0 8px 0; font-size: 11px; font-weight: 600; color: #71717a; text-transform: uppercase; letter-spacing: 0.5px;">Discount</p>
-                                <p style="margin: 0; font-size: 16px; font-weight: 600; color: #18181b;">
+                                <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Discount</p>
+                                <p style="margin: 0; font-size: 16px; font-weight: 600; color: #0F172A;">
                                     {{if eq .DiscountType "percentage"}}{{.DiscountValue}}%{{else}}{{.Currency}}{{.DiscountValue}}{{end}}
                                 </p>
                             </td>
                             <td style="width: 50%; vertical-align: top; padding-left: 12px;">
-                                <p style="margin: 0 0 8px 0; font-size: 11px; font-weight: 600; color: #71717a; text-transform: uppercase; letter-spacing: 0.5px;">Status</p>
+                                <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Status</p>
                                 <span style="display: inline-block; padding: 4px 12px; font-size: 12px; font-weight: 600; color: #6b7280; background-color: #f3f4f6; border-radius: 20px;">Expired</span>
                             </td>
                         </tr>
@@ -81,14 +81,14 @@
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                         {{if .ValidFrom}}
                         <tr>
-                            <td style="padding: 8px 0; border-bottom: 1px solid #f4f4f5;">
+                            <td style="padding: 8px 0; border-bottom: 1px solid #F8FAFC;">
                                 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                                     <tr>
                                         <td style="width: 120px;">
-                                            <p style="margin: 0; font-size: 13px; color: #71717a;">Valid From</p>
+                                            <p style="margin: 0; font-size: 14px; color: #64748B;">Valid From</p>
                                         </td>
                                         <td>
-                                            <p style="margin: 0; font-size: 13px; color: #3f3f46;">{{.ValidFrom}}</p>
+                                            <p style="margin: 0; font-size: 14px; color: #334155;">{{.ValidFrom}}</p>
                                         </td>
                                     </tr>
                                 </table>
@@ -101,10 +101,10 @@
                                 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                                     <tr>
                                         <td style="width: 120px;">
-                                            <p style="margin: 0; font-size: 13px; color: #71717a;">Expired On</p>
+                                            <p style="margin: 0; font-size: 14px; color: #64748B;">Expired On</p>
                                         </td>
                                         <td>
-                                            <p style="margin: 0; font-size: 13px; font-weight: 600; color: #dc2626;">{{.ValidUntil}}</p>
+                                            <p style="margin: 0; font-size: 14px; font-weight: 600; color: #dc2626;">{{.ValidUntil}}</p>
                                         </td>
                                     </tr>
                                 </table>
@@ -118,7 +118,7 @@
             <!-- Action Box -->
             <tr>
                 <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f0f9ff; border-radius: 12px; border: 1px solid #bae6fd;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f0f9ff; border-radius: 8px; border: 1px solid #bae6fd;">
                         <tr>
                             <td style="padding: 16px 20px;">
                                 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
@@ -128,7 +128,7 @@
                                         </td>
                                         <td style="padding-left: 12px;">
                                             <p style="margin: 0; font-size: 14px; font-weight: 600; color: #0369a1;">Suggested Action</p>
-                                            <p style="margin: 4px 0 0 0; font-size: 13px; color: #0c4a6e;">Consider creating a new promotional coupon to maintain customer engagement.</p>
+                                            <p style="margin: 4px 0 0 0; font-size: 14px; color: #0c4a6e;">Consider creating a new promotional coupon to maintain customer engagement.</p>
                                         </td>
                                     </tr>
                                 </table>
@@ -143,7 +143,7 @@
                 <td style="padding: 24px 40px 32px 40px; text-align: center;" class="mobile-padding">
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
                         <tr>
-                            <td style="background: linear-gradient(135deg, #18181b 0%, #27272a 100%); border-radius: 10px;">
+                            <td style="background-color: #0F172A; border-radius: 10px;">
                                 <a href="{{.CouponsURL}}" style="display: inline-block; padding: 14px 32px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
                                     Manage Coupons &#8594;
                                 </a>
@@ -161,10 +161,10 @@
 <!-- Footer -->
 <tr>
     <td style="padding: 32px 20px; text-align: center;">
-        <p style="margin: 0 0 8px 0; font-size: 13px; color: #71717a;">
-            This is an automated admin notification from <a href="mailto:{{.SupportEmail}}" style="color: #6366f1; text-decoration: none; font-weight: 500;">{{.BusinessName}}</a>
+        <p style="margin: 0 0 8px 0; font-size: 14px; color: #64748B;">
+            This is an automated admin notification from <a href="mailto:{{.SupportEmail}}" style="color: #0F172A; text-decoration: none; font-weight: 500;">{{.BusinessName}}</a>
         </p>
-        <p style="margin: 0; font-size: 12px; color: #a1a1aa;">
+        <p style="margin: 0; font-size: 12px; color: #94A3B8;">
             &copy; {{.Year}} {{.BusinessName}}. All rights reserved.
         </p>
     </td>

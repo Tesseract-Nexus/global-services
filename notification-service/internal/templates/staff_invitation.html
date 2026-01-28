@@ -4,13 +4,13 @@
     <td style="text-align: center; padding-bottom: 24px;">
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
             <tr>
-                <td style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
+                <td style="background-color: #0F172A; width: 48px; height: 48px; border-radius: 8px; text-align: center; vertical-align: middle;">
                     <span style="color: #ffffff; font-size: 24px; font-weight: 700;">{{if .BusinessInitial}}{{.BusinessInitial}}{{else}}T{{end}}</span>
                 </td>
             </tr>
         </table>
         {{if .BusinessName}}
-        <p style="margin: 12px 0 0 0; font-size: 18px; font-weight: 600; color: #18181b; letter-spacing: -0.3px;">{{.BusinessName}}</p>
+        <p style="margin: 12px 0 0 0; font-size: 18px; font-weight: 600; color: #0F172A; letter-spacing: -0.3px;">{{.BusinessName}}</p>
         {{end}}
     </td>
 </tr>
@@ -20,11 +20,11 @@
 <!-- Main Card -->
 <tr>
     <td>
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1); overflow: hidden;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ffffff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1); overflow: hidden;">
 
             <!-- Welcome Header -->
             <tr>
-                <td style="background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 50%, #4f46e5 100%); padding: 40px 40px; text-align: center;" class="mobile-padding">
+                <td style="background-color: #0F172A; padding: 40px 40px; text-align: center;" class="mobile-padding">
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
                         <tr>
                             <td style="width: 64px; height: 64px; background-color: rgba(255,255,255,0.2); border-radius: 50%; text-align: center; vertical-align: middle;">
@@ -44,10 +44,10 @@
             <!-- Greeting -->
             <tr>
                 <td style="padding: 28px 40px 0 40px;" class="mobile-padding">
-                    <p style="margin: 0; font-size: 15px; color: #3f3f46; line-height: 1.6;">
+                    <p style="margin: 0; font-size: 14px; color: #334155; line-height: 1.6;">
                         Hi {{.StaffName}},
                     </p>
-                    <p style="margin: 16px 0 0 0; font-size: 15px; color: #3f3f46; line-height: 1.6;">
+                    <p style="margin: 16px 0 0 0; font-size: 14px; color: #334155; line-height: 1.6;">
                         You've been invited to join {{if .BusinessName}}<strong>{{.BusinessName}}</strong>{{else}}our team{{end}} as a <strong>{{.Role}}</strong>. Click the button below to set up your account and get started.
                     </p>
                 </td>
@@ -58,8 +58,8 @@
                 <td style="padding: 28px 40px; text-align: center;" class="mobile-padding">
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
                         <tr>
-                            <td style="background: linear-gradient(135deg, #18181b 0%, #27272a 100%); border-radius: 10px; box-shadow: 0 4px 14px rgba(0,0,0,0.15);">
-                                <a href="{{.ActivationLink}}" style="display: inline-block; padding: 16px 40px; font-size: 15px; font-weight: 600; color: #ffffff; text-decoration: none;">
+                            <td style="background-color: #0F172A; border-radius: 10px; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);">
+                                <a href="{{.ActivationLink}}" style="display: inline-block; padding: 16px 40px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
                                     Accept Invitation &#8594;
                                 </a>
                             </td>
@@ -82,13 +82,13 @@
             <!-- Alternative Link -->
             <tr>
                 <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
-                    <p style="margin: 0 0 12px 0; font-size: 13px; color: #71717a; text-align: center;">
+                    <p style="margin: 0 0 12px 0; font-size: 14px; color: #64748B; text-align: center;">
                         Or copy this link into your browser:
                     </p>
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #F8FAFC; border-radius: 8px; border: 1px solid #e2e8f0;">
                         <tr>
                             <td style="padding: 14px 16px;">
-                                <p style="margin: 0; font-size: 12px; color: #6366f1; text-align: center; word-break: break-all; font-family: 'SF Mono', 'Roboto Mono', monospace;">
+                                <p style="margin: 0; font-size: 12px; color: #0F172A; text-align: center; word-break: break-all; font-family: 'JetBrains Mono', 'SFMono-Regular', 'Menlo', monospace;">
                                     {{.ActivationLink}}
                                 </p>
                             </td>
@@ -100,7 +100,7 @@
             <!-- Expiry & Security Notice -->
             <tr>
                 <td style="padding: 24px 40px 32px 40px;" class="mobile-padding">
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #fffbeb; border-radius: 12px; border: 1px solid #fef3c7;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #fffbeb; border-radius: 8px; border: 1px solid #fef3c7;">
                         <tr>
                             <td style="padding: 16px 20px;">
                                 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
@@ -109,7 +109,7 @@
                                             <span style="font-size: 18px;">&#9888;</span>
                                         </td>
                                         <td style="vertical-align: top;">
-                                            <p style="margin: 0 0 4px 0; font-size: 13px; font-weight: 600; color: #92400e;">This invitation expires in 72 hours</p>
+                                            <p style="margin: 0 0 4px 0; font-size: 14px; font-weight: 600; color: #92400e;">This invitation expires in 72 hours</p>
                                             <p style="margin: 0; font-size: 12px; color: #a16207; line-height: 1.5;">
                                                 If you didn't expect this invitation, you can safely ignore this email.
                                             </p>
@@ -130,11 +130,11 @@
 <!-- Footer -->
 <tr>
     <td style="padding: 32px 20px; text-align: center;">
-        <p style="margin: 0 0 12px 0; font-size: 13px; color: #71717a;">
-            Need help? <a href="mailto:{{.SupportEmail}}" style="color: #6366f1; text-decoration: none; font-weight: 500;">Contact support</a>
+        <p style="margin: 0 0 12px 0; font-size: 14px; color: #64748B;">
+            Need help? <a href="mailto:{{.SupportEmail}}" style="color: #0F172A; text-decoration: none; font-weight: 500;">Contact support</a>
         </p>
-        <p style="margin: 0 0 8px 0; font-size: 13px; color: #a1a1aa;">
-            Sent to <span style="color: #71717a;">{{.Email}}</span>
+        <p style="margin: 0 0 8px 0; font-size: 14px; color: #94A3B8;">
+            Sent to <span style="color: #64748B;">{{.Email}}</span>
         </p>
         <p style="margin: 0; font-size: 12px; color: #d4d4d8;">
             &copy; {{.Year}} {{if .BusinessName}}{{.BusinessName}}{{else}}Tesseract Hub{{end}}. All rights reserved.

@@ -1511,6 +1511,43 @@ func (s *Subscriber) sendTemplatedEmail(ctx context.Context, tenantID, templateN
 		return
 	}
 
+	// Fetch tenant info for branding
+	if tenantID != "" && tenantID != "system" {
+		tenantInfo, err := s.tenantClient.GetTenantInfo(tenantID)
+		if err == nil && tenantInfo != nil {
+			// Add tenant branding to variables
+			if variables["businessName"] == nil || variables["businessName"] == "" {
+				variables["businessName"] = tenantInfo.BusinessName
+			}
+			if variables["supportEmail"] == nil || variables["supportEmail"] == "" {
+				variables["supportEmail"] = tenantInfo.SupportEmail
+			}
+			// Add branding colors
+			if tenantInfo.BrandPrimaryColor != "" {
+				variables["brandPrimaryColor"] = tenantInfo.BrandPrimaryColor
+			}
+			if tenantInfo.BrandSecondaryColor != "" {
+				variables["brandSecondaryColor"] = tenantInfo.BrandSecondaryColor
+			}
+			if tenantInfo.BrandAccentColor != "" {
+				variables["brandAccentColor"] = tenantInfo.BrandAccentColor
+			}
+			if tenantInfo.BrandTextColor != "" {
+				variables["brandTextColor"] = tenantInfo.BrandTextColor
+			}
+			if tenantInfo.BrandLogoURL != "" {
+				variables["brandLogoUrl"] = tenantInfo.BrandLogoURL
+			}
+			// Add URLs if not already set
+			if variables["adminUrl"] == nil || variables["adminUrl"] == "" {
+				variables["adminUrl"] = tenantInfo.AdminURL
+			}
+			if variables["storefrontUrl"] == nil || variables["storefrontUrl"] == "" {
+				variables["storefrontUrl"] = tenantInfo.StorefrontURL
+			}
+		}
+	}
+
 	var subject, body string
 	var tmplID *uuid.UUID
 
@@ -2279,6 +2316,13 @@ func (s *Subscriber) buildEmailData(variables map[string]interface{}) *templates
 	data.DomainSettingsURL = getString("domainSettingsUrl")
 	data.OwnerEmail = getString("ownerEmail")
 	data.OwnerName = getString("ownerName")
+
+	// Storefront branding fields - for tenant-branded customer emails
+	data.BrandPrimaryColor = getString("brandPrimaryColor")
+	data.BrandSecondaryColor = getString("brandSecondaryColor")
+	data.BrandAccentColor = getString("brandAccentColor")
+	data.BrandTextColor = getString("brandTextColor")
+	data.BrandLogoURL = getString("brandLogoUrl")
 
 	return data
 }

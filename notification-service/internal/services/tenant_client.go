@@ -22,6 +22,13 @@ type TenantInfo struct {
 	SupportEmail  string `json:"supportEmail"`
 	BusinessName  string `json:"businessName"`
 	CachedAt      time.Time
+
+	// Branding fields for tenant-customized emails
+	BrandPrimaryColor   string `json:"brandPrimaryColor"`   // e.g., "#3B82F6"
+	BrandSecondaryColor string `json:"brandSecondaryColor"` // e.g., "#1E40AF"
+	BrandAccentColor    string `json:"brandAccentColor"`    // e.g., "#10B981"
+	BrandTextColor      string `json:"brandTextColor"`      // Text on brand backgrounds, default "#FFFFFF"
+	BrandLogoURL        string `json:"brandLogoUrl"`        // Logo URL for email headers
 }
 
 // TenantClient provides tenant information with caching
@@ -148,6 +155,14 @@ func (c *TenantClient) fetchTenantInfo(tenantID string) (*TenantInfo, error) {
 			DisplayName  string `json:"displayName"`
 			Subdomain    string `json:"subdomain"`
 			BillingEmail string `json:"billingEmail"`
+			// Branding fields from storefront settings
+			Branding struct {
+				PrimaryColor   string `json:"primaryColor"`
+				SecondaryColor string `json:"secondaryColor"`
+				AccentColor    string `json:"accentColor"`
+				TextColor      string `json:"textColor"`
+				LogoURL        string `json:"logoUrl"`
+			} `json:"branding"`
 		} `json:"data"`
 	}
 
@@ -165,6 +180,12 @@ func (c *TenantClient) fetchTenantInfo(tenantID string) (*TenantInfo, error) {
 		businessName = result.Data.Name
 	}
 
+	// Set default text color if not provided
+	brandTextColor := result.Data.Branding.TextColor
+	if brandTextColor == "" {
+		brandTextColor = "#FFFFFF"
+	}
+
 	info := &TenantInfo{
 		ID:            result.Data.ID,
 		Slug:          result.Data.Slug,
@@ -174,6 +195,12 @@ func (c *TenantClient) fetchTenantInfo(tenantID string) (*TenantInfo, error) {
 		SupportEmail:  result.Data.BillingEmail, // Use billing email as support email
 		BusinessName:  businessName,
 		CachedAt:      time.Now(),
+		// Branding
+		BrandPrimaryColor:   result.Data.Branding.PrimaryColor,
+		BrandSecondaryColor: result.Data.Branding.SecondaryColor,
+		BrandAccentColor:    result.Data.Branding.AccentColor,
+		BrandTextColor:      brandTextColor,
+		BrandLogoURL:        result.Data.Branding.LogoURL,
 	}
 
 	log.Printf("[TenantClient] Fetched tenant %s: slug=%s, adminURL=%s", tenantID, info.Slug, info.AdminURL)

@@ -135,16 +135,16 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Verify Your Email</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7fa;">
+<body style="margin: 0; padding: 0; font-family: 'Source Sans 3', 'Inter', 'Segoe UI', 'Helvetica Neue', Arial, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; background-color: #F8FAFC;">
     <table role="presentation" style="width: 100%; border-collapse: collapse;">
         <tr>
             <td align="center" style="padding: 40px 0;">
-                <table role="presentation" style="width: 600px; max-width: 100%; border-collapse: collapse; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);">
-                    <!-- Header with gradient -->
+                <table role="presentation" style="width: 600px; max-width: 100%; border-collapse: collapse; background-color: #ffffff; border-radius: 10px; border: 1px solid #E2E8F0; box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);">
+                    <!-- Header - Solid color, no gradient -->
                     <tr>
-                        <td style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%); padding: 40px 40px 30px; border-radius: 16px 16px 0 0; text-align: center;">
-                            <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 600;">
-                                ✉️ Verify Your Email
+                        <td style="background-color: #0F172A; padding: 40px 40px 30px; border-radius: 10px 10px 0 0; text-align: center;">
+                            <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600;">
+                                Verify Your Email
                             </h1>
                             <p style="color: rgba(255, 255, 255, 0.9); margin: 12px 0 0; font-size: 16px;">
                                 One click away from launching {{.BusinessName}}
@@ -155,18 +155,18 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
                     <!-- Main content -->
                     <tr>
                         <td style="padding: 40px;">
-                            <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
-                                Hi there! 👋
+                            <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
+                                Hi there,
                             </p>
-                            <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
+                            <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
                                 You're almost ready to launch <strong>{{.BusinessName}}</strong>. Just click the button below to verify your email address and complete your store setup.
                             </p>
 
-                            <!-- CTA Button -->
+                            <!-- CTA Button - Solid color -->
                             <table role="presentation" style="width: 100%; border-collapse: collapse;">
                                 <tr>
                                     <td align="center" style="padding: 16px 0 32px;">
-                                        <a href="{{.VerificationLink}}" style="display: inline-block; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: #ffffff; text-decoration: none; padding: 16px 48px; border-radius: 12px; font-size: 16px; font-weight: 600; box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);">
+                                        <a href="{{.VerificationLink}}" style="display: inline-block; background-color: #0F172A; color: #ffffff; text-decoration: none; padding: 12px 32px; border-radius: 8px; font-size: 14px; font-weight: 600; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);">
                                             Verify Email Address
                                         </a>
                                     </td>
@@ -174,40 +174,40 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
                             </table>
 
                             <!-- Alternative link -->
-                            <div style="background-color: #f9fafb; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
-                                <p style="color: #6b7280; font-size: 14px; margin: 0 0 8px;">
+                            <div style="background-color: #F8FAFC; border-radius: 8px; padding: 20px; margin-bottom: 24px; border: 1px solid #E2E8F0;">
+                                <p style="color: #64748B; font-size: 14px; margin: 0 0 8px;">
                                     Or copy this link into your browser:
                                 </p>
-                                <p style="color: #6366f1; font-size: 13px; margin: 0; word-break: break-all;">
+                                <p style="color: #0F172A; font-size: 14px; margin: 0; word-break: break-all;">
                                     {{.VerificationLink}}
                                 </p>
                             </div>
 
                             {{if .IsCustomDomain}}
-                            <!-- Custom Domain Notice - Minimal for security (no IP addresses to prevent spoofing) -->
-                            <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 12px; padding: 24px; margin-bottom: 24px; border: 2px solid #f59e0b;">
-                                <h2 style="color: #92400e; font-size: 20px; font-weight: 700; margin: 0 0 16px;">
-                                    🌐 Custom Domain: {{.CustomDomain}}
+                            <!-- Custom Domain Notice -->
+                            <div style="background-color: #FEF3C7; border-radius: 8px; padding: 24px; margin-bottom: 24px; border: 1px solid #FCD34D;">
+                                <h2 style="color: #92400E; font-size: 18px; font-weight: 700; margin: 0 0 16px;">
+                                    Custom Domain: {{.CustomDomain}}
                                 </h2>
-                                <p style="color: #78350f; font-size: 15px; line-height: 1.6; margin: 0 0 16px;">
+                                <p style="color: #78350F; font-size: 14px; line-height: 1.6; margin: 0 0 16px;">
                                     Your custom domain requires DNS configuration. For security reasons, <strong>please view the complete DNS records in the onboarding dashboard</strong> after verifying your email.
                                 </p>
 
                                 <!-- Security Notice -->
-                                <div style="background-color: #ffffff; border-radius: 8px; padding: 16px; border: 2px solid #dc2626;">
-                                    <p style="color: #dc2626; font-size: 14px; font-weight: 700; margin: 0 0 8px;">
-                                        🔒 Security Notice
+                                <div style="background-color: #ffffff; border-radius: 8px; padding: 16px; border: 1px solid #EF4444;">
+                                    <p style="color: #EF4444; font-size: 14px; font-weight: 700; margin: 0 0 8px;">
+                                        Security Notice
                                     </p>
-                                    <p style="color: #991b1b; font-size: 13px; margin: 0; line-height: 1.6;">
+                                    <p style="color: #991B1B; font-size: 14px; margin: 0; line-height: 1.6;">
                                         DNS records containing IP addresses and routing information are <strong>only shown in the secure onboarding dashboard</strong> to prevent phishing attacks.
                                         Never configure DNS records from an email without verifying the source.
                                     </p>
                                 </div>
 
                                 <!-- Tips -->
-                                <div style="background-color: #eff6ff; border-radius: 8px; padding: 16px; margin-top: 16px; border-left: 4px solid #3b82f6;">
-                                    <p style="color: #1e40af; font-size: 14px; margin: 0; line-height: 1.7;">
-                                        💡 <strong>Next Steps:</strong><br>
+                                <div style="background-color: #DBEAFE; border-radius: 8px; padding: 16px; margin-top: 16px; border-left: 4px solid #3B82F6;">
+                                    <p style="color: #1E40AF; font-size: 14px; margin: 0; line-height: 1.7;">
+                                        <strong>Next Steps:</strong><br>
                                         1. Click the verification link above to verify your email<br>
                                         2. Complete DNS setup in the onboarding dashboard<br>
                                         3. DNS changes usually take <strong>5-30 minutes</strong> to propagate<br>
@@ -218,9 +218,9 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
                             {{end}}
 
                             <!-- Security notice -->
-                            <div style="border-left: 4px solid #f59e0b; background-color: #fffbeb; padding: 16px; border-radius: 0 8px 8px 0;">
-                                <p style="color: #92400e; font-size: 14px; margin: 0;">
-                                    ⏰ This link expires in <strong>{{.ExpiryTime}}</strong>. If you didn't request this, you can safely ignore this email.
+                            <div style="border-left: 4px solid #F59E0B; background-color: #FEF3C7; padding: 16px; border-radius: 0 8px 8px 0;">
+                                <p style="color: #92400E; font-size: 14px; margin: 0;">
+                                    This link expires in <strong>{{.ExpiryTime}}</strong>. If you didn't request this, you can safely ignore this email.
                                 </p>
                             </div>
                         </td>
@@ -228,11 +228,11 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
 
                     <!-- Footer -->
                     <tr>
-                        <td style="background-color: #f9fafb; padding: 24px 40px; border-radius: 0 0 16px 16px; text-align: center;">
-                            <p style="color: #9ca3af; font-size: 13px; margin: 0 0 8px;">
+                        <td style="background-color: #F8FAFC; padding: 24px 40px; border-radius: 0 0 10px 10px; text-align: center;">
+                            <p style="color: #94A3B8; font-size: 14px; margin: 0 0 8px;">
                                 Sent to {{.Email}}
                             </p>
-                            <p style="color: #9ca3af; font-size: 13px; margin: 0;">
+                            <p style="color: #94A3B8; font-size: 12px; margin: 0;">
                                 © 2026 Tesseract Hub. All rights reserved.
                             </p>
                         </td>
@@ -365,16 +365,16 @@ func renderCustomerWelcomeEmailTemplate(firstName, storeName string) string {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Welcome to %s!</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7fa;">
+<body style="margin: 0; padding: 0; font-family: 'Source Sans 3', 'Inter', 'Segoe UI', 'Helvetica Neue', Arial, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; background-color: #F8FAFC;">
     <table role="presentation" style="width: 100%%; border-collapse: collapse;">
         <tr>
             <td align="center" style="padding: 40px 0;">
-                <table role="presentation" style="width: 600px; max-width: 100%%; border-collapse: collapse; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);">
-                    <!-- Header with gradient -->
+                <table role="presentation" style="width: 600px; max-width: 100%%; border-collapse: collapse; background-color: #ffffff; border-radius: 10px; border: 1px solid #E2E8F0; box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);">
+                    <!-- Header - Solid color -->
                     <tr>
-                        <td style="background: linear-gradient(135deg, #6366f1 0%%, #8b5cf6 50%%, #a855f7 100%%); padding: 40px 40px 30px; border-radius: 16px 16px 0 0; text-align: center;">
-                            <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 600;">
-                                🎉 Welcome to %s!
+                        <td style="background-color: #0F172A; padding: 40px 40px 30px; border-radius: 10px 10px 0 0; text-align: center;">
+                            <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600;">
+                                Welcome to %s!
                             </h1>
                         </td>
                     </tr>
@@ -382,16 +382,16 @@ func renderCustomerWelcomeEmailTemplate(firstName, storeName string) string {
                     <!-- Main content -->
                     <tr>
                         <td style="padding: 40px;">
-                            <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
-                                Hi %s! 👋
+                            <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
+                                Hi %s,
                             </p>
-                            <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
+                            <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
                                 Thank you for creating an account with <strong>%s</strong>. We're excited to have you as part of our community!
                             </p>
-                            <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
+                            <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
                                 You can now:
                             </p>
-                            <ul style="color: #374151; font-size: 16px; line-height: 1.8; margin: 0 0 24px; padding-left: 24px;">
+                            <ul style="color: #334155; font-size: 16px; line-height: 1.8; margin: 0 0 24px; padding-left: 24px;">
                                 <li>Browse our products and collections</li>
                                 <li>Save items to your wishlist</li>
                                 <li>Track your orders</li>
@@ -399,9 +399,9 @@ func renderCustomerWelcomeEmailTemplate(firstName, storeName string) string {
                             </ul>
 
                             <!-- Check email notice -->
-                            <div style="border-left: 4px solid #6366f1; background-color: #f0f0ff; padding: 16px; border-radius: 0 8px 8px 0; margin-top: 24px;">
-                                <p style="color: #4338ca; font-size: 14px; margin: 0;">
-                                    📧 Please check your inbox for an email verification code to complete your account setup.
+                            <div style="border-left: 4px solid #3B82F6; background-color: #DBEAFE; padding: 16px; border-radius: 0 8px 8px 0; margin-top: 24px;">
+                                <p style="color: #1E40AF; font-size: 14px; margin: 0;">
+                                    Please check your inbox for an email verification code to complete your account setup.
                                 </p>
                             </div>
                         </td>
@@ -409,11 +409,11 @@ func renderCustomerWelcomeEmailTemplate(firstName, storeName string) string {
 
                     <!-- Footer -->
                     <tr>
-                        <td style="background-color: #f9fafb; padding: 24px 40px; border-radius: 0 0 16px 16px; text-align: center;">
-                            <p style="color: #9ca3af; font-size: 13px; margin: 0 0 8px;">
+                        <td style="background-color: #F8FAFC; padding: 24px 40px; border-radius: 0 0 10px 10px; text-align: center;">
+                            <p style="color: #94A3B8; font-size: 14px; margin: 0 0 8px;">
                                 This email was sent because you created an account at %s
                             </p>
-                            <p style="color: #9ca3af; font-size: 13px; margin: 0;">
+                            <p style="color: #94A3B8; font-size: 12px; margin: 0;">
                                 © 2026 Powered by Tesseract Hub
                             </p>
                         </td>
@@ -464,11 +464,11 @@ func (c *NotificationClient) SendWelcomePackEmail(ctx context.Context, data *Wel
 // renderWelcomeEmailTemplate generates a simple welcome email
 func renderWelcomeEmailTemplate(firstName string) string {
 	return fmt.Sprintf(`<!DOCTYPE html>
-<html><body style="font-family: Arial, sans-serif; background-color: #f4f7fa; padding: 40px;">
-<div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 16px; padding: 40px;">
-<h1 style="color: #6366f1;">Welcome, %s! 🎉</h1>
-<p>Your account has been created successfully.</p>
-<p>Get started by exploring your dashboard.</p>
+<html><body style="font-family: 'Source Sans 3', 'Inter', 'Segoe UI', Arial, sans-serif; background-color: #F8FAFC; padding: 40px;">
+<div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 10px; padding: 40px; border: 1px solid #E2E8F0; box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);">
+<h1 style="color: #0F172A; font-size: 24px; font-weight: 600;">Welcome, %s!</h1>
+<p style="color: #334155; font-size: 16px; line-height: 1.6;">Your account has been created successfully.</p>
+<p style="color: #334155; font-size: 16px; line-height: 1.6;">Get started by exploring your dashboard.</p>
 </div></body></html>`, firstName)
 }
 
@@ -481,16 +481,16 @@ func renderWelcomePackEmailTemplate(data *WelcomePackData) (string, error) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Your Store is Ready!</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7fa;">
+<body style="margin: 0; padding: 0; font-family: 'Source Sans 3', 'Inter', 'Segoe UI', 'Helvetica Neue', Arial, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; background-color: #F8FAFC;">
     <table role="presentation" style="width: 100%; border-collapse: collapse;">
         <tr>
             <td align="center" style="padding: 40px 0;">
-                <table role="presentation" style="width: 600px; max-width: 100%; border-collapse: collapse; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);">
-                    <!-- Header -->
+                <table role="presentation" style="width: 600px; max-width: 100%; border-collapse: collapse; background-color: #ffffff; border-radius: 10px; border: 1px solid #E2E8F0; box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);">
+                    <!-- Header - Success green for celebration -->
                     <tr>
-                        <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 40px; border-radius: 16px 16px 0 0; text-align: center;">
-                            <h1 style="color: #ffffff; margin: 0; font-size: 32px;">🎉 Congratulations!</h1>
-                            <p style="color: rgba(255,255,255,0.9); margin: 12px 0 0; font-size: 18px;">
+                        <td style="background-color: #10B981; padding: 40px; border-radius: 10px 10px 0 0; text-align: center;">
+                            <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600;">Congratulations!</h1>
+                            <p style="color: rgba(255,255,255,0.9); margin: 12px 0 0; font-size: 16px;">
                                 {{.BusinessName}} is now live!
                             </p>
                         </td>
@@ -499,33 +499,33 @@ func renderWelcomePackEmailTemplate(data *WelcomePackData) (string, error) {
                     <!-- Content -->
                     <tr>
                         <td style="padding: 40px;">
-                            <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
-                                Hi {{.FirstName}}! 👋
+                            <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
+                                Hi {{.FirstName}},
                             </p>
-                            <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 32px;">
+                            <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 32px;">
                                 Your store has been set up successfully. Here are your important links:
                             </p>
 
                             <!-- Links -->
-                            <div style="background: #f9fafb; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
-                                <h3 style="color: #111827; margin: 0 0 16px; font-size: 16px;">📋 Your Store URLs</h3>
+                            <div style="background-color: #F8FAFC; border-radius: 8px; padding: 24px; margin-bottom: 24px; border: 1px solid #E2E8F0;">
+                                <h3 style="color: #0F172A; margin: 0 0 16px; font-size: 16px; font-weight: 600;">Your Store URLs</h3>
 
                                 <p style="margin: 0 0 12px;">
-                                    <strong style="color: #6b7280;">Admin Panel:</strong><br>
-                                    <a href="{{.AdminURL}}" style="color: #6366f1; text-decoration: none;">{{.AdminURL}}</a>
+                                    <strong style="color: #64748B;">Admin Panel:</strong><br>
+                                    <a href="{{.AdminURL}}" style="color: #0F172A; text-decoration: none; font-weight: 500;">{{.AdminURL}}</a>
                                 </p>
 
                                 <p style="margin: 0;">
-                                    <strong style="color: #6b7280;">Storefront:</strong><br>
-                                    <a href="{{.StorefrontURL}}" style="color: #6366f1; text-decoration: none;">{{.StorefrontURL}}</a>
+                                    <strong style="color: #64748B;">Storefront:</strong><br>
+                                    <a href="{{.StorefrontURL}}" style="color: #0F172A; text-decoration: none; font-weight: 500;">{{.StorefrontURL}}</a>
                                 </p>
                             </div>
 
-                            <!-- CTA -->
+                            <!-- CTA - Solid color button -->
                             <table role="presentation" style="width: 100%;">
                                 <tr>
                                     <td align="center">
-                                        <a href="{{.AdminURL}}" style="display: inline-block; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: #ffffff; text-decoration: none; padding: 16px 48px; border-radius: 12px; font-size: 16px; font-weight: 600;">
+                                        <a href="{{.AdminURL}}" style="display: inline-block; background-color: #0F172A; color: #ffffff; text-decoration: none; padding: 12px 32px; border-radius: 8px; font-size: 14px; font-weight: 600;">
                                             Open Admin Panel →
                                         </a>
                                     </td>
@@ -536,8 +536,8 @@ func renderWelcomePackEmailTemplate(data *WelcomePackData) (string, error) {
 
                     <!-- Footer -->
                     <tr>
-                        <td style="background-color: #f9fafb; padding: 24px 40px; border-radius: 0 0 16px 16px; text-align: center;">
-                            <p style="color: #9ca3af; font-size: 13px; margin: 0;">
+                        <td style="background-color: #F8FAFC; padding: 24px 40px; border-radius: 0 0 10px 10px; text-align: center;">
+                            <p style="color: #94A3B8; font-size: 12px; margin: 0;">
                                 © 2026 Tesseract Hub. All rights reserved.
                             </p>
                         </td>
@@ -675,16 +675,16 @@ func renderPasswordResetEmailTemplate(data *PasswordResetEmailData) string {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Reset Your Password</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7fa;">
+<body style="margin: 0; padding: 0; font-family: 'Source Sans 3', 'Inter', 'Segoe UI', 'Helvetica Neue', Arial, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; background-color: #F8FAFC;">
     <table role="presentation" style="width: 100%%; border-collapse: collapse;">
         <tr>
             <td align="center" style="padding: 40px 0;">
-                <table role="presentation" style="width: 600px; max-width: 100%%; border-collapse: collapse; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);">
-                    <!-- Header -->
+                <table role="presentation" style="width: 600px; max-width: 100%%; border-collapse: collapse; background-color: #ffffff; border-radius: 10px; border: 1px solid #E2E8F0; box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);">
+                    <!-- Header - Solid color -->
                     <tr>
-                        <td style="background: linear-gradient(135deg, #6366f1 0%%, #8b5cf6 50%%, #a855f7 100%%); padding: 40px 40px 30px; border-radius: 16px 16px 0 0; text-align: center;">
-                            <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 600;">
-                                🔐 Reset Your Password
+                        <td style="background-color: #0F172A; padding: 40px 40px 30px; border-radius: 10px 10px 0 0; text-align: center;">
+                            <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600;">
+                                Reset Your Password
                             </h1>
                         </td>
                     </tr>
@@ -692,18 +692,18 @@ func renderPasswordResetEmailTemplate(data *PasswordResetEmailData) string {
                     <!-- Main content -->
                     <tr>
                         <td style="padding: 40px;">
-                            <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
+                            <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
                                 Hi %s,
                             </p>
-                            <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
+                            <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
                                 We received a request to reset your password for your <strong>%s</strong> account. Click the button below to create a new password.
                             </p>
 
-                            <!-- CTA Button -->
+                            <!-- CTA Button - Solid color -->
                             <table role="presentation" style="width: 100%%; border-collapse: collapse;">
                                 <tr>
                                     <td align="center" style="padding: 16px 0 32px;">
-                                        <a href="%s" style="display: inline-block; background: linear-gradient(135deg, #6366f1 0%%, #8b5cf6 100%%); color: #ffffff; text-decoration: none; padding: 16px 48px; border-radius: 12px; font-size: 16px; font-weight: 600; box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);">
+                                        <a href="%s" style="display: inline-block; background-color: #0F172A; color: #ffffff; text-decoration: none; padding: 12px 32px; border-radius: 8px; font-size: 14px; font-weight: 600; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);">
                                             Reset Password
                                         </a>
                                     </td>
@@ -711,19 +711,19 @@ func renderPasswordResetEmailTemplate(data *PasswordResetEmailData) string {
                             </table>
 
                             <!-- Alternative link -->
-                            <div style="background-color: #f9fafb; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
-                                <p style="color: #6b7280; font-size: 14px; margin: 0 0 8px;">
+                            <div style="background-color: #F8FAFC; border-radius: 8px; padding: 20px; margin-bottom: 24px; border: 1px solid #E2E8F0;">
+                                <p style="color: #64748B; font-size: 14px; margin: 0 0 8px;">
                                     Or copy this link into your browser:
                                 </p>
-                                <p style="color: #6366f1; font-size: 13px; margin: 0; word-break: break-all;">
+                                <p style="color: #0F172A; font-size: 14px; margin: 0; word-break: break-all;">
                                     %s
                                 </p>
                             </div>
 
                             <!-- Security notice -->
-                            <div style="border-left: 4px solid #f59e0b; background-color: #fffbeb; padding: 16px; border-radius: 0 8px 8px 0;">
-                                <p style="color: #92400e; font-size: 14px; margin: 0;">
-                                    ⏰ This link expires in <strong>%s</strong>. If you didn't request this password reset, you can safely ignore this email.
+                            <div style="border-left: 4px solid #F59E0B; background-color: #FEF3C7; padding: 16px; border-radius: 0 8px 8px 0;">
+                                <p style="color: #92400E; font-size: 14px; margin: 0;">
+                                    This link expires in <strong>%s</strong>. If you didn't request this password reset, you can safely ignore this email.
                                 </p>
                             </div>
                         </td>
@@ -731,11 +731,11 @@ func renderPasswordResetEmailTemplate(data *PasswordResetEmailData) string {
 
                     <!-- Footer -->
                     <tr>
-                        <td style="background-color: #f9fafb; padding: 24px 40px; border-radius: 0 0 16px 16px; text-align: center;">
-                            <p style="color: #9ca3af; font-size: 13px; margin: 0 0 8px;">
+                        <td style="background-color: #F8FAFC; padding: 24px 40px; border-radius: 0 0 10px 10px; text-align: center;">
+                            <p style="color: #94A3B8; font-size: 14px; margin: 0 0 8px;">
                                 This email was sent to %s
                             </p>
-                            <p style="color: #9ca3af; font-size: 13px; margin: 0;">
+                            <p style="color: #94A3B8; font-size: 12px; margin: 0;">
                                 © 2026 Powered by Tesseract Hub
                             </p>
                         </td>
@@ -759,15 +759,15 @@ func renderGoodbyeEmailTemplate(data *GoodbyeEmailData) string {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>We're sorry to see you go</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7fa;">
+<body style="margin: 0; padding: 0; font-family: 'Source Sans 3', 'Inter', 'Segoe UI', 'Helvetica Neue', Arial, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; background-color: #F8FAFC;">
     <table role="presentation" style="width: 100%%; border-collapse: collapse;">
         <tr>
             <td align="center" style="padding: 40px 0;">
-                <table role="presentation" style="width: 600px; max-width: 100%%; border-collapse: collapse; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);">
-                    <!-- Header -->
+                <table role="presentation" style="width: 600px; max-width: 100%%; border-collapse: collapse; background-color: #ffffff; border-radius: 10px; border: 1px solid #E2E8F0; box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);">
+                    <!-- Header - Neutral slate color -->
                     <tr>
-                        <td style="background: linear-gradient(135deg, #64748b 0%%, #475569 100%%); padding: 40px 40px 30px; border-radius: 16px 16px 0 0; text-align: center;">
-                            <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 600;">
+                        <td style="background-color: #64748B; padding: 40px 40px 30px; border-radius: 10px 10px 0 0; text-align: center;">
+                            <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600;">
                                 We're sorry to see you go
                             </h1>
                         </td>
@@ -776,17 +776,17 @@ func renderGoodbyeEmailTemplate(data *GoodbyeEmailData) string {
                     <!-- Main content -->
                     <tr>
                         <td style="padding: 40px;">
-                            <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
+                            <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
                                 Hi %s,
                             </p>
-                            <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
+                            <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
                                 Your account at <strong>%s</strong> has been deactivated as requested.
                             </p>
 
                             <!-- Info box -->
-                            <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; border-radius: 0 8px 8px 0; margin-bottom: 24px;">
-                                <h3 style="color: #92400e; margin: 0 0 12px; font-size: 16px;">What happens next?</h3>
-                                <ul style="color: #92400e; font-size: 14px; margin: 0; padding-left: 20px; line-height: 1.8;">
+                            <div style="background-color: #FEF3C7; border-left: 4px solid #F59E0B; padding: 20px; border-radius: 0 8px 8px 0; margin-bottom: 24px;">
+                                <h3 style="color: #92400E; margin: 0 0 12px; font-size: 16px; font-weight: 600;">What happens next?</h3>
+                                <ul style="color: #92400E; font-size: 14px; margin: 0; padding-left: 20px; line-height: 1.8;">
                                     <li>Your data will be safely retained for <strong>90 days</strong></li>
                                     <li>You can reactivate your account anytime before <strong>%s</strong></li>
                                     <li>After 90 days, your data will be permanently deleted</li>
@@ -794,25 +794,25 @@ func renderGoodbyeEmailTemplate(data *GoodbyeEmailData) string {
                             </div>
 
                             <!-- Changed your mind section -->
-                            <div style="background-color: #f0fdf4; border-left: 4px solid #22c55e; padding: 20px; border-radius: 0 8px 8px 0; margin-bottom: 24px;">
-                                <h3 style="color: #166534; margin: 0 0 12px; font-size: 16px;">Changed your mind?</h3>
+                            <div style="background-color: #D1FAE5; border-left: 4px solid #10B981; padding: 20px; border-radius: 0 8px 8px 0; margin-bottom: 24px;">
+                                <h3 style="color: #166534; margin: 0 0 12px; font-size: 16px; font-weight: 600;">Changed your mind?</h3>
                                 <p style="color: #166534; font-size: 14px; margin: 0;">
                                     Simply log back in to reactivate your account. All your data will be restored instantly.
                                 </p>
                             </div>
 
-                            <!-- CTA Button -->
+                            <!-- CTA Button - Success green -->
                             <table role="presentation" style="width: 100%%; border-collapse: collapse;">
                                 <tr>
                                     <td align="center" style="padding: 16px 0;">
-                                        <a href="%s" style="display: inline-block; background: linear-gradient(135deg, #22c55e 0%%, #16a34a 100%%); color: #ffffff; text-decoration: none; padding: 16px 48px; border-radius: 12px; font-size: 16px; font-weight: 600; box-shadow: 0 4px 14px rgba(34, 197, 94, 0.4);">
+                                        <a href="%s" style="display: inline-block; background-color: #10B981; color: #ffffff; text-decoration: none; padding: 12px 32px; border-radius: 8px; font-size: 14px; font-weight: 600; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);">
                                             Reactivate My Account
                                         </a>
                                     </td>
                                 </tr>
                             </table>
 
-                            <p style="color: #6b7280; font-size: 14px; line-height: 1.6; margin: 24px 0 0; text-align: center;">
+                            <p style="color: #64748B; font-size: 14px; line-height: 1.6; margin: 24px 0 0; text-align: center;">
                                 We'd love to have you back! If you have any feedback on how we can improve, please let us know.
                             </p>
                         </td>
@@ -820,11 +820,11 @@ func renderGoodbyeEmailTemplate(data *GoodbyeEmailData) string {
 
                     <!-- Footer -->
                     <tr>
-                        <td style="background-color: #f9fafb; padding: 24px 40px; border-radius: 0 0 16px 16px; text-align: center;">
-                            <p style="color: #9ca3af; font-size: 13px; margin: 0 0 8px;">
+                        <td style="background-color: #F8FAFC; padding: 24px 40px; border-radius: 0 0 10px 10px; text-align: center;">
+                            <p style="color: #94A3B8; font-size: 14px; margin: 0 0 8px;">
                                 This email was sent because you deactivated your account at %s
                             </p>
-                            <p style="color: #9ca3af; font-size: 13px; margin: 0;">
+                            <p style="color: #94A3B8; font-size: 12px; margin: 0;">
                                 © 2026 Powered by Tesseract Hub
                             </p>
                         </td>

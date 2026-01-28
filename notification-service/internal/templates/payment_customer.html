@@ -1,16 +1,22 @@
 {{define "header"}}
-<!-- Logo -->
+<!-- Logo with tenant branding support -->
 <tr>
     <td style="text-align: center; padding-bottom: 24px;">
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
             <tr>
-                <td style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
-                    <span style="color: #ffffff; font-size: 24px; font-weight: 700;">{{if .BusinessInitial}}{{.BusinessInitial}}{{else}}T{{end}}</span>
+                {{if .BrandLogoURL}}
+                <td style="text-align: center;">
+                    <img src="{{.BrandLogoURL}}" alt="{{.BusinessName}}" height="48" style="height: 48px; max-width: 200px; display: block; margin: 0 auto;">
                 </td>
+                {{else}}
+                <td style="background-color: {{if .BrandPrimaryColor}}{{.BrandPrimaryColor}}{{else}}#0F172A{{end}}; width: 48px; height: 48px; border-radius: 8px; text-align: center; vertical-align: middle;">
+                    <span style="color: {{if .BrandTextColor}}{{.BrandTextColor}}{{else}}#ffffff{{end}}; font-size: 24px; font-weight: 700;">{{if .BusinessInitial}}{{.BusinessInitial}}{{else}}T{{end}}</span>
+                </td>
+                {{end}}
             </tr>
         </table>
         {{if .BusinessName}}
-        <p style="margin: 12px 0 0 0; font-size: 18px; font-weight: 600; color: #18181b; letter-spacing: -0.3px;">{{.BusinessName}}</p>
+        <p style="margin: 12px 0 0 0; font-size: 18px; font-weight: 600; color: #0F172A; letter-spacing: -0.3px;">{{.BusinessName}}</p>
         {{end}}
     </td>
 </tr>
@@ -20,12 +26,12 @@
 <!-- Main Card -->
 <tr>
     <td>
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1); overflow: hidden;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ffffff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1); overflow: hidden;">
 
             <!-- Dynamic Header based on PaymentStatus -->
             <tr>
                 {{if eq .PaymentStatus "CAPTURED"}}
-                <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 40px 40px; text-align: center;" class="mobile-padding">
+                <td style="background-color: #10B981; padding: 40px 40px; text-align: center;" class="mobile-padding">
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
                         <tr>
                             <td style="width: 72px; height: 72px; background-color: rgba(255,255,255,0.2); border-radius: 50%; text-align: center; vertical-align: middle;">
@@ -36,12 +42,12 @@
                     <h1 style="margin: 20px 0 0 0; font-size: 26px; font-weight: 700; color: #ffffff; line-height: 1.3;">
                         Payment Successful!
                     </h1>
-                    <p style="margin: 8px 0 0 0; font-size: 15px; color: rgba(255,255,255,0.9);">
+                    <p style="margin: 8px 0 0 0; font-size: 14px; color: rgba(255,255,255,0.9);">
                         Thank you for your payment
                     </p>
                 </td>
                 {{else if eq .PaymentStatus "FAILED"}}
-                <td style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); padding: 40px 40px; text-align: center;" class="mobile-padding">
+                <td style="background-color: #EF4444; padding: 40px 40px; text-align: center;" class="mobile-padding">
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
                         <tr>
                             <td style="width: 72px; height: 72px; background-color: rgba(255,255,255,0.2); border-radius: 50%; text-align: center; vertical-align: middle;">
@@ -52,12 +58,12 @@
                     <h1 style="margin: 20px 0 0 0; font-size: 26px; font-weight: 700; color: #ffffff; line-height: 1.3;">
                         Payment Failed
                     </h1>
-                    <p style="margin: 8px 0 0 0; font-size: 15px; color: rgba(255,255,255,0.9);">
+                    <p style="margin: 8px 0 0 0; font-size: 14px; color: rgba(255,255,255,0.9);">
                         We couldn't process your payment
                     </p>
                 </td>
                 {{else if eq .PaymentStatus "REFUNDED"}}
-                <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 40px 40px; text-align: center;" class="mobile-padding">
+                <td style="background-color: #10B981; padding: 40px 40px; text-align: center;" class="mobile-padding">
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
                         <tr>
                             <td style="width: 72px; height: 72px; background-color: rgba(255,255,255,0.2); border-radius: 50%; text-align: center; vertical-align: middle;">
@@ -68,12 +74,12 @@
                     <h1 style="margin: 20px 0 0 0; font-size: 26px; font-weight: 700; color: #ffffff; line-height: 1.3;">
                         Refund Processed
                     </h1>
-                    <p style="margin: 8px 0 0 0; font-size: 15px; color: rgba(255,255,255,0.9);">
+                    <p style="margin: 8px 0 0 0; font-size: 14px; color: rgba(255,255,255,0.9);">
                         Your refund has been successfully processed
                     </p>
                 </td>
                 {{else}}
-                <td style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); padding: 40px 40px; text-align: center;" class="mobile-padding">
+                <td style="background-color: {{if .BrandPrimaryColor}}{{.BrandPrimaryColor}}{{else}}#0F172A{{end}}; padding: 40px 40px; text-align: center;" class="mobile-padding">
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
                         <tr>
                             <td style="width: 72px; height: 72px; background-color: rgba(255,255,255,0.2); border-radius: 50%; text-align: center; vertical-align: middle;">
@@ -81,10 +87,10 @@
                             </td>
                         </tr>
                     </table>
-                    <h1 style="margin: 20px 0 0 0; font-size: 26px; font-weight: 700; color: #ffffff; line-height: 1.3;">
+                    <h1 style="margin: 20px 0 0 0; font-size: 26px; font-weight: 700; color: {{if .BrandTextColor}}{{.BrandTextColor}}{{else}}#ffffff{{end}}; line-height: 1.3;">
                         Payment Update
                     </h1>
-                    <p style="margin: 8px 0 0 0; font-size: 15px; color: rgba(255,255,255,0.9);">
+                    <p style="margin: 8px 0 0 0; font-size: 14px; color: rgba(255,255,255,0.9);">
                         Here's an update on your payment
                     </p>
                 </td>
@@ -95,7 +101,7 @@
             <tr>
                 <td style="padding: 32px 40px 0 40px;" class="mobile-padding">
                     {{if eq .PaymentStatus "CAPTURED"}}
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); border-radius: 16px; border: 2px solid #86efac;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #D1FAE5; border-radius: 10px; border: 2px solid #86efac;">
                         <tr>
                             <td style="padding: 32px; text-align: center;">
                                 <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 600; color: #059669; text-transform: uppercase; letter-spacing: 1px;">Amount Paid</p>
@@ -104,7 +110,7 @@
                         </tr>
                     </table>
                     {{else if eq .PaymentStatus "FAILED"}}
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); border-radius: 16px; border: 2px solid #fecaca;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #FEE2E2; border-radius: 10px; border: 2px solid #fecaca;">
                         <tr>
                             <td style="padding: 24px; text-align: center;">
                                 <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 600; color: #dc2626; text-transform: uppercase; letter-spacing: 1px;">Amount Attempted</p>
@@ -113,7 +119,7 @@
                         </tr>
                     </table>
                     {{else if eq .PaymentStatus "REFUNDED"}}
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); border-radius: 16px; border: 2px solid #86efac;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #D1FAE5; border-radius: 10px; border: 2px solid #86efac;">
                         <tr>
                             <td style="padding: 32px; text-align: center;">
                                 <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 600; color: #059669; text-transform: uppercase; letter-spacing: 1px;">Refund Amount</p>
@@ -129,50 +135,50 @@
             {{if or (eq .PaymentStatus "CAPTURED") (eq .PaymentStatus "REFUNDED")}}
             <tr>
                 <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f8fafc; border-radius: 12px;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #F8FAFC; border-radius: 8px;">
                         <tr>
                             <td style="padding: 24px;">
-                                <p style="margin: 0 0 16px 0; font-size: 11px; font-weight: 700; color: #71717a; text-transform: uppercase; letter-spacing: 1px;">
+                                <p style="margin: 0 0 16px 0; font-size: 12px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 1px;">
                                     {{if eq .PaymentStatus "REFUNDED"}}Refund Details{{else}}Payment Details{{end}}
                                 </p>
                                 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                                     {{if .TransactionID}}
                                     <tr>
                                         <td style="padding-bottom: 12px;">
-                                            <p style="margin: 0; font-size: 12px; color: #71717a;">Transaction ID</p>
-                                            <p style="margin: 4px 0 0 0; font-family: 'SF Mono', 'Roboto Mono', monospace; font-size: 13px; color: #18181b; font-weight: 500;">{{.TransactionID}}</p>
+                                            <p style="margin: 0; font-size: 12px; color: #64748B;">Transaction ID</p>
+                                            <p style="margin: 4px 0 0 0; font-family: 'JetBrains Mono', 'SFMono-Regular', 'Menlo', monospace; font-size: 14px; color: #0F172A; font-weight: 500;">{{.TransactionID}}</p>
                                         </td>
                                     </tr>
                                     {{end}}
                                     {{if .OrderNumber}}
                                     <tr>
                                         <td style="padding-bottom: 12px;">
-                                            <p style="margin: 0; font-size: 12px; color: #71717a;">Order Number</p>
-                                            <p style="margin: 4px 0 0 0; font-size: 13px; color: #18181b; font-weight: 600;">{{.OrderNumber}}</p>
+                                            <p style="margin: 0; font-size: 12px; color: #64748B;">Order Number</p>
+                                            <p style="margin: 4px 0 0 0; font-size: 14px; color: #0F172A; font-weight: 600;">{{.OrderNumber}}</p>
                                         </td>
                                     </tr>
                                     {{end}}
                                     {{if .PaymentMethod}}
                                     <tr>
                                         <td style="padding-bottom: 12px;">
-                                            <p style="margin: 0; font-size: 12px; color: #71717a;">Payment Method</p>
-                                            <p style="margin: 4px 0 0 0; font-size: 13px; color: #18181b;">{{.PaymentMethod}}</p>
+                                            <p style="margin: 0; font-size: 12px; color: #64748B;">Payment Method</p>
+                                            <p style="margin: 4px 0 0 0; font-size: 14px; color: #0F172A;">{{.PaymentMethod}}</p>
                                         </td>
                                     </tr>
                                     {{end}}
                                     {{if .PaymentDate}}
                                     <tr>
                                         <td>
-                                            <p style="margin: 0; font-size: 12px; color: #71717a;">Date & Time</p>
-                                            <p style="margin: 4px 0 0 0; font-size: 13px; color: #18181b;">{{.PaymentDate}}</p>
+                                            <p style="margin: 0; font-size: 12px; color: #64748B;">Date & Time</p>
+                                            <p style="margin: 4px 0 0 0; font-size: 14px; color: #0F172A;">{{.PaymentDate}}</p>
                                         </td>
                                     </tr>
                                     {{end}}
                                     {{if and (eq .PaymentStatus "REFUNDED") .CancellationReason}}
                                     <tr>
                                         <td style="padding-top: 12px;">
-                                            <p style="margin: 0; font-size: 12px; color: #71717a;">Reason</p>
-                                            <p style="margin: 4px 0 0 0; font-size: 13px; color: #18181b;">{{.CancellationReason}}</p>
+                                            <p style="margin: 0; font-size: 12px; color: #64748B;">Reason</p>
+                                            <p style="margin: 4px 0 0 0; font-size: 14px; color: #0F172A;">{{.CancellationReason}}</p>
                                         </td>
                                     </tr>
                                     {{end}}
@@ -188,7 +194,7 @@
             {{if eq .PaymentStatus "FAILED"}}
             <tr>
                 <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #fef2f2; border-radius: 12px; border: 1px solid #fecaca;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #fef2f2; border-radius: 8px; border: 1px solid #fecaca;">
                         <tr>
                             <td style="padding: 20px;">
                                 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
@@ -198,7 +204,7 @@
                                         </td>
                                         <td style="vertical-align: top;">
                                             <p style="margin: 0 0 4px 0; font-size: 14px; font-weight: 600; color: #991b1b;">Why did my payment fail?</p>
-                                            <p style="margin: 0; font-size: 13px; color: #b91c1c; line-height: 1.5;">
+                                            <p style="margin: 0; font-size: 14px; color: #b91c1c; line-height: 1.5;">
                                                 {{if .FailureReason}}{{.FailureReason}}{{else}}The payment was declined by your bank or card issuer. Please check your card details or try a different payment method.{{end}}
                                             </p>
                                         </td>
@@ -213,18 +219,18 @@
             <!-- Order Info for Failed -->
             <tr>
                 <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f8fafc; border-radius: 12px;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #F8FAFC; border-radius: 8px;">
                         <tr>
                             <td style="padding: 20px;">
                                 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                                     <tr>
                                         <td style="width: 50%;">
-                                            <p style="margin: 0 0 4px 0; font-size: 11px; font-weight: 600; color: #71717a; text-transform: uppercase; letter-spacing: 0.5px;">Order Number</p>
-                                            <p style="margin: 0; font-size: 15px; font-weight: 700; color: #18181b;">{{.OrderNumber}}</p>
+                                            <p style="margin: 0 0 4px 0; font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Order Number</p>
+                                            <p style="margin: 0; font-size: 14px; font-weight: 700; color: #0F172A;">{{.OrderNumber}}</p>
                                         </td>
                                         <td style="width: 50%; text-align: right;">
-                                            <p style="margin: 0 0 4px 0; font-size: 11px; font-weight: 600; color: #71717a; text-transform: uppercase; letter-spacing: 0.5px;">Attempted On</p>
-                                            <p style="margin: 0; font-size: 13px; color: #3f3f46;">{{.PaymentDate}}</p>
+                                            <p style="margin: 0 0 4px 0; font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Attempted On</p>
+                                            <p style="margin: 0; font-size: 14px; color: #334155;">{{.PaymentDate}}</p>
                                         </td>
                                     </tr>
                                 </table>
@@ -237,7 +243,7 @@
             <!-- What To Do Next for Failed -->
             <tr>
                 <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
-                    <p style="margin: 0 0 16px 0; font-size: 14px; font-weight: 600; color: #18181b;">
+                    <p style="margin: 0 0 16px 0; font-size: 14px; font-weight: 600; color: #0F172A;">
                         &#128161; What you can do
                     </p>
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
@@ -246,10 +252,10 @@
                                 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                                     <tr>
                                         <td style="width: 28px; vertical-align: top;">
-                                            <span style="display: inline-block; width: 20px; height: 20px; background-color: #f3f4f6; border-radius: 50%; text-align: center; line-height: 20px; font-size: 11px; font-weight: 600; color: #52525b;">1</span>
+                                            <span style="display: inline-block; width: 20px; height: 20px; background-color: #f3f4f6; border-radius: 50%; text-align: center; line-height: 20px; font-size: 12px; font-weight: 600; color: #475569;">1</span>
                                         </td>
                                         <td style="vertical-align: top;">
-                                            <p style="margin: 0; font-size: 13px; color: #3f3f46; line-height: 1.5;">Check your card details are correct</p>
+                                            <p style="margin: 0; font-size: 14px; color: #334155; line-height: 1.5;">Check your card details are correct</p>
                                         </td>
                                     </tr>
                                 </table>
@@ -260,10 +266,10 @@
                                 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                                     <tr>
                                         <td style="width: 28px; vertical-align: top;">
-                                            <span style="display: inline-block; width: 20px; height: 20px; background-color: #f3f4f6; border-radius: 50%; text-align: center; line-height: 20px; font-size: 11px; font-weight: 600; color: #52525b;">2</span>
+                                            <span style="display: inline-block; width: 20px; height: 20px; background-color: #f3f4f6; border-radius: 50%; text-align: center; line-height: 20px; font-size: 12px; font-weight: 600; color: #475569;">2</span>
                                         </td>
                                         <td style="vertical-align: top;">
-                                            <p style="margin: 0; font-size: 13px; color: #3f3f46; line-height: 1.5;">Ensure you have sufficient funds</p>
+                                            <p style="margin: 0; font-size: 14px; color: #334155; line-height: 1.5;">Ensure you have sufficient funds</p>
                                         </td>
                                     </tr>
                                 </table>
@@ -274,10 +280,10 @@
                                 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                                     <tr>
                                         <td style="width: 28px; vertical-align: top;">
-                                            <span style="display: inline-block; width: 20px; height: 20px; background-color: #f3f4f6; border-radius: 50%; text-align: center; line-height: 20px; font-size: 11px; font-weight: 600; color: #52525b;">3</span>
+                                            <span style="display: inline-block; width: 20px; height: 20px; background-color: #f3f4f6; border-radius: 50%; text-align: center; line-height: 20px; font-size: 12px; font-weight: 600; color: #475569;">3</span>
                                         </td>
                                         <td style="vertical-align: top;">
-                                            <p style="margin: 0; font-size: 13px; color: #3f3f46; line-height: 1.5;">Contact your bank if the issue persists</p>
+                                            <p style="margin: 0; font-size: 14px; color: #334155; line-height: 1.5;">Contact your bank if the issue persists</p>
                                         </td>
                                     </tr>
                                 </table>
@@ -288,10 +294,10 @@
                                 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                                     <tr>
                                         <td style="width: 28px; vertical-align: top;">
-                                            <span style="display: inline-block; width: 20px; height: 20px; background-color: #f3f4f6; border-radius: 50%; text-align: center; line-height: 20px; font-size: 11px; font-weight: 600; color: #52525b;">4</span>
+                                            <span style="display: inline-block; width: 20px; height: 20px; background-color: #f3f4f6; border-radius: 50%; text-align: center; line-height: 20px; font-size: 12px; font-weight: 600; color: #475569;">4</span>
                                         </td>
                                         <td style="vertical-align: top;">
-                                            <p style="margin: 0; font-size: 13px; color: #3f3f46; line-height: 1.5;">Try a different payment method</p>
+                                            <p style="margin: 0; font-size: 14px; color: #334155; line-height: 1.5;">Try a different payment method</p>
                                         </td>
                                     </tr>
                                 </table>
@@ -313,7 +319,7 @@
                                             <span style="font-size: 18px;">&#128717;</span>
                                         </td>
                                         <td style="vertical-align: top;">
-                                            <p style="margin: 0 0 4px 0; font-size: 13px; font-weight: 600; color: #1e40af;">Your cart is saved</p>
+                                            <p style="margin: 0 0 4px 0; font-size: 14px; font-weight: 600; color: #1e40af;">Your cart is saved</p>
                                             <p style="margin: 0; font-size: 12px; color: #3b82f6; line-height: 1.5;">
                                                 Don't worry - your items are still in your cart. Try checking out again when you're ready.
                                             </p>
@@ -340,7 +346,7 @@
                                             <span style="font-size: 18px;">&#128196;</span>
                                         </td>
                                         <td style="vertical-align: top;">
-                                            <p style="margin: 0 0 4px 0; font-size: 13px; font-weight: 600; color: #1e40af;">Your receipt is attached</p>
+                                            <p style="margin: 0 0 4px 0; font-size: 14px; font-weight: 600; color: #1e40af;">Your receipt is attached</p>
                                             <p style="margin: 0; font-size: 12px; color: #3b82f6; line-height: 1.5;">
                                                 You can also download your receipt from your order history.
                                             </p>
@@ -367,7 +373,7 @@
                                             <span style="font-size: 18px;">&#128337;</span>
                                         </td>
                                         <td style="vertical-align: top;">
-                                            <p style="margin: 0 0 4px 0; font-size: 13px; font-weight: 600; color: #1e40af;">Refund Timeline</p>
+                                            <p style="margin: 0 0 4px 0; font-size: 14px; font-weight: 600; color: #1e40af;">Refund Timeline</p>
                                             <p style="margin: 0; font-size: 12px; color: #3b82f6; line-height: 1.5;">
                                                 Please allow {{if .RefundDays}}{{.RefundDays}}{{else}}5-10 business days{{end}} for the refund to appear in your account, depending on your payment provider.
                                             </p>
@@ -387,20 +393,20 @@
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
                         <tr>
                             {{if eq .PaymentStatus "FAILED"}}
-                            <td style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); border-radius: 10px; box-shadow: 0 4px 14px rgba(239,68,68,0.3);">
-                                <a href="{{if .RetryURL}}{{.RetryURL}}{{else}}{{.ShopURL}}{{end}}" style="display: inline-block; padding: 16px 40px; font-size: 15px; font-weight: 600; color: #ffffff; text-decoration: none;">
+                            <td style="background-color: #EF4444; border-radius: 10px;">
+                                <a href="{{if .RetryURL}}{{.RetryURL}}{{else}}{{.ShopURL}}{{end}}" style="display: inline-block; padding: 16px 40px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
                                     Try Again &#8594;
                                 </a>
                             </td>
                             {{else if eq .PaymentStatus "REFUNDED"}}
-                            <td style="background: linear-gradient(135deg, #18181b 0%, #27272a 100%); border-radius: 10px;">
-                                <a href="{{.ShopURL}}" style="display: inline-block; padding: 14px 32px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
+                            <td style="background-color: {{if .BrandPrimaryColor}}{{.BrandPrimaryColor}}{{else}}#0F172A{{end}}; border-radius: 10px;">
+                                <a href="{{.ShopURL}}" style="display: inline-block; padding: 14px 32px; font-size: 14px; font-weight: 600; color: {{if .BrandTextColor}}{{.BrandTextColor}}{{else}}#ffffff{{end}}; text-decoration: none;">
                                     Continue Shopping &#8594;
                                 </a>
                             </td>
                             {{else}}
-                            <td style="background: linear-gradient(135deg, #18181b 0%, #27272a 100%); border-radius: 10px;">
-                                <a href="{{.OrderDetailsURL}}" style="display: inline-block; padding: 14px 32px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
+                            <td style="background-color: {{if .BrandPrimaryColor}}{{.BrandPrimaryColor}}{{else}}#0F172A{{end}}; border-radius: 10px;">
+                                <a href="{{.OrderDetailsURL}}" style="display: inline-block; padding: 14px 32px; font-size: 14px; font-weight: 600; color: {{if .BrandTextColor}}{{.BrandTextColor}}{{else}}#ffffff{{end}}; text-decoration: none;">
                                     View Order Details &#8594;
                                 </a>
                             </td>
@@ -418,10 +424,10 @@
 <!-- Footer -->
 <tr>
     <td style="padding: 32px 20px; text-align: center;">
-        <p style="margin: 0 0 8px 0; font-size: 13px; color: #71717a;">
-            {{if eq .PaymentStatus "FAILED"}}Need help?{{else if eq .PaymentStatus "REFUNDED"}}Questions about your refund?{{else}}Questions about your payment?{{end}} <a href="mailto:{{.SupportEmail}}" style="color: #6366f1; text-decoration: none; font-weight: 500;">Contact Support</a>
+        <p style="margin: 0 0 8px 0; font-size: 14px; color: #64748B;">
+            {{if eq .PaymentStatus "FAILED"}}Need help?{{else if eq .PaymentStatus "REFUNDED"}}Questions about your refund?{{else}}Questions about your payment?{{end}} <a href="mailto:{{.SupportEmail}}" style="color: #0F172A; text-decoration: none; font-weight: 500;">Contact Support</a>
         </p>
-        <p style="margin: 0; font-size: 12px; color: #a1a1aa;">
+        <p style="margin: 0; font-size: 12px; color: #94A3B8;">
             &copy; {{.Year}} {{.BusinessName}}. All rights reserved.
         </p>
     </td>

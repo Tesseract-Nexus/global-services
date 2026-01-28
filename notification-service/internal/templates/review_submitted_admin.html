@@ -4,13 +4,13 @@
     <td style="text-align: center; padding-bottom: 24px;">
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
             <tr>
-                <td style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); width: 48px; height: 48px; border-radius: 12px; text-align: center; vertical-align: middle;">
+                <td style="background-color: #F59E0B; width: 48px; height: 48px; border-radius: 8px; text-align: center; vertical-align: middle;">
                     <span style="color: #ffffff; font-size: 24px; font-weight: 700;">{{if .BusinessInitial}}{{.BusinessInitial}}{{else}}T{{end}}</span>
                 </td>
             </tr>
         </table>
         {{if .BusinessName}}
-        <p style="margin: 12px 0 0 0; font-size: 18px; font-weight: 600; color: #18181b; letter-spacing: -0.3px;">{{.BusinessName}} Admin</p>
+        <p style="margin: 12px 0 0 0; font-size: 18px; font-weight: 600; color: #0F172A; letter-spacing: -0.3px;">{{.BusinessName}} Admin</p>
         {{end}}
     </td>
 </tr>
@@ -20,16 +20,16 @@
 <!-- Main Card -->
 <tr>
     <td>
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1); overflow: hidden;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ffffff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1); overflow: hidden;">
 
             <!-- Header -->
             <tr>
-                <td style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 50%, #b45309 100%); padding: 40px 40px; text-align: center;" class="mobile-padding">
+                <td style="background-color: #F59E0B; padding: 40px 40px; text-align: center;" class="mobile-padding">
                     <span style="font-size: 48px; display: block; margin-bottom: 12px;">&#128172;</span>
                     <h1 style="margin: 0 0 8px 0; font-size: 24px; font-weight: 700; color: #ffffff; line-height: 1.2;">
                         New Review Needs Moderation
                     </h1>
-                    <p style="margin: 0; font-size: 15px; color: rgba(255,255,255,0.9);">
+                    <p style="margin: 0; font-size: 14px; color: rgba(255,255,255,0.9);">
                         A customer just submitted a {{.Rating}}-star review
                     </p>
                 </td>
@@ -42,10 +42,10 @@
                         <!-- Product Info -->
                         <tr>
                             <td style="padding-bottom: 16px;">
-                                <p style="margin: 0 0 4px 0; font-size: 12px; font-weight: 600; color: #71717a; text-transform: uppercase; letter-spacing: 0.5px;">Product</p>
-                                <p style="margin: 0; font-size: 16px; font-weight: 600; color: #18181b;">{{.ProductName}}</p>
+                                <p style="margin: 0 0 4px 0; font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Product</p>
+                                <p style="margin: 0; font-size: 16px; font-weight: 600; color: #0F172A;">{{.ProductName}}</p>
                                 {{if .ProductSKU}}
-                                <p style="margin: 4px 0 0 0; font-size: 13px; color: #71717a;">SKU: {{.ProductSKU}}</p>
+                                <p style="margin: 4px 0 0 0; font-size: 14px; color: #64748B;">SKU: {{.ProductSKU}}</p>
                                 {{end}}
                             </td>
                         </tr>
@@ -53,10 +53,10 @@
                         <!-- Customer Info -->
                         <tr>
                             <td style="padding-bottom: 16px; border-bottom: 1px solid #e4e4e7;">
-                                <p style="margin: 0 0 4px 0; font-size: 12px; font-weight: 600; color: #71717a; text-transform: uppercase; letter-spacing: 0.5px;">Customer</p>
-                                <p style="margin: 0; font-size: 16px; font-weight: 600; color: #18181b;">{{if .CustomerName}}{{.CustomerName}}{{else}}Anonymous{{end}}</p>
+                                <p style="margin: 0 0 4px 0; font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Customer</p>
+                                <p style="margin: 0; font-size: 16px; font-weight: 600; color: #0F172A;">{{if .CustomerName}}{{.CustomerName}}{{else}}Anonymous{{end}}</p>
                                 {{if .Email}}
-                                <p style="margin: 4px 0 0 0; font-size: 13px; color: #71717a;">{{.Email}}</p>
+                                <p style="margin: 4px 0 0 0; font-size: 14px; color: #64748B;">{{.Email}}</p>
                                 {{end}}
                             </td>
                         </tr>
@@ -69,7 +69,7 @@
                 <td style="padding: 24px 40px 0 40px; text-align: center;" class="mobile-padding">
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
                         <tr>
-                            <td style="background: {{if ge .Rating 4}}linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%){{else if ge .Rating 3}}linear-gradient(135deg, #fef3c7 0%, #fde68a 100%){{else}}linear-gradient(135deg, #fee2e2 0%, #fecaca 100%){{end}}; border-radius: 12px; padding: 16px 24px;">
+                            <td style="background-color: {{if ge .Rating 4}}#dcfce7{{else if ge .Rating 3}}#fef3c7{{else}}#fee2e2{{end}}; border-radius: 8px; padding: 16px 24px;">
                                 <p style="margin: 0 0 4px 0; font-size: 28px; letter-spacing: 3px; color: #f59e0b;">{{.RatingStars}}</p>
                                 <p style="margin: 0; font-size: 14px; font-weight: 600; color: {{if ge .Rating 4}}#166534{{else if ge .Rating 3}}#92400e{{else}}#991b1b{{end}};">{{.Rating}} out of {{.MaxRating}} Stars</p>
                             </td>
@@ -81,13 +81,13 @@
             <!-- Review Content -->
             <tr>
                 <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background: #f9fafb; border-radius: 12px; border-left: 4px solid #f59e0b;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background: #F8FAFC; border-radius: 8px; border-left: 4px solid #f59e0b;">
                         <tr>
                             <td style="padding: 20px;">
                                 {{if .ReviewTitle}}
-                                <p style="margin: 0 0 12px 0; font-size: 16px; font-weight: 700; color: #18181b;">"{{.ReviewTitle}}"</p>
+                                <p style="margin: 0 0 12px 0; font-size: 16px; font-weight: 700; color: #0F172A;">"{{.ReviewTitle}}"</p>
                                 {{end}}
-                                <p style="margin: 0; font-size: 15px; color: #3f3f46; line-height: 1.7;">
+                                <p style="margin: 0; font-size: 14px; color: #334155; line-height: 1.7;">
                                     {{.ReviewContent}}
                                 </p>
                             </td>
@@ -100,7 +100,7 @@
             <!-- Verified Badge -->
             <tr>
                 <td style="padding: 16px 40px 0 40px; text-align: center;" class="mobile-padding">
-                    <span style="display: inline-block; background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); border-radius: 20px; padding: 8px 16px; font-size: 13px; color: #166534; font-weight: 600;">&#10003; Verified Purchase</span>
+                    <span style="display: inline-block; background-color: #D1FAE5; border-radius: 20px; padding: 8px 16px; font-size: 14px; color: #166534; font-weight: 600;">&#10003; Verified Purchase</span>
                 </td>
             </tr>
             {{end}}
@@ -112,20 +112,20 @@
                         <tr>
                             <!-- Approve Button -->
                             <td style="padding-right: 12px;">
-                                <a href="{{.ReviewsURL}}/{{.ReviewID}}/approve" style="display: inline-block; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); border-radius: 8px; padding: 12px 24px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none; box-shadow: 0 2px 8px rgba(34,197,94,0.3);">
+                                <a href="{{.ReviewsURL}}/{{.ReviewID}}/approve" style="display: inline-block; background-color: #22c55e; border-radius: 8px; padding: 12px 24px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
                                     &#10003; Approve
                                 </a>
                             </td>
                             <!-- Reject Button -->
                             <td style="padding-left: 12px;">
-                                <a href="{{.ReviewsURL}}/{{.ReviewID}}/reject" style="display: inline-block; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); border-radius: 8px; padding: 12px 24px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none; box-shadow: 0 2px 8px rgba(239,68,68,0.3);">
+                                <a href="{{.ReviewsURL}}/{{.ReviewID}}/reject" style="display: inline-block; background-color: #EF4444; border-radius: 8px; padding: 12px 24px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
                                     &#10005; Reject
                                 </a>
                             </td>
                         </tr>
                     </table>
 
-                    <p style="margin: 16px 0 0 0; font-size: 13px; color: #71717a;">
+                    <p style="margin: 16px 0 0 0; font-size: 14px; color: #64748B;">
                         Or <a href="{{.ReviewsURL}}" style="color: #f59e0b; text-decoration: none; font-weight: 500;">view all pending reviews</a>
                     </p>
                 </td>
@@ -139,10 +139,10 @@
 <!-- Footer -->
 <tr>
     <td style="padding: 32px 20px; text-align: center;">
-        <p style="margin: 0 0 8px 0; font-size: 12px; color: #a1a1aa;">
+        <p style="margin: 0 0 8px 0; font-size: 12px; color: #94A3B8;">
             This is an automated admin notification from {{.BusinessName}}
         </p>
-        <p style="margin: 0; font-size: 12px; color: #a1a1aa;">
+        <p style="margin: 0; font-size: 12px; color: #94A3B8;">
             &copy; {{.Year}} {{.BusinessName}}. All rights reserved.
         </p>
     </td>
