@@ -108,6 +108,42 @@ func FormatVerificationEmailWithBranding(code, purpose, businessName string, exp
 </html>
 `, code)
 
+	case "staff_mfa_verification":
+		subject = "Admin Login Verification Code"
+		htmlBody = fmt.Sprintf(`
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #4F46E5; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+        .content { background-color: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
+        .code { font-size: 32px; font-weight: bold; color: #4F46E5; letter-spacing: 8px; text-align: center; padding: 20px; background-color: white; border-radius: 8px; margin: 20px 0; }
+        .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 Admin Login Verification</h1>
+        </div>
+        <div class="content">
+            <p>Hello,</p>
+            <p>A login attempt was made to the admin portal. Please use the following code to verify your identity:</p>
+            <div class="code">%s</div>
+            <p>This code will expire in %d minutes.</p>
+            <p>If you did not attempt to log in, please secure your account immediately.</p>
+        </div>
+        <div class="footer">
+            <p>&copy; 2025 Tesseract Hub. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>
+`, code, expiryMinutes)
+
 	case "password_reset":
 		// Try new template first
 		if s, h, err := templates.RenderPasswordResetDefault("", code, 10); err == nil {

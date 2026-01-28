@@ -27,6 +27,7 @@ import { tenantServiceClient, maskEmail } from '../tenant-service-client';
 import { sessionStore } from '../session-store';
 import { createLogger } from '../logger';
 import { v4 as uuidv4 } from 'uuid';
+import { callVerificationService } from '../verification-client';
 
 const logger = createLogger('direct-auth');
 
@@ -508,29 +509,8 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
       });
     }
 
-    // Handle MFA requirement (step-up authentication)
-    if (data.mfa_required) {
-      // Create a temporary MFA session
-      const mfaSessionId = uuidv4();
-      await sessionStore.saveMfaSession(mfaSessionId, {
-        userId: data.user_id!,
-        email: data.email,
-        tenantId: data.tenant_id,
-        tenantSlug: data.tenant_slug,
-        mfaEnabled: data.mfa_enabled,
-        createdAt: Date.now(),
-      });
-
-      return reply.send({
-        success: true,
-        mfa_required: true,
-        mfa_session: mfaSessionId,
-        mfa_methods: data.mfa_enabled ? ['totp', 'email'] : ['email'],
-        message: 'Multi-factor authentication required.',
-      });
-    }
-
-    // Check if we received tokens from tenant-service
+    // MANDATORY MFA: All admin logins require email OTP verification
+    // Store tokens in MFA session for deferred session creation after OTP
     if (!data.access_token) {
       logger.error({ email: maskEmail(email), tenant_slug }, 'No tokens received from tenant-service for staff');
       return reply.code(500).send({
@@ -540,65 +520,32 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
       });
     }
 
-    // Create session with tokens
-    // Use 24 hours for session expiry (not token expiry) to avoid frequent refresh attempts
-    const sessionExpirySeconds = 86400; // 24 hours
-    const session = await sessionStore.createSession({
+    const mfaSessionId = uuidv4();
+    await sessionStore.saveMfaSession(mfaSessionId, {
       userId: data.user_id!,
+      email: data.email,
       tenantId: data.tenant_id,
       tenantSlug: data.tenant_slug,
-      clientType: 'customer', // Staff still use customer realm
+      mfaEnabled: data.mfa_enabled,
+      createdAt: Date.now(),
       accessToken: data.access_token,
       idToken: data.id_token,
       refreshToken: data.refresh_token,
-      expiresAt: Math.floor(Date.now() / 1000) + sessionExpirySeconds,
-      userInfo: {
-        sub: data.keycloak_user_id || data.user_id,
-        email: data.email,
-        given_name: data.first_name,
-        family_name: data.last_name,
-        name: data.first_name && data.last_name
-          ? `${data.first_name} ${data.last_name}`
-          : data.email,
-        tenant_id: data.tenant_id,
-        tenant_slug: data.tenant_slug,
-        role: data.role,
-        is_staff: true, // Mark session as staff
-        // Include role in realm_access for frontend authorization check
-        realm_access: {
-          roles: data.role ? [data.role] : [],
-        },
-      },
+      keycloakUserId: data.keycloak_user_id,
+      firstName: data.first_name,
+      lastName: data.last_name,
+      role: data.role,
+      rememberMe: remember_me,
     });
 
-    // Set session cookie with dynamic domain based on request host
-    const forwardedHost = request.headers['x-forwarded-host'] as string || request.hostname;
-    setSessionCookie(reply, session.id, forwardedHost, remember_me);
-
-    logger.info({
-      userId: session.userId,
-      sessionId: session.id,
-      tenant_slug,
-      forwardedHost,
-    }, 'Admin/Staff direct login successful');
+    logger.info({ email: maskEmail(email), tenant_slug }, 'Admin login password verified, MFA required');
 
     return reply.send({
       success: true,
-      authenticated: true,
-      user: {
-        id: data.user_id,
-        email: data.email,
-        first_name: data.first_name,
-        last_name: data.last_name,
-        tenant_id: data.tenant_id,
-        tenant_slug: data.tenant_slug,
-        role: data.role,
-        is_staff: true,
-      },
-      session: {
-        expires_at: session.expiresAt,
-        csrf_token: session.csrfToken,
-      },
+      mfa_required: true,
+      mfa_session: mfaSessionId,
+      mfa_methods: ['email'],
+      message: 'Multi-factor authentication required.',
     });
   });
 
@@ -676,15 +623,97 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
       });
     }
 
-    // TODO: Implement actual MFA verification
-    // For now, this is a placeholder that should call tenant-service
-    // to verify the TOTP code or email verification code
-    logger.info({ mfa_session, method }, 'MFA verification requested (not yet implemented)');
+    // Verify OTP via verification-service
+    const verifyResult = await callVerificationService('/verify/code', 'POST', {
+      recipient: mfaData.email,
+      code,
+      purpose: 'staff_mfa_verification',
+    });
 
-    return reply.code(501).send({
-      success: false,
-      error: 'NOT_IMPLEMENTED',
-      message: 'MFA verification is not yet implemented.',
+    if (!verifyResult.success) {
+      const verifyData = verifyResult.data as { remaining_attempts?: number; message?: string } | undefined;
+      logger.info({ mfa_session, method, status: verifyResult.status }, 'MFA verification failed');
+
+      // Track attempts
+      const attemptCount = (mfaData.attemptCount || 0) + 1;
+      await sessionStore.updateMfaSession(mfa_session, { attemptCount });
+
+      if (attemptCount >= 5) {
+        await sessionStore.deleteMfaSession(mfa_session);
+        return reply.code(401).send({
+          success: false,
+          error: 'MFA_MAX_ATTEMPTS',
+          message: 'Too many failed attempts. Please start over.',
+        });
+      }
+
+      return reply.code(401).send({
+        success: false,
+        error: 'INVALID_MFA_CODE',
+        message: verifyData?.message || 'Invalid verification code.',
+        remaining_attempts: 5 - attemptCount,
+      });
+    }
+
+    // OTP verified — create session with stored tokens
+    const sessionExpirySeconds = 86400; // 24 hours
+    const session = await sessionStore.createSession({
+      userId: mfaData.userId,
+      tenantId: mfaData.tenantId,
+      tenantSlug: mfaData.tenantSlug,
+      clientType: 'customer',
+      accessToken: mfaData.accessToken!,
+      idToken: mfaData.idToken,
+      refreshToken: mfaData.refreshToken,
+      expiresAt: Math.floor(Date.now() / 1000) + sessionExpirySeconds,
+      userInfo: {
+        sub: mfaData.keycloakUserId || mfaData.userId,
+        email: mfaData.email,
+        given_name: mfaData.firstName,
+        family_name: mfaData.lastName,
+        name: mfaData.firstName && mfaData.lastName
+          ? `${mfaData.firstName} ${mfaData.lastName}`
+          : mfaData.email,
+        tenant_id: mfaData.tenantId,
+        tenant_slug: mfaData.tenantSlug,
+        role: mfaData.role,
+        is_staff: true,
+        realm_access: {
+          roles: mfaData.role ? [mfaData.role] : [],
+        },
+      },
+    });
+
+    // Set session cookie
+    const forwardedHost = request.headers['x-forwarded-host'] as string || request.hostname;
+    setSessionCookie(reply, session.id, forwardedHost, mfaData.rememberMe || false);
+
+    // Clean up MFA session
+    await sessionStore.deleteMfaSession(mfa_session);
+
+    logger.info({
+      userId: session.userId,
+      sessionId: session.id,
+      tenantSlug: mfaData.tenantSlug,
+    }, 'Admin MFA verification successful, session created');
+
+    return reply.send({
+      success: true,
+      authenticated: true,
+      user: {
+        id: mfaData.userId,
+        email: mfaData.email,
+        first_name: mfaData.firstName,
+        last_name: mfaData.lastName,
+        tenant_id: mfaData.tenantId,
+        tenant_slug: mfaData.tenantSlug,
+        role: mfaData.role,
+        is_staff: true,
+      },
+      session: {
+        expires_at: session.expiresAt,
+        csrf_token: session.csrfToken,
+      },
     });
   });
 
@@ -718,14 +747,30 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
       });
     }
 
-    // TODO: Implement actual MFA code sending
-    // This should call tenant-service or a notification service
-    logger.info({ mfa_session, method }, 'MFA code send requested (not yet implemented)');
+    // Send OTP via verification-service
+    const sendResult = await callVerificationService('/verify/send', 'POST', {
+      recipient: mfaData.email,
+      channel: method,
+      purpose: 'staff_mfa_verification',
+      metadata: {
+        tenantSlug: mfaData.tenantSlug,
+      },
+    });
 
-    return reply.code(501).send({
-      success: false,
-      error: 'NOT_IMPLEMENTED',
-      message: 'MFA code sending is not yet implemented.',
+    if (!sendResult.success) {
+      logger.error({ mfa_session, method, status: sendResult.status }, 'Failed to send MFA code');
+      return reply.code(sendResult.status >= 400 && sendResult.status < 500 ? sendResult.status : 502).send({
+        success: false,
+        error: 'MFA_SEND_FAILED',
+        message: 'Failed to send verification code. Please try again.',
+      });
+    }
+
+    logger.info({ email: maskEmail(mfaData.email), method }, 'MFA code sent');
+
+    return reply.send({
+      success: true,
+      message: 'Verification code sent to your email.',
     });
   });
 

@@ -68,6 +68,15 @@ export interface MfaSessionData {
   mfaEnabled: boolean;
   attemptCount?: number;
   createdAt: number;
+  // Stored after successful password auth for deferred session creation
+  accessToken?: string;
+  idToken?: string;
+  refreshToken?: string;
+  keycloakUserId?: string;
+  firstName?: string;
+  lastName?: string;
+  role?: string;
+  rememberMe?: boolean;
 }
 
 class SessionStore {

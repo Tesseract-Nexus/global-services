@@ -13,8 +13,8 @@
 
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { config } from '../config';
 import { createLogger } from '../logger';
+import { callVerificationService } from '../verification-client';
 
 const logger = createLogger('otp-routes');
 
@@ -25,7 +25,7 @@ const logger = createLogger('otp-routes');
 const sendOTPSchema = z.object({
   email: z.string().email('Invalid email format'),
   channel: z.enum(['email', 'sms']).default('email'),
-  purpose: z.enum(['customer_email_verification']),
+  purpose: z.enum(['customer_email_verification', 'staff_mfa_verification']),
   metadata: z.object({
     businessName: z.string().optional(),
     tenantSlug: z.string().optional(),
@@ -35,13 +35,13 @@ const sendOTPSchema = z.object({
 const verifyOTPSchema = z.object({
   email: z.string().email('Invalid email format'),
   code: z.string().min(6).max(6, 'Code must be 6 digits'),
-  purpose: z.enum(['customer_email_verification']),
+  purpose: z.enum(['customer_email_verification', 'staff_mfa_verification']),
 });
 
 const resendOTPSchema = z.object({
   email: z.string().email('Invalid email format'),
   channel: z.enum(['email', 'sms']).default('email'),
-  purpose: z.enum(['customer_email_verification']),
+  purpose: z.enum(['customer_email_verification', 'staff_mfa_verification']),
   metadata: z.object({
     businessName: z.string().optional(),
     tenantSlug: z.string().optional(),
@@ -79,54 +79,6 @@ function checkRateLimit(key: string, maxAttempts: number): { allowed: boolean; r
   return { allowed: true, remaining: maxAttempts - entry.count, resetIn: entry.resetAt - now };
 }
 
-// ============================================================================
-// Verification Service Client
-// ============================================================================
-
-async function callVerificationService(
-  endpoint: string,
-  method: 'GET' | 'POST',
-  body?: Record<string, unknown>,
-  queryParams?: Record<string, string>
-): Promise<{ success: boolean; status: number; data?: unknown; error?: string }> {
-  const baseUrl = config.verificationServiceUrl;
-  const apiKey = config.verificationServiceApiKey;
-
-  logger.debug({ baseUrl, hasApiKey: !!apiKey, endpoint }, 'Calling verification service');
-
-  let url = baseUrl + '/api/v1' + endpoint;
-  if (queryParams) {
-    const params = new URLSearchParams(queryParams);
-    url += '?' + params.toString();
-  }
-
-  try {
-    const response = await fetch(url, {
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(apiKey ? { 'X-API-Key': apiKey } : {}),
-      },
-      ...(body ? { body: JSON.stringify(body) } : {}),
-    });
-
-    const data = await response.json().catch(() => null) as { message?: string } | null;
-
-    return {
-      success: response.ok,
-      status: response.status,
-      data,
-      error: !response.ok ? (data?.message || 'Service error') : undefined,
-    };
-  } catch (error) {
-    logger.error({ error, endpoint }, 'Failed to call verification service');
-    return {
-      success: false,
-      status: 503,
-      error: 'Verification service unavailable',
-    };
-  }
-}
 
 // ============================================================================
 // Routes
