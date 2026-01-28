@@ -1,24 +1,9 @@
 {{define "header"}}
-<!-- Logo -->
+<!-- Header -->
 <tr>
     <td style="text-align: center; padding-bottom: 24px;">
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
-            <tr>
-                {{if eq .ApprovalPriority "urgent"}}
-                <td style="background-color: #dc2626; width: 48px; height: 48px; border-radius: 8px; text-align: center; vertical-align: middle;">
-                {{else if eq .ApprovalPriority "high"}}
-                <td style="background-color: #F59E0B; width: 48px; height: 48px; border-radius: 8px; text-align: center; vertical-align: middle;">
-                {{else if eq .ApprovalStatus "ESCALATED"}}
-                <td style="background-color: #7c3aed; width: 48px; height: 48px; border-radius: 8px; text-align: center; vertical-align: middle;">
-                {{else}}
-                <td style="background-color: #3B82F6; width: 48px; height: 48px; border-radius: 8px; text-align: center; vertical-align: middle;">
-                {{end}}
-                    <span style="color: #ffffff; font-size: 24px; font-weight: 700;">{{if .BusinessInitial}}{{.BusinessInitial}}{{else}}A{{end}}</span>
-                </td>
-            </tr>
-        </table>
         {{if .BusinessName}}
-        <p style="margin: 12px 0 0 0; font-size: 18px; font-weight: 600; color: #0F172A; letter-spacing: -0.3px;">{{.BusinessName}}</p>
+        <p style="margin: 0; font-size: 18px; font-weight: 600; color: #0F172A; letter-spacing: -0.3px;">{{.BusinessName}}</p>
         {{end}}
     </td>
 </tr>

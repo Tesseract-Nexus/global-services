@@ -1,39 +1,12 @@
 {{define "header"}}
-<!-- Logo with tenant branding support -->
+<!-- Header with optional logo -->
 <tr>
     <td style="text-align: center; padding-bottom: 24px;">
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
-            <tr>
-                {{if .BrandLogoURL}}
-                <td style="text-align: center;">
-                    <img src="{{.BrandLogoURL}}" alt="{{.BusinessName}}" height="48" style="height: 48px; max-width: 200px; display: block; margin: 0 auto;">
-                </td>
-                {{else}}
-                {{/* Dynamic color based on status */}}
-                {{if eq .TicketStatus "RESOLVED"}}
-                <td style="background-color: #10B981; width: 48px; height: 48px; border-radius: 8px; text-align: center; vertical-align: middle;">
-                {{else if eq .TicketStatus "CLOSED"}}
-                <td style="background-color: #6b7280; width: 48px; height: 48px; border-radius: 8px; text-align: center; vertical-align: middle;">
-                {{else if eq .TicketStatus "ESCALATED"}}
-                <td style="background-color: #dc2626; width: 48px; height: 48px; border-radius: 8px; text-align: center; vertical-align: middle;">
-                {{else if eq .TicketStatus "CANCELLED"}}
-                <td style="background-color: #78716c; width: 48px; height: 48px; border-radius: 8px; text-align: center; vertical-align: middle;">
-                {{else if eq .TicketStatus "ON_HOLD"}}
-                <td style="background-color: #F59E0B; width: 48px; height: 48px; border-radius: 8px; text-align: center; vertical-align: middle;">
-                {{else if eq .TicketStatus "REOPENED"}}
-                <td style="background-color: #7c3aed; width: 48px; height: 48px; border-radius: 8px; text-align: center; vertical-align: middle;">
-                {{else if eq .TicketStatus "IN_PROGRESS"}}
-                <td style="background-color: #3B82F6; width: 48px; height: 48px; border-radius: 8px; text-align: center; vertical-align: middle;">
-                {{else}}
-                <td style="background-color: {{if .BrandPrimaryColor}}{{.BrandPrimaryColor}}{{else}}#0F172A{{end}}; width: 48px; height: 48px; border-radius: 8px; text-align: center; vertical-align: middle;">
-                {{end}}
-                    <span style="color: #ffffff; font-size: 24px; font-weight: 700;">{{if .BusinessInitial}}{{.BusinessInitial}}{{else}}T{{end}}</span>
-                </td>
-                {{end}}
-            </tr>
-        </table>
+        {{if .BrandLogoURL}}
+        <img src="{{.BrandLogoURL}}" alt="{{.BusinessName}}" height="48" style="height: 48px; max-width: 200px; display: block; margin: 0 auto;">
+        {{end}}
         {{if .BusinessName}}
-        <p style="margin: 12px 0 0 0; font-size: 18px; font-weight: 600; color: #0F172A; letter-spacing: -0.3px;">{{.BusinessName}}</p>
+        <p style="margin: {{if .BrandLogoURL}}12px{{else}}0{{end}} 0 0 0; font-size: 18px; font-weight: 600; color: #0F172A; letter-spacing: -0.3px;">{{.BusinessName}}</p>
         {{end}}
     </td>
 </tr>

@@ -1,22 +1,12 @@
 {{define "header"}}
-<!-- Logo with tenant branding support -->
+<!-- Header with optional logo -->
 <tr>
     <td style="text-align: center; padding-bottom: 24px;">
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
-            <tr>
-                {{if .BrandLogoURL}}
-                <td style="text-align: center;">
-                    <img src="{{.BrandLogoURL}}" alt="{{.BusinessName}}" height="48" style="height: 48px; max-width: 200px; display: block; margin: 0 auto;">
-                </td>
-                {{else}}
-                <td style="background-color: {{if .BrandPrimaryColor}}{{.BrandPrimaryColor}}{{else}}#0F172A{{end}}; width: 48px; height: 48px; border-radius: 8px; text-align: center; vertical-align: middle;">
-                    <span style="color: {{if .BrandTextColor}}{{.BrandTextColor}}{{else}}#ffffff{{end}}; font-size: 24px; font-weight: 700;">{{if .BusinessInitial}}{{.BusinessInitial}}{{else}}T{{end}}</span>
-                </td>
-                {{end}}
-            </tr>
-        </table>
+        {{if .BrandLogoURL}}
+        <img src="{{.BrandLogoURL}}" alt="{{.BusinessName}}" height="48" style="height: 48px; max-width: 200px; display: block; margin: 0 auto;">
+        {{end}}
         {{if .BusinessName}}
-        <p style="margin: 12px 0 0 0; font-size: 18px; font-weight: 600; color: #0F172A; letter-spacing: -0.3px;">{{.BusinessName}}</p>
+        <p style="margin: {{if .BrandLogoURL}}12px{{else}}0{{end}} 0 0 0; font-size: 18px; font-weight: 600; color: #0F172A; letter-spacing: -0.3px;">{{.BusinessName}}</p>
         {{end}}
     </td>
 </tr>
