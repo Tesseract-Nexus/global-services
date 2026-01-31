@@ -71,7 +71,7 @@ func (c *StaffClient) BootstrapOwner(ctx context.Context, tenantID uuid.UUID, us
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("X-Tenant-ID", tenantID.String())
+	httpReq.Header.Set("x-jwt-claim-tenant-id", tenantID.String())
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -257,7 +257,7 @@ func (c *StaffClient) GetStaffByEmailForTenant(ctx context.Context, email string
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("X-Tenant-ID", tenantID.String())
+	httpReq.Header.Set("x-jwt-claim-tenant-id", tenantID.String())
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -313,7 +313,7 @@ func (c *StaffClient) SyncKeycloakUserID(ctx context.Context, tenantID, staffID 
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("X-Tenant-ID", tenantID.String())
+	httpReq.Header.Set("x-jwt-claim-tenant-id", tenantID.String())
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
