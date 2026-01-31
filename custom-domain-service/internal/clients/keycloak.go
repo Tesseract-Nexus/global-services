@@ -188,41 +188,54 @@ func (k *KeycloakClient) RemoveDomainRedirectURIs(ctx context.Context, domain *m
 	return nil
 }
 
-// getClientsByPattern finds Keycloak clients matching the pattern for a tenant
+// getClientsByPattern finds Keycloak clients by configured client IDs.
+// Falls back to legacy ClientPattern if ClientIDs is empty.
 func (k *KeycloakClient) getClientsByPattern(ctx context.Context, tenantSlug string) ([]keycloakClient, error) {
-	// Search for clients matching the pattern
-	pattern := strings.Replace(k.cfg.Keycloak.ClientPattern, "{tenant}", tenantSlug, -1)
+	clientIDs := k.cfg.Keycloak.ClientIDs
 
-	listURL := fmt.Sprintf("%s/admin/realms/%s/clients?clientId=%s",
-		k.cfg.Keycloak.AdminURL, k.cfg.Keycloak.Realm, url.QueryEscape(pattern))
-
-	resp, err := k.doRequest(ctx, "GET", listURL, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("failed to list clients: status %d, body: %s", resp.StatusCode, string(body))
+	// Fallback to legacy pattern if ClientIDs not configured
+	if len(clientIDs) == 0 && k.cfg.Keycloak.ClientPattern != "" {
+		pattern := strings.Replace(k.cfg.Keycloak.ClientPattern, "{tenant}", tenantSlug, -1)
+		clientIDs = []string{pattern}
 	}
 
-	var clients []keycloakClient
-	if err := json.NewDecoder(resp.Body).Decode(&clients); err != nil {
-		return nil, fmt.Errorf("failed to decode clients response: %w", err)
+	if len(clientIDs) == 0 {
+		return nil, fmt.Errorf("no Keycloak client IDs configured (set KEYCLOAK_CLIENT_IDS)")
 	}
 
-	// Filter by pattern if needed
 	var matched []keycloakClient
-	for _, c := range clients {
-		if strings.Contains(c.ClientID, tenantSlug) || c.ClientID == pattern {
-			matched = append(matched, c)
+	for _, clientID := range clientIDs {
+		listURL := fmt.Sprintf("%s/admin/realms/%s/clients?clientId=%s&first=0&max=1",
+			k.cfg.Keycloak.AdminURL, k.cfg.Keycloak.Realm, url.QueryEscape(clientID))
+
+		resp, err := k.doRequest(ctx, "GET", listURL, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			return nil, fmt.Errorf("failed to list clients: status %d, body: %s", resp.StatusCode, string(body))
+		}
+
+		var clients []keycloakClient
+		if err := json.NewDecoder(resp.Body).Decode(&clients); err != nil {
+			resp.Body.Close()
+			return nil, fmt.Errorf("failed to decode clients response: %w", err)
+		}
+		resp.Body.Close()
+
+		// Exact match only
+		for _, c := range clients {
+			if c.ClientID == clientID {
+				matched = append(matched, c)
+			}
 		}
 	}
 
-	// If no direct match, try listing all and filtering
-	if len(matched) == 0 && len(clients) > 0 {
-		return clients, nil
+	if len(matched) == 0 {
+		log.Warn().Strs("clientIDs", clientIDs).Msg("No Keycloak clients found")
 	}
 
 	return matched, nil

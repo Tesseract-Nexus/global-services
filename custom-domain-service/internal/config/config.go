@@ -52,11 +52,12 @@ type NATSConfig struct {
 }
 
 type KeycloakConfig struct {
-	AdminURL      string `json:"admin_url"`
-	Realm         string `json:"realm"`
-	ClientID      string `json:"client_id"`
-	ClientSecret  string `json:"client_secret"`
-	ClientPattern string `json:"client_pattern"`
+	AdminURL      string   `json:"admin_url"`
+	Realm         string   `json:"realm"`
+	ClientID      string   `json:"client_id"`
+	ClientSecret  string   `json:"client_secret"`
+	ClientPattern string   `json:"client_pattern"` // Deprecated: use ClientIDs
+	ClientIDs     []string `json:"client_ids"`
 }
 
 type IstioConfig struct {
@@ -159,7 +160,8 @@ func NewConfig() *Config {
 			Realm:         getEnv("KEYCLOAK_REALM", "tesserix-customer"),
 			ClientID:      getEnv("KEYCLOAK_ADMIN_CLIENT_ID", "admin-cli"),
 			ClientSecret:  getEnv("KEYCLOAK_ADMIN_CLIENT_SECRET", ""),
-			ClientPattern: getEnv("KEYCLOAK_CLIENT_PATTERN", "marketplace-storefront"),
+			ClientPattern: getEnv("KEYCLOAK_CLIENT_PATTERN", ""),
+			ClientIDs:     getStringSliceEnv("KEYCLOAK_CLIENT_IDS", []string{"storefront-web", "marketplace-dashboard"}),
 		},
 		Istio: IstioConfig{
 			GatewayName:      getEnv("ISTIO_GATEWAY_NAME", "custom-domains-gateway"),
