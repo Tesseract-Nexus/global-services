@@ -12,6 +12,7 @@ import (
 
 	"tenant-router-service/internal/config"
 	"tenant-router-service/internal/k8s"
+	"tenant-router-service/internal/keycloak"
 	"tenant-router-service/internal/models"
 	"tenant-router-service/internal/repository"
 )
@@ -64,9 +65,10 @@ type WorkItem struct {
 // TenantReconciler reconciles tenant routing configuration
 // Follows Kubebuilder reconciler pattern with work queue and rate limiting
 type TenantReconciler struct {
-	k8sClient  *k8s.Client
-	repo       repository.TenantHostRepository
-	config     *config.Config
+	k8sClient      *k8s.Client
+	keycloakClient *keycloak.Client
+	repo           repository.TenantHostRepository
+	config         *config.Config
 
 	// Work queue for processing events
 	workQueue  chan *WorkItem
@@ -109,13 +111,14 @@ type MetricsSnapshot struct {
 }
 
 // NewTenantReconciler creates a new reconciler
-func NewTenantReconciler(k8sClient *k8s.Client, repo repository.TenantHostRepository, cfg *config.Config) *TenantReconciler {
+func NewTenantReconciler(k8sClient *k8s.Client, keycloakClient *keycloak.Client, repo repository.TenantHostRepository, cfg *config.Config) *TenantReconciler {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &TenantReconciler{
-		k8sClient:   k8sClient,
-		repo:        repo,
-		config:      cfg,
+		k8sClient:      k8sClient,
+		keycloakClient: keycloakClient,
+		repo:           repo,
+		config:         cfg,
 		workQueue:   make(chan *WorkItem, 100), // Buffer for 100 items
 		inProgress:  make(map[string]bool),
 		rateLimiter: rate.NewLimiter(rate.Limit(10), 20), // 10 req/s, burst 20
@@ -719,6 +722,23 @@ func (r *TenantReconciler) reconcileCreate(ctx context.Context, event *models.Te
 		}
 	}
 
+	// 8. Update Keycloak OIDC client redirect URIs for this tenant's hosts
+	if r.keycloakClient != nil && r.config.Keycloak.Enabled {
+		hosts := []string{record.AdminHost, record.StorefrontHost}
+		if record.StorefrontWwwHost != "" {
+			hosts = append(hosts, record.StorefrontWwwHost)
+		}
+		if record.APIHost != "" {
+			hosts = append(hosts, record.APIHost)
+		}
+		if err := r.keycloakClient.AddTenantRedirectURIs(ctx, hosts); err != nil {
+			log.Printf("[Reconciler] Warning: Failed to update Keycloak redirect URIs for %s: %v", record.Slug, err)
+			// Don't fail provisioning — Keycloak update is non-critical for routing
+		} else {
+			log.Printf("[Reconciler] Updated Keycloak redirect URIs for %s", record.Slug)
+		}
+	}
+
 	// All resources provisioned - mark as ready
 	conditions = append(conditions, Condition{
 		Type:               ConditionReady,
@@ -818,6 +838,20 @@ func (r *TenantReconciler) reconcileDelete(ctx context.Context, event *models.Te
 	// 5. Delete Certificate
 	if err := r.k8sClient.DeleteCertificate(ctx, event.Slug); err != nil {
 		log.Printf("[Reconciler] Failed to delete certificate: %v", err)
+	}
+
+	// 6. Remove Keycloak redirect URIs
+	if r.keycloakClient != nil && r.config.Keycloak.Enabled {
+		hosts := []string{adminHost, storefrontHost}
+		if record.StorefrontWwwHost != "" {
+			hosts = append(hosts, record.StorefrontWwwHost)
+		}
+		if apiHost != "" {
+			hosts = append(hosts, apiHost)
+		}
+		if err := r.keycloakClient.RemoveTenantRedirectURIs(ctx, hosts); err != nil {
+			log.Printf("[Reconciler] Warning: Failed to remove Keycloak redirect URIs for %s: %v", event.Slug, err)
+		}
 	}
 
 	// Soft delete from database

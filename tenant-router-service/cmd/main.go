@@ -16,6 +16,7 @@ import (
 	"tenant-router-service/internal/database"
 	"tenant-router-service/internal/handlers"
 	"tenant-router-service/internal/k8s"
+	"tenant-router-service/internal/keycloak"
 	"tenant-router-service/internal/models"
 	natsClient "tenant-router-service/internal/nats"
 	redisClient "tenant-router-service/internal/redis"
@@ -59,11 +60,20 @@ func main() {
 		log.Println("Connected to Redis successfully")
 	}
 
+	// Initialize Keycloak client for redirect URI management
+	var keycloakClient *keycloak.Client
+	if cfg.Keycloak.Enabled && cfg.Keycloak.AdminURL != "" {
+		keycloakClient = keycloak.NewClient(&cfg.Keycloak)
+		log.Printf("Keycloak integration enabled (realm: %s, clients: %v)", cfg.Keycloak.Realm, cfg.Keycloak.ClientIDs)
+	} else {
+		log.Println("Keycloak integration disabled (KEYCLOAK_ADMIN_URL not set)")
+	}
+
 	// Initialize router service for VS sync operations
 	routerService := services.NewRouterService(k8sClient, tenantHostRepo, cfg)
 
 	// Initialize reconciler (Kubebuilder pattern)
-	tenantReconciler := reconciler.NewTenantReconciler(k8sClient, tenantHostRepo, cfg)
+	tenantReconciler := reconciler.NewTenantReconciler(k8sClient, keycloakClient, tenantHostRepo, cfg)
 
 	// Start reconciler workers (number of workers can be configured)
 	workerCount := 3

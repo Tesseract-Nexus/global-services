@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/Tesseract-Nexus/go-shared/secrets"
 )
@@ -15,6 +16,17 @@ type Config struct {
 	NATS       NATSConfig
 	Kubernetes K8sConfig
 	Domain     DomainConfig
+	Keycloak   KeycloakConfig
+}
+
+// KeycloakConfig holds Keycloak admin API configuration for redirect URI management
+type KeycloakConfig struct {
+	Enabled          bool
+	AdminURL         string
+	Realm            string
+	AdminClientID    string
+	AdminClientSecret string
+	ClientIDs        []string // OIDC client IDs to update (e.g., storefront-web, marketplace-dashboard)
 }
 
 // RedisConfig holds Redis configuration for caching platform settings
@@ -125,6 +137,14 @@ func LoadConfig() *Config {
 		Domain: DomainConfig{
 			BaseDomain: getEnv("BASE_DOMAIN", "tesserix.app"),
 		},
+		Keycloak: KeycloakConfig{
+			Enabled:           getEnvBool("KEYCLOAK_ENABLED", true),
+			AdminURL:          getEnv("KEYCLOAK_ADMIN_URL", ""),
+			Realm:             getEnv("KEYCLOAK_REALM", "tesserix-customer"),
+			AdminClientID:     getEnv("KEYCLOAK_ADMIN_CLIENT_ID", "admin-cli"),
+			AdminClientSecret: getEnv("KEYCLOAK_ADMIN_CLIENT_SECRET", ""),
+			ClientIDs:         getEnvStringSlice("KEYCLOAK_CLIENT_IDS", "storefront-web,marketplace-dashboard"),
+		},
 	}
 }
 
@@ -144,6 +164,22 @@ func getEnvInt(key string, defaultValue int) int {
 		}
 	}
 	return defaultValue
+}
+
+// getEnvStringSlice splits a comma-separated env var into a string slice
+func getEnvStringSlice(key, defaultValue string) []string {
+	value := getEnv(key, defaultValue)
+	if value == "" {
+		return nil
+	}
+	var result []string
+	for _, s := range strings.Split(value, ",") {
+		s = strings.TrimSpace(s)
+		if s != "" {
+			result = append(result, s)
+		}
+	}
+	return result
 }
 
 // getEnvBool gets an environment variable as bool with a default value
