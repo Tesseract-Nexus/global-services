@@ -116,6 +116,7 @@ func (c *DomainEventConsumer) Start(ctx context.Context) error {
 		{name: "APPROVAL_EVENTS", subjects: []string{"approval.>"}},
 		{name: "CATEGORY_EVENTS", subjects: []string{"category.>"}},
 		{name: "SHIPPING_EVENTS", subjects: []string{"shipping.>"}},
+		{name: "SETTINGS_EVENTS", subjects: []string{"settings.>"}},
 	}
 
 	for _, stream := range streams {
@@ -523,6 +524,10 @@ func (c *DomainEventConsumer) mapEventToAudit(eventType string) (models.AuditAct
 	case "tenant.settings_updated":
 		return models.ActionUpdate, models.ResourceSettings, models.SeverityMedium
 
+	// Settings events (from settings-service via NATS)
+	case "settings.updated", "settings.created", "settings.bulk_updated":
+		return models.ActionSettingChange, models.ResourceSettings, models.SeverityMedium
+
 	// Gift card events
 	case "gift_card.created":
 		return models.ActionCreate, models.ResourceGiftCard, models.SeverityLow
@@ -757,6 +762,13 @@ func (c *DomainEventConsumer) generateDescription(eventType string, data map[str
 	case "approval.escalated":
 		resourceType, _ := data["resourceType"].(string)
 		return fmt.Sprintf("%s approval escalated to higher authority", resourceType)
+	// Settings events
+	case "settings.updated":
+		return "Settings were updated"
+	case "settings.created":
+		return "Settings were created"
+	case "settings.bulk_updated":
+		return "Settings were bulk updated"
 	default:
 		// Generate generic description from event type
 		return fmt.Sprintf("Event: %s", eventType)
