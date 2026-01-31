@@ -162,11 +162,11 @@ func renderVerificationEmailTemplate(verificationLink, businessName, email strin
                                 You're almost ready to launch <strong>{{.BusinessName}}</strong>. Just click the button below to verify your email address and complete your store setup.
                             </p>
 
-                            <!-- CTA Button - Solid color -->
-                            <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                            <!-- CTA Button - Bulletproof table-cell button -->
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 16px auto 32px;">
                                 <tr>
-                                    <td align="center" style="padding: 16px 0 32px;">
-                                        <a href="{{.VerificationLink}}" style="display: inline-block; background-color: #0F172A; color: #ffffff; text-decoration: none; padding: 12px 32px; border-radius: 8px; font-size: 14px; font-weight: 600; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);">
+                                    <td style="background-color: #0F172A; border-radius: 10px;">
+                                        <a href="{{.VerificationLink}}" target="_blank" style="display: inline-block; padding: 18px 48px; font-size: 16px; font-weight: 600; color: #ffffff; text-decoration: none; border-radius: 10px;">
                                             Verify Email Address
                                         </a>
                                     </td>
@@ -521,12 +521,12 @@ func renderWelcomePackEmailTemplate(data *WelcomePackData) (string, error) {
                                 </p>
                             </div>
 
-                            <!-- CTA - Solid color button -->
-                            <table role="presentation" style="width: 100%;">
+                            <!-- CTA - Bulletproof table-cell button -->
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto;">
                                 <tr>
-                                    <td align="center">
-                                        <a href="{{.AdminURL}}" style="display: inline-block; background-color: #0F172A; color: #ffffff; text-decoration: none; padding: 12px 32px; border-radius: 8px; font-size: 14px; font-weight: 600;">
-                                            Open Admin Panel →
+                                    <td style="background-color: #0F172A; border-radius: 10px;">
+                                        <a href="{{.AdminURL}}" target="_blank" style="display: inline-block; padding: 14px 32px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none; border-radius: 10px;">
+                                            Open Admin Panel &#8594;
                                         </a>
                                     </td>
                                 </tr>
@@ -699,11 +699,11 @@ func renderPasswordResetEmailTemplate(data *PasswordResetEmailData) string {
                                 We received a request to reset your password for your <strong>%s</strong> account. Click the button below to create a new password.
                             </p>
 
-                            <!-- CTA Button - Solid color -->
-                            <table role="presentation" style="width: 100%%; border-collapse: collapse;">
+                            <!-- CTA Button - Bulletproof table-cell button -->
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 16px auto 32px;">
                                 <tr>
-                                    <td align="center" style="padding: 16px 0 32px;">
-                                        <a href="%s" style="display: inline-block; background-color: #0F172A; color: #ffffff; text-decoration: none; padding: 12px 32px; border-radius: 8px; font-size: 14px; font-weight: 600; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);">
+                                    <td style="background-color: #0F172A; border-radius: 10px;">
+                                        <a href="%s" target="_blank" style="display: inline-block; padding: 18px 48px; font-size: 16px; font-weight: 600; color: #ffffff; text-decoration: none; border-radius: 10px;">
                                             Reset Password
                                         </a>
                                     </td>
@@ -801,11 +801,11 @@ func renderGoodbyeEmailTemplate(data *GoodbyeEmailData) string {
                                 </p>
                             </div>
 
-                            <!-- CTA Button - Success green -->
-                            <table role="presentation" style="width: 100%%; border-collapse: collapse;">
+                            <!-- CTA Button - Bulletproof table-cell button -->
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 16px auto;">
                                 <tr>
-                                    <td align="center" style="padding: 16px 0;">
-                                        <a href="%s" style="display: inline-block; background-color: #10B981; color: #ffffff; text-decoration: none; padding: 12px 32px; border-radius: 8px; font-size: 14px; font-weight: 600; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);">
+                                    <td style="background-color: #10B981; border-radius: 10px;">
+                                        <a href="%s" target="_blank" style="display: inline-block; padding: 14px 32px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none; border-radius: 10px;">
                                             Reactivate My Account
                                         </a>
                                     </td>
