@@ -263,7 +263,9 @@ export async function authRoutes(fastify: FastifyInstance) {
               if (matchedTenant) {
                 tenantId = tenantId || matchedTenant.id;
                 userRole = matchedTenant.role;
-                isStaff = ['store_owner', 'admin', 'staff', 'manager'].includes(userRole || '');
+                // getUserTenants already filters through validateStaffAdminAccess,
+                // so any tenant returned means the user is authorized staff
+                isStaff = !!userRole;
                 logger.info(
                   { email, tenantSlug, tenantId, role: userRole, isStaff },
                   'Resolved tenant role from tenant-service for SSO user'
@@ -274,7 +276,7 @@ export async function authRoutes(fastify: FastifyInstance) {
               tenantId = tenants[0].id;
               tenantSlug = tenants[0].slug;
               userRole = tenants[0].role;
-              isStaff = ['store_owner', 'admin', 'staff', 'manager'].includes(userRole || '');
+              isStaff = !!userRole;
               logger.info(
                 { email, tenantSlug, tenantId, role: userRole },
                 'Auto-selected single tenant for SSO user'
