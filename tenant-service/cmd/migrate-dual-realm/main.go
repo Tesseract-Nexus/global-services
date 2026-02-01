@@ -18,7 +18,7 @@
 //	KEYCLOAK_CUSTOMER_CLIENT_ID     - Customer admin client ID
 //	KEYCLOAK_CUSTOMER_CLIENT_SECRET - Customer admin client secret
 //	KEYCLOAK_INTERNAL_URL           - Internal IDP URL
-//	KEYCLOAK_INTERNAL_REALM         - Internal realm name (e.g., tesseract-internal)
+//	KEYCLOAK_INTERNAL_REALM         - Internal realm name (e.g., tesserix-internal)
 //	KEYCLOAK_INTERNAL_CLIENT_ID     - Internal admin client ID
 //	KEYCLOAK_INTERNAL_CLIENT_SECRET - Internal admin client secret
 package main

@@ -174,7 +174,7 @@ func NewConfig() *Config {
 			ClientIDs:     getStringSliceEnv("KEYCLOAK_CLIENT_IDS", []string{"storefront-web", "web-storefront", "mobile-app"}),
 			// Internal realm (for admin domains)
 			InternalAdminURL:     getEnv("KEYCLOAK_INTERNAL_ADMIN_URL", ""),
-			InternalRealm:        getEnv("KEYCLOAK_INTERNAL_REALM", "tesseract-internal"),
+			InternalRealm:        getEnv("KEYCLOAK_INTERNAL_REALM", "tesserix-internal"),
 			InternalClientID:     getEnv("KEYCLOAK_INTERNAL_CLIENT_ID", "admin-cli"),
 			InternalClientSecret: getEnv("KEYCLOAK_INTERNAL_CLIENT_SECRET", ""),
 			InternalClientIDs:    getStringSliceEnv("KEYCLOAK_INTERNAL_CLIENT_IDS", []string{"admin-web", "admin-bff", "marketplace-dashboard"}),

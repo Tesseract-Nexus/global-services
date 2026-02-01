@@ -91,7 +91,7 @@ type OnboardingService struct {
 	customDomainClient   *clients.CustomDomainClient
 	natsClient           *natsClient.Client
 	// Dual-realm Keycloak architecture:
-	// - keycloakClient: Internal realm (tesseract-internal) for staff/admin users
+	// - keycloakClient: Internal realm (tesserix-internal) for staff/admin users
 	// - keycloakCustomerClient: Customer realm (tesserix-customer) for Organizations
 	keycloakClient         *auth.KeycloakAdminClient // Internal realm for staff/owner creation
 	keycloakCustomerClient *auth.KeycloakAdminClient // Customer realm for Organizations
@@ -179,7 +179,7 @@ func NewOnboardingService(
 // Returns: internal realm client (for staff), customer realm client (for Organizations), config
 func initKeycloakClients() (*auth.KeycloakAdminClient, *auth.KeycloakAdminClient, *KeycloakOnboardingConfig) {
 	// ============================================================================
-	// INTERNAL REALM CLIENT (tesseract-internal)
+	// INTERNAL REALM CLIENT (tesserix-internal)
 	// Used for: staff/owner user creation, admin redirect URIs
 	// ============================================================================
 	internalBaseURL := os.Getenv("KEYCLOAK_INTERNAL_BASE_URL")
@@ -194,7 +194,7 @@ func initKeycloakClients() (*auth.KeycloakAdminClient, *auth.KeycloakAdminClient
 	if internalRealm == "" {
 		internalRealm = os.Getenv("KEYCLOAK_REALM") // Fallback for backward compat
 		if internalRealm == "" {
-			internalRealm = "tesseract-internal"
+			internalRealm = "tesserix-internal"
 		}
 	}
 
@@ -1276,7 +1276,7 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 	// ============================================================================
 	// KEYCLOAK REDIRECT URIs: Register tenant-specific redirect URIs
 	// Dual-realm architecture:
-	// - Admin URIs (slug-admin.tesserix.app) → INTERNAL realm (tesseract-internal)
+	// - Admin URIs (slug-admin.tesserix.app) → INTERNAL realm (tesserix-internal)
 	// - Storefront URIs (slug.tesserix.app) → CUSTOMER realm (tesserix-customer)
 	// ============================================================================
 	baseDomain := s.keycloakConfig.BaseDomain
