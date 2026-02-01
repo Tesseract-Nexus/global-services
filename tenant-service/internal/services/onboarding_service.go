@@ -1087,12 +1087,14 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 		}
 	}
 
-	// Validate password requirements
-	if password == "" {
-		return nil, fmt.Errorf("password is required")
-	}
-	if len(password) < 8 {
-		return nil, fmt.Errorf("password must be at least 8 characters")
+	// Validate password requirements (only for password auth)
+	if authMethod != "google" {
+		if password == "" {
+			return nil, fmt.Errorf("password is required")
+		}
+		if len(password) < 8 {
+			return nil, fmt.Errorf("password must be at least 8 characters")
+		}
 	}
 
 	// Check if tenant already created for this session
@@ -1115,15 +1117,22 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 
 		// Use unified Keycloak setup with verification (P0 FIX)
 		// This ensures: password is set, role is assigned, and login is verified
-		keycloakResult, keycloakErr := s.setupUserInKeycloak(ctx, &KeycloakSetupRequest{
+		keycloakReq := &KeycloakSetupRequest{
 			Email:      primaryContact.Email,
 			Password:   password,
 			FirstName:  primaryContact.FirstName,
 			LastName:   primaryContact.LastName,
 			TenantID:   tenantID.String(),
 			TenantSlug: tenant.Slug,
-			Role:       s.keycloakConfig.DefaultRole, // "store_owner" - NOW INCLUDED FOR EXISTING USERS
-		})
+			Role:       s.keycloakConfig.DefaultRole, // "store_owner"
+		}
+		var keycloakResult *KeycloakSetupResult
+		var keycloakErr error
+		if authMethod == "google" {
+			keycloakResult, keycloakErr = s.setupSocialUserInKeycloak(ctx, keycloakReq)
+		} else {
+			keycloakResult, keycloakErr = s.setupUserInKeycloak(ctx, keycloakReq)
+		}
 		if keycloakErr != nil {
 			log.Printf("[OnboardingService] CRITICAL: Failed to setup user in Keycloak: %v", keycloakErr)
 			return nil, fmt.Errorf("failed to set up authentication: %w", keycloakErr)
@@ -1328,7 +1337,7 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 	// This ensures: user is created, password is set, role is assigned, and login is verified
 	// CRITICAL: If this fails, we cannot guarantee the user can log in, so fail the entire onboarding
 	log.Printf("[OnboardingService] Setting up user %s in Keycloak with verification...", security.MaskEmail(primaryContact.Email))
-	keycloakResult, keycloakErr := s.setupUserInKeycloak(ctx, &KeycloakSetupRequest{
+	keycloakReq := &KeycloakSetupRequest{
 		Email:      primaryContact.Email,
 		Password:   password,
 		FirstName:  primaryContact.FirstName,
@@ -1336,7 +1345,14 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 		TenantID:   tenantID.String(),
 		TenantSlug: slug,
 		Role:       s.keycloakConfig.DefaultRole, // "store_owner"
-	})
+	}
+	var keycloakResult *KeycloakSetupResult
+	var keycloakErr error
+	if authMethod == "google" {
+		keycloakResult, keycloakErr = s.setupSocialUserInKeycloak(ctx, keycloakReq)
+	} else {
+		keycloakResult, keycloakErr = s.setupUserInKeycloak(ctx, keycloakReq)
+	}
 
 	var userID uuid.UUID
 	if keycloakErr != nil {
@@ -1777,7 +1793,24 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 		log.Printf("[OnboardingService] Token refresh config: clientID=%s, hasSecret=%v",
 			s.keycloakConfig.ClientID, s.keycloakConfig.ClientSecret != "")
 
-		refreshedTokens, refreshErr := s.loginAndGetTokens(primaryContact.Email, password)
+		var refreshedTokens *AuthTokenResponse
+		var refreshErr error
+		if authMethod == "google" {
+			// For Google OAuth, use token exchange instead of password login
+			keycloakUserID := keycloakResult.UserID
+			tokenResp, err := s.keycloakClient.ImpersonateUser(ctx, keycloakUserID, s.keycloakConfig.ClientID, s.keycloakConfig.ClientSecret)
+			if err != nil {
+				refreshErr = err
+			} else {
+				refreshedTokens = &AuthTokenResponse{
+					AccessToken:  tokenResp.AccessToken,
+					RefreshToken: tokenResp.RefreshToken,
+					ExpiresIn:    tokenResp.ExpiresIn,
+				}
+			}
+		} else {
+			refreshedTokens, refreshErr = s.loginAndGetTokens(primaryContact.Email, password)
+		}
 		if refreshErr != nil {
 			log.Printf("[OnboardingService] CRITICAL: Failed to refresh token with updated claims: %v", refreshErr)
 			log.Printf("[OnboardingService] User %s will receive a token WITHOUT staff_id/vendor_id claims", security.MaskEmail(primaryContact.Email))
@@ -2537,6 +2570,90 @@ func (s *OnboardingService) setupUserInKeycloak(ctx context.Context, req *Keyclo
 	result.RefreshToken = tokenResp.RefreshToken
 	result.ExpiresIn = tokenResp.ExpiresIn
 	log.Printf("[KeycloakSetup] Verified user %s can authenticate successfully", security.MaskEmail(req.Email))
+
+	return result, nil
+}
+
+// setupSocialUserInKeycloak performs Keycloak user setup for Google OAuth users.
+// Unlike setupUserInKeycloak, this does NOT set a password or verify via password login.
+// Instead, it finds the user created by Google IDP flow and uses token exchange (ImpersonateUser).
+func (s *OnboardingService) setupSocialUserInKeycloak(ctx context.Context, req *KeycloakSetupRequest) (*KeycloakSetupResult, error) {
+	if s.keycloakClient == nil {
+		return nil, fmt.Errorf("keycloak client not configured - authentication service unavailable")
+	}
+
+	result := &KeycloakSetupResult{Email: req.Email}
+
+	// Step 1: Find existing user by email (created by Google IDP flow in Keycloak)
+	existingUser, err := s.keycloakClient.GetUserByEmail(ctx, req.Email)
+	var userID string
+	var isNewUser bool
+
+	if err != nil || existingUser == nil {
+		// User doesn't exist yet — create without password
+		log.Printf("[KeycloakSetup:Social] User %s not found, creating without password", security.MaskEmail(req.Email))
+		user := auth.UserRepresentation{
+			Username:      req.Email,
+			Email:         req.Email,
+			FirstName:     req.FirstName,
+			LastName:      req.LastName,
+			Enabled:       true,
+			EmailVerified: true, // Google already verified the email
+			Attributes: map[string][]string{
+				"tenant_id":   {req.TenantID},
+				"tenant_slug": {req.TenantSlug},
+			},
+		}
+		userID, err = s.keycloakClient.CreateUser(ctx, user)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create social user in Keycloak: %w", err)
+		}
+		isNewUser = true
+		log.Printf("[KeycloakSetup:Social] Created user %s with ID %s", security.MaskEmail(req.Email), userID)
+	} else {
+		// User exists (created by Google IDP) — update tenant attributes
+		userID = existingUser.ID
+		if err := s.updateUserTenantAttributes(ctx, existingUser, req.TenantID, req.TenantSlug); err != nil {
+			return nil, fmt.Errorf("failed to update social user tenant attributes: %w", err)
+		}
+		log.Printf("[KeycloakSetup:Social] Updated existing user %s with tenant %s", security.MaskEmail(req.Email), req.TenantID)
+	}
+	result.UserID = userID
+
+	// Step 2: Assign role (CRITICAL - must succeed)
+	if req.Role != "" {
+		if err := s.assignRoleWithRetry(ctx, userID, req.Role); err != nil {
+			if isNewUser {
+				log.Printf("[KeycloakSetup:Social] Cleaning up user %s after role assignment failure", userID)
+				_ = s.keycloakClient.DeleteUser(ctx, userID)
+			}
+			return nil, fmt.Errorf("failed to assign role '%s': %w", req.Role, err)
+		}
+		result.RoleAssigned = true
+		log.Printf("[KeycloakSetup:Social] Role '%s' assigned to user %s", req.Role, security.MaskEmail(req.Email))
+	}
+
+	// Step 3: Get tokens via token exchange (ImpersonateUser) — no password needed
+	tokenResp, err := s.keycloakClient.ImpersonateUser(
+		ctx,
+		userID,
+		s.keycloakConfig.ClientID,
+		s.keycloakConfig.ClientSecret,
+	)
+	if err != nil {
+		log.Printf("[KeycloakSetup:Social] CRITICAL: Token exchange failed for user %s: %v", security.MaskEmail(req.Email), err)
+		if isNewUser {
+			log.Printf("[KeycloakSetup:Social] Cleaning up user %s after token exchange failure", userID)
+			_ = s.keycloakClient.DeleteUser(ctx, userID)
+		}
+		return nil, fmt.Errorf("failed to obtain tokens via token exchange: %w", err)
+	}
+
+	result.Verified = true
+	result.AccessToken = tokenResp.AccessToken
+	result.RefreshToken = tokenResp.RefreshToken
+	result.ExpiresIn = tokenResp.ExpiresIn
+	log.Printf("[KeycloakSetup:Social] Successfully obtained tokens for user %s via token exchange", security.MaskEmail(req.Email))
 
 	return result, nil
 }
