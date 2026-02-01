@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { config } from '../config';
 import { oidcClient } from '../oidc-client';
 import { sessionStore, SessionData, WsTicketData, SessionTransferData } from '../session-store';
+import { tenantServiceClient } from '../tenant-service-client';
 import { natsClient } from '../nats-client';
 import { v4 as uuidv4 } from 'uuid';
 import { createLogger } from '../logger';
@@ -115,9 +116,22 @@ export async function authRoutes(fastify: FastifyInstance) {
     const clientType = determineClientType(request);
 
     // Get tenant context from headers (set by middleware) or query params
-    // Priority: query params > headers (query allows override for testing)
-    const tenantId = query.tenant_id || (request.headers['x-tenant-id'] as string | undefined);
-    const tenantSlug = query.tenant_slug || (request.headers['x-tenant-slug'] as string | undefined);
+    // Priority: query params > headers > hostname extraction
+    let tenantId = query.tenant_id || (request.headers['x-tenant-id'] as string | undefined);
+    let tenantSlug = query.tenant_slug || (request.headers['x-tenant-slug'] as string | undefined);
+
+    // Extract tenant slug from hostname if not provided
+    // e.g., demo-store-admin.tesserix.app → demo-store
+    if (!tenantSlug) {
+      const forwardedHost = (request.headers['x-forwarded-host'] as string || request.hostname || '').split(':')[0];
+      const adminMatch = forwardedHost.match(/^(.+)-admin\.tesserix\.app$/);
+      const storefrontMatch = forwardedHost.match(/^(.+)\.tesserix\.app$/);
+      if (adminMatch) {
+        tenantSlug = adminMatch[1];
+      } else if (storefrontMatch && !storefrontMatch[1].includes('devtest')) {
+        tenantSlug = storefrontMatch[1];
+      }
+    }
 
     // Log tenant context for debugging
     if (tenantId || tenantSlug) {
@@ -219,18 +233,68 @@ export async function authRoutes(fastify: FastifyInstance) {
       const userInfo = await oidcClient.getUserInfo(authState.clientType, tokens.accessToken);
 
       // Determine tenant context:
-      // 1. Use auth state tenant context if provided (from storefront login)
+      // 1. Use auth state tenant context if provided (from storefront/admin login)
       // 2. Fall back to Keycloak userinfo tenant claims (if configured)
-      // This ensures storefront users are scoped to their tenant, not a global session
-      const tenantId = authState.tenantId || (userInfo.tenant_id as string | undefined);
-      const tenantSlug = authState.tenantSlug || (userInfo.tenant_slug as string | undefined);
+      let tenantId = authState.tenantId || (userInfo.tenant_id as string | undefined);
+      let tenantSlug = authState.tenantSlug || (userInfo.tenant_slug as string | undefined);
 
       if (authState.tenantId || authState.tenantSlug) {
         logger.info(
           { tenantId, tenantSlug, fromAuthState: true },
-          'Using tenant context from auth state (storefront login)'
+          'Using tenant context from auth state'
         );
       }
+
+      // Enrich session with tenant role from tenant-service
+      // This is critical for SSO (Google) logins where Keycloak doesn't have tenant-specific roles
+      const email = userInfo.email as string | undefined;
+      let userRole: string | undefined;
+      let isStaff = false;
+
+      if (email) {
+        try {
+          const tenantsResult = await tenantServiceClient.getUserTenants(email);
+          if (tenantsResult.success && tenantsResult.data?.tenants) {
+            const tenants = tenantsResult.data.tenants;
+
+            // If we have a tenant slug, find the matching tenant
+            if (tenantSlug) {
+              const matchedTenant = tenants.find(t => t.slug === tenantSlug);
+              if (matchedTenant) {
+                tenantId = tenantId || matchedTenant.id;
+                userRole = matchedTenant.role;
+                isStaff = ['store_owner', 'admin', 'staff', 'manager'].includes(userRole || '');
+                logger.info(
+                  { email, tenantSlug, tenantId, role: userRole, isStaff },
+                  'Resolved tenant role from tenant-service for SSO user'
+                );
+              }
+            } else if (tenants.length === 1) {
+              // Auto-select single tenant
+              tenantId = tenants[0].id;
+              tenantSlug = tenants[0].slug;
+              userRole = tenants[0].role;
+              isStaff = ['store_owner', 'admin', 'staff', 'manager'].includes(userRole || '');
+              logger.info(
+                { email, tenantSlug, tenantId, role: userRole },
+                'Auto-selected single tenant for SSO user'
+              );
+            }
+          }
+        } catch (err) {
+          logger.warn({ error: err, email }, 'Failed to resolve tenant role (non-blocking)');
+        }
+      }
+
+      // Merge tenant-specific role into userInfo for session
+      const enrichedUserInfo = {
+        ...userInfo,
+        ...(tenantId ? { tenant_id: tenantId } : {}),
+        ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
+        ...(userRole ? { role: userRole } : {}),
+        ...(isStaff ? { is_staff: true } : {}),
+        ...(userRole ? { realm_access: { roles: [userRole, ...(((userInfo.realm_access as any)?.roles) || [])] } } : {}),
+      };
 
       // Create session with tenant context
       const session = await sessionStore.createSession({
@@ -242,7 +306,7 @@ export async function authRoutes(fastify: FastifyInstance) {
         idToken: tokens.idToken,
         refreshToken: tokens.refreshToken,
         expiresAt: tokens.expiresAt,
-        userInfo,
+        userInfo: enrichedUserInfo,
       });
 
       // Set session cookie with dynamic domain for custom domain support
