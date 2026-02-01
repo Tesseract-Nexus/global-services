@@ -90,9 +90,13 @@ type OnboardingService struct {
 	tenantRouterClient   *clients.TenantRouterClient
 	customDomainClient   *clients.CustomDomainClient
 	natsClient           *natsClient.Client
-	keycloakClient       *auth.KeycloakAdminClient
-	keycloakConfig       *KeycloakOnboardingConfig
-	db                   *gorm.DB
+	// Dual-realm Keycloak architecture:
+	// - keycloakClient: Internal realm (tesseract-internal) for staff/admin users
+	// - keycloakCustomerClient: Customer realm (tesserix-customer) for Organizations
+	keycloakClient         *auth.KeycloakAdminClient // Internal realm for staff/owner creation
+	keycloakCustomerClient *auth.KeycloakAdminClient // Customer realm for Organizations
+	keycloakConfig         *KeycloakOnboardingConfig
+	db                     *gorm.DB
 }
 
 // KeycloakOnboardingConfig holds Keycloak configuration for onboarding
@@ -102,6 +106,8 @@ type KeycloakOnboardingConfig struct {
 	DefaultRole      string // Default role to assign (e.g., "store_owner")
 	AdminClientID    string // Client ID for admin portal redirect URIs (e.g., "marketplace-dashboard")
 	BaseDomain       string // Base domain for redirect URIs (e.g., "tesserix.app")
+	// Storefront client IDs for customer realm redirect URIs
+	StorefrontClientIDs []string // e.g., ["storefront-web", "web-storefront", "mobile-app"]
 }
 
 // NewOnboardingService creates a new onboarding service
@@ -142,75 +148,127 @@ func NewOnboardingService(
 	}
 	customDomainClient := clients.NewCustomDomainClient(customDomainServiceURL)
 
-	// Initialize Keycloak admin client for user registration
-	keycloakClient, keycloakConfig := initKeycloakClient()
+	// Initialize Keycloak admin clients for dual-realm architecture
+	// - Internal realm client: for staff/owner user creation
+	// - Customer realm client: for Organizations and customer users
+	keycloakClient, keycloakCustomerClient, keycloakConfig := initKeycloakClients()
 
 	return &OnboardingService{
-		onboardingRepo:       onboardingRepo,
-		taskRepo:             taskRepo,
-		businessRepo:         repository.NewBusinessInformationRepository(db),
-		contactRepo:          repository.NewContactInformationRepository(db),
-		credentialRepo:       repository.NewCredentialRepository(db),
-		verificationSvc:      verificationSvc,
-		paymentSvc:           paymentSvc,
-		notificationSvc:      NewNotificationService(),
-		membershipSvc:        membershipSvc,
-		vendorClient:         vendorClient,
-		staffClient:          staffClient,
-		tenantRouterClient:   tenantRouterClient,
-		customDomainClient:   customDomainClient,
-		natsClient:           nc,
-		keycloakClient:       keycloakClient,
-		keycloakConfig:       keycloakConfig,
-		db:                   db,
+		onboardingRepo:         onboardingRepo,
+		taskRepo:               taskRepo,
+		businessRepo:           repository.NewBusinessInformationRepository(db),
+		contactRepo:            repository.NewContactInformationRepository(db),
+		credentialRepo:         repository.NewCredentialRepository(db),
+		verificationSvc:        verificationSvc,
+		paymentSvc:             paymentSvc,
+		notificationSvc:        NewNotificationService(),
+		membershipSvc:          membershipSvc,
+		vendorClient:           vendorClient,
+		staffClient:            staffClient,
+		tenantRouterClient:     tenantRouterClient,
+		customDomainClient:     customDomainClient,
+		natsClient:             nc,
+		keycloakClient:         keycloakClient,         // Internal realm for staff
+		keycloakCustomerClient: keycloakCustomerClient, // Customer realm for Organizations
+		keycloakConfig:         keycloakConfig,
+		db:                     db,
 	}
 }
 
-// initKeycloakClient initializes the Keycloak admin client from environment variables
-func initKeycloakClient() (*auth.KeycloakAdminClient, *KeycloakOnboardingConfig) {
-	// Keycloak Admin API configuration
-	keycloakBaseURL := os.Getenv("KEYCLOAK_BASE_URL")
-	if keycloakBaseURL == "" {
-		keycloakBaseURL = "https://devtest-internal-idp.tesserix.app"
+// initKeycloakClients initializes both Keycloak admin clients for dual-realm architecture
+// Returns: internal realm client (for staff), customer realm client (for Organizations), config
+func initKeycloakClients() (*auth.KeycloakAdminClient, *auth.KeycloakAdminClient, *KeycloakOnboardingConfig) {
+	// ============================================================================
+	// INTERNAL REALM CLIENT (tesseract-internal)
+	// Used for: staff/owner user creation, admin redirect URIs
+	// ============================================================================
+	internalBaseURL := os.Getenv("KEYCLOAK_INTERNAL_BASE_URL")
+	if internalBaseURL == "" {
+		internalBaseURL = os.Getenv("KEYCLOAK_BASE_URL") // Fallback for backward compat
+		if internalBaseURL == "" {
+			internalBaseURL = "https://devtest-internal-idp.tesserix.app"
+		}
 	}
 
-	keycloakRealm := os.Getenv("KEYCLOAK_REALM")
-	if keycloakRealm == "" {
-		keycloakRealm = "tesserix-internal"
+	internalRealm := os.Getenv("KEYCLOAK_INTERNAL_REALM")
+	if internalRealm == "" {
+		internalRealm = os.Getenv("KEYCLOAK_REALM") // Fallback for backward compat
+		if internalRealm == "" {
+			internalRealm = "tesseract-internal"
+		}
 	}
 
-	// Admin client credentials (service account)
-	adminClientID := os.Getenv("KEYCLOAK_ADMIN_CLIENT_ID")
-	if adminClientID == "" {
-		adminClientID = "admin-cli"
+	// Admin client credentials for internal realm
+	internalAdminClientID := os.Getenv("KEYCLOAK_INTERNAL_ADMIN_CLIENT_ID")
+	if internalAdminClientID == "" {
+		internalAdminClientID = os.Getenv("KEYCLOAK_ADMIN_CLIENT_ID")
+		if internalAdminClientID == "" {
+			internalAdminClientID = "admin-cli"
+		}
 	}
 
-	// Try to get admin client secret from GCP Secret Manager, fall back to env var
-	adminClientSecret := secrets.GetSecretOrEnv("KEYCLOAK_ADMIN_CLIENT_SECRET_NAME", "KEYCLOAK_ADMIN_CLIENT_SECRET", "")
+	internalAdminClientSecret := secrets.GetSecretOrEnv("KEYCLOAK_INTERNAL_ADMIN_CLIENT_SECRET_NAME", "KEYCLOAK_INTERNAL_ADMIN_CLIENT_SECRET", "")
+	if internalAdminClientSecret == "" {
+		internalAdminClientSecret = secrets.GetSecretOrEnv("KEYCLOAK_ADMIN_CLIENT_SECRET_NAME", "KEYCLOAK_ADMIN_CLIENT_SECRET", "")
+	}
 
-	// Create admin client
-	var keycloakClient *auth.KeycloakAdminClient
-	if adminClientSecret != "" {
-		keycloakClient = auth.NewKeycloakAdminClient(auth.KeycloakAdminConfig{
-			BaseURL:      keycloakBaseURL,
-			Realm:        keycloakRealm,
-			ClientID:     adminClientID,
-			ClientSecret: adminClientSecret,
+	var internalClient *auth.KeycloakAdminClient
+	if internalAdminClientSecret != "" {
+		internalClient = auth.NewKeycloakAdminClient(auth.KeycloakAdminConfig{
+			BaseURL:      internalBaseURL,
+			Realm:        internalRealm,
+			ClientID:     internalAdminClientID,
+			ClientSecret: internalAdminClientSecret,
 			Timeout:      30 * time.Second,
 		})
-		log.Printf("Keycloak admin client initialized for realm: %s", keycloakRealm)
+		log.Printf("Keycloak INTERNAL realm client initialized: %s/realms/%s", internalBaseURL, internalRealm)
 	} else {
-		log.Printf("Warning: KEYCLOAK_ADMIN_CLIENT_SECRET not set - user registration will fail")
+		log.Printf("Warning: KEYCLOAK_INTERNAL_ADMIN_CLIENT_SECRET not set - staff registration will fail")
 	}
 
-	// Public client configuration for password grant (auto-login after registration)
+	// ============================================================================
+	// CUSTOMER REALM CLIENT (tesserix-customer)
+	// Used for: Organizations, customer users, storefront redirect URIs
+	// ============================================================================
+	customerBaseURL := os.Getenv("KEYCLOAK_CUSTOMER_BASE_URL")
+	if customerBaseURL == "" {
+		customerBaseURL = "https://devtest-customer-idp.tesserix.app"
+	}
+
+	customerRealm := os.Getenv("KEYCLOAK_CUSTOMER_REALM")
+	if customerRealm == "" {
+		customerRealm = "tesserix-customer"
+	}
+
+	customerAdminClientID := os.Getenv("KEYCLOAK_CUSTOMER_ADMIN_CLIENT_ID")
+	if customerAdminClientID == "" {
+		customerAdminClientID = "admin-cli"
+	}
+
+	customerAdminClientSecret := secrets.GetSecretOrEnv("KEYCLOAK_CUSTOMER_ADMIN_CLIENT_SECRET_NAME", "KEYCLOAK_CUSTOMER_ADMIN_CLIENT_SECRET", "")
+
+	var customerClient *auth.KeycloakAdminClient
+	if customerAdminClientSecret != "" {
+		customerClient = auth.NewKeycloakAdminClient(auth.KeycloakAdminConfig{
+			BaseURL:      customerBaseURL,
+			Realm:        customerRealm,
+			ClientID:     customerAdminClientID,
+			ClientSecret: customerAdminClientSecret,
+			Timeout:      30 * time.Second,
+		})
+		log.Printf("Keycloak CUSTOMER realm client initialized: %s/realms/%s", customerBaseURL, customerRealm)
+	} else {
+		log.Printf("Warning: KEYCLOAK_CUSTOMER_ADMIN_CLIENT_SECRET not set - Organization creation will fail")
+	}
+
+	// ============================================================================
+	// CONFIG (for password grant / auto-login)
+	// ============================================================================
 	publicClientID := os.Getenv("KEYCLOAK_PUBLIC_CLIENT_ID")
 	if publicClientID == "" {
 		publicClientID = "tesserix-onboarding"
 	}
 
-	// Get client secret from GCP Secret Manager (via KEYCLOAK_CLIENT_SECRET_NAME) or fall back to env var
-	// This enables auto-login with confidential clients like marketplace-dashboard
 	publicClientSecret := secrets.GetSecretOrEnv("KEYCLOAK_CLIENT_SECRET_NAME", "KEYCLOAK_PUBLIC_CLIENT_SECRET", "")
 	if publicClientSecret != "" {
 		log.Printf("Keycloak public client secret loaded for auto-login")
@@ -223,27 +281,41 @@ func initKeycloakClient() (*auth.KeycloakAdminClient, *KeycloakOnboardingConfig)
 		defaultRole = "store_owner"
 	}
 
-	// Admin portal client ID for registering tenant-specific redirect URIs
 	adminPortalClientID := os.Getenv("KEYCLOAK_ADMIN_PORTAL_CLIENT_ID")
 	if adminPortalClientID == "" {
 		adminPortalClientID = "marketplace-dashboard"
 	}
 
-	// Base domain for constructing redirect URIs
 	baseDomain := os.Getenv("BASE_DOMAIN")
 	if baseDomain == "" {
 		baseDomain = "tesserix.app"
 	}
 
-	config := &KeycloakOnboardingConfig{
-		ClientID:      publicClientID,
-		ClientSecret:  publicClientSecret,
-		DefaultRole:   defaultRole,
-		AdminClientID: adminPortalClientID,
-		BaseDomain:    baseDomain,
+	// Storefront client IDs for customer realm redirect URIs
+	storefrontClientIDsEnv := os.Getenv("KEYCLOAK_STOREFRONT_CLIENT_IDS")
+	var storefrontClientIDs []string
+	if storefrontClientIDsEnv != "" {
+		for _, id := range strings.Split(storefrontClientIDsEnv, ",") {
+			trimmed := strings.TrimSpace(id)
+			if trimmed != "" {
+				storefrontClientIDs = append(storefrontClientIDs, trimmed)
+			}
+		}
+	}
+	if len(storefrontClientIDs) == 0 {
+		storefrontClientIDs = []string{"storefront-web", "web-storefront", "mobile-app"}
 	}
 
-	return keycloakClient, config
+	config := &KeycloakOnboardingConfig{
+		ClientID:            publicClientID,
+		ClientSecret:        publicClientSecret,
+		DefaultRole:         defaultRole,
+		AdminClientID:       adminPortalClientID,
+		BaseDomain:          baseDomain,
+		StorefrontClientIDs: storefrontClientIDs,
+	}
+
+	return internalClient, customerClient, config
 }
 
 // StartOnboardingRequest represents a request to start onboarding
@@ -1169,19 +1241,20 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 
 	// ============================================================================
 	// KEYCLOAK ORGANIZATION: Create organization for tenant identity isolation
-	// This enables users to have separate identities per tenant (store)
+	// Organizations are created in the CUSTOMER realm (tesserix-customer)
+	// This enables customers to have separate identities per tenant (store)
 	// ============================================================================
 	var keycloakOrgID string
-	if s.keycloakClient != nil {
-		log.Printf("[OnboardingService] Creating Keycloak Organization for tenant %s (slug: %s)...", tenantID, slug)
-		orgID, orgErr := s.keycloakClient.CreateOrganizationForTenant(ctx, tenantID.String(), tenant.Name, slug)
+	if s.keycloakCustomerClient != nil {
+		log.Printf("[OnboardingService] Creating Keycloak Organization in CUSTOMER realm for tenant %s (slug: %s)...", tenantID, slug)
+		orgID, orgErr := s.keycloakCustomerClient.CreateOrganizationForTenant(ctx, tenantID.String(), tenant.Name, slug)
 		if orgErr != nil {
 			// Log error but don't fail onboarding - organization can be created later
 			// This ensures backward compatibility during rollout
 			log.Printf("[OnboardingService] Warning: Failed to create Keycloak Organization for tenant %s: %v", tenantID, orgErr)
 		} else {
 			keycloakOrgID = orgID
-			log.Printf("[OnboardingService] Created Keycloak Organization %s for tenant %s", orgID, tenantID)
+			log.Printf("[OnboardingService] Created Keycloak Organization %s for tenant %s in customer realm", orgID, tenantID)
 
 			// Update tenant with organization ID
 			orgUUID, parseErr := uuid.Parse(orgID)
@@ -1196,30 +1269,48 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 				}
 			}
 		}
+	} else {
+		log.Printf("[OnboardingService] Warning: Customer realm client not configured - Organization not created for tenant %s", tenantID)
 	}
 
 	// ============================================================================
 	// KEYCLOAK REDIRECT URIs: Register tenant-specific redirect URIs
-	// This allows OAuth login to work for the new tenant's admin portal and storefront
+	// Dual-realm architecture:
+	// - Admin URIs (slug-admin.tesserix.app) → INTERNAL realm (tesseract-internal)
+	// - Storefront URIs (slug.tesserix.app) → CUSTOMER realm (tesserix-customer)
 	// ============================================================================
+	baseDomain := s.keycloakConfig.BaseDomain
+	if baseDomain == "" {
+		baseDomain = "tesserix.app"
+	}
+
+	// Register ADMIN redirect URIs in INTERNAL realm
 	if s.keycloakClient != nil && s.keycloakConfig != nil && s.keycloakConfig.AdminClientID != "" {
-		baseDomain := s.keycloakConfig.BaseDomain
-		if baseDomain == "" {
-			baseDomain = "tesserix.app"
+		adminRedirectURIs := []string{
+			fmt.Sprintf("https://%s-admin.%s/*", slug, baseDomain),
 		}
 
-		// Build redirect URIs for this tenant
-		redirectURIs := []string{
-			fmt.Sprintf("https://%s-admin.%s/*", slug, baseDomain),
+		log.Printf("[OnboardingService] Registering ADMIN redirect URIs in INTERNAL realm for tenant %s: %v", tenantID, adminRedirectURIs)
+		if err := s.keycloakClient.AddClientRedirectURIs(ctx, s.keycloakConfig.AdminClientID, adminRedirectURIs); err != nil {
+			log.Printf("[OnboardingService] Warning: Failed to register admin redirect URIs for tenant %s: %v", tenantID, err)
+		} else {
+			log.Printf("[OnboardingService] Successfully registered admin redirect URIs for tenant %s", tenantID)
+		}
+	}
+
+	// Register STOREFRONT redirect URIs in CUSTOMER realm
+	if s.keycloakCustomerClient != nil && s.keycloakConfig != nil && len(s.keycloakConfig.StorefrontClientIDs) > 0 {
+		storefrontRedirectURIs := []string{
 			fmt.Sprintf("https://%s.%s/*", slug, baseDomain),
 		}
 
-		log.Printf("[OnboardingService] Registering Keycloak redirect URIs for tenant %s: %v", tenantID, redirectURIs)
-		if err := s.keycloakClient.AddClientRedirectURIs(ctx, s.keycloakConfig.AdminClientID, redirectURIs); err != nil {
-			// Log error but don't fail onboarding - redirect URIs can be added manually if needed
-			log.Printf("[OnboardingService] Warning: Failed to register Keycloak redirect URIs for tenant %s: %v", tenantID, err)
-		} else {
-			log.Printf("[OnboardingService] Successfully registered Keycloak redirect URIs for tenant %s", tenantID)
+		log.Printf("[OnboardingService] Registering STOREFRONT redirect URIs in CUSTOMER realm for tenant %s: %v", tenantID, storefrontRedirectURIs)
+		for _, clientID := range s.keycloakConfig.StorefrontClientIDs {
+			if err := s.keycloakCustomerClient.AddClientRedirectURIs(ctx, clientID, storefrontRedirectURIs); err != nil {
+				log.Printf("[OnboardingService] Warning: Failed to register storefront redirect URIs for client %s, tenant %s: %v", clientID, tenantID, err)
+			} else {
+				log.Printf("[OnboardingService] Registered storefront redirect URIs for client %s, tenant %s", clientID, tenantID)
+			}
 		}
 	}
 
@@ -1357,18 +1448,15 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 	}
 
 	// ============================================================================
-	// KEYCLOAK ORGANIZATION MEMBERSHIP
-	// Add owner to the organization for identity isolation
+	// KEYCLOAK ORGANIZATION MEMBERSHIP (CUSTOMER REALM ONLY)
+	// Note: In dual-realm architecture, Organizations are in the CUSTOMER realm
+	// and store owners are in the INTERNAL realm. Store owners/staff do NOT
+	// need to be added to Organizations since they authenticate via internal realm.
+	// Organizations are for customer identity isolation, not staff.
 	// ============================================================================
-	if s.keycloakClient != nil && keycloakOrgID != "" {
-		// keycloakUserID is the Keycloak user ID (may differ from local userID for existing users)
-		log.Printf("[OnboardingService] Adding user %s to Keycloak Organization %s...", keycloakUserID, keycloakOrgID)
-		if addErr := s.keycloakClient.AddOrganizationMember(ctx, keycloakOrgID, keycloakUserID.String()); addErr != nil {
-			// Log error but don't fail - membership can be added later
-			log.Printf("[OnboardingService] Warning: Failed to add user %s to organization %s: %v", keycloakUserID, keycloakOrgID, addErr)
-		} else {
-			log.Printf("[OnboardingService] Added user %s to Keycloak Organization %s", keycloakUserID, keycloakOrgID)
-		}
+	// Skip adding owner to organization - they're in internal realm, organization is in customer realm
+	if keycloakOrgID != "" {
+		log.Printf("[OnboardingService] Note: Organization %s created for tenant %s. Owner will authenticate via internal realm (not added to customer org).", keycloakOrgID, tenantID)
 	}
 
 	// ============================================================================
@@ -1670,10 +1758,7 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 	// Generate admin URL for the tenant (subdomain-based routing)
 	// URL pattern: https://{slug}-admin.{baseDomain}
 	// Example: https://mystore-admin.tesserix.app
-	baseDomain := os.Getenv("BASE_DOMAIN")
-	if baseDomain == "" {
-		baseDomain = "tesserix.app"
-	}
+	// Note: baseDomain is already set from keycloakConfig earlier in the function
 	adminURL := fmt.Sprintf("https://%s-admin.%s", slug, baseDomain)
 
 	// NOTE: Keycloak redirect URI registration is deferred until AFTER custom domain extraction
@@ -1797,15 +1882,16 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 
 	// Register redirect URIs in Keycloak for the admin dashboard
 	// This runs AFTER custom domain extraction so custom domain admin URLs are included.
+	// Uses INTERNAL realm client since marketplace-dashboard is an admin client
 	if s.keycloakClient != nil {
-		redirectURIs := []string{
+		adminRedirectURIs := []string{
 			fmt.Sprintf("https://%s/*", adminHost),
 			fmt.Sprintf("https://%s/auth/callback", adminHost),
 		}
 		// If custom domain, also register default subdomain as fallback
 		if isCustomDomainUsed {
 			defaultAdminHost := fmt.Sprintf("%s-admin.%s", slug, baseDomain)
-			redirectURIs = append(redirectURIs,
+			adminRedirectURIs = append(adminRedirectURIs,
 				fmt.Sprintf("https://%s/*", defaultAdminHost),
 				fmt.Sprintf("https://%s/auth/callback", defaultAdminHost),
 			)
@@ -1814,10 +1900,45 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 		redirectCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 
-		if err := s.keycloakClient.AddClientRedirectURIs(redirectCtx, "marketplace-dashboard", redirectURIs); err != nil {
-			log.Printf("[OnboardingService] Warning: Failed to register redirect URIs for tenant %s: %v", slug, err)
+		if err := s.keycloakClient.AddClientRedirectURIs(redirectCtx, "marketplace-dashboard", adminRedirectURIs); err != nil {
+			log.Printf("[OnboardingService] Warning: Failed to register admin redirect URIs in internal realm for tenant %s: %v", slug, err)
 		} else {
-			log.Printf("[OnboardingService] Registered admin Keycloak redirect URIs for tenant %s: %v", slug, redirectURIs)
+			log.Printf("[OnboardingService] Registered admin redirect URIs in INTERNAL realm for tenant %s: %v", slug, adminRedirectURIs)
+		}
+	}
+
+	// Register storefront redirect URIs in CUSTOMER realm
+	// This enables customer authentication via the customer realm
+	if s.keycloakCustomerClient != nil && s.keycloakConfig != nil && len(s.keycloakConfig.StorefrontClientIDs) > 0 {
+		storefrontRedirectURIs := []string{
+			fmt.Sprintf("https://%s/*", storefrontHost),
+			fmt.Sprintf("https://%s/auth/callback", storefrontHost),
+		}
+		// Add www version
+		if storefrontWwwHost != "" {
+			storefrontRedirectURIs = append(storefrontRedirectURIs,
+				fmt.Sprintf("https://%s/*", storefrontWwwHost),
+				fmt.Sprintf("https://%s/auth/callback", storefrontWwwHost),
+			)
+		}
+		// If custom domain, also register default subdomain as fallback
+		if isCustomDomainUsed {
+			defaultStorefrontHost := fmt.Sprintf("%s.%s", slug, baseDomain)
+			storefrontRedirectURIs = append(storefrontRedirectURIs,
+				fmt.Sprintf("https://%s/*", defaultStorefrontHost),
+				fmt.Sprintf("https://%s/auth/callback", defaultStorefrontHost),
+			)
+		}
+
+		redirectCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+
+		for _, clientID := range s.keycloakConfig.StorefrontClientIDs {
+			if err := s.keycloakCustomerClient.AddClientRedirectURIs(redirectCtx, clientID, storefrontRedirectURIs); err != nil {
+				log.Printf("[OnboardingService] Warning: Failed to register storefront redirect URIs in customer realm for client %s, tenant %s: %v", clientID, slug, err)
+			} else {
+				log.Printf("[OnboardingService] Registered storefront redirect URIs in CUSTOMER realm for client %s, tenant %s", clientID, slug)
+			}
 		}
 	}
 

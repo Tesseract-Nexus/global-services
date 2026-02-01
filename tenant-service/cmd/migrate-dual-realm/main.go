@@ -459,7 +459,7 @@ func addRedirectURIToClient(ctx context.Context, kc *auth.KeycloakAdminClient, c
 	// Add new redirect URI
 	client.RedirectUris = append(client.RedirectUris, redirectURI)
 
-	if err := kc.UpdateClient(ctx, client); err != nil {
+	if err := kc.UpdateClient(ctx, client.ID, *client); err != nil {
 		stats.RedirectsFailed++
 		return fmt.Errorf("failed to update client: %w", err)
 	}
