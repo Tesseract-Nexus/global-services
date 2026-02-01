@@ -72,6 +72,7 @@ export const config = {
   keycloak: {
     internal: {
       url: env.KEYCLOAK_INTERNAL_URL,
+      internalUrl: undefined as string | undefined,
       realm: env.KEYCLOAK_INTERNAL_REALM,
       clientId: env.KEYCLOAK_INTERNAL_CLIENT_ID,
       clientSecret: env.KEYCLOAK_INTERNAL_CLIENT_SECRET,

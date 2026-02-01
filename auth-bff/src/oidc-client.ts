@@ -193,7 +193,7 @@ class OIDCClientManager {
           token_endpoint: replaceUrl(issuer.metadata.token_endpoint),
           userinfo_endpoint: replaceUrl(issuer.metadata.userinfo_endpoint),
           revocation_endpoint: replaceUrl(issuer.metadata.revocation_endpoint as string),
-          introspection_endpoint: replaceUrl(issuer.metadata.introspection_endpoint),
+          introspection_endpoint: replaceUrl(issuer.metadata.introspection_endpoint as string | undefined),
           end_session_endpoint: replaceUrl(issuer.metadata.end_session_endpoint),
           jwks_uri: replaceUrl(issuer.metadata.jwks_uri),
         });
