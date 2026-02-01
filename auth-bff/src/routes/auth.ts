@@ -276,8 +276,15 @@ export async function authRoutes(fastify: FastifyInstance) {
       // Redirect to return URL or default
       const returnTo = authState.returnTo || '/';
       return reply.redirect(returnTo);
-    } catch (error) {
-      logger.error({ error }, 'Token exchange failed');
+    } catch (error: any) {
+      logger.error({
+        error,
+        errorMessage: error?.message,
+        errorResponse: error?.response?.body,
+        statusCode: error?.response?.statusCode,
+        redirectUri: authState.redirectUri,
+        clientType: authState.clientType,
+      }, 'Token exchange failed');
       return reply.redirect('/auth/error?error=token_exchange_failed');
     }
   });
