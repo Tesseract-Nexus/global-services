@@ -1940,6 +1940,32 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 		}
 	}
 
+	// Register admin redirect URIs in CUSTOMER realm as well
+	// Auth-bff uses the customer realm for all OAuth flows (including Google OAuth during onboarding)
+	// so the customer realm's marketplace-dashboard client needs matching redirect URIs
+	if s.keycloakCustomerClient != nil {
+		customerAdminRedirectURIs := []string{
+			fmt.Sprintf("https://%s/*", adminHost),
+			fmt.Sprintf("https://%s/auth/callback", adminHost),
+		}
+		if isCustomDomainUsed {
+			defaultAdminHost := fmt.Sprintf("%s-admin.%s", slug, baseDomain)
+			customerAdminRedirectURIs = append(customerAdminRedirectURIs,
+				fmt.Sprintf("https://%s/*", defaultAdminHost),
+				fmt.Sprintf("https://%s/auth/callback", defaultAdminHost),
+			)
+		}
+
+		redirectCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+
+		if err := s.keycloakCustomerClient.AddClientRedirectURIs(redirectCtx, "marketplace-dashboard", customerAdminRedirectURIs); err != nil {
+			log.Printf("[OnboardingService] Warning: Failed to register admin redirect URIs in customer realm for tenant %s: %v", slug, err)
+		} else {
+			log.Printf("[OnboardingService] Registered admin redirect URIs in CUSTOMER realm for tenant %s: %v", slug, customerAdminRedirectURIs)
+		}
+	}
+
 	// Register storefront redirect URIs in CUSTOMER realm
 	// This enables customer authentication via the customer realm
 	if s.keycloakCustomerClient != nil && s.keycloakConfig != nil && len(s.keycloakConfig.StorefrontClientIDs) > 0 {
