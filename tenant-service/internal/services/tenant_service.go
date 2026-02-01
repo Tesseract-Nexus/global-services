@@ -382,6 +382,8 @@ type TenantBasicInfo struct {
 	APIURL          string `json:"api_url,omitempty"`
 	CustomDomain    string `json:"custom_domain,omitempty"`
 	UseCustomDomain bool   `json:"use_custom_domain,omitempty"`
+	DefaultTimezone string `json:"default_timezone,omitempty"`
+	DefaultCurrency string `json:"default_currency,omitempty"`
 }
 
 // GetTenantByID retrieves basic tenant information by ID (for internal service calls)
@@ -404,6 +406,8 @@ func (s *TenantService) GetTenantByID(ctx context.Context, tenantID uuid.UUID) (
 		APIURL:          tenant.APIURL,
 		CustomDomain:    tenant.CustomDomain,
 		UseCustomDomain: tenant.UseCustomDomain,
+		DefaultTimezone: tenant.DefaultTimezone,
+		DefaultCurrency: tenant.DefaultCurrency,
 	}, nil
 }
 
@@ -457,26 +461,30 @@ func (s *TenantService) GetTenantBySlug(ctx context.Context, slug string) (*Tena
 
 			log.Printf("[TenantService] Successfully resolved slug %s to tenant %s via storefront fallback", slug, tenant.ID.String())
 			return &TenantBasicInfo{
-				ID:           tenant.ID.String(),
-				Slug:         tenant.Slug,
-				Name:         tenant.Name,
-				DisplayName:  tenant.DisplayName,
-				Subdomain:    tenant.Subdomain,
-				BillingEmail: tenant.BillingEmail,
-				Status:       tenant.Status,
+				ID:              tenant.ID.String(),
+				Slug:            tenant.Slug,
+				Name:            tenant.Name,
+				DisplayName:     tenant.DisplayName,
+				Subdomain:       tenant.Subdomain,
+				BillingEmail:    tenant.BillingEmail,
+				Status:          tenant.Status,
+				DefaultTimezone: tenant.DefaultTimezone,
+				DefaultCurrency: tenant.DefaultCurrency,
 			}, nil
 		}
 		return nil, err
 	}
 
 	return &TenantBasicInfo{
-		ID:           tenant.ID.String(),
-		Slug:         tenant.Slug,
-		Name:         tenant.Name,
-		DisplayName:  tenant.DisplayName,
-		Subdomain:    tenant.Subdomain,
-		BillingEmail: tenant.BillingEmail,
-		Status:       tenant.Status,
+		ID:              tenant.ID.String(),
+		Slug:            tenant.Slug,
+		Name:            tenant.Name,
+		DisplayName:     tenant.DisplayName,
+		Subdomain:       tenant.Subdomain,
+		BillingEmail:    tenant.BillingEmail,
+		Status:          tenant.Status,
+		DefaultTimezone: tenant.DefaultTimezone,
+		DefaultCurrency: tenant.DefaultCurrency,
 	}, nil
 }
 
