@@ -134,9 +134,15 @@ func (k *KeycloakClient) doRequest(ctx context.Context, method, url string, body
 	return k.httpClient.Do(req)
 }
 
-// AddDomainRedirectURIs adds redirect URIs for a custom domain to Keycloak clients
+// AddDomainRedirectURIs adds redirect URIs for a custom domain to the appropriate Keycloak realm
+// Storefront domains -> Customer realm, Admin domains -> Internal realm
 func (k *KeycloakClient) AddDomainRedirectURIs(ctx context.Context, domain *models.CustomDomain) error {
-	// Get client ID by pattern matching
+	// Route to correct realm based on domain target type
+	if domain.TargetType == models.TargetTypeAdmin {
+		return k.AddDomainRedirectURIsToInternalRealm(ctx, domain)
+	}
+
+	// Default to customer realm for storefront and other types
 	clients, err := k.getClientsByPattern(ctx, domain.TenantSlug)
 	if err != nil {
 		return fmt.Errorf("failed to get clients: %w", err)
@@ -162,8 +168,15 @@ func (k *KeycloakClient) AddDomainRedirectURIs(ctx context.Context, domain *mode
 	return nil
 }
 
-// RemoveDomainRedirectURIs removes redirect URIs for a custom domain from Keycloak clients
+// RemoveDomainRedirectURIs removes redirect URIs for a custom domain from the appropriate Keycloak realm
+// Storefront domains -> Customer realm, Admin domains -> Internal realm
 func (k *KeycloakClient) RemoveDomainRedirectURIs(ctx context.Context, domain *models.CustomDomain) error {
+	// Route to correct realm based on domain target type
+	if domain.TargetType == models.TargetTypeAdmin {
+		return k.RemoveDomainRedirectURIsFromInternalRealm(ctx, domain)
+	}
+
+	// Default to customer realm for storefront and other types
 	clients, err := k.getClientsByPattern(ctx, domain.TenantSlug)
 	if err != nil {
 		return fmt.Errorf("failed to get clients: %w", err)
@@ -406,4 +419,311 @@ func (k *KeycloakClient) GetClientRedirectURIs(ctx context.Context, tenantSlug s
 	}
 
 	return uris, nil
+}
+
+// =============================================================================
+// INTERNAL REALM SUPPORT (Dual-Realm Architecture)
+// =============================================================================
+
+// internalToken stores the internal realm admin token
+var (
+	internalToken    string
+	internalTokenExp time.Time
+	internalTokenMu  sync.RWMutex
+)
+
+// getInternalToken obtains or refreshes the internal realm admin token
+func (k *KeycloakClient) getInternalToken(ctx context.Context) (string, error) {
+	if k.cfg.Keycloak.InternalAdminURL == "" {
+		return "", fmt.Errorf("internal Keycloak URL not configured")
+	}
+
+	internalTokenMu.RLock()
+	if internalToken != "" && time.Now().Before(internalTokenExp) {
+		token := internalToken
+		internalTokenMu.RUnlock()
+		return token, nil
+	}
+	internalTokenMu.RUnlock()
+
+	internalTokenMu.Lock()
+	defer internalTokenMu.Unlock()
+
+	// Double-check after acquiring write lock
+	if internalToken != "" && time.Now().Before(internalTokenExp) {
+		return internalToken, nil
+	}
+
+	tokenURL := fmt.Sprintf("%s/realms/master/protocol/openid-connect/token", k.cfg.Keycloak.InternalAdminURL)
+
+	data := url.Values{}
+	data.Set("grant_type", "client_credentials")
+	data.Set("client_id", k.cfg.Keycloak.InternalClientID)
+	data.Set("client_secret", k.cfg.Keycloak.InternalClientSecret)
+
+	req, err := http.NewRequestWithContext(ctx, "POST", tokenURL, strings.NewReader(data.Encode()))
+	if err != nil {
+		return "", fmt.Errorf("failed to create internal token request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := k.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to get internal token: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("failed to get internal token: status %d, body: %s", resp.StatusCode, string(body))
+	}
+
+	var tokenResp keycloakToken
+	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
+		return "", fmt.Errorf("failed to decode internal token response: %w", err)
+	}
+
+	internalToken = tokenResp.AccessToken
+	internalTokenExp = time.Now().Add(time.Duration(tokenResp.ExpiresIn-30) * time.Second)
+
+	return internalToken, nil
+}
+
+// doInternalRequest performs an authenticated request to the internal Keycloak realm
+func (k *KeycloakClient) doInternalRequest(ctx context.Context, method, url string, body interface{}) (*http.Response, error) {
+	token, err := k.getInternalToken(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var bodyReader io.Reader
+	if body != nil {
+		bodyBytes, err := json.Marshal(body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal request body: %w", err)
+		}
+		bodyReader = bytes.NewReader(bodyBytes)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	return k.httpClient.Do(req)
+}
+
+// AddDomainRedirectURIsToInternalRealm adds redirect URIs to internal realm clients
+// Used for admin-type custom domains
+func (k *KeycloakClient) AddDomainRedirectURIsToInternalRealm(ctx context.Context, domain *models.CustomDomain) error {
+	if k.cfg.Keycloak.InternalAdminURL == "" {
+		log.Warn().Msg("Internal Keycloak URL not configured, skipping internal realm redirect URIs")
+		return nil
+	}
+
+	clients, err := k.getInternalClientsByIDs(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get internal clients: %w", err)
+	}
+
+	if len(clients) == 0 {
+		log.Warn().Msg("No internal Keycloak clients found")
+		return nil
+	}
+
+	redirectURIs := k.buildRedirectURIs(domain)
+	webOrigins := k.buildWebOrigins(domain)
+
+	for _, client := range clients {
+		if err := k.updateInternalClientURIs(ctx, client, redirectURIs, webOrigins); err != nil {
+			log.Error().Err(err).Str("client", client.ClientID).Msg("Failed to update internal client URIs")
+			return err
+		}
+		log.Info().Str("client", client.ClientID).Str("domain", domain.Domain).Msg("Updated internal Keycloak client redirect URIs")
+	}
+
+	return nil
+}
+
+// RemoveDomainRedirectURIsFromInternalRealm removes redirect URIs from internal realm clients
+func (k *KeycloakClient) RemoveDomainRedirectURIsFromInternalRealm(ctx context.Context, domain *models.CustomDomain) error {
+	if k.cfg.Keycloak.InternalAdminURL == "" {
+		return nil
+	}
+
+	clients, err := k.getInternalClientsByIDs(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get internal clients: %w", err)
+	}
+
+	if len(clients) == 0 {
+		return nil
+	}
+
+	redirectURIsToRemove := k.buildRedirectURIs(domain)
+	webOriginsToRemove := k.buildWebOrigins(domain)
+
+	for _, client := range clients {
+		if err := k.removeInternalClientURIs(ctx, client, redirectURIsToRemove, webOriginsToRemove); err != nil {
+			log.Error().Err(err).Str("client", client.ClientID).Msg("Failed to remove internal client URIs")
+			return err
+		}
+		log.Info().Str("client", client.ClientID).Str("domain", domain.Domain).Msg("Removed internal Keycloak client redirect URIs")
+	}
+
+	return nil
+}
+
+// getInternalClientsByIDs finds internal realm clients by configured client IDs
+func (k *KeycloakClient) getInternalClientsByIDs(ctx context.Context) ([]keycloakClient, error) {
+	clientIDs := k.cfg.Keycloak.InternalClientIDs
+	if len(clientIDs) == 0 {
+		return nil, fmt.Errorf("no internal Keycloak client IDs configured")
+	}
+
+	var matched []keycloakClient
+	for _, clientID := range clientIDs {
+		listURL := fmt.Sprintf("%s/admin/realms/%s/clients?clientId=%s&first=0&max=1",
+			k.cfg.Keycloak.InternalAdminURL, k.cfg.Keycloak.InternalRealm, url.QueryEscape(clientID))
+
+		resp, err := k.doInternalRequest(ctx, "GET", listURL, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			return nil, fmt.Errorf("failed to list internal clients: status %d, body: %s", resp.StatusCode, string(body))
+		}
+
+		var clients []keycloakClient
+		if err := json.NewDecoder(resp.Body).Decode(&clients); err != nil {
+			resp.Body.Close()
+			return nil, fmt.Errorf("failed to decode internal clients response: %w", err)
+		}
+		resp.Body.Close()
+
+		for _, c := range clients {
+			if c.ClientID == clientID {
+				matched = append(matched, c)
+			}
+		}
+	}
+
+	return matched, nil
+}
+
+// updateInternalClientURIs adds redirect URIs to an internal realm client
+func (k *KeycloakClient) updateInternalClientURIs(ctx context.Context, client keycloakClient, newURIs, newOrigins []string) error {
+	uriSet := make(map[string]bool)
+	for _, uri := range client.RedirectUris {
+		uriSet[uri] = true
+	}
+	for _, uri := range newURIs {
+		uriSet[uri] = true
+	}
+
+	originSet := make(map[string]bool)
+	for _, origin := range client.WebOrigins {
+		originSet[origin] = true
+	}
+	for _, origin := range newOrigins {
+		originSet[origin] = true
+	}
+
+	updatedURIs := make([]string, 0, len(uriSet))
+	for uri := range uriSet {
+		updatedURIs = append(updatedURIs, uri)
+	}
+
+	updatedOrigins := make([]string, 0, len(originSet))
+	for origin := range originSet {
+		updatedOrigins = append(updatedOrigins, origin)
+	}
+
+	updateURL := fmt.Sprintf("%s/admin/realms/%s/clients/%s",
+		k.cfg.Keycloak.InternalAdminURL, k.cfg.Keycloak.InternalRealm, client.ID)
+
+	update := map[string]interface{}{
+		"redirectUris": updatedURIs,
+		"webOrigins":   updatedOrigins,
+	}
+
+	resp, err := k.doInternalRequest(ctx, "PUT", updateURL, update)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to update internal client: status %d, body: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// removeInternalClientURIs removes redirect URIs from an internal realm client
+func (k *KeycloakClient) removeInternalClientURIs(ctx context.Context, client keycloakClient, urisToRemove, originsToRemove []string) error {
+	removeURIs := make(map[string]bool)
+	for _, uri := range urisToRemove {
+		removeURIs[uri] = true
+	}
+
+	removeOrigins := make(map[string]bool)
+	for _, origin := range originsToRemove {
+		removeOrigins[origin] = true
+	}
+
+	updatedURIs := make([]string, 0)
+	for _, uri := range client.RedirectUris {
+		if !removeURIs[uri] {
+			updatedURIs = append(updatedURIs, uri)
+		}
+	}
+
+	updatedOrigins := make([]string, 0)
+	for _, origin := range client.WebOrigins {
+		if !removeOrigins[origin] {
+			updatedOrigins = append(updatedOrigins, origin)
+		}
+	}
+
+	updateURL := fmt.Sprintf("%s/admin/realms/%s/clients/%s",
+		k.cfg.Keycloak.InternalAdminURL, k.cfg.Keycloak.InternalRealm, client.ID)
+
+	update := map[string]interface{}{
+		"redirectUris": updatedURIs,
+		"webOrigins":   updatedOrigins,
+	}
+
+	resp, err := k.doInternalRequest(ctx, "PUT", updateURL, update)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to update internal client: status %d, body: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// VerifyInternalKeycloakConnection checks if internal Keycloak is reachable
+func (k *KeycloakClient) VerifyInternalKeycloakConnection(ctx context.Context) error {
+	if k.cfg.Keycloak.InternalAdminURL == "" {
+		return nil // Internal realm not configured, skip
+	}
+
+	_, err := k.getInternalToken(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to connect to internal Keycloak: %w", err)
+	}
+	return nil
 }

@@ -52,12 +52,21 @@ type NATSConfig struct {
 }
 
 type KeycloakConfig struct {
+	// Customer realm configuration (for storefront domains)
 	AdminURL      string   `json:"admin_url"`
 	Realm         string   `json:"realm"`
 	ClientID      string   `json:"client_id"`
 	ClientSecret  string   `json:"client_secret"`
 	ClientPattern string   `json:"client_pattern"` // Deprecated: use ClientIDs
 	ClientIDs     []string `json:"client_ids"`
+
+	// Internal realm configuration (for admin domains)
+	// Dual-realm architecture: storefront domains -> customer realm, admin domains -> internal realm
+	InternalAdminURL      string   `json:"internal_admin_url"`
+	InternalRealm         string   `json:"internal_realm"`
+	InternalClientID      string   `json:"internal_client_id"`
+	InternalClientSecret  string   `json:"internal_client_secret"`
+	InternalClientIDs     []string `json:"internal_client_ids"`
 }
 
 type IstioConfig struct {
@@ -156,12 +165,19 @@ func NewConfig() *Config {
 			URL: getEnv("NATS_URL", "nats://localhost:4222"),
 		},
 		Keycloak: KeycloakConfig{
+			// Customer realm (for storefront domains)
 			AdminURL:      getEnv("KEYCLOAK_ADMIN_URL", ""),
 			Realm:         getEnv("KEYCLOAK_REALM", "tesserix-customer"),
 			ClientID:      getEnv("KEYCLOAK_ADMIN_CLIENT_ID", "admin-cli"),
 			ClientSecret:  getEnv("KEYCLOAK_ADMIN_CLIENT_SECRET", ""),
 			ClientPattern: getEnv("KEYCLOAK_CLIENT_PATTERN", ""),
-			ClientIDs:     getStringSliceEnv("KEYCLOAK_CLIENT_IDS", []string{"storefront-web", "marketplace-dashboard"}),
+			ClientIDs:     getStringSliceEnv("KEYCLOAK_CLIENT_IDS", []string{"storefront-web", "web-storefront", "mobile-app"}),
+			// Internal realm (for admin domains)
+			InternalAdminURL:     getEnv("KEYCLOAK_INTERNAL_ADMIN_URL", ""),
+			InternalRealm:        getEnv("KEYCLOAK_INTERNAL_REALM", "tesseract-internal"),
+			InternalClientID:     getEnv("KEYCLOAK_INTERNAL_CLIENT_ID", "admin-cli"),
+			InternalClientSecret: getEnv("KEYCLOAK_INTERNAL_CLIENT_SECRET", ""),
+			InternalClientIDs:    getStringSliceEnv("KEYCLOAK_INTERNAL_CLIENT_IDS", []string{"admin-web", "admin-bff", "marketplace-dashboard"}),
 		},
 		Istio: IstioConfig{
 			GatewayName:      getEnv("ISTIO_GATEWAY_NAME", "custom-domains-gateway"),
