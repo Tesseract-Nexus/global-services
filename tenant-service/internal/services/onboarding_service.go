@@ -1676,32 +1676,8 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 	}
 	adminURL := fmt.Sprintf("https://%s-admin.%s", slug, baseDomain)
 
-	// Register redirect URIs in Keycloak for the admin dashboard only
-	// NOTE: Storefront redirect URIs are NOT registered to marketplace-dashboard client
-	// because the storefront is public-facing and should not use admin OAuth flow.
-	// Customers on the storefront will use a separate authentication flow (customer realm/client)
-	// or can browse anonymously.
-	if s.keycloakClient != nil {
-		// Admin dashboard redirect URIs only - storefront is public and uses separate auth
-		adminWildcard := fmt.Sprintf("https://%s-admin.%s/*", slug, baseDomain)
-		adminCallback := fmt.Sprintf("https://%s-admin.%s/auth/callback", slug, baseDomain)
-
-		redirectURIs := []string{
-			adminWildcard,
-			adminCallback,
-		}
-
-		redirectCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-		defer cancel()
-
-		// Add redirect URIs to the marketplace-dashboard client (admin only)
-		if err := s.keycloakClient.AddClientRedirectURIs(redirectCtx, "marketplace-dashboard", redirectURIs); err != nil {
-			log.Printf("[OnboardingService] Warning: Failed to register redirect URIs for tenant %s: %v", slug, err)
-			// Don't fail onboarding - admin can add manually if needed
-		} else {
-			log.Printf("[OnboardingService] Registered admin Keycloak redirect URIs for tenant %s: %v", slug, redirectURIs)
-		}
-	}
+	// NOTE: Keycloak redirect URI registration is deferred until AFTER custom domain extraction
+	// (see below) so that custom domain admin URLs are also registered.
 
 	// FIX-P0: Refresh token AFTER all Keycloak attributes are set
 	// The original token from setupUserInKeycloak was issued BEFORE staff_id, tenant_id, vendor_id
@@ -1817,6 +1793,32 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 	} else {
 		log.Printf("[OnboardingService] Updated tenant %s with URLs: admin=%s, storefront=%s, api=%s, customDomain=%v",
 			tenantID, tenantURLs["admin_url"], tenantURLs["storefront_url"], tenantURLs["api_url"], isCustomDomainUsed)
+	}
+
+	// Register redirect URIs in Keycloak for the admin dashboard
+	// This runs AFTER custom domain extraction so custom domain admin URLs are included.
+	if s.keycloakClient != nil {
+		redirectURIs := []string{
+			fmt.Sprintf("https://%s/*", adminHost),
+			fmt.Sprintf("https://%s/auth/callback", adminHost),
+		}
+		// If custom domain, also register default subdomain as fallback
+		if isCustomDomainUsed {
+			defaultAdminHost := fmt.Sprintf("%s-admin.%s", slug, baseDomain)
+			redirectURIs = append(redirectURIs,
+				fmt.Sprintf("https://%s/*", defaultAdminHost),
+				fmt.Sprintf("https://%s/auth/callback", defaultAdminHost),
+			)
+		}
+
+		redirectCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+
+		if err := s.keycloakClient.AddClientRedirectURIs(redirectCtx, "marketplace-dashboard", redirectURIs); err != nil {
+			log.Printf("[OnboardingService] Warning: Failed to register redirect URIs for tenant %s: %v", slug, err)
+		} else {
+			log.Printf("[OnboardingService] Registered admin Keycloak redirect URIs for tenant %s: %v", slug, redirectURIs)
+		}
 	}
 
 	// Publish tenant.created event for document migration, routing, and other subscribers
