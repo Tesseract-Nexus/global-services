@@ -43,6 +43,7 @@ const envSchema = z.object({
 
   // Service URLs (for direct calls)
   TENANT_SERVICE_URL: z.string().url().optional(),
+  STAFF_SERVICE_URL: z.string().url().optional(),
   VERIFICATION_SERVICE_URL: z.string().url().optional(),
   VERIFICATION_SERVICE_API_KEY: z.string().optional(),
 
@@ -105,6 +106,7 @@ export const config = {
   allowedOrigins: env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()),
   apiGatewayUrl: env.API_GATEWAY_URL,
   tenantServiceUrl: env.TENANT_SERVICE_URL || 'http://tenant-service.marketplace.svc.cluster.local:8080',
+  staffServiceUrl: env.STAFF_SERVICE_URL || 'http://staff-service.marketplace.svc.cluster.local:8080',
   verificationServiceUrl: env.VERIFICATION_SERVICE_URL || 'http://verification-service.global-services.svc.cluster.local:8080',
   verificationServiceApiKey: env.VERIFICATION_SERVICE_API_KEY || '',
 } as const;

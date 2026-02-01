@@ -866,6 +866,41 @@ class TenantServiceClient {
   }
 
   /**
+   * Update auth method for a staff member (service-to-service call to staff-service).
+   * Called when a Google SSO login is detected for a staff member who activated with password.
+   * Fire-and-forget: errors are logged but not propagated.
+   */
+  async updateStaffAuthMethod(email: string, tenantId: string, authMethod: string): Promise<void> {
+    try {
+      const url = `${config.staffServiceUrl}/api/v1/internal/auth/update-auth-method`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+
+      try {
+        const response = await fetch(url, {
+          method: 'PATCH',
+          signal: controller.signal,
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Service-Name': 'auth-bff',
+          },
+          body: JSON.stringify({ email, tenant_id: tenantId, auth_method: authMethod }),
+        });
+
+        if (!response.ok) {
+          logger.warn({ status: response.status, email: this.maskEmail(email) }, 'Failed to update staff auth method');
+        } else {
+          logger.info({ email: this.maskEmail(email) }, 'Staff auth method updated to password_and_google');
+        }
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    } catch (error) {
+      logger.error({ error, email: this.maskEmail(email) }, 'Error updating staff auth method (non-blocking)');
+    }
+  }
+
+  /**
    * Mask email for logging (privacy protection)
    */
   private maskEmail(email: string): string {

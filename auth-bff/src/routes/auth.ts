@@ -156,6 +156,7 @@ export async function authRoutes(fastify: FastifyInstance) {
       returnTo: query.returnTo,
       tenantId,
       tenantSlug,
+      idpHint: query.kc_idp_hint,
       createdAt: Date.now(),
     });
 
@@ -286,6 +287,12 @@ export async function authRoutes(fastify: FastifyInstance) {
         } catch (err) {
           logger.warn({ error: err, email }, 'Failed to resolve tenant role (non-blocking)');
         }
+      }
+
+      // If staff logged in via Google IDP, upgrade auth_method from password → password_and_google
+      if (isStaff && tenantId && email && authState.idpHint === 'google') {
+        tenantServiceClient.updateStaffAuthMethod(email, tenantId, 'password_and_google')
+          .catch(err => logger.warn({ error: err }, 'Failed to update staff auth method (non-blocking)'));
       }
 
       // Merge tenant-specific role into userInfo for session

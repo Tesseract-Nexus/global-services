@@ -32,6 +32,7 @@ export interface AuthFlowState {
   // These are passed by the storefront and used to scope the session
   tenantId?: string;
   tenantSlug?: string;
+  idpHint?: string;
   createdAt: number;
 }
 
