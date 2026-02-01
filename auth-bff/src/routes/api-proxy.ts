@@ -102,7 +102,10 @@ export async function apiProxyRoutes(fastify: FastifyInstance) {
       Authorization: `Bearer ${validSession.accessToken}`,
       'Content-Type': 'application/json',
       Accept: 'application/json',
-      'X-User-ID': validSession.userId,
+      // Use Istio-style headers for consistency with ingress
+      'x-jwt-claim-sub': validSession.userId,
+      'x-jwt-claim-tenant-id': validSession.tenantId || '',
+      'x-jwt-claim-tenant-slug': validSession.tenantSlug || '',
     };
 
     try {
@@ -174,7 +177,10 @@ export async function apiProxyRoutes(fastify: FastifyInstance) {
       Authorization: `Bearer ${validSession.accessToken}`,
       'Content-Type': 'application/json',
       Accept: 'application/json',
-      'X-User-ID': validSession.userId,
+      // Use Istio-style headers for consistency with ingress
+      'x-jwt-claim-sub': validSession.userId,
+      'x-jwt-claim-tenant-id': validSession.tenantId || '',
+      'x-jwt-claim-tenant-slug': validSession.tenantSlug || '',
     };
 
     try {
@@ -283,15 +289,18 @@ export async function apiProxyRoutes(fastify: FastifyInstance) {
 
     // SECURITY: Always use session values for tenant/user context
     // These values are from the validated Keycloak session, never from client headers
+    // Use Istio-style x-jwt-claim-* headers so backend services can process them
+    // consistently whether requests come from ingress or internal BFF
     if (validSession.tenantId) {
-      headers['x-tenant-id'] = validSession.tenantId;
+      headers['x-jwt-claim-tenant-id'] = validSession.tenantId;
     }
     if (validSession.tenantSlug) {
-      headers['x-tenant-slug'] = validSession.tenantSlug;
+      headers['x-jwt-claim-tenant-slug'] = validSession.tenantSlug;
     }
 
     // Add user ID from session (validated from Keycloak token)
-    headers['x-user-id'] = validSession.userId;
+    // x-jwt-claim-sub is the standard Istio header for JWT subject claim
+    headers['x-jwt-claim-sub'] = validSession.userId;
 
     try {
       // Make the proxied request
