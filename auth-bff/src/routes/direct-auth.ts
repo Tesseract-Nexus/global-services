@@ -100,6 +100,21 @@ interface RateLimitEntry {
 }
 
 const rateLimits = new Map<string, RateLimitEntry>();
+
+/**
+ * Decode JWT payload without verification (token already validated by tenant-service/Keycloak).
+ * Used to inspect claims like google_linked.
+ */
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const payload = Buffer.from(parts[1], 'base64url').toString('utf-8');
+    return JSON.parse(payload);
+  } catch {
+    return null;
+  }
+}
 const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
 const RATE_LIMIT_MAX_ATTEMPTS = 10; // 10 attempts per minute per key
 
@@ -367,6 +382,17 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
       });
     }
 
+    // Block password login for Google-linked users
+    const tokenPayload = decodeJwtPayload(data.access_token);
+    if (tokenPayload?.google_linked === true || tokenPayload?.google_linked === 'true') {
+      logger.info({ email: maskEmail(email), tenant_slug }, 'Password login blocked for Google-linked user');
+      return reply.code(403).send({
+        success: false,
+        error: 'GOOGLE_LINKED',
+        message: 'Your account is linked to Google. Please use "Continue with Google" to sign in.',
+      });
+    }
+
     // Create session with tokens
     // Use 24 hours for session expiry (not token expiry) to avoid frequent refresh attempts
     // The session cookie handles the actual session lifetime
@@ -516,6 +542,17 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
         success: false,
         error: 'TOKEN_ERROR',
         message: 'Failed to complete authentication. Please try again.',
+      });
+    }
+
+    // Block password login for Google-linked users
+    const adminTokenPayload = decodeJwtPayload(data.access_token);
+    if (adminTokenPayload?.google_linked === true || adminTokenPayload?.google_linked === 'true') {
+      logger.info({ email: maskEmail(email), tenant_slug }, 'Admin password login blocked for Google-linked user');
+      return reply.code(403).send({
+        success: false,
+        error: 'GOOGLE_LINKED',
+        message: 'Your account is linked to Google. Please use "Continue with Google" to sign in.',
       });
     }
 
