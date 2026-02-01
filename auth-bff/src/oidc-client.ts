@@ -178,6 +178,39 @@ class OIDCClientManager {
     if (!issuer) {
       // Use custom discovery with proper User-Agent to avoid WAF/CDN blocking
       issuer = await discoverIssuerWithCustomUserAgent(keycloakConfig.issuer);
+
+      // Override server-to-server endpoints with internal URL to bypass Cloudflare
+      // Browser-facing endpoints (authorization_endpoint) stay external
+      const internalUrl = keycloakConfig.internalUrl;
+      if (internalUrl) {
+        const externalUrl = keycloakConfig.url;
+        const replaceUrl = (url: string | undefined) =>
+          url ? url.replace(externalUrl, internalUrl) : url;
+
+        issuer = new Issuer({
+          ...issuer.metadata,
+          // Keep authorization_endpoint external (browser redirects to it)
+          token_endpoint: replaceUrl(issuer.metadata.token_endpoint),
+          userinfo_endpoint: replaceUrl(issuer.metadata.userinfo_endpoint),
+          revocation_endpoint: replaceUrl(issuer.metadata.revocation_endpoint as string),
+          introspection_endpoint: replaceUrl(issuer.metadata.introspection_endpoint),
+          end_session_endpoint: replaceUrl(issuer.metadata.end_session_endpoint),
+          jwks_uri: replaceUrl(issuer.metadata.jwks_uri),
+        });
+
+        // Re-apply custom http_options on the new issuer
+        issuer[custom.http_options] = function httpOptionsHook(_url: URL, options: Record<string, unknown>) {
+          const headers = (options.headers || {}) as Record<string, string>;
+          headers['User-Agent'] = CUSTOM_USER_AGENT;
+          return { ...options, headers };
+        };
+
+        logger.info(
+          { type, tokenEndpoint: issuer.metadata.token_endpoint },
+          'Overriding OIDC endpoints with internal URL to bypass Cloudflare'
+        );
+      }
+
       this.issuers.set(type, issuer);
       logger.info(
         {

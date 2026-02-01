@@ -15,6 +15,7 @@ const envSchema = z.object({
 
   // Keycloak - Customer IDP (for storefront)
   KEYCLOAK_CUSTOMER_URL: z.string().url(),
+  KEYCLOAK_CUSTOMER_INTERNAL_URL: z.string().url().optional(), // Internal URL to bypass Cloudflare for server-to-server calls
   KEYCLOAK_CUSTOMER_REALM: z.string().default('tesserix-customer'),
   KEYCLOAK_CUSTOMER_CLIENT_ID: z.string(),
   KEYCLOAK_CUSTOMER_CLIENT_SECRET: z.string(),
@@ -78,6 +79,7 @@ export const config = {
     },
     customer: {
       url: env.KEYCLOAK_CUSTOMER_URL,
+      internalUrl: env.KEYCLOAK_CUSTOMER_INTERNAL_URL,
       realm: env.KEYCLOAK_CUSTOMER_REALM,
       clientId: env.KEYCLOAK_CUSTOMER_CLIENT_ID,
       clientSecret: env.KEYCLOAK_CUSTOMER_CLIENT_SECRET,
