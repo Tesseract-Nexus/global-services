@@ -1092,8 +1092,8 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 		if password == "" {
 			return nil, fmt.Errorf("password is required")
 		}
-		if len(password) < 8 {
-			return nil, fmt.Errorf("password must be at least 8 characters")
+		if len(password) < 10 {
+			return nil, fmt.Errorf("password must be at least 10 characters")
 		}
 	}
 

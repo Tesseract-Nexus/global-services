@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -560,8 +561,8 @@ func (h *OnboardingHandler) CompleteAccountSetup(c *gin.Context) {
 
 	// Password required only for password auth
 	if req.AuthMethod == "password" {
-		if req.Password == "" || len(req.Password) < 8 {
-			ErrorResponse(c, http.StatusBadRequest, "Password must be at least 8 characters", nil)
+		if req.Password == "" || len(req.Password) < 10 {
+			ErrorResponse(c, http.StatusBadRequest, "Password must be at least 10 characters", nil)
 			return
 		}
 	}
@@ -577,6 +578,12 @@ func (h *OnboardingHandler) CompleteAccountSetup(c *gin.Context) {
 
 	result, err := h.onboardingService.CompleteAccountSetup(c.Request.Context(), sessionID, req.Password, req.AuthMethod, req.Timezone, req.Currency, req.BusinessModel)
 	if err != nil {
+		// Return 400 for password policy violations from Keycloak
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "failed to set password") && strings.Contains(errMsg, "status 400") {
+			ErrorResponse(c, http.StatusBadRequest, "Password does not meet the security requirements. It must be at least 10 characters with uppercase, lowercase, number, and special character.", err)
+			return
+		}
 		ErrorResponse(c, http.StatusInternalServerError, "Failed to complete account setup", err)
 		return
 	}
