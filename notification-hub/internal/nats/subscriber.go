@@ -767,24 +767,34 @@ func (s *Subscriber) handleApprovalEvent(msg *nats.Msg) {
 // broadcastNotification is a helper that creates and broadcasts notifications to all connected users
 func (s *Subscriber) broadcastNotification(event interface{}, tenantID string) {
 	targetUsers := s.getTargetUsers(tenantID)
+	log.Printf("[DEBUG] Target users for tenant %s: %d users", tenantID, len(targetUsers))
+
 	if len(targetUsers) == 0 {
 		// Store as broadcast notification (for when users connect later)
+		log.Printf("[DEBUG] No connected users, creating broadcast notification")
 		notification := models.EventToNotification(event, uuid.Nil)
 		if notification != nil {
 			if err := s.notifRepo.Create(context.Background(), notification); err != nil {
 				log.Printf("Failed to create broadcast notification: %v", err)
+			} else {
+				log.Printf("[DEBUG] Broadcast notification created successfully (userID: nil)")
 			}
+		} else {
+			log.Printf("[DEBUG] EventToNotification returned nil")
 		}
 	} else {
 		for _, userID := range targetUsers {
+			log.Printf("[DEBUG] Creating notification for user: %s", userID)
 			notification := models.EventToNotification(event, userID)
 			if notification == nil {
+				log.Printf("[DEBUG] EventToNotification returned nil for user %s", userID)
 				continue
 			}
 			if err := s.notifRepo.Create(context.Background(), notification); err != nil {
 				log.Printf("Failed to create notification: %v", err)
 				continue
 			}
+			log.Printf("[DEBUG] Notification created for user %s", userID)
 			s.hub.BroadcastToUser(tenantID, userID, notification)
 			count, _ := s.notifRepo.GetUnreadCount(context.Background(), tenantID, userID)
 			s.hub.BroadcastUnreadCount(tenantID, userID, int(count))
