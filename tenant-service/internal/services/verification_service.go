@@ -128,7 +128,7 @@ func (s *VerificationService) GetDNSConfig(ctx context.Context, sessionID uuid.U
 		return nil, fmt.Errorf("failed to get session: %w", err)
 	}
 
-	dnsConfig := s.buildDNSConfigFromSession(session)
+	dnsConfig := s.buildDNSConfigFromSession(ctx, session)
 	if dnsConfig == nil {
 		return nil, nil // No custom domain configured
 	}
@@ -240,7 +240,7 @@ func (s *VerificationService) startEmailVerificationWithLinkAndBusinessName(ctx 
 			}
 
 			// Check if there's a custom domain in the store_setup configuration
-			dnsConfig = s.buildDNSConfigFromSession(session)
+			dnsConfig = s.buildDNSConfigFromSession(ctx, session)
 		}
 	}
 	if businessName == "" {
@@ -286,7 +286,7 @@ type storeSetupConfig struct {
 
 // buildDNSConfigFromSession checks if the session has a custom domain and builds DNS config
 // The CNAME targets point to the tenant's platform subdomains (e.g., awesome-store.tesserix.app)
-func (s *VerificationService) buildDNSConfigFromSession(session *models.OnboardingSession) *clients.CustomDomainDNSConfig {
+func (s *VerificationService) buildDNSConfigFromSession(ctx context.Context, session *models.OnboardingSession) *clients.CustomDomainDNSConfig {
 	if session == nil || len(session.ApplicationConfigurations) == 0 {
 		return nil
 	}
