@@ -28,12 +28,15 @@ const (
 
 // VerificationService handles verification business logic
 type VerificationService struct {
-	verificationClient *clients.VerificationClient
-	notificationClient *clients.NotificationClient
-	redisClient        *redis.Client
-	verificationConfig config.VerificationConfig
-	natsClient         *tsnats.Client
-	onboardingRepo     *repository.OnboardingRepository
+	verificationClient   *clients.VerificationClient
+	notificationClient   *clients.NotificationClient
+	customDomainClient   *clients.CustomDomainClient
+	redisClient          *redis.Client
+	verificationConfig   config.VerificationConfig
+	natsClient           *tsnats.Client
+	onboardingRepo       *repository.OnboardingRepository
+	cachedGatewayIP      string    // Cached gateway IP
+	gatewayIPCachedAt    time.Time // When the IP was cached
 }
 
 // NewVerificationService creates a new verification service
@@ -59,6 +62,49 @@ func (s *VerificationService) SetNATSClient(natsClient *tsnats.Client) {
 // SetOnboardingRepo sets the onboarding repository for session lookups
 func (s *VerificationService) SetOnboardingRepo(repo *repository.OnboardingRepository) {
 	s.onboardingRepo = repo
+}
+
+// SetCustomDomainClient sets the custom domain service client for dynamic gateway IP lookup
+func (s *VerificationService) SetCustomDomainClient(client *clients.CustomDomainClient) {
+	s.customDomainClient = client
+}
+
+// getGatewayIP returns the custom domain gateway IP, fetching it dynamically if needed.
+// The IP is cached for 5 minutes to reduce API calls.
+func (s *VerificationService) getGatewayIP(ctx context.Context) (string, error) {
+	// Check if we have a cached IP that's still valid (5 minute TTL)
+	if s.cachedGatewayIP != "" && time.Since(s.gatewayIPCachedAt) < 5*time.Minute {
+		return s.cachedGatewayIP, nil
+	}
+
+	// Try to fetch from custom-domain-service
+	if s.customDomainClient != nil {
+		response, err := s.customDomainClient.GetGatewayIP(ctx)
+		if err != nil {
+			log.Printf("[VerificationService] Warning: failed to fetch gateway IP from custom-domain-service: %v", err)
+			// Fall back to static config if available
+			if s.verificationConfig.CustomDomainGatewayIP != "" {
+				log.Printf("[VerificationService] Using static config gateway IP: %s", s.verificationConfig.CustomDomainGatewayIP)
+				return s.verificationConfig.CustomDomainGatewayIP, nil
+			}
+			return "", err
+		}
+
+		if response.IP != "" {
+			s.cachedGatewayIP = response.IP
+			s.gatewayIPCachedAt = time.Now()
+			log.Printf("[VerificationService] Fetched and cached gateway IP: %s", response.IP)
+			return response.IP, nil
+		}
+	}
+
+	// Fall back to static config
+	if s.verificationConfig.CustomDomainGatewayIP != "" {
+		log.Printf("[VerificationService] Using static config gateway IP (no client): %s", s.verificationConfig.CustomDomainGatewayIP)
+		return s.verificationConfig.CustomDomainGatewayIP, nil
+	}
+
+	return "", nil
 }
 
 // GetVerificationMethod returns the current verification method
@@ -312,8 +358,11 @@ func (s *VerificationService) buildDNSConfigFromSession(session *models.Onboardi
 	// Build routing configuration for custom domains
 	// Custom domains must use A records (pointing to LoadBalancer IP) due to
 	// Cloudflare cross-account CNAME restrictions (Error 1014)
-	// If CustomDomainGatewayIP is configured, use A records; otherwise fallback to CNAME
-	routingIP := s.verificationConfig.CustomDomainGatewayIP
+	// The gateway IP is fetched dynamically from custom-domain-service (which queries Kubernetes)
+	routingIP, err := s.getGatewayIP(ctx)
+	if err != nil {
+		log.Printf("[VerificationService] Warning: failed to get gateway IP: %v, using CNAME fallback", err)
+	}
 	useARecords := routingIP != ""
 	routingCNAMETarget := fmt.Sprintf("proxy.%s", baseDomain) // fallback if IP not configured
 

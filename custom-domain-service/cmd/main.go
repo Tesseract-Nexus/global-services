@@ -347,6 +347,9 @@ func setupRouter(cfg *config.Config, domainHandlers *handlers.DomainHandlers, in
 		{
 			internal.GET("/resolve", internalHandlers.ResolveDomain)
 			internal.GET("/check", internalHandlers.CheckDomain)
+			// Gateway IP endpoint - returns the external IP of custom-ingressgateway
+			// Used by tenant-service and other services for DNS instructions
+			internal.GET("/gateway/ip", internalHandlers.GetGatewayIP)
 		}
 	}
 

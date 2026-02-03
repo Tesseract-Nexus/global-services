@@ -1570,3 +1570,93 @@ func (s *DomainService) toCNAMEDelegationStatusResponse(domain *models.CustomDom
 
 	return response
 }
+
+// GatewayIPResponse contains the custom domain gateway IP information
+type GatewayIPResponse struct {
+	IP            string `json:"ip"`
+	ProxyDomain   string `json:"proxy_domain"`
+	UseARecords   bool   `json:"use_a_records"`
+	GatewayName   string `json:"gateway_name"`
+	Namespace     string `json:"namespace"`
+	CachedAt      string `json:"cached_at,omitempty"`
+	CacheExpires  string `json:"cache_expires,omitempty"`
+}
+
+const (
+	gatewayIPCacheKey = "custom-domain-gateway-ip"
+	gatewayIPCacheTTL = 5 * time.Minute
+)
+
+// GetGatewayIP returns the external IP of the custom domain ingress gateway.
+// The IP is cached in Redis for 5 minutes to reduce Kubernetes API calls.
+// This endpoint is used by tenant-service and other services to get DNS instructions.
+func (s *DomainService) GetGatewayIP(ctx context.Context) (*GatewayIPResponse, error) {
+	response := &GatewayIPResponse{
+		ProxyDomain: s.cfg.DNS.ProxyDomain,
+		GatewayName: "custom-ingressgateway",
+		Namespace:   s.cfg.Istio.GatewayNamespace,
+	}
+
+	// Try to get from Redis cache first
+	if s.redisClient != nil {
+		cachedIP, err := s.redisClient.Get(ctx, gatewayIPCacheKey).Result()
+		if err == nil && cachedIP != "" {
+			log.Debug().Str("ip", cachedIP).Msg("Using cached gateway IP")
+			response.IP = cachedIP
+			response.UseARecords = true
+
+			// Get TTL for cache info
+			ttl, _ := s.redisClient.TTL(ctx, gatewayIPCacheKey).Result()
+			if ttl > 0 {
+				response.CacheExpires = time.Now().Add(ttl).Format(time.RFC3339)
+			}
+			return response, nil
+		}
+	}
+
+	// Fetch from Kubernetes if k8sClient is available
+	if s.k8sClient != nil {
+		ip, err := s.k8sClient.GetCustomIngressGatewayIP(ctx)
+		if err != nil {
+			log.Warn().Err(err).Msg("Failed to fetch gateway IP from Kubernetes")
+			// Fall back to configured static IP if available
+			if s.cfg.DNS.ProxyIP != "" {
+				response.IP = s.cfg.DNS.ProxyIP
+				response.UseARecords = true
+				return response, nil
+			}
+			return response, fmt.Errorf("failed to get gateway IP: %w", err)
+		}
+
+		if ip != "" {
+			response.IP = ip
+			response.UseARecords = true
+
+			// Cache in Redis
+			if s.redisClient != nil {
+				err := s.redisClient.Set(ctx, gatewayIPCacheKey, ip, gatewayIPCacheTTL).Err()
+				if err != nil {
+					log.Warn().Err(err).Msg("Failed to cache gateway IP in Redis")
+				} else {
+					response.CachedAt = time.Now().Format(time.RFC3339)
+					response.CacheExpires = time.Now().Add(gatewayIPCacheTTL).Format(time.RFC3339)
+					log.Info().Str("ip", ip).Dur("ttl", gatewayIPCacheTTL).Msg("Cached gateway IP in Redis")
+				}
+			}
+
+			return response, nil
+		}
+	}
+
+	// Fall back to configured static IP
+	if s.cfg.DNS.ProxyIP != "" {
+		response.IP = s.cfg.DNS.ProxyIP
+		response.UseARecords = true
+		return response, nil
+	}
+
+	// No IP available - use CNAME mode
+	response.UseARecords = false
+	log.Warn().Msg("No gateway IP available - DNS instructions will use CNAME to proxy domain")
+	return response, nil
+}

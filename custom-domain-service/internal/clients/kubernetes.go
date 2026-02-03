@@ -1066,3 +1066,41 @@ func (k *KubernetesClient) DeleteACMEChallengeVirtualService(ctx context.Context
 	}
 	return nil
 }
+
+// GetCustomIngressGatewayIP fetches the external IP of the custom-ingressgateway LoadBalancer service.
+// This IP is used for DNS A record instructions for custom domains.
+// Returns empty string if the service doesn't exist or has no external IP assigned.
+func (k *KubernetesClient) GetCustomIngressGatewayIP(ctx context.Context) (string, error) {
+	// The custom ingress gateway service name and namespace
+	serviceName := "custom-ingressgateway"
+	namespace := k.cfg.Istio.GatewayNamespace // istio-ingress
+
+	svc, err := k.kubeClient.CoreV1().Services(namespace).Get(ctx, serviceName, metav1.GetOptions{})
+	if err != nil {
+		log.Warn().Err(err).Str("service", serviceName).Str("namespace", namespace).Msg("Failed to get custom ingress gateway service")
+		return "", fmt.Errorf("failed to get service %s/%s: %w", namespace, serviceName, err)
+	}
+
+	// Check if it's a LoadBalancer type
+	if svc.Spec.Type != "LoadBalancer" {
+		log.Warn().Str("service", serviceName).Str("type", string(svc.Spec.Type)).Msg("Custom ingress gateway is not LoadBalancer type")
+		return "", nil
+	}
+
+	// Get the external IP from status
+	if len(svc.Status.LoadBalancer.Ingress) > 0 {
+		ingress := svc.Status.LoadBalancer.Ingress[0]
+		if ingress.IP != "" {
+			log.Debug().Str("ip", ingress.IP).Msg("Found custom ingress gateway external IP")
+			return ingress.IP, nil
+		}
+		if ingress.Hostname != "" {
+			// Some cloud providers return hostname instead of IP (e.g., AWS ELB)
+			log.Debug().Str("hostname", ingress.Hostname).Msg("Found custom ingress gateway hostname (no IP)")
+			return ingress.Hostname, nil
+		}
+	}
+
+	log.Warn().Str("service", serviceName).Msg("Custom ingress gateway has no external IP assigned yet")
+	return "", nil
+}

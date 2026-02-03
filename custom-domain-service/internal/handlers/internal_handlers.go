@@ -135,3 +135,27 @@ func (h *InternalHandlers) Ready(c *gin.Context) {
 		"status": "ready",
 	})
 }
+
+// GetGatewayIP handles GET /api/v1/internal/gateway/ip
+// @Summary Get custom domain gateway IP
+// @Description Returns the external IP of the custom-ingressgateway LoadBalancer.
+// @Description This IP is used for DNS A record instructions for custom domains.
+// @Description The IP is dynamically fetched from Kubernetes and cached in Redis.
+// @Tags internal
+// @Produce json
+// @Success 200 {object} services.GatewayIPResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /api/v1/internal/gateway/ip [get]
+func (h *InternalHandlers) GetGatewayIP(c *gin.Context) {
+	response, err := h.domainService.GetGatewayIP(c.Request.Context())
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to get gateway IP")
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error: "failed to get gateway IP",
+			Code:  "GATEWAY_IP_ERROR",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, response)
+}

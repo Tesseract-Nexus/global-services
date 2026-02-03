@@ -150,6 +150,49 @@ type ValidateDomainResponse struct {
 	ProxyTarget            string      `json:"proxy_target,omitempty"`             // Target for routing
 }
 
+// GatewayIPResponse represents the response from the gateway IP endpoint
+type GatewayIPResponse struct {
+	IP           string `json:"ip"`
+	ProxyDomain  string `json:"proxy_domain"`
+	UseARecords  bool   `json:"use_a_records"`
+	GatewayName  string `json:"gateway_name"`
+	Namespace    string `json:"namespace"`
+	CachedAt     string `json:"cached_at,omitempty"`
+	CacheExpires string `json:"cache_expires,omitempty"`
+}
+
+// GetGatewayIP fetches the external IP of the custom domain gateway from custom-domain-service.
+// This IP is dynamically fetched from the Kubernetes LoadBalancer service and cached.
+// Used to provide DNS A record instructions for custom domains.
+func (c *CustomDomainClient) GetGatewayIP(ctx context.Context) (*GatewayIPResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/internal/gateway/ip", c.baseURL)
+
+	httpReq, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		log.Printf("[CustomDomainClient] Warning: failed to get gateway IP from custom-domain-service: %v", err)
+		return nil, fmt.Errorf("failed to call custom-domain-service: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("gateway IP request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var response GatewayIPResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode gateway IP response: %w", err)
+	}
+
+	log.Printf("[CustomDomainClient] Got gateway IP: %s (useARecords: %v)", response.IP, response.UseARecords)
+	return &response, nil
+}
+
 // ValidateDomain validates a domain before creating it
 func (c *CustomDomainClient) ValidateDomain(ctx context.Context, domain string) (*ValidateDomainResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/domains/validate", c.baseURL)

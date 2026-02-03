@@ -116,8 +116,14 @@ func main() {
 	// Use verification-service for sending emails (instead of deprecated notification-service)
 	notificationClient := clients.NewNotificationClient(verificationServiceURL, verificationServiceAPIKey)
 
+	// Initialize custom domain client for dynamic gateway IP lookup
+	customDomainServiceURL := cfg.Integration.CustomDomainServiceURL
+	customDomainClient := clients.NewCustomDomainClient(customDomainServiceURL)
+	log.Printf("Initialized custom-domain-service client: %s", customDomainServiceURL)
+
 	// Initialize services
-	// Note: Gateway IP for custom domains is now fetched from Redis (populated by tenant-router-service)
+	// Note: Gateway IP for custom domains is now fetched dynamically from custom-domain-service
+	// (which queries the Kubernetes LoadBalancer service in istio-ingress namespace)
 	paymentSvc := services.NewPaymentService()
 	verificationSvc := services.NewVerificationService(verificationClient, notificationClient, redisClient, cfg.Verification)
 	// Wire up NATS client and onboarding repo for event-driven verification emails
@@ -126,6 +132,8 @@ func main() {
 		log.Println("Verification service: NATS event publishing enabled")
 	}
 	verificationSvc.SetOnboardingRepo(onboardingRepo)
+	verificationSvc.SetCustomDomainClient(customDomainClient)
+	log.Println("Verification service: Dynamic gateway IP lookup enabled via custom-domain-service")
 	templateSvc := services.NewTemplateService(templateRepo)
 	notificationSvc := services.NewNotificationService()
 	membershipSvc := services.NewMembershipService(membershipRepo)
