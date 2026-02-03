@@ -641,6 +641,8 @@ func (s *Subscriber) handleProductEvent(msg *nats.Msg) {
 }
 
 func (s *Subscriber) handleCategoryEvent(msg *nats.Msg) {
+	log.Printf("[DEBUG] Received category event, raw data: %s", string(msg.Data))
+
 	var event models.CategoryEvent
 	if err := json.Unmarshal(msg.Data, &event); err != nil {
 		log.Printf("Failed to unmarshal category event: %v", err)
@@ -648,12 +650,20 @@ func (s *Subscriber) handleCategoryEvent(msg *nats.Msg) {
 		return
 	}
 
-	exists, _ := s.notifRepo.ExistsBySourceEventID(context.Background(), event.SourceID)
+	log.Printf("[DEBUG] Unmarshaled category event: type=%s, categoryID=%s, tenantID=%s, sourceID=%s",
+		event.EventType, event.CategoryID, event.TenantID, event.SourceID)
+
+	exists, err := s.notifRepo.ExistsBySourceEventID(context.Background(), event.SourceID)
+	if err != nil {
+		log.Printf("[DEBUG] Error checking if event exists: %v", err)
+	}
 	if exists {
+		log.Printf("[DEBUG] Event already exists, skipping: %s", event.SourceID)
 		msg.Ack()
 		return
 	}
 
+	log.Printf("[DEBUG] Broadcasting notification for category event")
 	s.broadcastNotification(&event, event.TenantID)
 	msg.Ack()
 	log.Printf("Processed category event: %s for category %s", event.EventType, event.CategoryName)
