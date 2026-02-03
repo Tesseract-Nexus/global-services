@@ -178,6 +178,146 @@ func (s *Subscriber) Start(ctx context.Context) error {
 		log.Println("Subscribed to review.> events")
 	}
 
+	// Subscribe to product events
+	productSub, err := js.QueueSubscribe(
+		"product.>",
+		"notification-hub-workers",
+		s.handleProductEvent,
+		nats.BindStream("PRODUCT_EVENTS"),
+		nats.Durable("notification-hub-products"),
+		nats.DeliverNew(),
+		nats.ManualAck(),
+		nats.AckWait(30*time.Second),
+		nats.MaxDeliver(3),
+		nats.InactiveThreshold(24*time.Hour),
+	)
+	if err != nil {
+		log.Printf("Warning: failed to subscribe to product events: %v", err)
+	} else {
+		s.subs = append(s.subs, productSub)
+		log.Println("Subscribed to product.> events")
+	}
+
+	// Subscribe to category events
+	categorySub, err := js.QueueSubscribe(
+		"category.>",
+		"notification-hub-workers",
+		s.handleCategoryEvent,
+		nats.BindStream("CATEGORY_EVENTS"),
+		nats.Durable("notification-hub-categories"),
+		nats.DeliverNew(),
+		nats.ManualAck(),
+		nats.AckWait(30*time.Second),
+		nats.MaxDeliver(3),
+		nats.InactiveThreshold(24*time.Hour),
+	)
+	if err != nil {
+		log.Printf("Warning: failed to subscribe to category events: %v", err)
+	} else {
+		s.subs = append(s.subs, categorySub)
+		log.Println("Subscribed to category.> events")
+	}
+
+	// Subscribe to ticket events
+	ticketSub, err := js.QueueSubscribe(
+		"ticket.>",
+		"notification-hub-workers",
+		s.handleTicketEvent,
+		nats.BindStream("TICKET_EVENTS"),
+		nats.Durable("notification-hub-tickets"),
+		nats.DeliverNew(),
+		nats.ManualAck(),
+		nats.AckWait(30*time.Second),
+		nats.MaxDeliver(3),
+		nats.InactiveThreshold(24*time.Hour),
+	)
+	if err != nil {
+		log.Printf("Warning: failed to subscribe to ticket events: %v", err)
+	} else {
+		s.subs = append(s.subs, ticketSub)
+		log.Println("Subscribed to ticket.> events")
+	}
+
+	// Subscribe to staff events
+	staffSub, err := js.QueueSubscribe(
+		"staff.>",
+		"notification-hub-workers",
+		s.handleStaffEvent,
+		nats.BindStream("STAFF_EVENTS"),
+		nats.Durable("notification-hub-staff"),
+		nats.DeliverNew(),
+		nats.ManualAck(),
+		nats.AckWait(30*time.Second),
+		nats.MaxDeliver(3),
+		nats.InactiveThreshold(24*time.Hour),
+	)
+	if err != nil {
+		log.Printf("Warning: failed to subscribe to staff events: %v", err)
+	} else {
+		s.subs = append(s.subs, staffSub)
+		log.Println("Subscribed to staff.> events")
+	}
+
+	// Subscribe to coupon events
+	couponSub, err := js.QueueSubscribe(
+		"coupon.>",
+		"notification-hub-workers",
+		s.handleCouponEvent,
+		nats.BindStream("COUPON_EVENTS"),
+		nats.Durable("notification-hub-coupons"),
+		nats.DeliverNew(),
+		nats.ManualAck(),
+		nats.AckWait(30*time.Second),
+		nats.MaxDeliver(3),
+		nats.InactiveThreshold(24*time.Hour),
+	)
+	if err != nil {
+		log.Printf("Warning: failed to subscribe to coupon events: %v", err)
+	} else {
+		s.subs = append(s.subs, couponSub)
+		log.Println("Subscribed to coupon.> events")
+	}
+
+	// Subscribe to vendor events
+	vendorSub, err := js.QueueSubscribe(
+		"vendor.>",
+		"notification-hub-workers",
+		s.handleVendorEvent,
+		nats.BindStream("VENDOR_EVENTS"),
+		nats.Durable("notification-hub-vendors"),
+		nats.DeliverNew(),
+		nats.ManualAck(),
+		nats.AckWait(30*time.Second),
+		nats.MaxDeliver(3),
+		nats.InactiveThreshold(24*time.Hour),
+	)
+	if err != nil {
+		log.Printf("Warning: failed to subscribe to vendor events: %v", err)
+	} else {
+		s.subs = append(s.subs, vendorSub)
+		log.Println("Subscribed to vendor.> events")
+	}
+
+	// Subscribe to approval events
+	approvalSub, err := js.QueueSubscribe(
+		"approval.>",
+		"notification-hub-workers",
+		s.handleApprovalEvent,
+		nats.BindStream("APPROVAL_EVENTS"),
+		nats.Durable("notification-hub-approvals"),
+		nats.DeliverNew(),
+		nats.ManualAck(),
+		nats.AckWait(30*time.Second),
+		nats.MaxDeliver(3),
+		nats.InactiveThreshold(24*time.Hour),
+	)
+	if err != nil {
+		log.Printf("Warning: failed to subscribe to approval events: %v", err)
+	} else {
+		s.subs = append(s.subs, approvalSub)
+		log.Println("Subscribed to approval.> events")
+	}
+
 	log.Printf("NATS subscriber started with %d subscriptions", len(s.subs))
 	return nil
 }
@@ -479,4 +619,165 @@ func (s *Subscriber) getTargetUsers(tenantID string) []uuid.UUID {
 		log.Printf("Found %d connected users for tenant %s", len(users), tenantID)
 	}
 	return users
+}
+
+func (s *Subscriber) handleProductEvent(msg *nats.Msg) {
+	var event models.ProductEvent
+	if err := json.Unmarshal(msg.Data, &event); err != nil {
+		log.Printf("Failed to unmarshal product event: %v", err)
+		msg.Ack()
+		return
+	}
+
+	exists, _ := s.notifRepo.ExistsBySourceEventID(context.Background(), event.SourceID)
+	if exists {
+		msg.Ack()
+		return
+	}
+
+	s.broadcastNotification(&event, event.TenantID)
+	msg.Ack()
+	log.Printf("Processed product event: %s for product %s", event.EventType, event.ProductName)
+}
+
+func (s *Subscriber) handleCategoryEvent(msg *nats.Msg) {
+	var event models.CategoryEvent
+	if err := json.Unmarshal(msg.Data, &event); err != nil {
+		log.Printf("Failed to unmarshal category event: %v", err)
+		msg.Ack()
+		return
+	}
+
+	exists, _ := s.notifRepo.ExistsBySourceEventID(context.Background(), event.SourceID)
+	if exists {
+		msg.Ack()
+		return
+	}
+
+	s.broadcastNotification(&event, event.TenantID)
+	msg.Ack()
+	log.Printf("Processed category event: %s for category %s", event.EventType, event.CategoryName)
+}
+
+func (s *Subscriber) handleTicketEvent(msg *nats.Msg) {
+	var event models.TicketEvent
+	if err := json.Unmarshal(msg.Data, &event); err != nil {
+		log.Printf("Failed to unmarshal ticket event: %v", err)
+		msg.Ack()
+		return
+	}
+
+	exists, _ := s.notifRepo.ExistsBySourceEventID(context.Background(), event.SourceID)
+	if exists {
+		msg.Ack()
+		return
+	}
+
+	s.broadcastNotification(&event, event.TenantID)
+	msg.Ack()
+	log.Printf("Processed ticket event: %s for ticket %s", event.EventType, event.TicketNumber)
+}
+
+func (s *Subscriber) handleStaffEvent(msg *nats.Msg) {
+	var event models.StaffEvent
+	if err := json.Unmarshal(msg.Data, &event); err != nil {
+		log.Printf("Failed to unmarshal staff event: %v", err)
+		msg.Ack()
+		return
+	}
+
+	exists, _ := s.notifRepo.ExistsBySourceEventID(context.Background(), event.SourceID)
+	if exists {
+		msg.Ack()
+		return
+	}
+
+	s.broadcastNotification(&event, event.TenantID)
+	msg.Ack()
+	log.Printf("Processed staff event: %s for staff %s", event.EventType, event.StaffName)
+}
+
+func (s *Subscriber) handleCouponEvent(msg *nats.Msg) {
+	var event models.CouponEvent
+	if err := json.Unmarshal(msg.Data, &event); err != nil {
+		log.Printf("Failed to unmarshal coupon event: %v", err)
+		msg.Ack()
+		return
+	}
+
+	exists, _ := s.notifRepo.ExistsBySourceEventID(context.Background(), event.SourceID)
+	if exists {
+		msg.Ack()
+		return
+	}
+
+	s.broadcastNotification(&event, event.TenantID)
+	msg.Ack()
+	log.Printf("Processed coupon event: %s for coupon %s", event.EventType, event.CouponCode)
+}
+
+func (s *Subscriber) handleVendorEvent(msg *nats.Msg) {
+	var event models.VendorEvent
+	if err := json.Unmarshal(msg.Data, &event); err != nil {
+		log.Printf("Failed to unmarshal vendor event: %v", err)
+		msg.Ack()
+		return
+	}
+
+	exists, _ := s.notifRepo.ExistsBySourceEventID(context.Background(), event.SourceID)
+	if exists {
+		msg.Ack()
+		return
+	}
+
+	s.broadcastNotification(&event, event.TenantID)
+	msg.Ack()
+	log.Printf("Processed vendor event: %s for vendor %s", event.EventType, event.VendorName)
+}
+
+func (s *Subscriber) handleApprovalEvent(msg *nats.Msg) {
+	var event models.ApprovalEvent
+	if err := json.Unmarshal(msg.Data, &event); err != nil {
+		log.Printf("Failed to unmarshal approval event: %v", err)
+		msg.Ack()
+		return
+	}
+
+	exists, _ := s.notifRepo.ExistsBySourceEventID(context.Background(), event.SourceID)
+	if exists {
+		msg.Ack()
+		return
+	}
+
+	s.broadcastNotification(&event, event.TenantID)
+	msg.Ack()
+	log.Printf("Processed approval event: %s for %s", event.EventType, event.EntityType)
+}
+
+// broadcastNotification is a helper that creates and broadcasts notifications to all connected users
+func (s *Subscriber) broadcastNotification(event interface{}, tenantID string) {
+	targetUsers := s.getTargetUsers(tenantID)
+	if len(targetUsers) == 0 {
+		// Store as broadcast notification (for when users connect later)
+		notification := models.EventToNotification(event, uuid.Nil)
+		if notification != nil {
+			if err := s.notifRepo.Create(context.Background(), notification); err != nil {
+				log.Printf("Failed to create broadcast notification: %v", err)
+			}
+		}
+	} else {
+		for _, userID := range targetUsers {
+			notification := models.EventToNotification(event, userID)
+			if notification == nil {
+				continue
+			}
+			if err := s.notifRepo.Create(context.Background(), notification); err != nil {
+				log.Printf("Failed to create notification: %v", err)
+				continue
+			}
+			s.hub.BroadcastToUser(tenantID, userID, notification)
+			count, _ := s.notifRepo.GetUnreadCount(context.Background(), tenantID, userID)
+			s.hub.BroadcastUnreadCount(tenantID, userID, int(count))
+		}
+	}
 }

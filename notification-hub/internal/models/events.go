@@ -22,7 +22,7 @@ const (
 	SubjectPaymentRefunded = "payment.refunded"
 
 	// Inventory events
-	SubjectInventoryLowStock = "inventory.low_stock"
+	SubjectInventoryLowStock   = "inventory.low_stock"
 	SubjectInventoryOutOfStock = "inventory.out_of_stock"
 
 	// Customer events
@@ -36,6 +36,46 @@ const (
 	// Review events
 	SubjectReviewSubmitted = "review.submitted"
 	SubjectReviewApproved  = "review.approved"
+
+	// Product events
+	SubjectProductCreated   = "product.created"
+	SubjectProductUpdated   = "product.updated"
+	SubjectProductDeleted   = "product.deleted"
+	SubjectProductPublished = "product.published"
+	SubjectProductArchived  = "product.archived"
+
+	// Category events
+	SubjectCategoryCreated = "category.created"
+	SubjectCategoryUpdated = "category.updated"
+	SubjectCategoryDeleted = "category.deleted"
+
+	// Ticket events
+	SubjectTicketCreated  = "ticket.created"
+	SubjectTicketUpdated  = "ticket.updated"
+	SubjectTicketResolved = "ticket.resolved"
+	SubjectTicketClosed   = "ticket.closed"
+
+	// Staff events
+	SubjectStaffCreated = "staff.created"
+	SubjectStaffUpdated = "staff.updated"
+	SubjectStaffDeleted = "staff.deleted"
+
+	// Coupon events
+	SubjectCouponCreated = "coupon.created"
+	SubjectCouponUpdated = "coupon.updated"
+	SubjectCouponDeleted = "coupon.deleted"
+	SubjectCouponUsed    = "coupon.used"
+
+	// Vendor events
+	SubjectVendorCreated  = "vendor.created"
+	SubjectVendorUpdated  = "vendor.updated"
+	SubjectVendorApproved = "vendor.approved"
+	SubjectVendorRejected = "vendor.rejected"
+
+	// Approval events
+	SubjectApprovalRequested = "approval.requested"
+	SubjectApprovalGranted   = "approval.granted"
+	SubjectApprovalRejected  = "approval.rejected"
 )
 
 // Stream names
@@ -46,6 +86,13 @@ const (
 	StreamCustomerEvents  = "CUSTOMER_EVENTS"
 	StreamReturnEvents    = "RETURN_EVENTS"
 	StreamReviewEvents    = "REVIEW_EVENTS"
+	StreamProductEvents   = "PRODUCT_EVENTS"
+	StreamCategoryEvents  = "CATEGORY_EVENTS"
+	StreamTicketEvents    = "TICKET_EVENTS"
+	StreamStaffEvents     = "STAFF_EVENTS"
+	StreamCouponEvents    = "COUPON_EVENTS"
+	StreamVendorEvents    = "VENDOR_EVENTS"
+	StreamApprovalEvents  = "APPROVAL_EVENTS"
 )
 
 // BaseEvent is the common structure for all events
@@ -119,6 +166,96 @@ type ReviewEvent struct {
 	Rating      int    `json:"rating"`
 }
 
+// ProductEvent represents product-related events
+type ProductEvent struct {
+	BaseEvent
+	ProductID   string `json:"productId"`
+	ProductName string `json:"productName"`
+	SKU         string `json:"sku"`
+	Status      string `json:"status"`
+	Price       float64 `json:"price"`
+	CategoryID  string `json:"categoryId"`
+	ActorID     string `json:"actorId"`
+	ActorName   string `json:"actorName"`
+	ChangeType  string `json:"changeType"` // created, updated, deleted, published, archived
+}
+
+// CategoryEvent represents category-related events
+type CategoryEvent struct {
+	BaseEvent
+	CategoryID   string `json:"categoryId"`
+	CategoryName string `json:"categoryName"`
+	ParentID     string `json:"parentId"`
+	Status       string `json:"status"`
+	ActorID      string `json:"actorId"`
+	ActorName    string `json:"actorName"`
+	ChangeType   string `json:"changeType"`
+}
+
+// TicketEvent represents support ticket events
+type TicketEvent struct {
+	BaseEvent
+	TicketID     string `json:"ticketId"`
+	TicketNumber string `json:"ticketNumber"`
+	Subject      string `json:"subject"`
+	Status       string `json:"status"`
+	Priority     string `json:"priority"`
+	CustomerID   string `json:"customerId"`
+	CustomerName string `json:"customerName"`
+	AssigneeID   string `json:"assigneeId"`
+	AssigneeName string `json:"assigneeName"`
+	ChangeType   string `json:"changeType"`
+}
+
+// StaffEvent represents staff-related events
+type StaffEvent struct {
+	BaseEvent
+	StaffID    string `json:"staffId"`
+	StaffName  string `json:"staffName"`
+	StaffEmail string `json:"staffEmail"`
+	Role       string `json:"role"`
+	Status     string `json:"status"`
+	ActorID    string `json:"actorId"`
+	ActorName  string `json:"actorName"`
+	ChangeType string `json:"changeType"`
+}
+
+// CouponEvent represents coupon-related events
+type CouponEvent struct {
+	BaseEvent
+	CouponID   string  `json:"couponId"`
+	CouponCode string  `json:"couponCode"`
+	Discount   float64 `json:"discount"`
+	UsageCount int     `json:"usageCount"`
+	Status     string  `json:"status"`
+	ActorID    string  `json:"actorId"`
+	ActorName  string  `json:"actorName"`
+	ChangeType string  `json:"changeType"`
+}
+
+// VendorEvent represents vendor-related events
+type VendorEvent struct {
+	BaseEvent
+	VendorID   string `json:"vendorId"`
+	VendorName string `json:"vendorName"`
+	Status     string `json:"status"`
+	ActorID    string `json:"actorId"`
+	ActorName  string `json:"actorName"`
+	ChangeType string `json:"changeType"`
+}
+
+// ApprovalEvent represents approval workflow events
+type ApprovalEvent struct {
+	BaseEvent
+	ApprovalID   string `json:"approvalId"`
+	EntityType   string `json:"entityType"`   // order, refund, vendor, etc.
+	EntityID     string `json:"entityId"`
+	RequestedBy  string `json:"requestedBy"`
+	ApprovedBy   string `json:"approvedBy"`
+	Status       string `json:"status"`
+	Reason       string `json:"reason"`
+}
+
 // EventToNotification converts an event to a notification
 func EventToNotification(event interface{}, targetUserID uuid.UUID) *Notification {
 	switch e := event.(type) {
@@ -134,6 +271,20 @@ func EventToNotification(event interface{}, targetUserID uuid.UUID) *Notificatio
 		return returnEventToNotification(e, targetUserID)
 	case *ReviewEvent:
 		return reviewEventToNotification(e, targetUserID)
+	case *ProductEvent:
+		return productEventToNotification(e, targetUserID)
+	case *CategoryEvent:
+		return categoryEventToNotification(e, targetUserID)
+	case *TicketEvent:
+		return ticketEventToNotification(e, targetUserID)
+	case *StaffEvent:
+		return staffEventToNotification(e, targetUserID)
+	case *CouponEvent:
+		return couponEventToNotification(e, targetUserID)
+	case *VendorEvent:
+		return vendorEventToNotification(e, targetUserID)
+	case *ApprovalEvent:
+		return approvalEventToNotification(e, targetUserID)
 	default:
 		return nil
 	}
@@ -393,6 +544,391 @@ func reviewEventToNotification(e *ReviewEvent, userID uuid.UUID) *Notification {
 		Metadata: JSONB{
 			"productName": e.ProductName,
 			"rating":      e.Rating,
+		},
+	}
+}
+
+func productEventToNotification(e *ProductEvent, userID uuid.UUID) *Notification {
+	var title, message, icon string
+	priority := PriorityNormal
+
+	actorInfo := ""
+	if e.ActorName != "" {
+		actorInfo = " by " + e.ActorName
+	}
+
+	switch e.EventType {
+	case SubjectProductCreated:
+		title = "🆕 Product Created"
+		message = "New product \"" + e.ProductName + "\" has been created" + actorInfo
+		icon = "plus-circle"
+	case SubjectProductUpdated:
+		title = "✏️ Product Updated"
+		message = "Product \"" + e.ProductName + "\" has been updated" + actorInfo
+		icon = "edit"
+	case SubjectProductDeleted:
+		title = "🗑️ Product Deleted"
+		message = "Product \"" + e.ProductName + "\" has been deleted" + actorInfo
+		icon = "trash"
+		priority = PriorityHigh
+	case SubjectProductPublished:
+		title = "🚀 Product Published"
+		message = "Product \"" + e.ProductName + "\" is now live on the storefront" + actorInfo
+		icon = "globe"
+		priority = PriorityHigh
+	case SubjectProductArchived:
+		title = "📦 Product Archived"
+		message = "Product \"" + e.ProductName + "\" has been archived" + actorInfo
+		icon = "archive"
+	default:
+		title = "📦 Product Activity"
+		message = "Product \"" + e.ProductName + "\" was modified" + actorInfo
+		icon = "package"
+	}
+
+	productID, _ := uuid.Parse(e.ProductID)
+	return &Notification{
+		TenantID:      e.TenantID,
+		UserID:        userID,
+		Channel:       "in_app",
+		Type:          e.EventType,
+		Title:         title,
+		Message:       message,
+		Icon:          icon,
+		ActionURL:     "/products/" + e.ProductID,
+		SourceService: "products-service",
+		SourceEventID: e.SourceID,
+		EntityType:    "product",
+		EntityID:      &productID,
+		Priority:      priority,
+		GroupKey:      "product:" + e.ProductID,
+		Metadata: JSONB{
+			"productName": e.ProductName,
+			"sku":         e.SKU,
+			"status":      e.Status,
+			"actorName":   e.ActorName,
+		},
+	}
+}
+
+func categoryEventToNotification(e *CategoryEvent, userID uuid.UUID) *Notification {
+	var title, message, icon string
+
+	actorInfo := ""
+	if e.ActorName != "" {
+		actorInfo = " by " + e.ActorName
+	}
+
+	switch e.EventType {
+	case SubjectCategoryCreated:
+		title = "📁 Category Created"
+		message = "New category \"" + e.CategoryName + "\" has been created" + actorInfo
+		icon = "folder-plus"
+	case SubjectCategoryUpdated:
+		title = "📁 Category Updated"
+		message = "Category \"" + e.CategoryName + "\" has been updated" + actorInfo
+		icon = "folder"
+	case SubjectCategoryDeleted:
+		title = "📁 Category Deleted"
+		message = "Category \"" + e.CategoryName + "\" has been deleted" + actorInfo
+		icon = "folder-minus"
+	default:
+		title = "📁 Category Activity"
+		message = "Category \"" + e.CategoryName + "\" was modified" + actorInfo
+		icon = "folder"
+	}
+
+	categoryID, _ := uuid.Parse(e.CategoryID)
+	return &Notification{
+		TenantID:      e.TenantID,
+		UserID:        userID,
+		Channel:       "in_app",
+		Type:          e.EventType,
+		Title:         title,
+		Message:       message,
+		Icon:          icon,
+		ActionURL:     "/categories/" + e.CategoryID,
+		SourceService: "categories-service",
+		SourceEventID: e.SourceID,
+		EntityType:    "category",
+		EntityID:      &categoryID,
+		Priority:      PriorityNormal,
+		GroupKey:      "category:" + e.CategoryID,
+		Metadata: JSONB{
+			"categoryName": e.CategoryName,
+			"actorName":    e.ActorName,
+		},
+	}
+}
+
+func ticketEventToNotification(e *TicketEvent, userID uuid.UUID) *Notification {
+	var title, message, icon string
+	priority := PriorityNormal
+
+	switch e.EventType {
+	case SubjectTicketCreated:
+		title = "🎫 New Support Ticket"
+		message = "Ticket #" + e.TicketNumber + ": " + e.Subject
+		icon = "ticket"
+		priority = PriorityHigh
+	case SubjectTicketUpdated:
+		title = "🎫 Ticket Updated"
+		message = "Ticket #" + e.TicketNumber + " has been updated"
+		icon = "ticket"
+	case SubjectTicketResolved:
+		title = "✅ Ticket Resolved"
+		message = "Ticket #" + e.TicketNumber + " has been resolved"
+		icon = "check-circle"
+	case SubjectTicketClosed:
+		title = "🔒 Ticket Closed"
+		message = "Ticket #" + e.TicketNumber + " has been closed"
+		icon = "lock"
+	default:
+		title = "🎫 Ticket Activity"
+		message = "Ticket #" + e.TicketNumber + " was updated"
+		icon = "ticket"
+	}
+
+	ticketID, _ := uuid.Parse(e.TicketID)
+	return &Notification{
+		TenantID:      e.TenantID,
+		UserID:        userID,
+		Channel:       "in_app",
+		Type:          e.EventType,
+		Title:         title,
+		Message:       message,
+		Icon:          icon,
+		ActionURL:     "/tickets/" + e.TicketID,
+		SourceService: "tickets-service",
+		SourceEventID: e.SourceID,
+		EntityType:    "ticket",
+		EntityID:      &ticketID,
+		Priority:      priority,
+		GroupKey:      "ticket:" + e.TicketID,
+		Metadata: JSONB{
+			"ticketNumber": e.TicketNumber,
+			"subject":      e.Subject,
+			"status":       e.Status,
+			"priority":     e.Priority,
+		},
+	}
+}
+
+func staffEventToNotification(e *StaffEvent, userID uuid.UUID) *Notification {
+	var title, message, icon string
+
+	actorInfo := ""
+	if e.ActorName != "" {
+		actorInfo = " by " + e.ActorName
+	}
+
+	switch e.EventType {
+	case SubjectStaffCreated:
+		title = "👤 Staff Member Added"
+		message = e.StaffName + " has been added to the team as " + e.Role + actorInfo
+		icon = "user-plus"
+	case SubjectStaffUpdated:
+		title = "👤 Staff Profile Updated"
+		message = e.StaffName + "'s profile has been updated" + actorInfo
+		icon = "user"
+	case SubjectStaffDeleted:
+		title = "👤 Staff Member Removed"
+		message = e.StaffName + " has been removed from the team" + actorInfo
+		icon = "user-minus"
+	default:
+		title = "👤 Staff Activity"
+		message = e.StaffName + "'s account was modified" + actorInfo
+		icon = "user"
+	}
+
+	staffID, _ := uuid.Parse(e.StaffID)
+	return &Notification{
+		TenantID:      e.TenantID,
+		UserID:        userID,
+		Channel:       "in_app",
+		Type:          e.EventType,
+		Title:         title,
+		Message:       message,
+		Icon:          icon,
+		ActionURL:     "/settings/staff/" + e.StaffID,
+		SourceService: "staff-service",
+		SourceEventID: e.SourceID,
+		EntityType:    "staff",
+		EntityID:      &staffID,
+		Priority:      PriorityNormal,
+		GroupKey:      "staff:" + e.StaffID,
+		Metadata: JSONB{
+			"staffName":  e.StaffName,
+			"staffEmail": e.StaffEmail,
+			"role":       e.Role,
+			"actorName":  e.ActorName,
+		},
+	}
+}
+
+func couponEventToNotification(e *CouponEvent, userID uuid.UUID) *Notification {
+	var title, message, icon string
+
+	actorInfo := ""
+	if e.ActorName != "" {
+		actorInfo = " by " + e.ActorName
+	}
+
+	switch e.EventType {
+	case SubjectCouponCreated:
+		title = "🎟️ Coupon Created"
+		message = "Coupon \"" + e.CouponCode + "\" has been created" + actorInfo
+		icon = "tag"
+	case SubjectCouponUpdated:
+		title = "🎟️ Coupon Updated"
+		message = "Coupon \"" + e.CouponCode + "\" has been updated" + actorInfo
+		icon = "tag"
+	case SubjectCouponDeleted:
+		title = "🎟️ Coupon Deleted"
+		message = "Coupon \"" + e.CouponCode + "\" has been deleted" + actorInfo
+		icon = "tag"
+	case SubjectCouponUsed:
+		title = "🎟️ Coupon Redeemed"
+		message = "Coupon \"" + e.CouponCode + "\" was used (Total uses: " + formatInt(e.UsageCount) + ")"
+		icon = "check"
+	default:
+		title = "🎟️ Coupon Activity"
+		message = "Coupon \"" + e.CouponCode + "\" was modified" + actorInfo
+		icon = "tag"
+	}
+
+	couponID, _ := uuid.Parse(e.CouponID)
+	return &Notification{
+		TenantID:      e.TenantID,
+		UserID:        userID,
+		Channel:       "in_app",
+		Type:          e.EventType,
+		Title:         title,
+		Message:       message,
+		Icon:          icon,
+		ActionURL:     "/marketing/coupons/" + e.CouponID,
+		SourceService: "coupons-service",
+		SourceEventID: e.SourceID,
+		EntityType:    "coupon",
+		EntityID:      &couponID,
+		Priority:      PriorityNormal,
+		GroupKey:      "coupon:" + e.CouponID,
+		Metadata: JSONB{
+			"couponCode": e.CouponCode,
+			"discount":   e.Discount,
+			"usageCount": e.UsageCount,
+			"actorName":  e.ActorName,
+		},
+	}
+}
+
+func vendorEventToNotification(e *VendorEvent, userID uuid.UUID) *Notification {
+	var title, message, icon string
+	priority := PriorityNormal
+
+	actorInfo := ""
+	if e.ActorName != "" {
+		actorInfo = " by " + e.ActorName
+	}
+
+	switch e.EventType {
+	case SubjectVendorCreated:
+		title = "🏪 Vendor Application"
+		message = "New vendor application from \"" + e.VendorName + "\""
+		icon = "store"
+		priority = PriorityHigh
+	case SubjectVendorUpdated:
+		title = "🏪 Vendor Updated"
+		message = "Vendor \"" + e.VendorName + "\" has been updated" + actorInfo
+		icon = "store"
+	case SubjectVendorApproved:
+		title = "✅ Vendor Approved"
+		message = "Vendor \"" + e.VendorName + "\" has been approved" + actorInfo
+		icon = "check-circle"
+		priority = PriorityHigh
+	case SubjectVendorRejected:
+		title = "❌ Vendor Rejected"
+		message = "Vendor \"" + e.VendorName + "\" application was rejected" + actorInfo
+		icon = "x-circle"
+		priority = PriorityHigh
+	default:
+		title = "🏪 Vendor Activity"
+		message = "Vendor \"" + e.VendorName + "\" was modified" + actorInfo
+		icon = "store"
+	}
+
+	vendorID, _ := uuid.Parse(e.VendorID)
+	return &Notification{
+		TenantID:      e.TenantID,
+		UserID:        userID,
+		Channel:       "in_app",
+		Type:          e.EventType,
+		Title:         title,
+		Message:       message,
+		Icon:          icon,
+		ActionURL:     "/vendors/" + e.VendorID,
+		SourceService: "vendor-service",
+		SourceEventID: e.SourceID,
+		EntityType:    "vendor",
+		EntityID:      &vendorID,
+		Priority:      priority,
+		GroupKey:      "vendor:" + e.VendorID,
+		Metadata: JSONB{
+			"vendorName": e.VendorName,
+			"status":     e.Status,
+			"actorName":  e.ActorName,
+		},
+	}
+}
+
+func approvalEventToNotification(e *ApprovalEvent, userID uuid.UUID) *Notification {
+	var title, message, icon string
+	priority := PriorityNormal
+
+	switch e.EventType {
+	case SubjectApprovalRequested:
+		title = "📋 Approval Requested"
+		message = "New " + e.EntityType + " approval request needs your review"
+		icon = "clipboard"
+		priority = PriorityHigh
+	case SubjectApprovalGranted:
+		title = "✅ Approval Granted"
+		message = "The " + e.EntityType + " has been approved"
+		icon = "check-circle"
+	case SubjectApprovalRejected:
+		title = "❌ Approval Rejected"
+		message = "The " + e.EntityType + " has been rejected"
+		if e.Reason != "" {
+			message += ". Reason: " + e.Reason
+		}
+		icon = "x-circle"
+	default:
+		title = "📋 Approval Activity"
+		message = "Approval status updated for " + e.EntityType
+		icon = "clipboard"
+	}
+
+	approvalID, _ := uuid.Parse(e.ApprovalID)
+	return &Notification{
+		TenantID:      e.TenantID,
+		UserID:        userID,
+		Channel:       "in_app",
+		Type:          e.EventType,
+		Title:         title,
+		Message:       message,
+		Icon:          icon,
+		ActionURL:     "/approvals/" + e.ApprovalID,
+		SourceService: "approval-service",
+		SourceEventID: e.SourceID,
+		EntityType:    "approval",
+		EntityID:      &approvalID,
+		Priority:      priority,
+		GroupKey:      "approval:" + e.ApprovalID,
+		Metadata: JSONB{
+			"entityType":  e.EntityType,
+			"entityId":    e.EntityID,
+			"requestedBy": e.RequestedBy,
+			"status":      e.Status,
 		},
 	}
 }
