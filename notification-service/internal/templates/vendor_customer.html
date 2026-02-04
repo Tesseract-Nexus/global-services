@@ -1,9 +1,12 @@
 {{define "header"}}
-<!-- Header -->
+<!-- Header with optional logo -->
 <tr>
     <td style="text-align: center; padding-bottom: 24px;">
+        {{if .BrandLogoURL}}
+        <img src="{{.BrandLogoURL}}" alt="{{.BusinessName}}" height="48" style="height: 48px; max-width: 200px; display: block; margin: 0 auto;">
+        {{end}}
         {{if .BusinessName}}
-        <p style="margin: 0; font-size: 18px; font-weight: 600; color: #0F172A; letter-spacing: -0.3px;">{{.BusinessName}}</p>
+        <p style="margin: {{if .BrandLogoURL}}12px{{else}}0{{end}} 0 0 0; font-size: 18px; font-weight: 600; color: #0F172A; letter-spacing: -0.3px;">{{.BusinessName}}</p>
         {{end}}
     </td>
 </tr>

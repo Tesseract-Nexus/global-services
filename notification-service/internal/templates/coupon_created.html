@@ -1,18 +1,12 @@
 {{define "header"}}
-<!-- Header -->
+<!-- Header with optional logo -->
 <tr>
     <td style="text-align: center; padding-bottom: 24px;">
-        {{if .BusinessName}}
-        <p style="margin: 0; font-size: 18px; font-weight: 600; color: #0F172A; letter-spacing: -0.3px;">{{.BusinessName}}</p>
+        {{if .BrandLogoURL}}
+        <img src="{{.BrandLogoURL}}" alt="{{.BusinessName}}" height="48" style="height: 48px; max-width: 200px; display: block; margin: 0 auto;">
         {{end}}
-    </td>
-</tr>
-{{end}}</span>
-                </td>
-            </tr>
-        </table>
         {{if .BusinessName}}
-        <p style="margin: 12px 0 0 0; font-size: 18px; font-weight: 600; color: #0F172A; letter-spacing: -0.3px;">{{.BusinessName}}</p>
+        <p style="margin: {{if .BrandLogoURL}}12px{{else}}0{{end}} 0 0 0; font-size: 18px; font-weight: 600; color: #0F172A; letter-spacing: -0.3px;">{{.BusinessName}}</p>
         {{end}}
     </td>
 </tr>
@@ -26,7 +20,7 @@
 
             <!-- Promo Header -->
             <tr>
-                <td style="background-color: #7c3aed; padding: 32px 40px; text-align: center;" class="mobile-padding">
+                <td style="background-color: {{if .BrandPrimaryColor}}{{.BrandPrimaryColor}}{{else}}#0F172A{{end}}; padding: 32px 40px; text-align: center;" class="mobile-padding">
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
                         <tr>
                             <td style="width: 64px; height: 64px; background-color: rgba(255,255,255,0.2); border-radius: 50%; text-align: center; vertical-align: middle;">
@@ -34,10 +28,10 @@
                             </td>
                         </tr>
                     </table>
-                    <h1 style="margin: 16px 0 0 0; font-size: 24px; font-weight: 700; color: #ffffff; line-height: 1.3;">
+                    <h1 style="margin: 16px 0 0 0; font-size: 24px; font-weight: 700; color: {{if .BrandTextColor}}{{.BrandTextColor}}{{else}}#ffffff{{end}}; line-height: 1.3;">
                         Special Offer Just for You!
                     </h1>
-                    <p style="margin: 8px 0 0 0; font-size: 14px; color: #ffffff;">
+                    <p style="margin: 8px 0 0 0; font-size: 14px; color: {{if .BrandTextColor}}{{.BrandTextColor}}{{else}}#ffffff{{end}};">
                         Use this exclusive coupon code
                     </p>
                 </td>
@@ -46,11 +40,11 @@
             <!-- Coupon Code Display -->
             <tr>
                 <td style="padding: 32px 40px 0 40px;" class="mobile-padding">
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #faf5ff; border-radius: 8px; border: 2px dashed #c084fc;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #F8FAFC; border-radius: 8px; border: 2px dashed #CBD5E1;">
                         <tr>
                             <td style="padding: 24px; text-align: center;">
-                                <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 600; color: #7c3aed; text-transform: uppercase; letter-spacing: 1px;">Your Coupon Code</p>
-                                <p style="margin: 0; font-size: 32px; font-weight: 800; color: #7c3aed; letter-spacing: 3px;">{{.CouponCode}}</p>
+                                <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 1px;">Your Coupon Code</p>
+                                <p style="margin: 0; font-size: 32px; font-weight: 800; color: #0F172A; letter-spacing: 3px;">{{.CouponCode}}</p>
                             </td>
                         </tr>
                     </table>
@@ -154,8 +148,8 @@
                 <td style="padding: 24px 40px 32px 40px; text-align: center;" class="mobile-padding">
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
                         <tr>
-                            <td style="background-color: #7c3aed; border-radius: 10px;">
-                                <a href="{{.ShopURL}}" style="display: inline-block; padding: 14px 32px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
+                            <td style="background-color: {{if .BrandPrimaryColor}}{{.BrandPrimaryColor}}{{else}}#0F172A{{end}}; border-radius: 10px;">
+                                <a href="{{.ShopURL}}" aria-label="Shop at {{.BusinessName}}" style="display: inline-block; padding: 14px 32px; font-size: 14px; font-weight: 600; color: {{if .BrandTextColor}}{{.BrandTextColor}}{{else}}#ffffff{{end}}; text-decoration: none;">
                                     Shop Now &#8594;
                                 </a>
                             </td>

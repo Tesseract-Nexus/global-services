@@ -197,10 +197,10 @@ func (r *Renderer) RenderTenantWelcomePack(data *EmailData) (string, string, err
 	}
 
 	if data.BusinessName != "" {
-		data.Subject = fmt.Sprintf("Welcome to Tesseract Hub - %s is Ready!", data.BusinessName)
+		data.Subject = fmt.Sprintf("Welcome to Tesserix - %s is Ready!", data.BusinessName)
 		data.Preheader = fmt.Sprintf("Your store %s is now live! Access your admin panel and start selling.", data.BusinessName)
 	} else {
-		data.Subject = "Welcome to Tesseract Hub - Your Store is Ready!"
+		data.Subject = "Welcome to Tesserix - Your Store is Ready!"
 		data.Preheader = "Your store is now live! Access your admin panel and start selling."
 	}
 
