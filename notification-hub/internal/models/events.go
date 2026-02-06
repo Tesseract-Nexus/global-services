@@ -76,6 +76,12 @@ const (
 	SubjectApprovalRequested = "approval.requested"
 	SubjectApprovalGranted   = "approval.granted"
 	SubjectApprovalRejected  = "approval.rejected"
+
+	// Gift card events
+	SubjectGiftCardCreated   = "gift_card.created"
+	SubjectGiftCardActivated = "gift_card.activated"
+	SubjectGiftCardApplied   = "gift_card.applied"
+	SubjectGiftCardRefunded  = "gift_card.refunded"
 )
 
 // Stream names
@@ -93,6 +99,7 @@ const (
 	StreamCouponEvents    = "COUPON_EVENTS"
 	StreamVendorEvents    = "VENDOR_EVENTS"
 	StreamApprovalEvents  = "APPROVAL_EVENTS"
+	StreamGiftCardEvents  = "GIFT_CARD_EVENTS"
 )
 
 // BaseEvent is the common structure for all events
@@ -256,6 +263,20 @@ type ApprovalEvent struct {
 	Reason       string `json:"reason"`
 }
 
+// GiftCardEvent represents gift card-related events
+type GiftCardEvent struct {
+	BaseEvent
+	GiftCardID     string  `json:"giftCardId"`
+	GiftCardCode   string  `json:"giftCardCode"`
+	RecipientEmail string  `json:"recipientEmail"`
+	RecipientName  string  `json:"recipientName"`
+	PurchaserName  string  `json:"purchaserName"`
+	InitialBalance float64 `json:"initialBalance"`
+	CurrentBalance float64 `json:"currentBalance"`
+	Currency       string  `json:"currency"`
+	Status         string  `json:"status"`
+}
+
 // EventToNotification converts an event to a notification
 func EventToNotification(event interface{}, targetUserID uuid.UUID) *Notification {
 	switch e := event.(type) {
@@ -285,6 +306,8 @@ func EventToNotification(event interface{}, targetUserID uuid.UUID) *Notificatio
 		return vendorEventToNotification(e, targetUserID)
 	case *ApprovalEvent:
 		return approvalEventToNotification(e, targetUserID)
+	case *GiftCardEvent:
+		return giftCardEventToNotification(e, targetUserID)
 	default:
 		return nil
 	}
@@ -929,6 +952,65 @@ func approvalEventToNotification(e *ApprovalEvent, userID uuid.UUID) *Notificati
 			"entityId":    e.EntityID,
 			"requestedBy": e.RequestedBy,
 			"status":      e.Status,
+		},
+	}
+}
+
+func giftCardEventToNotification(e *GiftCardEvent, userID uuid.UUID) *Notification {
+	var title, message, icon string
+	priority := PriorityNormal
+	formattedAmount := formatCurrency(e.Currency, e.InitialBalance)
+
+	switch e.EventType {
+	case SubjectGiftCardCreated:
+		title = "🎁 Gift Card Created"
+		message = "Gift card worth " + formattedAmount + " has been created"
+		if e.RecipientEmail != "" {
+			message += " for " + e.RecipientEmail
+		}
+		icon = "gift"
+	case SubjectGiftCardActivated:
+		title = "🎉 Gift Card Activated"
+		message = "Gift card " + e.GiftCardCode + " (" + formattedAmount + ") is now active"
+		icon = "check-circle"
+	case SubjectGiftCardApplied:
+		title = "💳 Gift Card Applied"
+		message = "Gift card " + e.GiftCardCode + " was applied to an order"
+		icon = "credit-card"
+	case SubjectGiftCardRefunded:
+		title = "💸 Gift Card Refunded"
+		message = "Gift card " + e.GiftCardCode + " has been refunded"
+		icon = "rotate-ccw"
+		priority = PriorityHigh
+	default:
+		title = "🎁 Gift Card Activity"
+		message = "Gift card " + e.GiftCardCode + " was updated"
+		icon = "gift"
+	}
+
+	giftCardID, _ := uuid.Parse(e.GiftCardID)
+	return &Notification{
+		TenantID:      e.TenantID,
+		UserID:        userID,
+		Channel:       "in_app",
+		Type:          e.EventType,
+		Title:         title,
+		Message:       message,
+		Icon:          icon,
+		ActionURL:     "/gift-cards/" + e.GiftCardID,
+		SourceService: "gift-cards-service",
+		SourceEventID: e.SourceID,
+		EntityType:    "gift_card",
+		EntityID:      &giftCardID,
+		Priority:      priority,
+		GroupKey:      "gift_card:" + e.GiftCardID,
+		Metadata: JSONB{
+			"giftCardCode":   e.GiftCardCode,
+			"initialBalance": e.InitialBalance,
+			"currentBalance": e.CurrentBalance,
+			"currency":       e.Currency,
+			"status":         e.Status,
+			"recipientEmail": e.RecipientEmail,
 		},
 	}
 }

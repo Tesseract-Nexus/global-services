@@ -288,3 +288,32 @@ func (r *Renderer) RenderLoginNotification(data *EmailData) (string, string, err
 
 	return data.Subject, body, nil
 }
+
+// RenderGiftCardRecipient renders the gift card recipient notification email.
+// Returns subject, body, and error.
+func (r *Renderer) RenderGiftCardRecipient(data *EmailData) (string, string, error) {
+	if r == nil {
+		return "", "", ErrNilRenderer
+	}
+	if data == nil {
+		return "", "", errors.New("email data is nil")
+	}
+
+	if data.SenderName != "" {
+		data.Subject = fmt.Sprintf("You've received a gift card from %s!", data.SenderName)
+		data.Preheader = fmt.Sprintf("%s sent you a gift card worth %s%s.", data.SenderName, data.Currency, data.GiftCardBalance)
+	} else if data.BusinessName != "" {
+		data.Subject = fmt.Sprintf("You've received a gift card from %s!", data.BusinessName)
+		data.Preheader = fmt.Sprintf("You have a gift card worth %s%s to spend.", data.Currency, data.GiftCardBalance)
+	} else {
+		data.Subject = "You've received a gift card!"
+		data.Preheader = fmt.Sprintf("You have a gift card worth %s%s to spend.", data.Currency, data.GiftCardBalance)
+	}
+
+	body, err := r.Render("gift_card_recipient", data)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to render gift_card_recipient: %w", err)
+	}
+
+	return data.Subject, body, nil
+}

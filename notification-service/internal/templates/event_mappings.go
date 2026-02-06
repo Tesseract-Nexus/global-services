@@ -70,6 +70,10 @@ var eventToTemplateMap = map[string]string{
 	"approval.rejected":  "approval_requester",
 	"approval.cancelled": "approval_requester",
 	"approval.expired":   "approval_requester",
+
+	// Gift card events
+	"gift_card.created":   "gift_card_recipient",
+	"gift_card.activated": "gift_card_recipient",
 }
 
 // adminTemplateMap maps NATS event types to admin-facing template names.

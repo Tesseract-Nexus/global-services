@@ -73,6 +73,12 @@ var eventCategoryMap = map[string]string{
 	events.DomainRemoved:         "security",
 	events.DomainMigrated:        "security",
 	events.DomainSSLExpiringSoon: "security",
+
+	// Gift card events (marketing)
+	events.GiftCardCreated:   "marketing",
+	events.GiftCardActivated: "marketing",
+	events.GiftCardApplied:   "orders",
+	events.GiftCardRefunded:  "orders",
 }
 
 // Subscriber handles NATS event subscriptions for sending external notifications
@@ -184,6 +190,7 @@ func (s *Subscriber) Start(ctx context.Context) error {
 		{"TENANT_EVENTS", "tenant.>", "Tenant lifecycle events"},
 		{"APPROVAL_EVENTS", "approval.>", "Approval workflow events"},
 		{"DOMAIN_EVENTS", "domain.>", "Domain lifecycle events"},
+		{"GIFT_CARD_EVENTS", "gift_card.>", "Gift card lifecycle events"},
 	}
 
 	for _, stream := range streams {
@@ -420,6 +427,25 @@ func (s *Subscriber) Start(ctx context.Context) error {
 	} else {
 		s.subs = append(s.subs, domainSub)
 		log.Println("[NATS] Subscribed to domain.> events")
+	}
+
+	// Subscribe to gift card events (recipient notifications)
+	giftCardSub, err := js.QueueSubscribe(
+		"gift_card.>",
+		"notification-service-workers",
+		s.handleGiftCardEvent,
+		nats.BindStream("GIFT_CARD_EVENTS"),
+		nats.Durable("notification-service-giftcards"),
+		nats.DeliverNew(),
+		nats.ManualAck(),
+		nats.AckWait(30*time.Second),
+		nats.MaxDeliver(3),
+	)
+	if err != nil {
+		log.Printf("[NATS] Warning: failed to subscribe to gift card events: %v", err)
+	} else {
+		s.subs = append(s.subs, giftCardSub)
+		log.Println("[NATS] Subscribed to gift_card.> events")
 	}
 
 	log.Printf("[NATS] Subscriber started with %d subscriptions", len(s.subs))
@@ -1387,6 +1413,61 @@ func (s *Subscriber) handleDomainEvent(msg *nats.Msg) {
 	log.Printf("[NATS] Processed domain event: %s for domain %s", event.EventType, event.Domain)
 }
 
+// handleGiftCardEvent processes gift card events (send gift card details to recipients via email)
+func (s *Subscriber) handleGiftCardEvent(msg *nats.Msg) {
+	var event events.GiftCardEvent
+	if err := json.Unmarshal(msg.Data, &event); err != nil {
+		log.Printf("[NATS] Failed to unmarshal gift card event: %v", err)
+		msg.Ack()
+		return
+	}
+
+	log.Printf("[NATS] Processing gift card event: %s for gift card %s", event.EventType, event.GiftCardID)
+
+	ctx := context.Background()
+
+	variables := map[string]interface{}{
+		"giftCardId":     event.GiftCardID,
+		"giftCardCode":   event.GiftCardCode,
+		"purchaserEmail": event.PurchaserEmail,
+		"purchaserName":  event.PurchaserName,
+		"recipientEmail": event.RecipientEmail,
+		"recipientName":  event.RecipientName,
+		"initialBalance": event.InitialBalance,
+		"currentBalance": event.CurrentBalance,
+		"currency":       event.Currency,
+		"status":         event.Status,
+		"message":        event.Message,
+		"expiresAt":      event.ExpiresAt,
+	}
+
+	switch event.EventType {
+	case events.GiftCardCreated:
+		// Send gift card details to recipient if email is provided
+		if event.RecipientEmail != "" {
+			log.Printf("[EMAIL] Sending gift-card-recipient to %s", event.RecipientEmail)
+			s.sendTemplatedEmail(ctx, event.TenantID, "gift-card-recipient", event.RecipientEmail, variables)
+		}
+		// Also notify purchaser if different from recipient
+		if event.PurchaserEmail != "" && event.PurchaserEmail != event.RecipientEmail {
+			log.Printf("[EMAIL] Sending gift-card-purchaser to %s", event.PurchaserEmail)
+			s.sendTemplatedEmail(ctx, event.TenantID, "gift-card-purchaser", event.PurchaserEmail, variables)
+		}
+
+	case events.GiftCardActivated:
+		if event.RecipientEmail != "" {
+			log.Printf("[EMAIL] Sending gift-card-activated to %s", event.RecipientEmail)
+			s.sendTemplatedEmail(ctx, event.TenantID, "gift-card-activated", event.RecipientEmail, variables)
+		}
+
+	default:
+		log.Printf("[NATS] Skipping unhandled gift card event type: %s", event.EventType)
+	}
+
+	msg.Ack()
+	log.Printf("[NATS] Processed gift card event: %s for gift card %s", event.EventType, event.GiftCardID)
+}
+
 // formatActionTypeForDisplay converts action_type to human-readable format
 func formatActionTypeForDisplay(actionType string) string {
 	if actionType == "" {
@@ -1883,6 +1964,9 @@ func (s *Subscriber) renderEmbeddedTemplate(templateName string, variables map[s
 		return renderer.RenderDomainSSLExpiring(data)
 	case "domain_health_failed":
 		return renderer.RenderDomainHealthFailed(data)
+	// Gift card templates
+	case "gift_card_recipient":
+		return renderer.RenderGiftCardRecipient(data)
 	default:
 		return "", "", fmt.Errorf("no embedded template found for: %s", templateName)
 	}
@@ -1949,6 +2033,10 @@ func (s *Subscriber) mapTemplateNameToEmbedded(templateName string) string {
 		"domain-migrated":     "domain_migrated",
 		"domain-ssl-expiring": "domain_ssl_expiring",
 		"domain-health-failed": "domain_health_failed",
+		// Gift card templates
+		"gift-card-recipient":  "gift_card_recipient",
+		"gift-card-purchaser":  "gift_card_recipient",
+		"gift-card-activated":  "gift_card_recipient",
 	}
 
 	if mapped, ok := mapping[templateName]; ok {
@@ -2316,6 +2404,14 @@ func (s *Subscriber) buildEmailData(variables map[string]interface{}) *templates
 	data.DomainSettingsURL = getString("domainSettingsUrl")
 	data.OwnerEmail = getString("ownerEmail")
 	data.OwnerName = getString("ownerName")
+
+	// Gift card fields
+	data.GiftCardCode = getString("giftCardCode")
+	data.GiftCardBalance = getFloat("initialBalance")
+	data.SenderName = getString("purchaserName")
+	data.RecipientName = getString("recipientName")
+	data.GiftMessage = getString("message")
+	data.GiftCardExpiry = getString("expiresAt")
 
 	// Storefront branding fields - for tenant-branded customer emails
 	data.BrandPrimaryColor = getString("brandPrimaryColor")

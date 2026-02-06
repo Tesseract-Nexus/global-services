@@ -1,0 +1,191 @@
+{{define "header"}}
+<!-- Header -->
+<tr>
+    <td style="text-align: center; padding-bottom: 24px;">
+        {{if .BusinessName}}
+        <p style="margin: 0; font-size: 18px; font-weight: 600; color: #0F172A; letter-spacing: -0.3px;">{{.BusinessName}}</p>
+        {{end}}
+    </td>
+</tr>
+{{end}}
+
+{{define "content"}}
+<!-- Main Card -->
+<tr>
+    <td>
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ffffff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1); overflow: hidden;">
+
+            <!-- Gift Card Header -->
+            <tr>
+                <td style="background: linear-gradient(135deg, #059669, #10b981); padding: 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="width: 64px; height: 64px; background-color: rgba(255,255,255,0.2); border-radius: 50%; text-align: center; vertical-align: middle;">
+                                <span style="font-size: 32px;">&#127873;</span>
+                            </td>
+                        </tr>
+                    </table>
+                    <h1 style="margin: 16px 0 0 0; font-size: 24px; font-weight: 700; color: #ffffff; line-height: 1.3;">
+                        You've Received a Gift Card!
+                    </h1>
+                    {{if .SenderName}}
+                    <p style="margin: 8px 0 0 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                        From {{.SenderName}}
+                    </p>
+                    {{end}}
+                </td>
+            </tr>
+
+            {{if .GiftMessage}}
+            <!-- Personal Message -->
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f0fdf4; border-radius: 8px; border-left: 4px solid #10b981;">
+                        <tr>
+                            <td style="padding: 20px;">
+                                <p style="margin: 0 0 4px 0; font-size: 12px; font-weight: 600; color: #059669; text-transform: uppercase; letter-spacing: 1px;">Personal Message</p>
+                                <p style="margin: 0; font-size: 15px; color: #334155; font-style: italic; line-height: 1.5;">"{{.GiftMessage}}"</p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+            {{end}}
+
+            <!-- Gift Card Code Display -->
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ecfdf5; border-radius: 8px; border: 2px dashed #6ee7b7;">
+                        <tr>
+                            <td style="padding: 24px; text-align: center;">
+                                <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 600; color: #059669; text-transform: uppercase; letter-spacing: 1px;">Your Gift Card Code</p>
+                                <p style="margin: 0; font-size: 28px; font-weight: 800; color: #059669; letter-spacing: 3px;">{{.GiftCardCode}}</p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- Balance -->
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #F8FAFC; border-radius: 8px;">
+                        <tr>
+                            <td style="padding: 20px; text-align: center;">
+                                <p style="margin: 0; font-size: 14px; color: #64748B;">Gift Card Balance</p>
+                                <p style="margin: 8px 0 0 0; font-size: 36px; font-weight: 800; color: #0F172A;">
+                                    {{.Currency}}{{.GiftCardBalance}}
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            {{if .GiftCardExpiry}}
+            <!-- Expiry Notice -->
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #fef3c7; border-radius: 8px; border: 1px solid #fde68a;">
+                        <tr>
+                            <td style="padding: 16px 20px;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 24px; vertical-align: middle;">
+                                            <span style="font-size: 16px;">&#9200;</span>
+                                        </td>
+                                        <td style="padding-left: 12px;">
+                                            <p style="margin: 0; font-size: 14px; font-weight: 600; color: #92400e;">Valid until {{.GiftCardExpiry}}</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+            {{end}}
+
+            <!-- How to Use -->
+            <tr>
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <p style="margin: 0 0 12px 0; font-size: 14px; font-weight: 600; color: #0F172A;">How to redeem:</p>
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                        <tr>
+                            <td style="padding: 8px 0;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 24px; height: 24px; background-color: #ecfdf5; border-radius: 50%; text-align: center; vertical-align: middle;">
+                                            <span style="color: #059669; font-size: 12px; font-weight: 700;">1</span>
+                                        </td>
+                                        <td style="padding-left: 12px;">
+                                            <p style="margin: 0; font-size: 14px; color: #334155;">Add items to your cart</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 24px; height: 24px; background-color: #ecfdf5; border-radius: 50%; text-align: center; vertical-align: middle;">
+                                            <span style="color: #059669; font-size: 12px; font-weight: 700;">2</span>
+                                        </td>
+                                        <td style="padding-left: 12px;">
+                                            <p style="margin: 0; font-size: 14px; color: #334155;">Enter the gift card code at checkout</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="width: 24px; height: 24px; background-color: #ecfdf5; border-radius: 50%; text-align: center; vertical-align: middle;">
+                                            <span style="color: #059669; font-size: 12px; font-weight: 700;">3</span>
+                                        </td>
+                                        <td style="padding-left: 12px;">
+                                            <p style="margin: 0; font-size: 14px; color: #334155;">The balance will be applied to your order</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- CTA Button -->
+            <tr>
+                <td style="padding: 24px 40px 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="background-color: #059669; border-radius: 10px;">
+                                <a href="{{.ShopURL}}" style="display: inline-block; padding: 14px 32px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
+                                    Start Shopping &#8594;
+                                </a>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </td>
+</tr>
+{{end}}
+
+{{define "footer"}}
+<!-- Footer -->
+<tr>
+    <td style="padding: 32px 20px; text-align: center;">
+        <p style="margin: 0 0 8px 0; font-size: 14px; color: #64748B;">
+            Questions? Contact us at <a href="mailto:{{.SupportEmail}}" style="color: #0F172A; text-decoration: none; font-weight: 500;">{{.SupportEmail}}</a>
+        </p>
+        <p style="margin: 0; font-size: 12px; color: #64748B;">
+            &copy; {{.Year}} {{.BusinessName}}. All rights reserved.
+        </p>
+    </td>
+</tr>
+{{end}}

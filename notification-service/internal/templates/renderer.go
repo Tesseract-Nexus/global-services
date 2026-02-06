@@ -249,6 +249,14 @@ type EmailData struct {
 	OwnerEmail           string // Domain owner's email
 	OwnerName            string // Domain owner's name
 
+	// Gift card fields
+	GiftCardCode    string
+	GiftCardBalance string
+	SenderName      string
+	RecipientName   string
+	GiftMessage     string
+	GiftCardExpiry  string
+
 	// Storefront branding fields - for tenant-branded customer emails
 	// These colors come from the tenant's storefront settings
 	// If not provided, templates fall back to default slate palette
@@ -310,6 +318,8 @@ func NewRenderer() (*Renderer, error) {
 		"staff_invitation",
 		// Domain lifecycle templates
 		"domain_customer",
+		// Gift card templates
+		"gift_card_recipient",
 	}
 
 	for _, name := range templateNames {

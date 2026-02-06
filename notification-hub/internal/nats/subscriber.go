@@ -318,6 +318,26 @@ func (s *Subscriber) Start(ctx context.Context) error {
 		log.Println("Subscribed to approval.> events")
 	}
 
+	// Subscribe to gift card events
+	giftCardSub, err := js.QueueSubscribe(
+		"gift_card.>",
+		"notification-hub-workers",
+		s.handleGiftCardEvent,
+		nats.BindStream("GIFT_CARD_EVENTS"),
+		nats.Durable("notification-hub-gift-cards"),
+		nats.DeliverAll(),
+		nats.ManualAck(),
+		nats.AckWait(30*time.Second),
+		nats.MaxDeliver(3),
+		nats.InactiveThreshold(24*time.Hour),
+	)
+	if err != nil {
+		log.Printf("Warning: failed to subscribe to gift card events: %v", err)
+	} else {
+		s.subs = append(s.subs, giftCardSub)
+		log.Println("Subscribed to gift_card.> events")
+	}
+
 	log.Printf("NATS subscriber started with %d subscriptions", len(s.subs))
 	return nil
 }
@@ -762,6 +782,25 @@ func (s *Subscriber) handleApprovalEvent(msg *nats.Msg) {
 	s.broadcastNotification(&event, event.TenantID)
 	msg.Ack()
 	log.Printf("Processed approval event: %s for %s", event.EventType, event.EntityType)
+}
+
+func (s *Subscriber) handleGiftCardEvent(msg *nats.Msg) {
+	var event models.GiftCardEvent
+	if err := json.Unmarshal(msg.Data, &event); err != nil {
+		log.Printf("Failed to unmarshal gift card event: %v", err)
+		msg.Ack()
+		return
+	}
+
+	exists, _ := s.notifRepo.ExistsBySourceEventID(context.Background(), event.SourceID)
+	if exists {
+		msg.Ack()
+		return
+	}
+
+	s.broadcastNotification(&event, event.TenantID)
+	msg.Ack()
+	log.Printf("Processed gift card event: %s for gift card %s", event.EventType, event.GiftCardCode)
 }
 
 // broadcastNotification is a helper that creates and broadcasts notifications to all connected users

@@ -233,6 +233,16 @@ func (c *Client) ensureStreams() error {
 			MaxMsgs:     100000,
 			Discard:     nats.DiscardOld,
 		},
+		{
+			Name:        "GIFT_CARD_EVENTS",
+			Description: "Gift card lifecycle events",
+			Subjects:    []string{"gift_card.>"},
+			Storage:     nats.FileStorage,
+			Retention:   nats.LimitsPolicy,
+			MaxAge:      24 * time.Hour * 7,
+			MaxMsgs:     100000,
+			Discard:     nats.DiscardOld,
+		},
 	}
 
 	for _, streamCfg := range streams {

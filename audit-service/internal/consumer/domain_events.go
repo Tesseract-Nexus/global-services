@@ -762,6 +762,37 @@ func (c *DomainEventConsumer) generateDescription(eventType string, data map[str
 	case "approval.escalated":
 		resourceType, _ := data["resourceType"].(string)
 		return fmt.Sprintf("%s approval escalated to higher authority", resourceType)
+	// Gift card events
+	case "gift_card.created":
+		if code, ok := data["giftCardCode"].(string); ok {
+			if recipientEmail, ok := data["recipientEmail"].(string); ok && recipientEmail != "" {
+				return fmt.Sprintf("Gift card %s was created for %s", code, recipientEmail)
+			}
+			return fmt.Sprintf("Gift card %s was created", code)
+		}
+		return "Gift card was created"
+	case "gift_card.activated":
+		if code, ok := data["giftCardCode"].(string); ok {
+			return fmt.Sprintf("Gift card %s was activated", code)
+		}
+		return "Gift card was activated"
+	case "gift_card.applied":
+		if code, ok := data["giftCardCode"].(string); ok {
+			if orderNum, ok := data["orderNumber"].(string); ok && orderNum != "" {
+				return fmt.Sprintf("Gift card %s was applied to order %s", code, orderNum)
+			}
+			return fmt.Sprintf("Gift card %s was applied to an order", code)
+		}
+		return "Gift card was applied"
+	case "gift_card.refunded":
+		if code, ok := data["giftCardCode"].(string); ok {
+			if amount, ok := data["refundAmount"].(float64); ok {
+				currency, _ := data["currency"].(string)
+				return fmt.Sprintf("Gift card %s refunded %.2f %s", code, amount, currency)
+			}
+			return fmt.Sprintf("Gift card %s was refunded", code)
+		}
+		return "Gift card was refunded"
 	// Settings events
 	case "settings.updated":
 		return "Settings were updated"
