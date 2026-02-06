@@ -16,45 +16,41 @@
 <!-- Main Card -->
 <tr>
     <td>
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ffffff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1);">
-            <!-- Icon Header -->
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ffffff; border-radius: 10px; border: 1px solid #E2E8F0; box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1); overflow: hidden;">
+
+            <!-- Header Banner -->
             <tr>
-                <td style="padding: 48px 40px 0 40px; text-align: center;" class="mobile-padding">
+                <td style="background-color: #0F172A; padding: 40px 40px; text-align: center;" class="mobile-padding">
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
                         <tr>
-                            <td style="width: 80px; height: 80px; background-color: #D1FAE5; border-radius: 50%; text-align: center; vertical-align: middle;">
-                                <span style="font-size: 40px;">&#128274;</span>
+                            <td style="width: 64px; height: 64px; background-color: rgba(255,255,255,0.15); border-radius: 50%; text-align: center; vertical-align: middle;">
+                                <span style="font-size: 32px;">&#128274;</span>
                             </td>
                         </tr>
                     </table>
-                </td>
-            </tr>
-
-            <!-- Title -->
-            <tr>
-                <td style="padding: 28px 40px 0 40px; text-align: center;" class="mobile-padding">
-                    <h1 style="margin: 0; font-size: 26px; font-weight: 700; color: #0F172A; line-height: 1.3;">
-                        New Sign-in to Your Account
+                    <h1 style="margin: 20px 0 0 0; font-size: 26px; font-weight: 700; color: #ffffff; line-height: 1.3;">
+                        New Sign-in Detected
                     </h1>
+                    <p style="margin: 8px 0 0 0; font-size: 15px; color: rgba(255,255,255,0.8);">
+                        A new sign-in to your account was recorded
+                    </p>
                 </td>
             </tr>
 
             <!-- Greeting -->
             <tr>
-                <td style="padding: 16px 40px 0 40px; text-align: center;" class="mobile-padding">
-                    <p style="margin: 0; font-size: 16px; color: #475569; line-height: 1.6;">
-                        {{if .CustomerName}}Hi {{.CustomerName}},{{else}}Hi there,{{end}}
-                    </p>
-                    <p style="margin: 12px 0 0 0; font-size: 16px; color: #475569; line-height: 1.6;">
-                        We noticed a new sign-in to your account. Here are the details:
+                <td style="padding: 32px 40px 0 40px;" class="mobile-padding">
+                    <p style="margin: 0; font-size: 15px; color: #334155; line-height: 1.6;">
+                        {{if .CustomerName}}Hi {{.CustomerName}},{{else}}Hi there,{{end}}<br><br>
+                        We noticed a new sign-in to your account. If this was you, no action is needed. Here are the details:
                     </p>
                 </td>
             </tr>
 
             <!-- Login Details -->
             <tr>
-                <td style="padding: 24px 40px;" class="mobile-padding">
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #F8FAFC; border-radius: 8px; border: 1px solid #e2e8f0;">
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #F8FAFC; border-radius: 8px; border: 1px solid #E2E8F0;">
                         <tr>
                             <td style="padding: 24px;">
                                 <!-- Time -->
@@ -64,7 +60,7 @@
                                             <span style="font-size: 18px;">&#128336;</span>
                                         </td>
                                         <td style="vertical-align: top;">
-                                            <p style="margin: 0 0 2px 0; font-size: 12px; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">When</p>
+                                            <p style="margin: 0 0 2px 0; font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">When</p>
                                             <p style="margin: 0; font-size: 14px; font-weight: 500; color: #0F172A;">{{.LoginTime}}</p>
                                         </td>
                                     </tr>
@@ -78,7 +74,7 @@
                                             <span style="font-size: 18px;">&#128205;</span>
                                         </td>
                                         <td style="vertical-align: top;">
-                                            <p style="margin: 0 0 2px 0; font-size: 12px; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Location</p>
+                                            <p style="margin: 0 0 2px 0; font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Location</p>
                                             <p style="margin: 0; font-size: 14px; font-weight: 500; color: #0F172A;">{{.LoginLocation}}</p>
                                         </td>
                                     </tr>
@@ -93,7 +89,7 @@
                                             <span style="font-size: 18px;">&#127760;</span>
                                         </td>
                                         <td style="vertical-align: top;">
-                                            <p style="margin: 0 0 2px 0; font-size: 12px; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">IP Address</p>
+                                            <p style="margin: 0 0 2px 0; font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">IP Address</p>
                                             <p style="margin: 0; font-size: 14px; font-weight: 500; color: #0F172A; font-family: 'JetBrains Mono', 'SFMono-Regular', 'Menlo', monospace;">{{.IPAddress}}</p>
                                         </td>
                                     </tr>
@@ -108,7 +104,7 @@
                                             <span style="font-size: 18px;">&#128187;</span>
                                         </td>
                                         <td style="vertical-align: top;">
-                                            <p style="margin: 0 0 2px 0; font-size: 12px; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Device</p>
+                                            <p style="margin: 0 0 2px 0; font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Device</p>
                                             <p style="margin: 0; font-size: 14px; font-weight: 500; color: #0F172A;">{{.DeviceInfo}}</p>
                                         </td>
                                     </tr>
@@ -120,18 +116,9 @@
                 </td>
             </tr>
 
-            <!-- Was This You? -->
-            <tr>
-                <td style="padding: 0 40px 24px 40px; text-align: center;" class="mobile-padding">
-                    <p style="margin: 0; font-size: 14px; color: #475569;">
-                        <strong>Was this you?</strong> If yes, you can ignore this email.
-                    </p>
-                </td>
-            </tr>
-
             <!-- Security Warning -->
             <tr>
-                <td style="padding: 0 40px 40px 40px;" class="mobile-padding">
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #fef2f2; border-radius: 8px; border: 1px solid #fecaca;">
                         <tr>
                             <td style="padding: 20px 24px;">
@@ -144,21 +131,27 @@
                                             <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #dc2626;">
                                                 Not you? Secure your account now
                                             </p>
-                                            <p style="margin: 0 0 16px 0; font-size: 14px; color: #b91c1c; line-height: 1.5;">
-                                                If you didn't sign in, someone may have access to your account. We recommend changing your password immediately.
+                                            <p style="margin: 0; font-size: 14px; color: #b91c1c; line-height: 1.5;">
+                                                If you didn't sign in, someone may have access to your account. Change your password immediately.
                                             </p>
-                                            <table role="presentation" cellspacing="0" cellpadding="0" border="0">
-                                                <tr>
-                                                    <td style="background-color: #dc2626; border-radius: 8px;">
-                                                        <a href="{{.ResetPasswordURL}}" style="display: inline-block; padding: 12px 24px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
-                                                            Change Password
-                                                        </a>
-                                                    </td>
-                                                </tr>
-                                            </table>
                                         </td>
                                     </tr>
                                 </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <!-- CTA Button -->
+            <tr>
+                <td style="padding: 32px 40px; text-align: center;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                        <tr>
+                            <td style="background-color: #dc2626; border-radius: 8px;">
+                                <a href="{{.ResetPasswordURL}}" style="display: inline-block; padding: 14px 32px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
+                                    Change Password &#8594;
+                                </a>
                             </td>
                         </tr>
                     </table>
@@ -174,10 +167,10 @@
 <tr>
     <td style="padding: 32px 20px; text-align: center;">
         <p style="margin: 0 0 8px 0; font-size: 14px; color: #64748B;">
-            This is an automated security notification for <span style="color: #475569;">{{.Email}}</span>
+            This is an automated security notification for <span style="color: #475569; font-weight: 500;">{{.Email}}</span>
         </p>
-        <p style="margin: 0 0 12px 0; font-size: 14px; color: #64748B;">
-            Need help? <a href="mailto:{{.SupportEmail}}" style="color: #0F172A; text-decoration: none; font-weight: 500;">Contact Support</a>
+        <p style="margin: 0 0 8px 0; font-size: 14px; color: #64748B;">
+            Need help? <a href="mailto:{{.SupportEmail}}" style="color: #0F172A; text-decoration: none; font-weight: 600;">Contact Support</a>
         </p>
         <p style="margin: 0; font-size: 12px; color: #64748B;">
             &copy; {{.Year}} {{if .BusinessName}}{{.BusinessName}}{{else}}Tesserix{{end}}. All rights reserved.

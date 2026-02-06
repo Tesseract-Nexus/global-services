@@ -16,36 +16,32 @@
 <!-- Main Card -->
 <tr>
     <td>
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ffffff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1);">
-            <!-- Icon Header -->
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ffffff; border-radius: 10px; border: 1px solid #E2E8F0; box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1); overflow: hidden;">
+
+            <!-- Header Banner -->
             <tr>
-                <td style="padding: 48px 40px 0 40px; text-align: center;" class="mobile-padding">
+                <td style="background-color: {{if .BrandPrimaryColor}}{{.BrandPrimaryColor}}{{else}}#0F172A{{end}}; padding: 40px 40px; text-align: center;" class="mobile-padding">
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
                         <tr>
-                            <td style="width: 80px; height: 80px; background-color: #dbeafe; border-radius: 50%; text-align: center; vertical-align: middle;">
-                                <span style="font-size: 40px;">&#9993;</span>
+                            <td style="width: 64px; height: 64px; background-color: rgba(255,255,255,0.15); border-radius: 50%; text-align: center; vertical-align: middle;">
+                                <span style="font-size: 32px;">&#9993;</span>
                             </td>
                         </tr>
                     </table>
-                </td>
-            </tr>
-
-            <!-- Title -->
-            <tr>
-                <td style="padding: 28px 40px 0 40px; text-align: center;" class="mobile-padding">
-                    <h1 style="margin: 0; font-size: 26px; font-weight: 700; color: #0F172A; line-height: 1.3;">
-                        Verify your email address
+                    <h1 style="margin: 20px 0 0 0; font-size: 26px; font-weight: 700; color: {{if .BrandTextColor}}{{.BrandTextColor}}{{else}}#ffffff{{end}}; line-height: 1.3;">
+                        Verify Your Email
                     </h1>
+                    <p style="margin: 8px 0 0 0; font-size: 15px; color: rgba(255,255,255,0.8);">
+                        One quick step to complete your account setup
+                    </p>
                 </td>
             </tr>
 
             <!-- Greeting -->
             <tr>
-                <td style="padding: 16px 40px 0 40px; text-align: center;" class="mobile-padding">
-                    <p style="margin: 0; font-size: 16px; color: #475569; line-height: 1.6;">
-                        {{if .CustomerName}}Hi {{.CustomerName}},{{else}}Hi there,{{end}}
-                    </p>
-                    <p style="margin: 12px 0 0 0; font-size: 16px; color: #475569; line-height: 1.6;">
+                <td style="padding: 32px 40px 0 40px;" class="mobile-padding">
+                    <p style="margin: 0; font-size: 15px; color: #334155; line-height: 1.6;">
+                        {{if .CustomerName}}Hi {{.CustomerName}},{{else}}Hi there,{{end}}<br><br>
                         Please verify your email address to complete your account setup and unlock all features.
                     </p>
                 </td>
@@ -53,12 +49,12 @@
 
             <!-- CTA Button -->
             <tr>
-                <td style="padding: 32px 40px; text-align: center;" class="mobile-padding">
+                <td style="padding: 32px 40px 24px 40px; text-align: center;" class="mobile-padding">
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
                         <tr>
-                            <td style="background-color: {{if .BrandPrimaryColor}}{{.BrandPrimaryColor}}{{else}}#0F172A{{end}}; border-radius: 10px;">
-                                <a href="{{.VerificationLink}}" style="display: inline-block; padding: 18px 48px; font-size: 16px; font-weight: 600; color: {{if .BrandTextColor}}{{.BrandTextColor}}{{else}}#ffffff{{end}}; text-decoration: none;">
-                                    Verify Email Address
+                            <td style="background-color: {{if .BrandPrimaryColor}}{{.BrandPrimaryColor}}{{else}}#0F172A{{end}}; border-radius: 8px;">
+                                <a href="{{.VerificationLink}}" style="display: inline-block; padding: 14px 32px; font-size: 14px; font-weight: 600; color: {{if .BrandTextColor}}{{.BrandTextColor}}{{else}}#ffffff{{end}}; text-decoration: none;">
+                                    Verify Email Address &#8594;
                                 </a>
                             </td>
                         </tr>
@@ -69,7 +65,7 @@
             <!-- Benefits -->
             <tr>
                 <td style="padding: 0 40px;" class="mobile-padding">
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #F8FAFC; border-radius: 8px;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #F8FAFC; border-radius: 8px; border: 1px solid #E2E8F0;">
                         <tr>
                             <td style="padding: 20px 24px;">
                                 <p style="margin: 0 0 12px 0; font-size: 14px; font-weight: 600; color: #0F172A;">
@@ -78,20 +74,20 @@
                                 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                                     <tr>
                                         <td style="padding: 6px 0;">
-                                            <span style="color: #22c55e; font-size: 14px;">&#10003;</span>
-                                            <span style="margin-left: 8px; font-size: 14px; color: #475569;">Complete checkout faster</span>
+                                            <span style="color: #10B981; font-size: 14px;">&#10003;</span>
+                                            <span style="margin-left: 8px; font-size: 14px; color: #334155;">Complete checkout faster</span>
                                         </td>
                                     </tr>
                                     <tr>
                                         <td style="padding: 6px 0;">
-                                            <span style="color: #22c55e; font-size: 14px;">&#10003;</span>
-                                            <span style="margin-left: 8px; font-size: 14px; color: #475569;">Track your orders in real-time</span>
+                                            <span style="color: #10B981; font-size: 14px;">&#10003;</span>
+                                            <span style="margin-left: 8px; font-size: 14px; color: #334155;">Track your orders in real-time</span>
                                         </td>
                                     </tr>
                                     <tr>
                                         <td style="padding: 6px 0;">
-                                            <span style="color: #22c55e; font-size: 14px;">&#10003;</span>
-                                            <span style="margin-left: 8px; font-size: 14px; color: #475569;">Receive exclusive offers and updates</span>
+                                            <span style="color: #10B981; font-size: 14px;">&#10003;</span>
+                                            <span style="margin-left: 8px; font-size: 14px; color: #334155;">Receive exclusive offers and updates</span>
                                         </td>
                                     </tr>
                                 </table>
@@ -101,24 +97,13 @@
                 </td>
             </tr>
 
-            <!-- Divider -->
-            <tr>
-                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-                        <tr>
-                            <td style="height: 1px; background-color: #e2e8f0;"></td>
-                        </tr>
-                    </table>
-                </td>
-            </tr>
-
             <!-- Alternative Link -->
             <tr>
-                <td style="padding: 24px 40px;" class="mobile-padding">
+                <td style="padding: 24px 40px 0 40px;" class="mobile-padding">
                     <p style="margin: 0 0 12px 0; font-size: 14px; color: #64748B; text-align: center;">
                         Or copy this link into your browser:
                     </p>
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #F8FAFC; border-radius: 8px; border: 1px solid #e2e8f0;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #F8FAFC; border-radius: 8px; border: 1px solid #E2E8F0;">
                         <tr>
                             <td style="padding: 14px 16px;">
                                 <p style="margin: 0; font-size: 12px; color: #0F172A; text-align: center; word-break: break-all; font-family: 'JetBrains Mono', 'SFMono-Regular', 'Menlo', monospace;">
@@ -132,8 +117,8 @@
 
             <!-- Expiry Notice -->
             <tr>
-                <td style="padding: 0 40px 40px 40px;" class="mobile-padding">
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #fef3c7; border-radius: 10px;">
+                <td style="padding: 24px 40px 32px 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #fef3c7; border-radius: 8px; border: 1px solid #fde68a;">
                         <tr>
                             <td style="padding: 16px 20px;">
                                 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
@@ -163,8 +148,8 @@
 <!-- Footer -->
 <tr>
     <td style="padding: 32px 20px; text-align: center;">
-        <p style="margin: 0 0 12px 0; font-size: 14px; color: #64748B;">
-            Need help? <a href="mailto:{{.SupportEmail}}" style="color: #0F172A; text-decoration: none; font-weight: 500;">Contact us</a>
+        <p style="margin: 0 0 8px 0; font-size: 14px; color: #64748B;">
+            Need help? <a href="mailto:{{.SupportEmail}}" style="color: #0F172A; text-decoration: none; font-weight: 600;">Contact Support</a>
         </p>
         <p style="margin: 0; font-size: 12px; color: #64748B;">
             &copy; {{.Year}} {{if .BusinessName}}{{.BusinessName}}{{else}}Tesserix{{end}}. All rights reserved.
