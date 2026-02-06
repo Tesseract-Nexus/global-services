@@ -128,8 +128,11 @@ export function isAdminHost(forwardedHost: string | undefined): boolean {
  * Returns the appropriate session cookie name based on whether the request
  * comes from an admin host or a storefront/custom domain.
  * Admin uses the default `bff_session`; storefront uses `bff_storefront_session`.
+ * When host is unknown (internal/server-side calls), defaults to `bff_session`
+ * for backward compatibility with admin's auth-helper calls.
  */
 export function getSessionCookieName(forwardedHost: string | undefined): string {
+  if (!forwardedHost) return config.session.cookieName;
   return isAdminHost(forwardedHost)
     ? config.session.cookieName
     : config.session.storefrontCookieName;
