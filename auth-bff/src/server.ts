@@ -78,7 +78,6 @@ async function buildApp() {
       'X-CSRF-Token',
       'X-Tenant-ID',
       'X-Tenant-Slug',
-      'X-Client-Type',
       'X-Device-Type',
     ],
     exposedHeaders: [
@@ -95,8 +94,9 @@ async function buildApp() {
     max: 300,
     timeWindow: '1 minute',
     keyGenerator: (request) => {
-      // Use session ID if available for authenticated users
-      const sessionId = request.cookies[config.session.cookieName];
+      // Use session ID if available for authenticated users (check both admin and storefront cookies)
+      const sessionId = request.cookies[config.session.cookieName]
+        || request.cookies[config.session.storefrontCookieName];
       if (sessionId) {
         return sessionId;
       }

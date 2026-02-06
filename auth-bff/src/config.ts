@@ -24,6 +24,7 @@ const envSchema = z.object({
   SESSION_SECRET: z.string().min(32),
   SESSION_MAX_AGE: z.string().default('86400'), // 24 hours in seconds
   SESSION_COOKIE_NAME: z.string().default('bff_session'),
+  STOREFRONT_SESSION_COOKIE_NAME: z.string().default('bff_storefront_session'),
   SESSION_COOKIE_DOMAIN: z.string().optional(),
 
   // CSRF
@@ -92,6 +93,7 @@ export const config = {
     secret: env.SESSION_SECRET,
     maxAge: parseInt(env.SESSION_MAX_AGE, 10),
     cookieName: env.SESSION_COOKIE_NAME,
+    storefrontCookieName: env.STOREFRONT_SESSION_COOKIE_NAME,
     cookieDomain: env.SESSION_COOKIE_DOMAIN,
   },
   csrf: {
@@ -110,5 +112,27 @@ export const config = {
   verificationServiceUrl: env.VERIFICATION_SERVICE_URL || 'http://verification-service.global-services.svc.cluster.local:8080',
   verificationServiceApiKey: env.VERIFICATION_SERVICE_API_KEY || '',
 } as const;
+
+/**
+ * Determine if the request originates from an admin host based on x-forwarded-host.
+ * Admin hosts follow the pattern: *-admin.tesserix.app
+ * Everything else (storefronts, custom domains) is non-admin.
+ */
+export function isAdminHost(forwardedHost: string | undefined): boolean {
+  if (!forwardedHost) return false;
+  const hostname = forwardedHost.split(':')[0].toLowerCase();
+  return /^.+-admin\.tesserix\.app$/.test(hostname);
+}
+
+/**
+ * Returns the appropriate session cookie name based on whether the request
+ * comes from an admin host or a storefront/custom domain.
+ * Admin uses the default `bff_session`; storefront uses `bff_storefront_session`.
+ */
+export function getSessionCookieName(forwardedHost: string | undefined): string {
+  return isAdminHost(forwardedHost)
+    ? config.session.cookieName
+    : config.session.storefrontCookieName;
+}
 
 export type Config = typeof config;

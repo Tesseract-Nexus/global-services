@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
-import { config } from '../config';
+import { config, getSessionCookieName } from '../config';
 import { oidcClient } from '../oidc-client';
 import { sessionStore, SessionData, WsTicketData, SessionTransferData } from '../session-store';
 import { tenantServiceClient } from '../tenant-service-client';
@@ -72,7 +72,8 @@ const getCookieDomain = (forwardedHost: string | undefined): string | undefined 
 
 const setSessionCookie = (reply: FastifyReply, sessionId: string, forwardedHost?: string) => {
   const domain = getCookieDomain(forwardedHost);
-  reply.setCookie(config.session.cookieName, sessionId, {
+  const cookieName = getSessionCookieName(forwardedHost);
+  reply.setCookie(cookieName, sessionId, {
     httpOnly: true,
     secure: config.server.nodeEnv === 'production',
     sameSite: 'lax',
@@ -84,7 +85,8 @@ const setSessionCookie = (reply: FastifyReply, sessionId: string, forwardedHost?
 
 const clearSessionCookie = (reply: FastifyReply, forwardedHost?: string) => {
   const domain = getCookieDomain(forwardedHost);
-  reply.clearCookie(config.session.cookieName, {
+  const cookieName = getSessionCookieName(forwardedHost);
+  reply.clearCookie(cookieName, {
     httpOnly: true,
     secure: config.server.nodeEnv === 'production',
     sameSite: 'lax',
@@ -93,9 +95,11 @@ const clearSessionCookie = (reply: FastifyReply, forwardedHost?: string) => {
   });
 };
 
-// Get session from request
+// Get session from request (uses hostname to determine which cookie to read)
 const getSession = async (request: FastifyRequest): Promise<SessionData | null> => {
-  const sessionId = request.cookies[config.session.cookieName];
+  const forwardedHost = request.headers['x-forwarded-host'] as string | undefined;
+  const cookieName = getSessionCookieName(forwardedHost);
+  const sessionId = request.cookies[cookieName];
   if (!sessionId) {
     return null;
   }
@@ -808,14 +812,7 @@ export async function authRoutes(fastify: FastifyInstance) {
 }
 
 // Helper functions
-function determineClientType(request: FastifyRequest): 'internal' | 'customer' {
-  const clientTypeHeader = request.headers['x-client-type'];
-
-  // Check header first - allow explicit override
-  if (clientTypeHeader === 'internal' || clientTypeHeader === 'customer') {
-    return clientTypeHeader;
-  }
-
+function determineClientType(_request: FastifyRequest): 'internal' | 'customer' {
   // TODO: Enable internal client once tesserix-internal realm is configured
   // For now, all admin apps use customer IDP (tenant owners/staff authenticate via customer realm)
   // Once internal IDP is ready, admin.tesserix.app can use internal for Tesserix employees

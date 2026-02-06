@@ -1,14 +1,16 @@
 import { FastifyInstance, FastifyRequest } from 'fastify';
-import { config } from '../config';
+import { config, getSessionCookieName } from '../config';
 import { sessionStore, SessionData } from '../session-store';
 import { oidcClient } from '../oidc-client';
 import { createLogger } from '../logger';
 
 const logger = createLogger('api-proxy');
 
-// Get session from request
+// Get session from request (uses hostname to determine which cookie to read)
 const getSession = async (request: FastifyRequest): Promise<SessionData | null> => {
-  const sessionId = request.cookies[config.session.cookieName];
+  const forwardedHost = request.headers['x-forwarded-host'] as string | undefined;
+  const cookieName = getSessionCookieName(forwardedHost);
+  const sessionId = request.cookies[cookieName];
   if (!sessionId) {
     return null;
   }

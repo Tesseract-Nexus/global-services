@@ -22,7 +22,7 @@
 
 import { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
-import { config } from '../config';
+import { config, getSessionCookieName } from '../config';
 import { tenantServiceClient, maskEmail } from '../tenant-service-client';
 import { sessionStore } from '../session-store';
 import { createLogger } from '../logger';
@@ -183,10 +183,11 @@ const setSessionCookie = (
 ) => {
   const maxAge = rememberMe ? config.session.maxAge * 7 : config.session.maxAge; // 7 days if remember me
   const domain = getCookieDomain(forwardedHost);
+  const cookieName = getSessionCookieName(forwardedHost);
 
-  logger.debug({ domain, forwardedHost }, 'Setting session cookie');
+  logger.debug({ domain, forwardedHost, cookieName }, 'Setting session cookie');
 
-  reply.setCookie(config.session.cookieName, sessionId, {
+  reply.setCookie(cookieName, sessionId, {
     httpOnly: true,
     secure: config.server.nodeEnv === 'production',
     sameSite: 'lax',
@@ -568,7 +569,7 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
           userId: data.user_id!,
           tenantId: data.tenant_id,
           tenantSlug: data.tenant_slug,
-          clientType: 'customer',
+          clientType: 'internal',
           accessToken: data.access_token,
           idToken: data.id_token,
           refreshToken: data.refresh_token,
@@ -758,7 +759,7 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
       userId: mfaData.userId,
       tenantId: mfaData.tenantId,
       tenantSlug: mfaData.tenantSlug,
-      clientType: 'customer',
+      clientType: 'internal',
       accessToken: mfaData.accessToken!,
       idToken: mfaData.idToken,
       refreshToken: mfaData.refreshToken,
@@ -1170,8 +1171,10 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
   fastify.post<{
     Body: z.infer<typeof deactivateAccountSchema>;
   }>('/auth/direct/deactivate-account', async (request, reply) => {
-    // Get session from cookie
-    const sessionId = request.cookies[config.session.cookieName];
+    // Get session from cookie (use hostname to determine which cookie)
+    const forwardedHost = request.headers['x-forwarded-host'] as string | undefined;
+    const cookieName = getSessionCookieName(forwardedHost);
+    const sessionId = request.cookies[cookieName];
     if (!sessionId) {
       return reply.code(401).send({
         success: false,
@@ -1228,9 +1231,10 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
     await sessionStore.deleteSession(sessionId);
 
     // Clear the session cookie
-    reply.clearCookie(config.session.cookieName, {
+    const deactivateDomain = getCookieDomain(forwardedHost);
+    reply.clearCookie(cookieName, {
       path: '/',
-      domain: config.session.cookieDomain,
+      ...(deactivateDomain ? { domain: deactivateDomain } : {}),
     });
 
     logger.info({
