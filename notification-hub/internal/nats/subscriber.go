@@ -338,6 +338,46 @@ func (s *Subscriber) Start(ctx context.Context) error {
 		log.Println("Subscribed to gift_card.> events")
 	}
 
+	// Subscribe to campaign events
+	campaignSub, err := js.QueueSubscribe(
+		"campaign.>",
+		"notification-hub-workers",
+		s.handleCampaignEvent,
+		nats.BindStream("CAMPAIGN_EVENTS"),
+		nats.Durable("notification-hub-campaigns"),
+		nats.DeliverAll(),
+		nats.ManualAck(),
+		nats.AckWait(30*time.Second),
+		nats.MaxDeliver(3),
+		nats.InactiveThreshold(24*time.Hour),
+	)
+	if err != nil {
+		log.Printf("Warning: failed to subscribe to campaign events: %v", err)
+	} else {
+		s.subs = append(s.subs, campaignSub)
+		log.Println("Subscribed to campaign.> events")
+	}
+
+	// Subscribe to loyalty events
+	loyaltySub, err := js.QueueSubscribe(
+		"loyalty.>",
+		"notification-hub-workers",
+		s.handleLoyaltyEvent,
+		nats.BindStream("LOYALTY_EVENTS"),
+		nats.Durable("notification-hub-loyalty"),
+		nats.DeliverAll(),
+		nats.ManualAck(),
+		nats.AckWait(30*time.Second),
+		nats.MaxDeliver(3),
+		nats.InactiveThreshold(24*time.Hour),
+	)
+	if err != nil {
+		log.Printf("Warning: failed to subscribe to loyalty events: %v", err)
+	} else {
+		s.subs = append(s.subs, loyaltySub)
+		log.Println("Subscribed to loyalty.> events")
+	}
+
 	log.Printf("NATS subscriber started with %d subscriptions", len(s.subs))
 	return nil
 }
@@ -804,6 +844,48 @@ func (s *Subscriber) handleGiftCardEvent(msg *nats.Msg) {
 	s.broadcastNotification(&event, event.TenantID)
 	msg.Ack()
 	log.Printf("Processed gift card event: %s for gift card %s", event.EventType, event.GiftCardCode)
+}
+
+func (s *Subscriber) handleCampaignEvent(msg *nats.Msg) {
+	var event models.CampaignEvent
+	if err := json.Unmarshal(msg.Data, &event); err != nil {
+		log.Printf("Failed to unmarshal campaign event: %v", err)
+		msg.Ack()
+		return
+	}
+
+	if event.SourceID != "" {
+		exists, _ := s.notifRepo.ExistsBySourceEventID(context.Background(), event.SourceID)
+		if exists {
+			msg.Ack()
+			return
+		}
+	}
+
+	s.broadcastNotification(&event, event.TenantID)
+	msg.Ack()
+	log.Printf("Processed campaign event: %s for campaign %s", event.EventType, event.CampaignName)
+}
+
+func (s *Subscriber) handleLoyaltyEvent(msg *nats.Msg) {
+	var event models.LoyaltyEvent
+	if err := json.Unmarshal(msg.Data, &event); err != nil {
+		log.Printf("Failed to unmarshal loyalty event: %v", err)
+		msg.Ack()
+		return
+	}
+
+	if event.SourceID != "" {
+		exists, _ := s.notifRepo.ExistsBySourceEventID(context.Background(), event.SourceID)
+		if exists {
+			msg.Ack()
+			return
+		}
+	}
+
+	s.broadcastNotification(&event, event.TenantID)
+	msg.Ack()
+	log.Printf("Processed loyalty event: %s for program %s", event.EventType, event.ProgramName)
 }
 
 // broadcastNotification is a helper that creates and broadcasts notifications to all connected users

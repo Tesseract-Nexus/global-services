@@ -79,6 +79,19 @@ var eventCategoryMap = map[string]string{
 	events.GiftCardActivated: "marketing",
 	events.GiftCardApplied:   "orders",
 	events.GiftCardRefunded:  "orders",
+
+	// Campaign events (marketing)
+	events.CampaignCreated:   "marketing",
+	events.CampaignUpdated:   "marketing",
+	events.CampaignSent:      "marketing",
+	events.CampaignScheduled: "marketing",
+	events.CampaignDeleted:   "marketing",
+
+	// Loyalty events (marketing)
+	events.LoyaltyProgramCreated:   "marketing",
+	events.LoyaltyProgramUpdated:   "marketing",
+	events.LoyaltyCustomerEnrolled: "marketing",
+	events.LoyaltyPointsRedeemed:   "marketing",
 }
 
 // Subscriber handles NATS event subscriptions for sending external notifications
@@ -191,6 +204,8 @@ func (s *Subscriber) Start(ctx context.Context) error {
 		{"APPROVAL_EVENTS", "approval.>", "Approval workflow events"},
 		{"DOMAIN_EVENTS", "domain.>", "Domain lifecycle events"},
 		{"GIFT_CARD_EVENTS", "gift_card.>", "Gift card lifecycle events"},
+		{"CAMPAIGN_EVENTS", "campaign.>", "Marketing campaign events"},
+		{"LOYALTY_EVENTS", "loyalty.>", "Loyalty program events"},
 	}
 
 	for _, stream := range streams {
@@ -446,6 +461,44 @@ func (s *Subscriber) Start(ctx context.Context) error {
 	} else {
 		s.subs = append(s.subs, giftCardSub)
 		log.Println("[NATS] Subscribed to gift_card.> events")
+	}
+
+	// Subscribe to campaign events
+	campaignSub, err := js.QueueSubscribe(
+		"campaign.>",
+		"notification-service-workers",
+		s.handleCampaignEvent,
+		nats.BindStream("CAMPAIGN_EVENTS"),
+		nats.Durable("notification-service-campaigns"),
+		nats.DeliverNew(),
+		nats.ManualAck(),
+		nats.AckWait(30*time.Second),
+		nats.MaxDeliver(3),
+	)
+	if err != nil {
+		log.Printf("[NATS] Warning: failed to subscribe to campaign events: %v", err)
+	} else {
+		s.subs = append(s.subs, campaignSub)
+		log.Println("[NATS] Subscribed to campaign.> events")
+	}
+
+	// Subscribe to loyalty events
+	loyaltySub, err := js.QueueSubscribe(
+		"loyalty.>",
+		"notification-service-workers",
+		s.handleLoyaltyEvent,
+		nats.BindStream("LOYALTY_EVENTS"),
+		nats.Durable("notification-service-loyalty"),
+		nats.DeliverNew(),
+		nats.ManualAck(),
+		nats.AckWait(30*time.Second),
+		nats.MaxDeliver(3),
+	)
+	if err != nil {
+		log.Printf("[NATS] Warning: failed to subscribe to loyalty events: %v", err)
+	} else {
+		s.subs = append(s.subs, loyaltySub)
+		log.Println("[NATS] Subscribed to loyalty.> events")
 	}
 
 	log.Printf("[NATS] Subscriber started with %d subscriptions", len(s.subs))
@@ -1466,6 +1519,44 @@ func (s *Subscriber) handleGiftCardEvent(msg *nats.Msg) {
 
 	msg.Ack()
 	log.Printf("[NATS] Processed gift card event: %s for gift card %s", event.EventType, event.GiftCardID)
+}
+
+// handleCampaignEvent processes campaign-related events
+func (s *Subscriber) handleCampaignEvent(msg *nats.Msg) {
+	var event events.CampaignEvent
+	if err := json.Unmarshal(msg.Data, &event); err != nil {
+		log.Printf("[NATS] Failed to unmarshal campaign event: %v", err)
+		msg.Ack()
+		return
+	}
+
+	log.Printf("[NATS] Processing campaign event: %s for campaign %s", event.EventType, event.CampaignName)
+
+	// Campaign events are primarily for in-app notifications (handled by notification-hub)
+	// and audit logging (handled by audit-service).
+	// Email notifications for campaign events can be added here if needed.
+
+	msg.Ack()
+	log.Printf("[NATS] Processed campaign event: %s for campaign %s", event.EventType, event.CampaignName)
+}
+
+// handleLoyaltyEvent processes loyalty program-related events
+func (s *Subscriber) handleLoyaltyEvent(msg *nats.Msg) {
+	var event events.LoyaltyEvent
+	if err := json.Unmarshal(msg.Data, &event); err != nil {
+		log.Printf("[NATS] Failed to unmarshal loyalty event: %v", err)
+		msg.Ack()
+		return
+	}
+
+	log.Printf("[NATS] Processing loyalty event: %s", event.EventType)
+
+	// Loyalty events are primarily for in-app notifications (handled by notification-hub)
+	// and audit logging (handled by audit-service).
+	// Email notifications for loyalty events can be added here if needed.
+
+	msg.Ack()
+	log.Printf("[NATS] Processed loyalty event: %s", event.EventType)
 }
 
 // formatActionTypeForDisplay converts action_type to human-readable format

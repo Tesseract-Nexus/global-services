@@ -77,6 +77,8 @@ const (
 	ResourceGiftCard     AuditResource = "GIFT_CARD"
 	ResourceReview       AuditResource = "REVIEW"
 	ResourceShippingRate AuditResource = "SHIPPING_RATE"
+	ResourceCampaign     AuditResource = "CAMPAIGN"
+	ResourceLoyalty      AuditResource = "LOYALTY"
 	ResourceOther        AuditResource = "OTHER"
 )
 

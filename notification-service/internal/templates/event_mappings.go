@@ -74,6 +74,12 @@ var eventToTemplateMap = map[string]string{
 	// Gift card events
 	"gift_card.created":   "gift_card_recipient",
 	"gift_card.activated": "gift_card_recipient",
+
+	// Campaign events (no customer-facing emails; admin notifications only)
+	// "campaign.sent": "campaign_admin", // Can be added when email template is created
+
+	// Loyalty events (no customer-facing emails yet)
+	// "loyalty.customer_enrolled": "loyalty_welcome", // Can be added when email template is created
 }
 
 // adminTemplateMap maps NATS event types to admin-facing template names.

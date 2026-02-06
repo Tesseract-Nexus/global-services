@@ -243,6 +243,26 @@ func (c *Client) ensureStreams() error {
 			MaxMsgs:     100000,
 			Discard:     nats.DiscardOld,
 		},
+		{
+			Name:        "CAMPAIGN_EVENTS",
+			Description: "Marketing campaign events",
+			Subjects:    []string{"campaign.>"},
+			Storage:     nats.FileStorage,
+			Retention:   nats.LimitsPolicy,
+			MaxAge:      24 * time.Hour * 7,
+			MaxMsgs:     100000,
+			Discard:     nats.DiscardOld,
+		},
+		{
+			Name:        "LOYALTY_EVENTS",
+			Description: "Loyalty program events",
+			Subjects:    []string{"loyalty.>"},
+			Storage:     nats.FileStorage,
+			Retention:   nats.LimitsPolicy,
+			MaxAge:      24 * time.Hour * 7,
+			MaxMsgs:     100000,
+			Discard:     nats.DiscardOld,
+		},
 	}
 
 	for _, streamCfg := range streams {

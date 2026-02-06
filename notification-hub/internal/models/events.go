@@ -82,6 +82,19 @@ const (
 	SubjectGiftCardActivated = "gift_card.activated"
 	SubjectGiftCardApplied   = "gift_card.applied"
 	SubjectGiftCardRefunded  = "gift_card.refunded"
+
+	// Campaign events
+	SubjectCampaignCreated   = "campaign.created"
+	SubjectCampaignUpdated   = "campaign.updated"
+	SubjectCampaignSent      = "campaign.sent"
+	SubjectCampaignScheduled = "campaign.scheduled"
+	SubjectCampaignDeleted   = "campaign.deleted"
+
+	// Loyalty events
+	SubjectLoyaltyProgramCreated   = "loyalty.program_created"
+	SubjectLoyaltyProgramUpdated   = "loyalty.program_updated"
+	SubjectLoyaltyCustomerEnrolled = "loyalty.customer_enrolled"
+	SubjectLoyaltyPointsRedeemed   = "loyalty.points_redeemed"
 )
 
 // Stream names
@@ -100,6 +113,8 @@ const (
 	StreamVendorEvents    = "VENDOR_EVENTS"
 	StreamApprovalEvents  = "APPROVAL_EVENTS"
 	StreamGiftCardEvents  = "GIFT_CARD_EVENTS"
+	StreamCampaignEvents  = "CAMPAIGN_EVENTS"
+	StreamLoyaltyEvents   = "LOYALTY_EVENTS"
 )
 
 // BaseEvent is the common structure for all events
@@ -277,6 +292,35 @@ type GiftCardEvent struct {
 	Status         string  `json:"status"`
 }
 
+// CampaignEvent represents campaign-related events
+type CampaignEvent struct {
+	BaseEvent
+	CampaignID      string `json:"campaignId"`
+	CampaignName    string `json:"campaignName"`
+	CampaignType    string `json:"campaignType"`
+	Channel         string `json:"channel"`
+	Status          string `json:"status"`
+	TotalRecipients int    `json:"totalRecipients"`
+	ScheduledAt     string `json:"scheduledAt,omitempty"`
+	ActorID         string `json:"actorId"`
+	ActorName       string `json:"actorName"`
+}
+
+// LoyaltyEvent represents loyalty program-related events
+type LoyaltyEvent struct {
+	BaseEvent
+	ProgramID    string `json:"programId,omitempty"`
+	ProgramName  string `json:"programName,omitempty"`
+	CustomerID   string `json:"customerId,omitempty"`
+	CustomerName string `json:"customerName,omitempty"`
+	Points       int    `json:"points"`
+	TotalPoints  int    `json:"totalPoints"`
+	TierName     string `json:"tierName,omitempty"`
+	Reason       string `json:"reason,omitempty"`
+	ActorID      string `json:"actorId,omitempty"`
+	ActorName    string `json:"actorName,omitempty"`
+}
+
 // EventToNotification converts an event to a notification
 func EventToNotification(event interface{}, targetUserID uuid.UUID) *Notification {
 	switch e := event.(type) {
@@ -308,6 +352,10 @@ func EventToNotification(event interface{}, targetUserID uuid.UUID) *Notificatio
 		return approvalEventToNotification(e, targetUserID)
 	case *GiftCardEvent:
 		return giftCardEventToNotification(e, targetUserID)
+	case *CampaignEvent:
+		return campaignEventToNotification(e, targetUserID)
+	case *LoyaltyEvent:
+		return loyaltyEventToNotification(e, targetUserID)
 	default:
 		return nil
 	}
@@ -1011,6 +1059,121 @@ func giftCardEventToNotification(e *GiftCardEvent, userID uuid.UUID) *Notificati
 			"currency":       e.Currency,
 			"status":         e.Status,
 			"recipientEmail": e.RecipientEmail,
+		},
+	}
+}
+
+func campaignEventToNotification(e *CampaignEvent, userID uuid.UUID) *Notification {
+	var title, message, icon string
+
+	actorInfo := ""
+	if e.ActorName != "" {
+		actorInfo = " by " + e.ActorName
+	}
+
+	switch e.EventType {
+	case SubjectCampaignCreated:
+		title = "📢 Campaign Created"
+		message = "Campaign \"" + e.CampaignName + "\" has been created" + actorInfo
+		icon = "megaphone"
+	case SubjectCampaignUpdated:
+		title = "📢 Campaign Updated"
+		message = "Campaign \"" + e.CampaignName + "\" has been updated" + actorInfo
+		icon = "megaphone"
+	case SubjectCampaignSent:
+		title = "🚀 Campaign Sent"
+		message = "Campaign \"" + e.CampaignName + "\" has been sent to " + formatInt(e.TotalRecipients) + " recipients"
+		icon = "send"
+	case SubjectCampaignScheduled:
+		title = "📅 Campaign Scheduled"
+		message = "Campaign \"" + e.CampaignName + "\" has been scheduled" + actorInfo
+		icon = "calendar"
+	case SubjectCampaignDeleted:
+		title = "🗑️ Campaign Deleted"
+		message = "Campaign \"" + e.CampaignName + "\" has been deleted" + actorInfo
+		icon = "trash"
+	default:
+		title = "📢 Campaign Activity"
+		message = "Campaign \"" + e.CampaignName + "\" was modified" + actorInfo
+		icon = "megaphone"
+	}
+
+	campaignID, _ := uuid.Parse(e.CampaignID)
+	return &Notification{
+		TenantID:      e.TenantID,
+		UserID:        userID,
+		Channel:       "in_app",
+		Type:          e.EventType,
+		Title:         title,
+		Message:       message,
+		Icon:          icon,
+		ActionURL:     "/campaigns/" + e.CampaignID,
+		SourceService: "marketing-service",
+		SourceEventID: e.SourceID,
+		EntityType:    "campaign",
+		EntityID:      &campaignID,
+		Priority:      PriorityNormal,
+		GroupKey:      "campaign:" + e.CampaignID,
+		Metadata: JSONB{
+			"campaignName": e.CampaignName,
+			"campaignType": e.CampaignType,
+			"channel":      e.Channel,
+			"status":       e.Status,
+		},
+	}
+}
+
+func loyaltyEventToNotification(e *LoyaltyEvent, userID uuid.UUID) *Notification {
+	var title, message, icon string
+
+	switch e.EventType {
+	case SubjectLoyaltyProgramCreated:
+		title = "⭐ Loyalty Program Created"
+		message = "Loyalty program \"" + e.ProgramName + "\" has been created"
+		icon = "star"
+	case SubjectLoyaltyProgramUpdated:
+		title = "⭐ Loyalty Program Updated"
+		message = "Loyalty program \"" + e.ProgramName + "\" has been updated"
+		icon = "star"
+	case SubjectLoyaltyCustomerEnrolled:
+		title = "🎉 Customer Enrolled"
+		message = "A customer has enrolled in the loyalty program"
+		if e.CustomerName != "" {
+			message = e.CustomerName + " has enrolled in the loyalty program"
+		}
+		icon = "user-plus"
+	case SubjectLoyaltyPointsRedeemed:
+		title = "🏆 Points Redeemed"
+		message = formatInt(e.Points) + " loyalty points were redeemed"
+		if e.Reason != "" {
+			message += ": " + e.Reason
+		}
+		icon = "award"
+	default:
+		title = "⭐ Loyalty Activity"
+		message = "Loyalty program activity detected"
+		icon = "star"
+	}
+
+	return &Notification{
+		TenantID:      e.TenantID,
+		UserID:        userID,
+		Channel:       "in_app",
+		Type:          e.EventType,
+		Title:         title,
+		Message:       message,
+		Icon:          icon,
+		ActionURL:     "/loyalty",
+		SourceService: "marketing-service",
+		SourceEventID: e.SourceID,
+		EntityType:    "loyalty",
+		Priority:      PriorityNormal,
+		GroupKey:      "loyalty:" + e.ProgramID,
+		Metadata: JSONB{
+			"programName": e.ProgramName,
+			"customerId":  e.CustomerID,
+			"points":      e.Points,
+			"totalPoints": e.TotalPoints,
 		},
 	}
 }

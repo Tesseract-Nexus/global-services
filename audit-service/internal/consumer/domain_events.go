@@ -117,6 +117,8 @@ func (c *DomainEventConsumer) Start(ctx context.Context) error {
 		{name: "CATEGORY_EVENTS", subjects: []string{"category.>"}},
 		{name: "SHIPPING_EVENTS", subjects: []string{"shipping.>"}},
 		{name: "SETTINGS_EVENTS", subjects: []string{"settings.>"}},
+		{name: "CAMPAIGN_EVENTS", subjects: []string{"campaign.>"}},
+		{name: "LOYALTY_EVENTS", subjects: []string{"loyalty.>"}},
 	}
 
 	for _, stream := range streams {
@@ -495,8 +497,42 @@ func (c *DomainEventConsumer) mapEventToAudit(eventType string) (models.AuditAct
 		return models.ActionCreate, models.ResourceCoupon, models.SeverityLow
 	case "coupon.applied":
 		return models.ActionUpdate, models.ResourceCoupon, models.SeverityLow
+	case "coupon.updated":
+		return models.ActionUpdate, models.ResourceCoupon, models.SeverityLow
 	case "coupon.expired", "coupon.deleted":
 		return models.ActionDelete, models.ResourceCoupon, models.SeverityLow
+
+	// Campaign events
+	case "campaign.created":
+		return models.ActionCreate, models.ResourceCampaign, models.SeverityLow
+	case "campaign.updated":
+		return models.ActionUpdate, models.ResourceCampaign, models.SeverityLow
+	case "campaign.sent":
+		return models.ActionUpdate, models.ResourceCampaign, models.SeverityMedium
+	case "campaign.scheduled":
+		return models.ActionUpdate, models.ResourceCampaign, models.SeverityLow
+	case "campaign.paused":
+		return models.ActionUpdate, models.ResourceCampaign, models.SeverityLow
+	case "campaign.completed":
+		return models.ActionUpdate, models.ResourceCampaign, models.SeverityLow
+	case "campaign.cancelled":
+		return models.ActionUpdate, models.ResourceCampaign, models.SeverityMedium
+	case "campaign.deleted":
+		return models.ActionDelete, models.ResourceCampaign, models.SeverityMedium
+
+	// Loyalty events
+	case "loyalty.program_created":
+		return models.ActionCreate, models.ResourceLoyalty, models.SeverityMedium
+	case "loyalty.program_updated":
+		return models.ActionUpdate, models.ResourceLoyalty, models.SeverityLow
+	case "loyalty.customer_enrolled":
+		return models.ActionCreate, models.ResourceLoyalty, models.SeverityLow
+	case "loyalty.points_earned":
+		return models.ActionUpdate, models.ResourceLoyalty, models.SeverityLow
+	case "loyalty.points_redeemed":
+		return models.ActionUpdate, models.ResourceLoyalty, models.SeverityLow
+	case "loyalty.tier_changed":
+		return models.ActionUpdate, models.ResourceLoyalty, models.SeverityMedium
 
 	// Approval events
 	case "approval.requested":
@@ -603,7 +639,7 @@ func (c *DomainEventConsumer) extractResourceInfo(eventType string, data map[str
 	var resourceID, resourceName string
 
 	// Try common ID fields
-	idFields := []string{"orderId", "orderNumber", "paymentId", "customerId", "productId", "staffId", "vendorId", "couponId", "ticketId", "giftCardId", "returnId", "reviewId", "approvalRequestId", "categoryId", "shipmentId", "rateId"}
+	idFields := []string{"orderId", "orderNumber", "paymentId", "customerId", "productId", "staffId", "vendorId", "couponId", "ticketId", "giftCardId", "returnId", "reviewId", "approvalRequestId", "categoryId", "shipmentId", "rateId", "campaignId", "programId"}
 	for _, field := range idFields {
 		if id, ok := data[field].(string); ok && id != "" {
 			resourceID = id
@@ -612,7 +648,7 @@ func (c *DomainEventConsumer) extractResourceInfo(eventType string, data map[str
 	}
 
 	// Try common name fields
-	nameFields := []string{"orderNumber", "customerName", "productName", "staffName", "vendorName", "couponCode", "ticketNumber", "giftCardCode", "rmaNumber", "categoryName", "trackingNumber", "rateName", "carrier"}
+	nameFields := []string{"orderNumber", "customerName", "productName", "staffName", "vendorName", "couponCode", "ticketNumber", "giftCardCode", "rmaNumber", "categoryName", "trackingNumber", "rateName", "carrier", "campaignName", "programName"}
 	for _, field := range nameFields {
 		if name, ok := data[field].(string); ok && name != "" {
 			resourceName = name
@@ -774,6 +810,116 @@ func (c *DomainEventConsumer) generateDescription(eventType string, data map[str
 	case "approval.escalated":
 		resourceType, _ := data["resourceType"].(string)
 		return fmt.Sprintf("%s approval escalated to higher authority", resourceType)
+	// Coupon events
+	case "coupon.created":
+		if code, ok := data["couponCode"].(string); ok {
+			return fmt.Sprintf("Coupon %s was created", code)
+		}
+		return "Coupon was created"
+	case "coupon.updated":
+		if code, ok := data["couponCode"].(string); ok {
+			return fmt.Sprintf("Coupon %s was updated", code)
+		}
+		return "Coupon was updated"
+	case "coupon.applied":
+		if code, ok := data["couponCode"].(string); ok {
+			if orderNum, ok := data["orderNumber"].(string); ok && orderNum != "" {
+				return fmt.Sprintf("Coupon %s was applied to order %s", code, orderNum)
+			}
+			return fmt.Sprintf("Coupon %s was applied", code)
+		}
+		return "Coupon was applied"
+	case "coupon.expired":
+		if code, ok := data["couponCode"].(string); ok {
+			return fmt.Sprintf("Coupon %s has expired", code)
+		}
+		return "Coupon has expired"
+	case "coupon.deleted":
+		if code, ok := data["couponCode"].(string); ok {
+			return fmt.Sprintf("Coupon %s was deleted", code)
+		}
+		return "Coupon was deleted"
+	// Campaign events
+	case "campaign.created":
+		if name, ok := data["campaignName"].(string); ok {
+			return fmt.Sprintf("Campaign \"%s\" was created", name)
+		}
+		return "Campaign was created"
+	case "campaign.updated":
+		if name, ok := data["campaignName"].(string); ok {
+			return fmt.Sprintf("Campaign \"%s\" was updated", name)
+		}
+		return "Campaign was updated"
+	case "campaign.sent":
+		if name, ok := data["campaignName"].(string); ok {
+			if recipients, ok := data["totalRecipients"].(float64); ok && recipients > 0 {
+				return fmt.Sprintf("Campaign \"%s\" was sent to %d recipients", name, int(recipients))
+			}
+			return fmt.Sprintf("Campaign \"%s\" was sent", name)
+		}
+		return "Campaign was sent"
+	case "campaign.scheduled":
+		if name, ok := data["campaignName"].(string); ok {
+			return fmt.Sprintf("Campaign \"%s\" was scheduled", name)
+		}
+		return "Campaign was scheduled"
+	case "campaign.paused":
+		if name, ok := data["campaignName"].(string); ok {
+			return fmt.Sprintf("Campaign \"%s\" was paused", name)
+		}
+		return "Campaign was paused"
+	case "campaign.completed":
+		if name, ok := data["campaignName"].(string); ok {
+			return fmt.Sprintf("Campaign \"%s\" completed", name)
+		}
+		return "Campaign completed"
+	case "campaign.cancelled":
+		if name, ok := data["campaignName"].(string); ok {
+			return fmt.Sprintf("Campaign \"%s\" was cancelled", name)
+		}
+		return "Campaign was cancelled"
+	case "campaign.deleted":
+		if name, ok := data["campaignName"].(string); ok {
+			return fmt.Sprintf("Campaign \"%s\" was deleted", name)
+		}
+		return "Campaign was deleted"
+	// Loyalty events
+	case "loyalty.program_created":
+		if name, ok := data["programName"].(string); ok {
+			return fmt.Sprintf("Loyalty program \"%s\" was created", name)
+		}
+		return "Loyalty program was created"
+	case "loyalty.program_updated":
+		if name, ok := data["programName"].(string); ok {
+			return fmt.Sprintf("Loyalty program \"%s\" was updated", name)
+		}
+		return "Loyalty program was updated"
+	case "loyalty.customer_enrolled":
+		if customerName, ok := data["customerName"].(string); ok && customerName != "" {
+			return fmt.Sprintf("%s enrolled in loyalty program", customerName)
+		}
+		return "Customer enrolled in loyalty program"
+	case "loyalty.points_earned":
+		if points, ok := data["points"].(float64); ok {
+			return fmt.Sprintf("%d loyalty points earned", int(points))
+		}
+		return "Loyalty points earned"
+	case "loyalty.points_redeemed":
+		if points, ok := data["points"].(float64); ok {
+			if reason, ok := data["reason"].(string); ok && reason != "" {
+				return fmt.Sprintf("%d loyalty points redeemed: %s", int(points), reason)
+			}
+			return fmt.Sprintf("%d loyalty points redeemed", int(points))
+		}
+		return "Loyalty points redeemed"
+	case "loyalty.tier_changed":
+		if tierName, ok := data["tierName"].(string); ok {
+			if prevTier, ok := data["previousTier"].(string); ok && prevTier != "" {
+				return fmt.Sprintf("Loyalty tier changed from %s to %s", prevTier, tierName)
+			}
+			return fmt.Sprintf("Loyalty tier changed to %s", tierName)
+		}
+		return "Loyalty tier changed"
 	// Gift card events
 	case "gift_card.created":
 		if code, ok := data["giftCardCode"].(string); ok {
