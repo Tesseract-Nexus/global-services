@@ -792,10 +792,13 @@ func (s *Subscriber) handleGiftCardEvent(msg *nats.Msg) {
 		return
 	}
 
-	exists, _ := s.notifRepo.ExistsBySourceEventID(context.Background(), event.SourceID)
-	if exists {
-		msg.Ack()
-		return
+	// Only check dedup if SourceID is set (empty SourceID would match other empty records)
+	if event.SourceID != "" {
+		exists, _ := s.notifRepo.ExistsBySourceEventID(context.Background(), event.SourceID)
+		if exists {
+			msg.Ack()
+			return
+		}
 	}
 
 	s.broadcastNotification(&event, event.TenantID)

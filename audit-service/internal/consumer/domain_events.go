@@ -331,6 +331,18 @@ func (c *DomainEventConsumer) convertToAuditLog(subject string, event *BaseEvent
 	if requesterName, ok := eventData["requesterName"].(string); ok && auditLog.Username == "" {
 		auditLog.Username = requesterName
 	}
+	// Extract gift card purchaser info
+	if purchaserID, ok := eventData["purchaserId"].(string); ok && auditLog.UserID == uuid.Nil {
+		if uid, err := uuid.Parse(purchaserID); err == nil {
+			auditLog.UserID = uid
+		}
+	}
+	if purchaserEmail, ok := eventData["purchaserEmail"].(string); ok && auditLog.UserEmail == "" {
+		auditLog.UserEmail = purchaserEmail
+	}
+	if purchaserName, ok := eventData["purchaserName"].(string); ok && auditLog.Username == "" {
+		auditLog.Username = purchaserName
+	}
 
 	// Extract resource info
 	auditLog.ResourceID, auditLog.ResourceName = c.extractResourceInfo(event.EventType, eventData)
