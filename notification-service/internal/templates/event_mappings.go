@@ -75,9 +75,6 @@ var eventToTemplateMap = map[string]string{
 	"gift_card.created":   "gift_card_recipient",
 	"gift_card.activated": "gift_card_recipient",
 
-	// Campaign events (no customer-facing emails; admin notifications only)
-	// "campaign.sent": "campaign_admin", // Can be added when email template is created
-
 	// Loyalty events (no customer-facing emails yet)
 	// "loyalty.customer_enrolled": "loyalty_welcome", // Can be added when email template is created
 }
@@ -99,6 +96,12 @@ var adminTemplateMap = map[string]string{
 	// Approval workflow events - for approvers
 	"approval.requested": "approval_approver",
 	"approval.escalated": "approval_approver",
+	// Campaign events - admin notifications
+	"campaign.sent":      "campaign_admin",
+	"campaign.completed": "campaign_admin",
+	"campaign.cancelled": "campaign_admin",
+	"campaign.scheduled": "campaign_admin",
+	"campaign.paused":    "campaign_admin",
 }
 
 // GetTemplateForEvent returns the appropriate customer-facing template name for a NATS event.

@@ -1532,9 +1532,33 @@ func (s *Subscriber) handleCampaignEvent(msg *nats.Msg) {
 
 	log.Printf("[NATS] Processing campaign event: %s for campaign %s", event.EventType, event.CampaignName)
 
-	// Campaign events are primarily for in-app notifications (handled by notification-hub)
-	// and audit logging (handled by audit-service).
-	// Email notifications for campaign events can be added here if needed.
+	ctx := context.Background()
+
+	variables := map[string]interface{}{
+		"campaignId":        event.CampaignID,
+		"campaignName":      event.CampaignName,
+		"campaignType":      event.CampaignType,
+		"campaignChannel":   event.Channel,
+		"campaignStatus":    event.Status,
+		"totalRecipients":   event.TotalRecipients,
+		"campaignDelivered": event.Delivered,
+		"campaignOpened":    event.Opened,
+		"campaignClicked":   event.Clicked,
+		"campaignConverted": event.Converted,
+		"campaignRevenue":   event.Revenue,
+		"campaignScheduledAt": event.ScheduledAt,
+		"campaignActorName":   event.ActorName,
+	}
+
+	switch event.EventType {
+	case events.CampaignSent, events.CampaignCompleted, events.CampaignCancelled,
+		events.CampaignScheduled, events.CampaignPaused:
+		log.Printf("[EMAIL] Sending campaign-admin to %s for campaign %s", s.adminEmail, event.CampaignName)
+		s.sendTemplatedEmail(ctx, event.TenantID, "campaign-admin", s.adminEmail, variables)
+
+	default:
+		log.Printf("[NATS] Skipping unhandled campaign event type: %s", event.EventType)
+	}
 
 	msg.Ack()
 	log.Printf("[NATS] Processed campaign event: %s for campaign %s", event.EventType, event.CampaignName)
@@ -2058,6 +2082,13 @@ func (s *Subscriber) renderEmbeddedTemplate(templateName string, variables map[s
 	// Gift card templates
 	case "gift_card_recipient":
 		return renderer.RenderGiftCardRecipient(data)
+	// Campaign templates
+	case "campaign_admin":
+		return renderer.RenderCampaignAdmin(data)
+	case "campaign_broadcast":
+		return renderer.RenderCampaignBroadcast(data)
+	case "campaign_newsletter":
+		return renderer.RenderCampaignNewsletter(data)
 	default:
 		return "", "", fmt.Errorf("no embedded template found for: %s", templateName)
 	}
@@ -2128,6 +2159,10 @@ func (s *Subscriber) mapTemplateNameToEmbedded(templateName string) string {
 		"gift-card-recipient":  "gift_card_recipient",
 		"gift-card-purchaser":  "gift_card_recipient",
 		"gift-card-activated":  "gift_card_recipient",
+		// Campaign templates
+		"campaign-admin":      "campaign_admin",
+		"campaign-broadcast":  "campaign_broadcast",
+		"campaign-newsletter": "campaign_newsletter",
 	}
 
 	if mapped, ok := mapping[templateName]; ok {
@@ -2503,6 +2538,60 @@ func (s *Subscriber) buildEmailData(variables map[string]interface{}) *templates
 	data.RecipientName = getString("recipientName")
 	data.GiftMessage = getString("message")
 	data.GiftCardExpiry = getString("expiresAt")
+
+	// Campaign fields
+	data.CampaignID = getString("campaignId")
+	data.CampaignName = getString("campaignName")
+	data.CampaignType = getString("campaignType")
+	data.CampaignChannel = getString("campaignChannel")
+	data.CampaignStatus = getString("campaignStatus")
+	data.CampaignCTAText = getString("campaignCTAText")
+	data.CampaignCTAURL = getString("campaignCTAUrl")
+	data.CampaignURL = getString("campaignUrl")
+	data.UnsubscribeURL = getString("unsubscribeUrl")
+	data.CampaignRevenue = getFloat("campaignRevenue")
+	data.CampaignScheduledAt = getString("campaignScheduledAt")
+	data.CampaignActorName = getString("campaignActorName")
+	if totalRecipients, ok := variables["totalRecipients"]; ok {
+		switch v := totalRecipients.(type) {
+		case int:
+			data.TotalRecipients = v
+		case float64:
+			data.TotalRecipients = int(v)
+		}
+	}
+	if delivered, ok := variables["campaignDelivered"]; ok {
+		switch v := delivered.(type) {
+		case int:
+			data.CampaignDelivered = v
+		case float64:
+			data.CampaignDelivered = int(v)
+		}
+	}
+	if opened, ok := variables["campaignOpened"]; ok {
+		switch v := opened.(type) {
+		case int:
+			data.CampaignOpened = v
+		case float64:
+			data.CampaignOpened = int(v)
+		}
+	}
+	if clicked, ok := variables["campaignClicked"]; ok {
+		switch v := clicked.(type) {
+		case int:
+			data.CampaignClicked = v
+		case float64:
+			data.CampaignClicked = int(v)
+		}
+	}
+	if converted, ok := variables["campaignConverted"]; ok {
+		switch v := converted.(type) {
+		case int:
+			data.CampaignConverted = v
+		case float64:
+			data.CampaignConverted = int(v)
+		}
+	}
 
 	// Storefront branding fields - for tenant-branded customer emails
 	data.BrandPrimaryColor = getString("brandPrimaryColor")

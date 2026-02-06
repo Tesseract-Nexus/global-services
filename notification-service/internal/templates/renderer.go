@@ -257,6 +257,26 @@ type EmailData struct {
 	GiftMessage     string
 	GiftCardExpiry  string
 
+	// Campaign fields
+	CampaignID          string
+	CampaignName        string
+	CampaignType        string
+	CampaignChannel     string
+	CampaignStatus      string
+	CampaignBody        template.HTML // Rich HTML content for broadcast/newsletter
+	CampaignCTAText     string
+	CampaignCTAURL      string
+	CampaignURL         string
+	UnsubscribeURL      string
+	TotalRecipients     int
+	CampaignDelivered   int
+	CampaignOpened      int
+	CampaignClicked     int
+	CampaignConverted   int
+	CampaignRevenue     string
+	CampaignScheduledAt string
+	CampaignActorName   string
+
 	// Storefront branding fields - for tenant-branded customer emails
 	// These colors come from the tenant's storefront settings
 	// If not provided, templates fall back to default slate palette
@@ -320,6 +340,10 @@ func NewRenderer() (*Renderer, error) {
 		"domain_customer",
 		// Gift card templates
 		"gift_card_recipient",
+		// Campaign templates
+		"campaign_admin",
+		"campaign_broadcast",
+		"campaign_newsletter",
 	}
 
 	for _, name := range templateNames {
