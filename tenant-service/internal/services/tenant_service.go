@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -585,9 +586,17 @@ func (s *TenantService) GetTenantOnboardingData(ctx context.Context, tenantID uu
 		First(&session).Error
 
 	if err == gorm.ErrRecordNotFound {
-		// No completed onboarding - return tenant basic info only
-		// This is valid for tenants created via quick-create flow
-		// Use tenant's actual settings from CompleteAccountSetup, not hardcoded defaults
+		// No completed onboarding session found for this tenant.
+		// Try fallback strategies to recover onboarding data:
+		// 1. Look for any session (in_progress/draft) linked to this tenant
+		// 2. Look for sessions matching this tenant's slug in draft_form_data
+		result := &TenantOnboardingData{
+			TenantID:   tenant.ID.String(),
+			TenantSlug: tenant.Slug,
+			TenantName: tenant.DisplayName,
+		}
+
+		// Use tenant's actual settings
 		currency := tenant.DefaultCurrency
 		if currency == "" {
 			currency = "USD"
@@ -596,21 +605,133 @@ func (s *TenantService) GetTenantOnboardingData(ctx context.Context, tenantID uu
 		if timezone == "" {
 			timezone = "UTC"
 		}
-		return &TenantOnboardingData{
-			TenantID:   tenant.ID.String(),
-			TenantSlug: tenant.Slug,
-			TenantName: tenant.DisplayName,
-			StoreSetup: &OnboardingStoreSetup{
-				Subdomain:      tenant.Subdomain,
-				Currency:       currency,
-				Timezone:       timezone,
-				Language:       "en",
-				LogoURL:        tenant.LogoURL,
-				FaviconURL:     tenant.FaviconURL,
-				PrimaryColor:   tenant.PrimaryColor,
-				SecondaryColor: tenant.SecondaryColor,
-			},
-		}, nil
+		result.StoreSetup = &OnboardingStoreSetup{
+			Subdomain:      tenant.Subdomain,
+			Currency:       currency,
+			Timezone:       timezone,
+			Language:       "en",
+			LogoURL:        tenant.LogoURL,
+			FaviconURL:     tenant.FaviconURL,
+			PrimaryColor:   tenant.PrimaryColor,
+			SecondaryColor: tenant.SecondaryColor,
+		}
+
+		// Strategy 1: Find any session linked to this tenant (any status)
+		var draftSession models.OnboardingSession
+		draftErr := s.db.WithContext(ctx).
+			Where("tenant_id = ?", tenantID).
+			Preload("BusinessInformation").
+			Preload("ContactInformation").
+			Preload("BusinessAddresses").
+			Order("updated_at DESC").
+			First(&draftSession).Error
+
+		// Strategy 2: If no session linked by tenant_id, search by slug in draft_form_data
+		if draftErr == gorm.ErrRecordNotFound {
+			draftErr = s.db.WithContext(ctx).
+				Where("draft_form_data->>'storeSetup' LIKE ?", fmt.Sprintf("%%\"subdomain\":\"%s\"%%", tenant.Slug)).
+				Preload("BusinessInformation").
+				Preload("ContactInformation").
+				Preload("BusinessAddresses").
+				Order("updated_at DESC").
+				First(&draftSession).Error
+		}
+
+		if draftErr == nil {
+			// Extract data from related tables if available
+			if len(draftSession.ContactInformation) > 0 {
+				ci := draftSession.ContactInformation[0]
+				phone := ci.Phone
+				if ci.PhoneCountryCode != "" && phone != "" && !strings.HasPrefix(phone, "+") {
+					phone = ci.PhoneCountryCode + " " + phone
+				}
+				result.Contact = &OnboardingContact{
+					FirstName:        ci.FirstName,
+					LastName:         ci.LastName,
+					Email:            ci.Email,
+					Phone:            phone,
+					PhoneCountryCode: ci.PhoneCountryCode,
+					JobTitle:         ci.JobTitle,
+				}
+			}
+			if len(draftSession.BusinessAddresses) > 0 {
+				ba := draftSession.BusinessAddresses[0]
+				result.Address = &OnboardingAddress{
+					StreetAddress: ba.StreetAddress,
+					City:          ba.City,
+					StateProvince: ba.StateProvince,
+					PostalCode:    ba.PostalCode,
+					Country:       ba.Country,
+				}
+			}
+			if draftSession.BusinessInformation != nil {
+				bi := draftSession.BusinessInformation
+				result.Business = &OnboardingBusiness{
+					BusinessName:        bi.BusinessName,
+					BusinessType:        bi.BusinessType,
+					Industry:            bi.Industry,
+					BusinessDescription: bi.BusinessDescription,
+					Website:             bi.Website,
+					RegistrationNumber:  bi.RegistrationNumber,
+					TaxID:               bi.TaxID,
+				}
+			}
+
+			// If related tables are empty, try extracting from draft_form_data JSONB
+			if result.Contact == nil || result.Address == nil {
+				var draftData map[string]json.RawMessage
+				if jsonErr := json.Unmarshal([]byte(draftSession.DraftFormData), &draftData); jsonErr == nil {
+					if result.Contact == nil {
+						if contactRaw, ok := draftData["contactDetails"]; ok {
+							var cd struct {
+								Email            string `json:"email"`
+								FirstName        string `json:"firstName"`
+								LastName         string `json:"lastName"`
+								PhoneNumber      string `json:"phoneNumber"`
+								PhoneCountryCode string `json:"phoneCountryCode"`
+								JobTitle         string `json:"jobTitle"`
+							}
+							if json.Unmarshal(contactRaw, &cd) == nil && (cd.Email != "" || cd.FirstName != "" || cd.PhoneNumber != "") {
+								phone := cd.PhoneNumber
+								if cd.PhoneCountryCode != "" && phone != "" && !strings.HasPrefix(phone, "+") {
+									phone = cd.PhoneCountryCode + " " + phone
+								}
+								result.Contact = &OnboardingContact{
+									FirstName:        cd.FirstName,
+									LastName:         cd.LastName,
+									Email:            cd.Email,
+									Phone:            phone,
+									PhoneCountryCode: cd.PhoneCountryCode,
+									JobTitle:         cd.JobTitle,
+								}
+							}
+						}
+					}
+					if result.Address == nil {
+						if addrRaw, ok := draftData["businessAddress"]; ok {
+							var ba struct {
+								StreetAddress string `json:"streetAddress"`
+								City          string `json:"city"`
+								State         string `json:"state"`
+								PostalCode    string `json:"postalCode"`
+								Country       string `json:"country"`
+							}
+							if json.Unmarshal(addrRaw, &ba) == nil && (ba.City != "" || ba.StreetAddress != "") {
+								result.Address = &OnboardingAddress{
+									StreetAddress: ba.StreetAddress,
+									City:          ba.City,
+									StateProvince: ba.State,
+									PostalCode:    ba.PostalCode,
+									Country:       ba.Country,
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+		return result, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get onboarding data: %w", err)
