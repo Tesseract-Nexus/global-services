@@ -73,6 +73,7 @@ export async function loadSecrets(): Promise<Record<string, string>> {
     CSRF_SECRET: `${prefix}-jwt-secret`,
     REDIS_PASSWORD: `${prefix}-marketplace-redis-password`,
     VERIFICATION_SERVICE_API_KEY: `${prefix}-marketplace-api-key`,
+    TOTP_ENCRYPTION_KEY: `${prefix}-totp-encryption-key`,
   };
 
   // Check for custom secret name overrides via environment variables
@@ -83,6 +84,7 @@ export async function loadSecrets(): Promise<Record<string, string>> {
     CSRF_SECRET: process.env.CSRF_SECRET_NAME,
     REDIS_PASSWORD: process.env.REDIS_PASSWORD_SECRET_NAME,
     VERIFICATION_SERVICE_API_KEY: process.env.VERIFICATION_SERVICE_API_KEY_SECRET_NAME,
+    TOTP_ENCRYPTION_KEY: process.env.TOTP_ENCRYPTION_KEY_SECRET_NAME,
   };
 
   const secrets: Record<string, string> = {};
@@ -105,7 +107,7 @@ export async function loadSecrets(): Promise<Record<string, string>> {
       logger.debug({ envVar, secretName }, 'Loaded secret from GCP');
     } catch (error) {
       // Some secrets might be optional
-      const isOptional = envVar === 'VERIFICATION_SERVICE_API_KEY';
+      const isOptional = envVar === 'VERIFICATION_SERVICE_API_KEY' || envVar === 'TOTP_ENCRYPTION_KEY';
       if (isOptional) {
         logger.warn({ envVar, secretName }, 'Optional secret not found, continuing');
       } else {
