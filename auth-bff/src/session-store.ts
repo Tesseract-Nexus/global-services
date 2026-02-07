@@ -91,6 +91,17 @@ export interface TotpSetupSessionData {
   createdAt: number;
 }
 
+// Passkey (WebAuthn) challenge for registration/authentication
+export interface PasskeyChallengeData {
+  type: 'registration' | 'authentication';
+  challenge: string;
+  userId?: string;
+  tenantId?: string;
+  tenantSlug?: string;
+  rpId: string;
+  createdAt: number;
+}
+
 // Device trust for MFA bypass on remembered devices
 export interface DeviceTrustData {
   userId: string;
@@ -109,6 +120,7 @@ class SessionStore {
   private readonly MFA_SESSION_PREFIX = 'bff:mfa_session:';
   private readonly DEVICE_TRUST_PREFIX = 'bff:device_trust:';
   private readonly TOTP_SETUP_PREFIX = 'bff:totp_setup:';
+  private readonly PASSKEY_CHALLENGE_PREFIX = 'bff:passkey_challenge:';
   private readonly SESSION_TTL = config.session.maxAge;
   private readonly AUTH_FLOW_TTL = 600; // 10 minutes for auth flow state
   private readonly WS_TICKET_TTL = 30; // 30 seconds for WebSocket tickets
@@ -116,6 +128,7 @@ class SessionStore {
   private readonly MFA_SESSION_TTL = 300; // 5 minutes for MFA session
   private readonly DEVICE_TRUST_TTL = 2592000; // 30 days for device trust
   private readonly TOTP_SETUP_TTL = 600; // 10 minutes for TOTP setup
+  private readonly PASSKEY_CHALLENGE_TTL = 300; // 5 minutes for passkey challenges
 
   constructor() {
     if (config.redis.url) {
@@ -406,6 +419,33 @@ class SessionStore {
   async deleteTotpSetupSession(sessionId: string): Promise<boolean> {
     const result = await this.redis.del(this.TOTP_SETUP_PREFIX + sessionId);
     return result > 0;
+  }
+
+  // Passkey Challenge Management
+  async savePasskeyChallenge(challengeId: string, data: PasskeyChallengeData): Promise<void> {
+    await this.redis.setex(
+      this.PASSKEY_CHALLENGE_PREFIX + challengeId,
+      this.PASSKEY_CHALLENGE_TTL,
+      JSON.stringify(data)
+    );
+    logger.debug({ challengeId, type: data.type }, 'Passkey challenge saved');
+  }
+
+  async getPasskeyChallenge(challengeId: string): Promise<PasskeyChallengeData | null> {
+    const data = await this.redis.get(this.PASSKEY_CHALLENGE_PREFIX + challengeId);
+    if (!data) return null;
+    return JSON.parse(data) as PasskeyChallengeData;
+  }
+
+  async consumePasskeyChallenge(challengeId: string): Promise<PasskeyChallengeData | null> {
+    const data = await this.redis.get(this.PASSKEY_CHALLENGE_PREFIX + challengeId);
+    if (!data) return null;
+
+    // Delete after consumption (single-use)
+    await this.redis.del(this.PASSKEY_CHALLENGE_PREFIX + challengeId);
+    logger.debug({ challengeId }, 'Passkey challenge consumed');
+
+    return JSON.parse(data) as PasskeyChallengeData;
   }
 
   // Health check

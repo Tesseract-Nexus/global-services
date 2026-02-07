@@ -20,7 +20,7 @@
  * 3. Session is created automatically on success
  */
 
-import { FastifyInstance, FastifyReply } from 'fastify';
+import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { config, getSessionCookieName } from '../config';
 import { tenantServiceClient, maskEmail } from '../tenant-service-client';
@@ -29,6 +29,7 @@ import { createLogger } from '../logger';
 import { v4 as uuidv4 } from 'uuid';
 import { callVerificationService } from '../verification-client';
 import { verifyTotpCode, decryptTotpSecret, verifyBackupCode, hashBackupCode } from '../totp';
+import { getCookieDomain, setSessionCookie } from '../cookie-helpers';
 
 const logger = createLogger('direct-auth');
 
@@ -135,68 +136,6 @@ function checkRateLimit(key: string): { allowed: boolean; remaining: number; res
   entry.count++;
   return { allowed: true, remaining: RATE_LIMIT_MAX_ATTEMPTS - entry.count, resetIn: entry.resetAt - now };
 }
-
-// ============================================================================
-// Cookie Helper
-// ============================================================================
-
-/**
- * Determine the cookie domain based on the request host.
- * For tesserix.app domains, use .tesserix.app to enable cross-subdomain cookies.
- * For custom domains (e.g., admin.yahvismartfarm.com), don't set domain to let
- * the browser default to the request host.
- */
-const getCookieDomain = (forwardedHost: string | undefined): string | undefined => {
-  // If a static domain is configured, use it
-  if (config.session.cookieDomain) {
-    return config.session.cookieDomain;
-  }
-
-  // Dynamic domain determination based on X-Forwarded-Host
-  if (!forwardedHost) {
-    return undefined;
-  }
-
-  // Remove port if present
-  const hostname = forwardedHost.split(':')[0].toLowerCase();
-
-  // For tesserix.app domains, use .tesserix.app for cross-subdomain cookies
-  if (hostname.endsWith('.tesserix.app') || hostname === 'tesserix.app') {
-    return '.tesserix.app';
-  }
-
-  // For localhost, use undefined to let browser default
-  if (hostname === 'localhost' || hostname.endsWith('.localhost')) {
-    return undefined;
-  }
-
-  // For custom domains, don't set domain - let browser default to request host
-  // This is critical for custom domain authentication to work
-  logger.debug({ hostname }, 'Custom domain detected, not setting cookie domain');
-  return undefined;
-};
-
-const setSessionCookie = (
-  reply: FastifyReply,
-  sessionId: string,
-  forwardedHost: string | undefined,
-  rememberMe: boolean = false
-) => {
-  const maxAge = rememberMe ? config.session.maxAge * 7 : config.session.maxAge; // 7 days if remember me
-  const domain = getCookieDomain(forwardedHost);
-  const cookieName = getSessionCookieName(forwardedHost);
-
-  logger.debug({ domain, forwardedHost, cookieName }, 'Setting session cookie');
-
-  reply.setCookie(cookieName, sessionId, {
-    httpOnly: true,
-    secure: config.server.nodeEnv === 'production',
-    sameSite: 'lax',
-    path: '/',
-    maxAge,
-    ...(domain ? { domain } : {}), // Only set domain if defined
-  });
-};
 
 // ============================================================================
 // Routes

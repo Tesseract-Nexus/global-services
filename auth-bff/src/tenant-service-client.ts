@@ -227,6 +227,57 @@ export interface ConsumBackupCodeResponse {
   message?: string;
 }
 
+// ============================================================================
+// Passkey (WebAuthn) Types
+// ============================================================================
+
+export interface PasskeyCredential {
+  credential_id: string;
+  public_key: string;
+  counter: number;
+  device_type: string;
+  backed_up: boolean;
+  transports?: string[];
+  name: string;
+  created_at: string;
+  last_used_at?: string;
+}
+
+export interface SavePasskeyRequest {
+  user_id: string;
+  tenant_id: string;
+  credential_id: string;
+  public_key: string;
+  counter: number;
+  device_type: string;
+  backed_up: boolean;
+  transports?: string[];
+  name: string;
+}
+
+export interface GetPasskeysResponse {
+  success: boolean;
+  passkeys: PasskeyCredential[];
+  message?: string;
+}
+
+export interface GetPasskeyByCredentialIdResponse {
+  success: boolean;
+  passkey?: PasskeyCredential;
+  user_id?: string;
+  keycloak_user_id?: string;
+  email?: string;
+  first_name?: string;
+  last_name?: string;
+  tenant_id?: string;
+  tenant_slug?: string;
+  role?: string;
+  access_token?: string;
+  refresh_token?: string;
+  id_token?: string;
+  message?: string;
+}
+
 // Internal API response types
 interface ApiResponse {
   success?: boolean;
@@ -1065,6 +1116,224 @@ class TenantServiceClient {
       };
     } catch (error) {
       logger.error({ error, userId }, 'Error consuming backup code');
+      return { success: false, message: 'Service temporarily unavailable' };
+    }
+  }
+
+  // ============================================================================
+  // Passkey (WebAuthn) Methods
+  // ============================================================================
+
+  /**
+   * Save a new passkey credential for a user
+   */
+  async savePasskey(request: SavePasskeyRequest): Promise<{ success: boolean; message?: string }> {
+    try {
+      logger.info({ userId: request.user_id, credentialId: request.credential_id }, 'Saving passkey');
+
+      const response = await this.fetch('/api/v1/auth/passkeys/save', {
+        method: 'POST',
+        body: JSON.stringify(request),
+      });
+
+      const data = await response.json() as ApiResponse;
+
+      if (!response.ok) {
+        logger.warn({ userId: request.user_id, status: response.status }, 'Failed to save passkey');
+        return { success: false, message: data.message || 'Failed to save passkey' };
+      }
+
+      return { success: true };
+    } catch (error) {
+      logger.error({ error, userId: request.user_id }, 'Error saving passkey');
+      return { success: false, message: 'Service temporarily unavailable' };
+    }
+  }
+
+  /**
+   * List all passkeys for a user
+   */
+  async getPasskeys(userId: string, tenantId: string): Promise<GetPasskeysResponse> {
+    try {
+      const response = await this.fetch('/api/v1/auth/passkeys/list', {
+        method: 'POST',
+        body: JSON.stringify({ user_id: userId, tenant_id: tenantId }),
+      });
+
+      const data = await response.json() as ApiResponse & { passkeys?: PasskeyCredential[] };
+
+      if (!response.ok) {
+        return { success: false, passkeys: [], message: data.message || 'Failed to list passkeys' };
+      }
+
+      return {
+        success: true,
+        passkeys: data.passkeys || [],
+      };
+    } catch (error) {
+      logger.error({ error, userId }, 'Error listing passkeys');
+      return { success: false, passkeys: [], message: 'Service temporarily unavailable' };
+    }
+  }
+
+  /**
+   * Look up a passkey by credential ID for authentication.
+   * Returns the passkey credential, user info, and tokens.
+   */
+  async getPasskeyByCredentialId(
+    credentialId: string,
+    rpId: string
+  ): Promise<GetPasskeyByCredentialIdResponse> {
+    try {
+      logger.info({ credentialId }, 'Looking up passkey by credential ID');
+
+      const response = await this.fetch('/api/v1/auth/passkeys/authenticate', {
+        method: 'POST',
+        body: JSON.stringify({ credential_id: credentialId, rp_id: rpId }),
+      });
+
+      const data = await response.json() as ApiResponse & {
+        passkey?: PasskeyCredential;
+        user_id?: string;
+        keycloak_user_id?: string;
+        email?: string;
+        first_name?: string;
+        last_name?: string;
+        tenant_id?: string;
+        tenant_slug?: string;
+        role?: string;
+        access_token?: string;
+        refresh_token?: string;
+        id_token?: string;
+      };
+
+      if (!response.ok) {
+        return { success: false, message: data.message || 'Passkey not found' };
+      }
+
+      return {
+        success: true,
+        passkey: data.passkey,
+        user_id: data.user_id,
+        keycloak_user_id: data.keycloak_user_id,
+        email: data.email,
+        first_name: data.first_name,
+        last_name: data.last_name,
+        tenant_id: data.tenant_id,
+        tenant_slug: data.tenant_slug,
+        role: data.role,
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+        id_token: data.id_token,
+      };
+    } catch (error) {
+      logger.error({ error, credentialId }, 'Error looking up passkey');
+      return { success: false, message: 'Service temporarily unavailable' };
+    }
+  }
+
+  /**
+   * Update the signature counter for a passkey (clone detection)
+   */
+  async updatePasskeyCounter(
+    credentialId: string,
+    counter: number
+  ): Promise<{ success: boolean; message?: string }> {
+    try {
+      const response = await this.fetch('/api/v1/auth/passkeys/update-counter', {
+        method: 'POST',
+        body: JSON.stringify({ credential_id: credentialId, counter }),
+      });
+
+      const data = await response.json() as ApiResponse;
+
+      if (!response.ok) {
+        return { success: false, message: data.message || 'Failed to update counter' };
+      }
+
+      return { success: true };
+    } catch (error) {
+      logger.error({ error, credentialId }, 'Error updating passkey counter');
+      return { success: false, message: 'Service temporarily unavailable' };
+    }
+  }
+
+  /**
+   * Update the last_used_at timestamp for a passkey
+   */
+  async updatePasskeyLastUsed(credentialId: string): Promise<{ success: boolean; message?: string }> {
+    try {
+      const response = await this.fetch('/api/v1/auth/passkeys/update-last-used', {
+        method: 'POST',
+        body: JSON.stringify({ credential_id: credentialId }),
+      });
+
+      const data = await response.json() as ApiResponse;
+
+      if (!response.ok) {
+        return { success: false, message: data.message || 'Failed to update last used' };
+      }
+
+      return { success: true };
+    } catch (error) {
+      logger.error({ error, credentialId }, 'Error updating passkey last used');
+      return { success: false, message: 'Service temporarily unavailable' };
+    }
+  }
+
+  /**
+   * Rename a passkey
+   */
+  async renamePasskey(
+    credentialId: string,
+    userId: string,
+    tenantId: string,
+    name: string
+  ): Promise<{ success: boolean; message?: string }> {
+    try {
+      const response = await this.fetch('/api/v1/auth/passkeys/rename', {
+        method: 'POST',
+        body: JSON.stringify({ credential_id: credentialId, user_id: userId, tenant_id: tenantId, name }),
+      });
+
+      const data = await response.json() as ApiResponse;
+
+      if (!response.ok) {
+        return { success: false, message: data.message || 'Failed to rename passkey' };
+      }
+
+      return { success: true };
+    } catch (error) {
+      logger.error({ error, credentialId }, 'Error renaming passkey');
+      return { success: false, message: 'Service temporarily unavailable' };
+    }
+  }
+
+  /**
+   * Delete a passkey
+   */
+  async deletePasskey(
+    credentialId: string,
+    userId: string,
+    tenantId: string
+  ): Promise<{ success: boolean; message?: string }> {
+    try {
+      logger.info({ credentialId, userId }, 'Deleting passkey');
+
+      const response = await this.fetch('/api/v1/auth/passkeys/delete', {
+        method: 'POST',
+        body: JSON.stringify({ credential_id: credentialId, user_id: userId, tenant_id: tenantId }),
+      });
+
+      const data = await response.json() as ApiResponse;
+
+      if (!response.ok) {
+        return { success: false, message: data.message || 'Failed to delete passkey' };
+      }
+
+      return { success: true };
+    } catch (error) {
+      logger.error({ error, credentialId }, 'Error deleting passkey');
       return { success: false, message: 'Service temporarily unavailable' };
     }
   }

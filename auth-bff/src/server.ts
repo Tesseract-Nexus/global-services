@@ -18,6 +18,7 @@ import { directAuthRoutes } from './routes/direct-auth';
 import { apiProxyRoutes } from './routes/api-proxy';
 import { otpRoutes } from './routes/otp';
 import { totpRoutes } from './routes/totp';
+import { passkeyRoutes } from './routes/passkeys';
 import { sessionStore } from './session-store';
 import { oidcClient } from './oidc-client';
 
@@ -133,6 +134,7 @@ async function buildApp() {
   await fastify.register(directAuthRoutes); // Multi-tenant direct login
   await fastify.register(otpRoutes); // OTP verification for customer email
   await fastify.register(totpRoutes); // TOTP authenticator app setup and management
+  await fastify.register(passkeyRoutes); // WebAuthn/Passkey authentication
   await fastify.register(apiProxyRoutes);
 
   // Error handler
