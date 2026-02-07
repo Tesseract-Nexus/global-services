@@ -27,7 +27,7 @@ import {
   verifyAuthenticationResponse,
 } from '@simplewebauthn/server';
 import { v4 as uuidv4 } from 'uuid';
-import { getSessionCookieName } from '../config';
+import { config, getSessionCookieName } from '../config';
 import { sessionStore } from '../session-store';
 import { tenantServiceClient } from '../tenant-service-client';
 import { setSessionCookie } from '../cookie-helpers';
@@ -46,8 +46,8 @@ function deriveRpId(forwardedHost: string | undefined): string {
 
   const hostname = forwardedHost.split(':')[0].toLowerCase();
 
-  if (hostname.endsWith('.tesserix.app') || hostname === 'tesserix.app') {
-    return 'tesserix.app';
+  if (hostname.endsWith(`.${config.baseDomain}`) || hostname === config.baseDomain) {
+    return config.baseDomain;
   }
 
   if (hostname === 'localhost' || hostname.endsWith('.localhost')) {

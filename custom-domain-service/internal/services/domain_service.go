@@ -335,7 +335,7 @@ func (s *DomainService) ValidateDomain(ctx context.Context, req *ValidateDomainR
 	cnameRecord := models.DNSRecord{
 		RecordType: "CNAME",
 		Host:       "_tesserix-" + shortToken + "." + domainName,
-		Value:      "verify.tesserix.app",
+		Value:      fmt.Sprintf("verify.%s", s.cfg.DNS.VerificationDomain),
 		TTL:        3600,
 		Purpose:    "verification",
 	}
@@ -1393,7 +1393,7 @@ func (s *DomainService) publishDomainEvent(ctx context.Context, eventType string
 	event.IsPrimary = domain.PrimaryDomain
 	event.TargetType = string(domain.TargetType)
 	event.DomainURL = fmt.Sprintf("https://%s", domain.Domain)
-	event.AdminURL = fmt.Sprintf("https://%s-admin.tesserix.app", domain.TenantSlug)
+	event.AdminURL = fmt.Sprintf("https://%s-admin.%s", domain.TenantSlug, s.cfg.DNS.PlatformDomain)
 
 	if domain.DNSVerifiedAt != nil {
 		event.DNSVerifiedAt = domain.DNSVerifiedAt.Format(time.RFC3339)

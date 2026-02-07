@@ -6,7 +6,7 @@ const logger = createLogger('oidc-client');
 
 // Configure custom HTTP options to set User-Agent header
 // This is required because some WAF/CDN configurations block empty or "node" User-Agents
-const CUSTOM_USER_AGENT = 'Mozilla/5.0 (compatible; auth-bff/1.0; +https://tesserix.app)';
+const CUSTOM_USER_AGENT = `Mozilla/5.0 (compatible; auth-bff/1.0; +https://${config.baseDomain})`;
 
 /**
  * Discover OIDC issuer with custom User-Agent header.

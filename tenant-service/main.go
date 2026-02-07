@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -397,14 +398,26 @@ func setupRouter(
 
 	// CORS configuration
 	config := cors.DefaultConfig()
-	config.AllowOrigins = []string{
-		"http://localhost:3002",               // Onboarding app (local)
-		"http://localhost:4200",               // Admin portal (local)
-		"http://localhost:4201",               // Onboarding app alternate (local)
-		"https://dev-admin.tesserix.app",      // Admin portal (dev)
-		"https://dev-onboarding.tesserix.app", // Onboarding app (dev)
-		"https://admin.tesserix.app",          // Admin portal (prod)
-		"https://onboarding.tesserix.app",     // Onboarding app (prod)
+	// Use CORS_ALLOWED_ORIGINS env var for production, fall back to defaults for development
+	if corsEnv := os.Getenv("CORS_ALLOWED_ORIGINS"); corsEnv != "" {
+		origins := strings.Split(corsEnv, ",")
+		trimmed := make([]string, 0, len(origins))
+		for _, o := range origins {
+			if t := strings.TrimSpace(o); t != "" {
+				trimmed = append(trimmed, t)
+			}
+		}
+		config.AllowOrigins = trimmed
+	} else {
+		config.AllowOrigins = []string{
+			"http://localhost:3002",               // Onboarding app (local)
+			"http://localhost:4200",               // Admin portal (local)
+			"http://localhost:4201",               // Onboarding app alternate (local)
+			"https://dev-admin.tesserix.app",      // Admin portal (dev)
+			"https://dev-onboarding.tesserix.app", // Onboarding app (dev)
+			"https://admin.tesserix.app",          // Admin portal (prod)
+			"https://onboarding.tesserix.app",     // Onboarding app (prod)
+		}
 	}
 	config.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
 	config.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Request-ID", "X-Tenant-ID", "X-User-ID"}

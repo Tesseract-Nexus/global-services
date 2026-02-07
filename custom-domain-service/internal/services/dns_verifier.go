@@ -278,7 +278,7 @@ func (v *DNSVerifier) verifyCNAMERecord(ctx context.Context, domain *models.Cust
 
 	// Verification CNAME subdomain with unique token
 	verificationHost := "_tesserix-" + shortToken + "." + domain.Domain
-	expectedTarget := "verify.tesserix.app"
+	expectedTarget := fmt.Sprintf("verify.%s", v.cfg.DNS.VerificationDomain)
 
 	result.ExpectedRecord = fmt.Sprintf("%s CNAME %s", verificationHost, expectedTarget)
 
@@ -445,7 +445,7 @@ func (v *DNSVerifier) GetRequiredDNSRecordsWithIP(domain *models.CustomDomain, r
 		records = append(records, models.DNSRecord{
 			RecordType: "CNAME",
 			Host:       "_tesserix-" + shortToken + "." + domain.Domain,
-			Value:      "verify.tesserix.app",
+			Value:      fmt.Sprintf("verify.%s", v.cfg.DNS.VerificationDomain),
 			TTL:        300,
 			Purpose:    "verification",
 			IsVerified: domain.DNSVerified,
@@ -619,7 +619,8 @@ func (v *DNSVerifier) ValidateDomainFormat(domain string) error {
 	}
 
 	// Check it's not our platform domain
-	if strings.HasSuffix(domain, ".tesserix.app") || domain == "tesserix.app" {
+	platformDomain := v.cfg.DNS.PlatformDomain
+	if strings.HasSuffix(domain, "."+platformDomain) || domain == platformDomain {
 		return fmt.Errorf("cannot use platform domain")
 	}
 

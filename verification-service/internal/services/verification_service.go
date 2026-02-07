@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"os"
 	"fmt"
 	"log"
 	"time"
@@ -422,11 +423,19 @@ func (s *VerificationService) SendCustomEmail(ctx context.Context, req *models.S
 		}
 		adminURL := req.AdminURL
 		if adminURL == "" {
-			adminURL = "https://admin.tesserix.app"
+			baseDomain := os.Getenv("BASE_DOMAIN")
+			if baseDomain == "" {
+				baseDomain = "tesserix.app"
+			}
+			adminURL = fmt.Sprintf("https://admin.%s", baseDomain)
 		}
 		storefrontURL := req.StorefrontURL
 		if storefrontURL == "" {
-			storefrontURL = "https://store.tesserix.app"
+			baseDomain := os.Getenv("BASE_DOMAIN")
+			if baseDomain == "" {
+				baseDomain = "tesserix.app"
+			}
+			storefrontURL = fmt.Sprintf("https://store.%s", baseDomain)
 		}
 		subject, htmlBody = providers.FormatWelcomePackEmail(firstName, businessName, req.TenantSlug, adminURL, storefrontURL, req.Recipient)
 

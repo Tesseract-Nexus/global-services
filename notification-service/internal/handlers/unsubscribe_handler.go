@@ -326,10 +326,10 @@ func (h *UnsubscribeHandler) renderUnsubscribePage(c *gin.Context, email, catego
 			return fmt.Sprintf(`
         <h1>Oops!</h1>
         <div class="error">%s</div>
-        <a href="https://marketplace.tesserix.app" class="btn btn-secondary">Go to Homepage</a>
+        <a href="https://marketplace.%s" class="btn btn-secondary">Go to Homepage</a>
         <div class="footer">
-            <p>Need help? <a href="mailto:support@tesserix.app">Contact Support</a></p>
-        </div>`, errorMsg)
+            <p>Need help? <a href="mailto:%s">Contact Support</a></p>
+        </div>`, errorMsg, getBaseDomain(), getSupportEmail())
 		}
 		return fmt.Sprintf(`
         <h1>Unsubscribe</h1>
@@ -341,10 +341,10 @@ func (h *UnsubscribeHandler) renderUnsubscribePage(c *gin.Context, email, catego
             <input type="hidden" name="s" value="%s">
             <button type="submit" class="btn btn-primary">Yes, Unsubscribe</button>
         </form>
-        <a href="https://marketplace.tesserix.app" class="btn btn-secondary">Cancel</a>
+        <a href="https://marketplace.%s" class="btn btn-secondary">Cancel</a>
         <div class="footer">
             <p>You can also <a href="/api/v1/preferences?d=%s&s=%s">manage your preferences</a></p>
-        </div>`, categoryDisplay, email, splitToken(token, 0), splitToken(token, 1), splitToken(token, 0), splitToken(token, 1))
+        </div>`, categoryDisplay, email, splitToken(token, 0), splitToken(token, 1), getBaseDomain(), splitToken(token, 0), splitToken(token, 1))
 	}())
 
 	c.Header("Content-Type", "text/html; charset=utf-8")
@@ -424,20 +424,36 @@ func (h *UnsubscribeHandler) renderUnsubscribeSuccess(c *gin.Context, email, cat
         <p>You will no longer receive <strong>%s</strong> at:</p>
         <div class="email">%s</div>
         <p>We're sorry to see you go! You can always resubscribe from your account settings.</p>
-        <a href="https://marketplace.tesserix.app" class="btn btn-primary">Continue Shopping</a>
+        <a href="https://marketplace.%s" class="btn btn-primary">Continue Shopping</a>
         <div class="resubscribe">
             <p>Changed your mind?</p>
-            <a href="https://marketplace.tesserix.app/account/notifications">Manage Preferences</a>
+            <a href="https://marketplace.%s/account/notifications">Manage Preferences</a>
         </div>
         <div class="footer">
             <p>Tesserix - Your Trusted Marketplace</p>
         </div>
     </div>
 </body>
-</html>`, categoryDisplay, email)
+</html>`, categoryDisplay, email, getBaseDomain(), getBaseDomain())
 
 	c.Header("Content-Type", "text/html; charset=utf-8")
 	c.String(http.StatusOK, html)
+}
+
+// getBaseDomain returns the base domain from environment, defaulting to tesserix.app
+func getBaseDomain() string {
+	if d := os.Getenv("BASE_DOMAIN"); d != "" {
+		return d
+	}
+	return "tesserix.app"
+}
+
+// getSupportEmail returns the support email from environment, defaulting to support@tesserix.app
+func getSupportEmail() string {
+	if e := os.Getenv("SUPPORT_EMAIL"); e != "" {
+		return e
+	}
+	return "support@tesserix.app"
 }
 
 // Helper functions

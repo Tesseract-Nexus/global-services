@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"fmt"
 	"log"
 	"time"
@@ -174,7 +175,11 @@ func (s *CustomerDeactivationService) DeactivateCustomer(ctx context.Context, re
 			if storeName == "" {
 				storeName = tenant.Slug
 			}
-			storefrontURL := fmt.Sprintf("https://%s.tesserix.app/login", tenant.Slug)
+			baseDomain := os.Getenv("BASE_DOMAIN")
+			if baseDomain == "" {
+				baseDomain = "tesserix.app"
+			}
+			storefrontURL := fmt.Sprintf("https://%s.%s/login", tenant.Slug, baseDomain)
 
 			if err := s.notificationClient.SendGoodbyeEmail(sendCtx, &clients.GoodbyeEmailData{
 				Email:           user.Email,

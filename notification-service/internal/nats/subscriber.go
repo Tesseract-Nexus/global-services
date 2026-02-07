@@ -3,6 +3,7 @@ package nats
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"fmt"
 	"log"
 	"strings"
@@ -126,10 +127,18 @@ func NewSubscriber(
 ) *Subscriber {
 	// Use defaults if not provided
 	if adminEmail == "" {
-		adminEmail = "admin@tesserix.app"
+		if envAdmin := os.Getenv("ADMIN_EMAIL"); envAdmin != "" {
+			adminEmail = envAdmin
+		} else {
+			adminEmail = "admin@tesserix.app"
+		}
 	}
 	if supportEmail == "" {
-		supportEmail = "support@tesserix.app"
+		if envSupport := os.Getenv("SUPPORT_EMAIL"); envSupport != "" {
+			supportEmail = envSupport
+		} else {
+			supportEmail = "support@tesserix.app"
+		}
 	}
 	return &Subscriber{
 		client:        client,

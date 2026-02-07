@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"fmt"
+	"os"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -374,7 +376,12 @@ func (h *FeaturesHandler) GetSDKConfig(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data": gin.H{
-			"api_host":    "https://dev-growthbook.tesserix.app",
+			"api_host":    func() string {
+				if sdkHost := os.Getenv("GROWTHBOOK_SDK_HOST"); sdkHost != "" {
+					return sdkHost
+				}
+				return "https://dev-growthbook.tesserix.app"
+			}(),
 			"tenant_id":   tenantID,
 			"environment": h.config.Environment,
 			"features": gin.H{

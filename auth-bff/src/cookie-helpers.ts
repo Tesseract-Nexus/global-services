@@ -24,9 +24,9 @@ export const getCookieDomain = (forwardedHost: string | undefined): string | und
   // Remove port if present
   const hostname = forwardedHost.split(':')[0].toLowerCase();
 
-  // For tesserix.app domains, use .tesserix.app for cross-subdomain cookies
-  if (hostname.endsWith('.tesserix.app') || hostname === 'tesserix.app') {
-    return '.tesserix.app';
+  // For platform domains, use .{baseDomain} for cross-subdomain cookies
+  if (hostname.endsWith(`.${config.baseDomain}`) || hostname === config.baseDomain) {
+    return `.${config.baseDomain}`;
   }
 
   // For localhost, use undefined to let browser default

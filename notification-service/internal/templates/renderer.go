@@ -5,6 +5,7 @@ import (
 	"embed"
 	"fmt"
 	"html/template"
+	"os"
 	"time"
 )
 
@@ -385,7 +386,11 @@ func (r *Renderer) Render(templateName string, data *EmailData) (string, error) 
 		data.Currency = "$"
 	}
 	if data.SupportEmail == "" {
-		data.SupportEmail = "support@tesserix.app"
+		if envSupport := os.Getenv("SUPPORT_EMAIL"); envSupport != "" {
+			data.SupportEmail = envSupport
+		} else {
+			data.SupportEmail = "support@tesserix.app"
+		}
 	}
 	if data.BusinessInitial == "" && data.BusinessName != "" && len(data.BusinessName) > 0 {
 		data.BusinessInitial = string(data.BusinessName[0])

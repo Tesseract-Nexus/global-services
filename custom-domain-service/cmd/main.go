@@ -287,19 +287,16 @@ func setupRouter(cfg *config.Config, domainHandlers *handlers.DomainHandlers, in
 
 	// CORS middleware - configured for internal service communication
 	// When running behind Istio, CORS is typically handled at the gateway level
-	// For internal APIs, we restrict origins to known services
-	allowedOrigins := []string{
-		"https://admin.devtest.tesserix.app",
-		"https://onboarding.devtest.tesserix.app",
-		"https://admin.tesserix.app",
-		"https://onboarding.tesserix.app",
-	}
-	// Allow additional origins from environment
-	if extraOrigins := os.Getenv("CORS_ALLOWED_ORIGINS"); extraOrigins != "" {
-		for _, origin := range splitAndTrim(extraOrigins, ",") {
-			if origin != "" {
-				allowedOrigins = append(allowedOrigins, origin)
-			}
+	// Use CORS_ALLOWED_ORIGINS env var, fall back to defaults for development
+	var allowedOrigins []string
+	if corsEnv := os.Getenv("CORS_ALLOWED_ORIGINS"); corsEnv != "" {
+		allowedOrigins = splitAndTrim(corsEnv, ",")
+	} else {
+		allowedOrigins = []string{
+			"https://admin.devtest.tesserix.app",
+			"https://onboarding.devtest.tesserix.app",
+			"https://admin.tesserix.app",
+			"https://onboarding.tesserix.app",
 		}
 	}
 

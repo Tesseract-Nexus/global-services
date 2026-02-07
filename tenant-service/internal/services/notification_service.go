@@ -142,9 +142,9 @@ func (s *NotificationService) SendWelcomePackEmail(ctx context.Context, data *We
 		"dashboard_url":  dashboardURL,
 		"login_email":    data.Email,
 		// Include helpful links
-		"help_center_url":   "https://help.tesserix.app",
-		"documentation_url": "https://docs.tesserix.app",
-		"support_email":     "support@tesserix.app",
+		"help_center_url":   fmt.Sprintf("https://help.%s", baseDomain),
+		"documentation_url": fmt.Sprintf("https://docs.%s", baseDomain),
+		"support_email":     fmt.Sprintf("support@%s", baseDomain),
 	}
 
 	// Try to send via email service
