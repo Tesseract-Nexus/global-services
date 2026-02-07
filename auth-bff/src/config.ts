@@ -51,6 +51,9 @@ const envSchema = z.object({
   // TOTP encryption
   TOTP_ENCRYPTION_KEY: z.string().min(32).optional(),
 
+  // Base domain for hostname matching (tesserix.app for staging, mark8ly.com for prod)
+  BASE_DOMAIN: z.string().default('tesserix.app'),
+
   // Trusted Proxies
   TRUST_PROXY: z.string().default('true'),
 });
@@ -108,6 +111,7 @@ export const config = {
     port: parseInt(env.REDIS_PORT, 10),
     password: env.REDIS_PASSWORD,
   },
+  baseDomain: env.BASE_DOMAIN,
   allowedOrigins: env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()),
   apiGatewayUrl: env.API_GATEWAY_URL,
   tenantServiceUrl: env.TENANT_SERVICE_URL || 'http://tenant-service.marketplace.svc.cluster.local:8080',
@@ -119,13 +123,14 @@ export const config = {
 
 /**
  * Determine if the request originates from an admin host based on x-forwarded-host.
- * Admin hosts follow the pattern: *-admin.tesserix.app
+ * Admin hosts follow the pattern: *-admin.{BASE_DOMAIN}
  * Everything else (storefronts, custom domains) is non-admin.
  */
 export function isAdminHost(forwardedHost: string | undefined): boolean {
   if (!forwardedHost) return false;
   const hostname = forwardedHost.split(':')[0].toLowerCase();
-  return /^.+-admin\.tesserix\.app$/.test(hostname);
+  const escapedDomain = config.baseDomain.replace(/\./g, '\\.');
+  return new RegExp(`^.+-admin\\.${escapedDomain}$`).test(hostname);
 }
 
 /**

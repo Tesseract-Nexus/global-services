@@ -56,8 +56,9 @@ const getCookieDomain = (forwardedHost: string | undefined): string | undefined 
     return undefined;
   }
   const hostname = forwardedHost.split(':')[0].toLowerCase();
-  if (hostname.endsWith('.tesserix.app') || hostname === 'tesserix.app') {
-    return '.tesserix.app';
+  const baseDomain = config.baseDomain;
+  if (hostname.endsWith(`.${baseDomain}`) || hostname === baseDomain) {
+    return `.${baseDomain}`;
   }
   if (hostname === 'localhost' || hostname.endsWith('.localhost')) {
     return undefined;
@@ -65,9 +66,9 @@ const getCookieDomain = (forwardedHost: string | undefined): string | undefined 
   // Custom domains: set cookie on the base domain so it works across
   // both www.example.com and example.com. Strip "www." prefix and prepend
   // with "." to enable subdomain sharing.
-  const baseDomain = hostname.startsWith('www.') ? hostname.substring(4) : hostname;
-  logger.debug({ hostname, cookieDomain: `.${baseDomain}` }, 'Custom domain detected, using base domain for cookie');
-  return `.${baseDomain}`;
+  const customBaseDomain = hostname.startsWith('www.') ? hostname.substring(4) : hostname;
+  logger.debug({ hostname, cookieDomain: `.${customBaseDomain}` }, 'Custom domain detected, using base domain for cookie');
+  return `.${customBaseDomain}`;
 };
 
 const setSessionCookie = (reply: FastifyReply, sessionId: string, forwardedHost?: string) => {
@@ -125,11 +126,12 @@ export async function authRoutes(fastify: FastifyInstance) {
     let tenantSlug = query.tenant_slug || (request.headers['x-tenant-slug'] as string | undefined);
 
     // Extract tenant slug from hostname if not provided
-    // e.g., demo-store-admin.tesserix.app → demo-store
+    // e.g., demo-store-admin.mark8ly.com → demo-store
     if (!tenantSlug) {
       const forwardedHost = (request.headers['x-forwarded-host'] as string || request.hostname || '').split(':')[0];
-      const adminMatch = forwardedHost.match(/^(.+)-admin\.tesserix\.app$/);
-      const storefrontMatch = forwardedHost.match(/^(.+)\.tesserix\.app$/);
+      const escapedDomain = config.baseDomain.replace(/\./g, '\\.');
+      const adminMatch = forwardedHost.match(new RegExp(`^(.+)-admin\\.${escapedDomain}$`));
+      const storefrontMatch = forwardedHost.match(new RegExp(`^(.+)\\.${escapedDomain}$`));
       if (adminMatch) {
         tenantSlug = adminMatch[1];
       } else if (storefrontMatch && !storefrontMatch[1].includes('devtest')) {
@@ -812,11 +814,15 @@ export async function authRoutes(fastify: FastifyInstance) {
 }
 
 // Helper functions
-function determineClientType(_request: FastifyRequest): 'internal' | 'customer' {
-  // TODO: Enable internal client once tesserix-internal realm is configured
-  // For now, all admin apps use customer IDP (tenant owners/staff authenticate via customer realm)
-  // Once internal IDP is ready, admin.tesserix.app can use internal for Tesserix employees
-  // and {slug}-admin.tesserix.app will continue to use customer for tenant staff
+function determineClientType(request: FastifyRequest): 'internal' | 'customer' {
+  // Tenant admin apps ({slug}-admin.{domain}) use customer IDP
+  // Platform admin (admin.{domain}) uses internal IDP for Tesserix employees
+  // Storefronts and custom domains use customer IDP
+  const forwardedHost = (request.headers['x-forwarded-host'] as string || request.hostname || '').split(':')[0];
+  const baseDomain = config.baseDomain;
+  if (forwardedHost === `admin.${baseDomain}`) {
+    return 'internal';
+  }
   return 'customer';
 }
 

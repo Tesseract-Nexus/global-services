@@ -95,8 +95,8 @@ class OIDCClientManager {
 
     logger.info('Initializing OIDC clients on startup...');
 
-    // Only initialize customer client for now (internal realm not configured yet)
-    const clientTypes: Array<'internal' | 'customer'> = ['customer'];
+    // Initialize both customer and internal OIDC clients
+    const clientTypes: Array<'internal' | 'customer'> = ['customer', 'internal'];
 
     for (const type of clientTypes) {
       try {
