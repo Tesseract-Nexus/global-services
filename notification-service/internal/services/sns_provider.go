@@ -140,7 +140,7 @@ func (p *SNSProvider) SendOTP(ctx context.Context, phoneNumber, code string) (*S
 func (p *SNSProvider) SendMFA(ctx context.Context, phoneNumber, code string) (*SendResult, error) {
 	message := &Message{
 		To:   phoneNumber,
-		Body: fmt.Sprintf("Your Tesseract Hub login code is: %s", code),
+		Body: fmt.Sprintf("Your Tesserix login code is: %s", code),
 		Metadata: map[string]interface{}{
 			"sms_type": "Transactional",
 		},

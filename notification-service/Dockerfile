@@ -66,7 +66,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 
 # Labels
 LABEL org.label-schema.name="notification-service" \
-      org.label-schema.description="Tesseract Hub Notification Service" \
+      org.label-schema.description="Tesserix Notification Service" \
       org.label-schema.vcs-url="https://github.com/Tesseract-Nexus/global-services"
 
 # Run the service

@@ -308,7 +308,7 @@ func getBenchmarkEmails(fromEmail, fromName string) []Email {
 		// ===== WELCOME SERIES =====
 		{
 			Name:        "[Benchmark] Welcome Email",
-			Subject:     "Welcome to Tesseract Hub! Let's Get Started",
+			Subject:     "Welcome to Tesserix! Let's Get Started",
 			EmailType:   "template",
 			IsPublished: true,
 			FromAddress: fromEmail,
@@ -318,7 +318,7 @@ func getBenchmarkEmails(fromEmail, fromName string) []Email {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Welcome to Tesseract Hub</title>
+  <title>Welcome to Tesserix</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }
     .container { max-width: 600px; margin: 0 auto; background: #fff; }
@@ -336,11 +336,11 @@ func getBenchmarkEmails(fromEmail, fromName string) []Email {
 <body>
   <div class="container">
     <div class="header">
-      <h1>Welcome to Tesseract Hub!</h1>
+      <h1>Welcome to Tesserix!</h1>
     </div>
     <div class="content">
       <p>Hi {contactfield=firstname|there},</p>
-      <p>Thank you for joining Tesseract Hub! We're thrilled to have you as part of our community.</p>
+      <p>Thank you for joining Tesserix! We're thrilled to have you as part of our community.</p>
 
       <div class="features">
         <div class="feature">
@@ -372,20 +372,20 @@ func getBenchmarkEmails(fromEmail, fromName string) []Email {
 
       <p>As a welcome gift, use code <strong>WELCOME10</strong> for 10% off your first order!</p>
 
-      <p>Happy shopping!<br>The Tesseract Hub Team</p>
+      <p>Happy shopping!<br>The Tesserix Team</p>
     </div>
     <div class="footer">
-      <p>Tesseract Hub - Your Trusted Marketplace</p>
+      <p>Tesserix - Your Trusted Marketplace</p>
       <p><a href="{unsubscribe_url}">Unsubscribe</a> | <a href="{webview_url}">View in browser</a></p>
     </div>
   </div>
 </body>
 </html>`,
-			PlainText: `Welcome to Tesseract Hub!
+			PlainText: `Welcome to Tesserix!
 
 Hi {contactfield=firstname|there},
 
-Thank you for joining Tesseract Hub! We're thrilled to have you as part of our community.
+Thank you for joining Tesserix! We're thrilled to have you as part of our community.
 
 What you can do:
 - Discover thousands of products from verified sellers
@@ -397,7 +397,7 @@ Start shopping: https://marketplace.tesserix.app
 As a welcome gift, use code WELCOME10 for 10% off your first order!
 
 Happy shopping!
-The Tesseract Hub Team
+The Tesserix Team
 
 Unsubscribe: {unsubscribe_url}`,
 		},
@@ -450,10 +450,10 @@ Unsubscribe: {unsubscribe_url}`,
 
       <p>Need help? Our support team is here for you 24/7.</p>
 
-      <p>Best regards,<br>The Tesseract Hub Team</p>
+      <p>Best regards,<br>The Tesserix Team</p>
     </div>
     <div class="footer">
-      <p>Tesseract Hub - Your Trusted Marketplace</p>
+      <p>Tesserix - Your Trusted Marketplace</p>
       <p><a href="{unsubscribe_url}">Unsubscribe</a></p>
     </div>
   </div>
@@ -507,7 +507,7 @@ Unsubscribe: {unsubscribe_url}`,
 
       <p style="color: #94a3b8; font-size: 14px;">*This offer expires in 24 hours</p>
 
-      <p>Happy shopping!<br>The Tesseract Hub Team</p>
+      <p>Happy shopping!<br>The Tesserix Team</p>
     </div>
     <div class="footer">
       <p><a href="{unsubscribe_url}">Unsubscribe</a></p>
@@ -566,7 +566,7 @@ Unsubscribe: {unsubscribe_url}`,
       </center>
 
       <p>Thank you for shopping with us!</p>
-      <p>The Tesseract Hub Team</p>
+      <p>The Tesserix Team</p>
     </div>
     <div class="footer">
       <p>Need help? Contact us at support@tesserix.app</p>
@@ -621,7 +621,7 @@ Unsubscribe: {unsubscribe_url}`,
       </div>
 
       <p>Your feedback helps other shoppers and helps us improve.</p>
-      <p>Thank you!<br>The Tesseract Hub Team</p>
+      <p>Thank you!<br>The Tesserix Team</p>
     </div>
     <div class="footer">
       <p><a href="{unsubscribe_url}" style="color: #94a3b8;">Unsubscribe</a></p>
@@ -681,7 +681,7 @@ Unsubscribe: {unsubscribe_url}`,
       <p style="color: #94a3b8; font-size: 14px; text-align: center;">*Offer valid for 7 days. One-time use only.</p>
 
       <p>We can't wait to see you again!</p>
-      <p>With love,<br>The Tesseract Hub Team</p>
+      <p>With love,<br>The Tesserix Team</p>
     </div>
     <div class="footer">
       <p><a href="{unsubscribe_url}" style="color: #94a3b8;">Unsubscribe</a></p>
@@ -771,7 +771,7 @@ Unsubscribe: {unsubscribe_url}`,
 		// ===== NEWSLETTER =====
 		{
 			Name:        "[Benchmark] Monthly Newsletter",
-			Subject:     "This Month at Tesseract Hub: News, Deals & More!",
+			Subject:     "This Month at Tesserix: News, Deals & More!",
 			EmailType:   "list",
 			IsPublished: true,
 			FromAddress: fromEmail,
@@ -803,11 +803,11 @@ Unsubscribe: {unsubscribe_url}`,
 <body>
   <div class="container">
     <div class="header">
-      <h1>📰 Tesseract Hub Newsletter</h1>
+      <h1>📰 Tesserix Newsletter</h1>
     </div>
     <div class="content">
       <p>Hi {contactfield=firstname|there},</p>
-      <p>Here's what's happening at Tesseract Hub this month!</p>
+      <p>Here's what's happening at Tesserix this month!</p>
 
       <div class="section">
         <div class="section-title">🔥 Featured Products</div>
@@ -841,7 +841,7 @@ Unsubscribe: {unsubscribe_url}`,
         <a href="#">🐦</a>
         <a href="#">📸</a>
       </div>
-      <p>Tesseract Hub - Your Trusted Marketplace</p>
+      <p>Tesserix - Your Trusted Marketplace</p>
       <p><a href="{unsubscribe_url}">Unsubscribe</a> | <a href="{preference_url}">Update Preferences</a></p>
     </div>
   </div>
@@ -907,7 +907,7 @@ Unsubscribe: {unsubscribe_url}`,
       </div>
 
       <p>We're here to help!</p>
-      <p>The Tesseract Hub Team</p>
+      <p>The Tesserix Team</p>
     </div>
     <div class="footer">
       <p>This is an automated message regarding your order.</p>
@@ -999,7 +999,7 @@ Unsubscribe: {unsubscribe_url}`,
       </center>
 
       <p>Thank you for shopping with us!</p>
-      <p>The Tesseract Hub Team</p>
+      <p>The Tesserix Team</p>
     </div>
     <div class="footer">
       <p>Questions about your delivery? <a href="mailto:support@tesserix.app" style="color: #94a3b8;">Contact Support</a></p>
@@ -1035,7 +1035,7 @@ func main() {
 
 	fromName := os.Getenv("FROM_NAME")
 	if fromName == "" {
-		fromName = "Tesseract Hub"
+		fromName = "Tesserix"
 	}
 
 	testEmail := os.Getenv("TEST_EMAIL")

@@ -110,7 +110,7 @@ fi
 
 # Set email settings
 export FROM_EMAIL="${FROM_EMAIL:-noreply@mail.tesserix.app}"
-export FROM_NAME="${FROM_NAME:-Tesseract Hub}"
+export FROM_NAME="${FROM_NAME:-Tesserix}"
 
 # Optional: Test email
 if [ -n "$1" ]; then

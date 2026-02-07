@@ -261,7 +261,7 @@ func (h *UnsubscribeHandler) renderUnsubscribePage(c *gin.Context, email, catego
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Unsubscribe - Tesseract Hub</title>
+    <title>Unsubscribe - Tesserix</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -366,7 +366,7 @@ func (h *UnsubscribeHandler) renderUnsubscribeSuccess(c *gin.Context, email, cat
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Unsubscribed - Tesseract Hub</title>
+    <title>Unsubscribed - Tesserix</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -430,7 +430,7 @@ func (h *UnsubscribeHandler) renderUnsubscribeSuccess(c *gin.Context, email, cat
             <a href="https://marketplace.tesserix.app/account/notifications">Manage Preferences</a>
         </div>
         <div class="footer">
-            <p>Tesseract Hub - Your Trusted Marketplace</p>
+            <p>Tesserix - Your Trusted Marketplace</p>
         </div>
     </div>
 </body>

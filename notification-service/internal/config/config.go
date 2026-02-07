@@ -212,12 +212,12 @@ func Load() (*Config, error) {
 		Email: EmailConfig{
 			// AWS SES (primary)
 			SESFrom:     getEnvWithFallback("AWS_SES_FROM", "POSTAL_FROM", ""), // Fallback to POSTAL_FROM if SES_FROM not set
-			SESFromName: getEnv("AWS_SES_FROM_NAME", "Tesseract Hub"),
+			SESFromName: getEnv("AWS_SES_FROM_NAME", "Tesserix"),
 			// Postal HTTP API (fallback)
 			PostalAPIURL:   getEnv("POSTAL_API_URL", ""),
 			PostalAPIKey:   secrets.GetSecretOrEnv("POSTAL_API_KEY_SECRET_NAME", "POSTAL_API_KEY", ""),
 			PostalFrom:     getEnv("POSTAL_FROM", ""),
-			PostalFromName: getEnv("POSTAL_FROM_NAME", "Tesseract Hub"),
+			PostalFromName: getEnv("POSTAL_FROM_NAME", "Tesserix"),
 			// Postal SMTP (legacy - use HTTP API instead)
 			PostalHost:     getEnv("POSTAL_HOST", ""),
 			PostalPort:     getEnvInt("POSTAL_PORT", 25),
@@ -238,7 +238,7 @@ func Load() (*Config, error) {
 			MauticUsername: getEnv("MAUTIC_USERNAME", ""),
 			MauticPassword: getEnv("MAUTIC_PASSWORD", ""),
 			MauticFrom:     getEnv("MAUTIC_FROM", ""),
-			MauticFromName: getEnv("MAUTIC_FROM_NAME", "Tesseract Hub"),
+			MauticFromName: getEnv("MAUTIC_FROM_NAME", "Tesserix"),
 			// Failover: SES > Postal > SendGrid
 			EnableFailover: getEnvBool("EMAIL_FAILOVER_ENABLED", true),
 		},
