@@ -452,7 +452,13 @@ func (k *KubernetesClient) createNewVirtualService(ctx context.Context, domain *
 	existing, err := k.istioClient.NetworkingV1beta1().VirtualServices(k.cfg.Istio.VSNamespace).Get(ctx, vsName, metav1.GetOptions{})
 	if err == nil {
 		// Update existing
-		existing.Spec = vs.Spec
+		// Copy spec fields individually to avoid copying internal protobuf mutex
+		existing.Spec.Hosts = vs.Spec.Hosts
+		existing.Spec.Gateways = vs.Spec.Gateways
+		existing.Spec.Http = vs.Spec.Http
+		existing.Spec.Tls = vs.Spec.Tls
+		existing.Spec.Tcp = vs.Spec.Tcp
+		existing.Spec.ExportTo = vs.Spec.ExportTo
 		existing.Labels = vs.Labels
 		existing.Annotations = vs.Annotations
 		_, err = k.istioClient.NetworkingV1beta1().VirtualServices(k.cfg.Istio.VSNamespace).Update(ctx, existing, metav1.UpdateOptions{})
@@ -823,8 +829,10 @@ func (k *KubernetesClient) CreateAuthorizationPolicy(ctx context.Context, domain
 	// Check if policy already exists
 	existing, err := k.istioClient.SecurityV1beta1().AuthorizationPolicies(k.cfg.Istio.GatewayNamespace).Get(ctx, policyName, metav1.GetOptions{})
 	if err == nil {
-		// Update existing
-		existing.Spec = policy.Spec
+		// Copy spec fields individually to avoid copying internal protobuf mutex
+		existing.Spec.Selector = policy.Spec.Selector
+		existing.Spec.Action = policy.Spec.Action
+		existing.Spec.Rules = policy.Spec.Rules
 		existing.Labels = policy.Labels
 		existing.Annotations = policy.Annotations
 		_, err = k.istioClient.SecurityV1beta1().AuthorizationPolicies(k.cfg.Istio.GatewayNamespace).Update(ctx, existing, metav1.UpdateOptions{})

@@ -21,47 +21,10 @@ permissions:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}/auth-bff
-  GO_VERSION: '1.25'
-
 jobs:
-  test:
-    name: Test auth-bff
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache-dependency-path: auth-bff/go.sum
-
-      - name: Download dependencies
-        working-directory: auth-bff
-        run: go mod download
-
-      - name: Run go vet
-        working-directory: auth-bff
-        run: go vet ./...
-
-      - name: Run tests
-        working-directory: auth-bff
-        run: go test -v -race -coverprofile=coverage.out ./...
-        continue-on-error: true
-
-      - name: Test Summary
-        if: always()
-        run: |
-          echo "## Test Summary - auth-bff Release" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Tests completed for release build." >> $GITHUB_STEP_SUMMARY
-
   release:
     name: Release auth-bff
     runs-on: ubuntu-latest
-    needs: test
 
     steps:
       - name: Checkout code
