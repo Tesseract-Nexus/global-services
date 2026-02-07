@@ -384,9 +384,17 @@ func (v *DNSVerifier) CheckARecord(ctx context.Context, domain string) (bool, []
 	return false, ipStrings, nil
 }
 
-// GetRequiredDNSRecords returns the DNS records needed for domain setup
-// This includes CNAME delegation record when enabled for automatic certificate management
+// GetRequiredDNSRecords returns the DNS records needed for domain setup.
+// This delegates to GetRequiredDNSRecordsWithIP using the static config ProxyIP.
 func (v *DNSVerifier) GetRequiredDNSRecords(domain *models.CustomDomain) []models.DNSRecord {
+	return v.GetRequiredDNSRecordsWithIP(domain, v.cfg.DNS.ProxyIP)
+}
+
+// GetRequiredDNSRecordsWithIP returns the DNS records needed for domain setup,
+// using the provided resolvedProxyIP for routing records when non-empty.
+// This allows callers to pass a dynamically resolved gateway IP instead of
+// relying solely on static config.
+func (v *DNSVerifier) GetRequiredDNSRecordsWithIP(domain *models.CustomDomain, resolvedProxyIP string) []models.DNSRecord {
 	records := []models.DNSRecord{}
 
 	// CNAME Delegation record for automatic SSL (tenant-specific target)
@@ -462,16 +470,16 @@ func (v *DNSVerifier) GetRequiredDNSRecords(domain *models.CustomDomain) []model
 	// - Platform domains (*.tesserix.app): Use Cloudflare Tunnel (CNAME to tunnel)
 	// - Custom domains: Use LoadBalancer IP directly (A records)
 	//
-	// When Cloudflare Tunnel is enabled AND we have a ProxyIP configured,
+	// When we have a resolved proxy IP (from dynamic gateway lookup or static config),
 	// custom domains should use A records to bypass Cloudflare's cross-account CNAME ban (Error 1014)
-	useARecords := v.cfg.DNS.ProxyIP != ""
+	useARecords := resolvedProxyIP != ""
 
 	if useARecords {
 		// Custom domains: Use A records pointing to LoadBalancer IP
 		records = append(records, models.DNSRecord{
 			RecordType: "A",
 			Host:       domain.Domain,
-			Value:      v.cfg.DNS.ProxyIP,
+			Value:      resolvedProxyIP,
 			TTL:        300,
 			Purpose:    "routing (LoadBalancer IP)",
 			IsVerified: domain.DNSVerified,
@@ -482,7 +490,7 @@ func (v *DNSVerifier) GetRequiredDNSRecords(domain *models.CustomDomain) []model
 			records = append(records, models.DNSRecord{
 				RecordType: "A",
 				Host:       "www." + domain.Domain,
-				Value:      v.cfg.DNS.ProxyIP,
+				Value:      resolvedProxyIP,
 				TTL:        300,
 				Purpose:    "routing (LoadBalancer IP)",
 				IsVerified: domain.DNSVerified,
@@ -493,7 +501,7 @@ func (v *DNSVerifier) GetRequiredDNSRecords(domain *models.CustomDomain) []model
 		records = append(records, models.DNSRecord{
 			RecordType: "A",
 			Host:       "admin." + domain.Domain,
-			Value:      v.cfg.DNS.ProxyIP,
+			Value:      resolvedProxyIP,
 			TTL:        300,
 			Purpose:    "routing (LoadBalancer IP)",
 			IsVerified: domain.DNSVerified,
@@ -503,7 +511,7 @@ func (v *DNSVerifier) GetRequiredDNSRecords(domain *models.CustomDomain) []model
 		records = append(records, models.DNSRecord{
 			RecordType: "A",
 			Host:       "api." + domain.Domain,
-			Value:      v.cfg.DNS.ProxyIP,
+			Value:      resolvedProxyIP,
 			TTL:        300,
 			Purpose:    "routing (LoadBalancer IP)",
 			IsVerified: domain.DNSVerified,

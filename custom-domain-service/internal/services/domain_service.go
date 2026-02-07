@@ -361,29 +361,38 @@ func (s *DomainService) ValidateDomain(ctx context.Context, req *ValidateDomainR
 	// They must use A records pointing to the custom-ingressgateway LoadBalancer IP
 	var routingRecords []models.DNSRecord
 
-	if s.cfg.DNS.ProxyIP != "" {
+	// Dynamically resolve the gateway IP (checks Redis cache → K8s API → static config)
+	var gatewayIP string
+	gatewayResp, err := s.GetGatewayIP(ctx)
+	if err == nil && gatewayResp.UseARecords && gatewayResp.IP != "" {
+		gatewayIP = gatewayResp.IP
+	} else if s.cfg.DNS.ProxyIP != "" {
+		gatewayIP = s.cfg.DNS.ProxyIP
+	}
+
+	if gatewayIP != "" {
 		// Use A records pointing to LoadBalancer IP
-		response.ProxyTarget = s.cfg.DNS.ProxyIP
+		response.ProxyTarget = gatewayIP
 
 		routingRecords = []models.DNSRecord{
 			{
 				RecordType: "A",
 				Host:       domainName,
-				Value:      s.cfg.DNS.ProxyIP,
+				Value:      gatewayIP,
 				TTL:        300,
 				Purpose:    "routing (LoadBalancer IP)",
 			},
 			{
 				RecordType: "A",
 				Host:       "admin." + domainName,
-				Value:      s.cfg.DNS.ProxyIP,
+				Value:      gatewayIP,
 				TTL:        300,
 				Purpose:    "routing (LoadBalancer IP)",
 			},
 			{
 				RecordType: "A",
 				Host:       "api." + domainName,
-				Value:      s.cfg.DNS.ProxyIP,
+				Value:      gatewayIP,
 				TTL:        300,
 				Purpose:    "routing (LoadBalancer IP)",
 			},
@@ -394,7 +403,7 @@ func (s *DomainService) ValidateDomain(ctx context.Context, req *ValidateDomainR
 			routingRecords = append(routingRecords, models.DNSRecord{
 				RecordType: "A",
 				Host:       "www." + domainName,
-				Value:      s.cfg.DNS.ProxyIP,
+				Value:      gatewayIP,
 				TTL:        300,
 				Purpose:    "routing (LoadBalancer IP)",
 			})
@@ -749,7 +758,7 @@ func (s *DomainService) VerifyDomain(ctx context.Context, tenantID, domainID uui
 
 	// Check if already verified and not forcing
 	if domain.DNSVerified && !force {
-		return s.toDNSStatusResponse(domain, "Domain already verified"), nil
+		return s.toDNSStatusResponse(ctx, domain, "Domain already verified"), nil
 	}
 
 	// Verify DNS
@@ -776,7 +785,7 @@ func (s *DomainService) VerifyDomain(ctx context.Context, tenantID, domainID uui
 		s.logActivity(ctx, domain, "verification_attempted", "pending", result.Message)
 	}
 
-	return s.toDNSStatusResponse(domain, result.Message), nil
+	return s.toDNSStatusResponse(ctx, domain, result.Message), nil
 }
 
 // provisionDomain handles the full provisioning flow after DNS verification
@@ -1073,7 +1082,7 @@ func (s *DomainService) GetDNSStatus(ctx context.Context, tenantID, domainID uui
 		return nil, repository.ErrDomainNotFound
 	}
 
-	return s.toDNSStatusResponse(domain, ""), nil
+	return s.toDNSStatusResponse(ctx, domain, ""), nil
 }
 
 // GetSSLStatus returns SSL certificate status
@@ -1256,13 +1265,22 @@ func (s *DomainService) toDomainResponse(domain *models.CustomDomain) *models.Do
 	return response
 }
 
-func (s *DomainService) toDNSStatusResponse(domain *models.CustomDomain, message string) *models.DNSStatusResponse {
+func (s *DomainService) toDNSStatusResponse(ctx context.Context, domain *models.CustomDomain, message string) *models.DNSStatusResponse {
+	// Dynamically resolve gateway IP for DNS records
+	var resolvedProxyIP string
+	gatewayResp, err := s.GetGatewayIP(ctx)
+	if err == nil && gatewayResp.UseARecords && gatewayResp.IP != "" {
+		resolvedProxyIP = gatewayResp.IP
+	} else if s.cfg.DNS.ProxyIP != "" {
+		resolvedProxyIP = s.cfg.DNS.ProxyIP
+	}
+
 	response := &models.DNSStatusResponse{
 		DomainID:      domain.ID,
 		Domain:        domain.Domain,
 		IsVerified:    domain.DNSVerified,
 		CheckAttempts: domain.DNSCheckAttempts,
-		Records:       s.dnsVerifier.GetRequiredDNSRecords(domain),
+		Records:       s.dnsVerifier.GetRequiredDNSRecordsWithIP(domain, resolvedProxyIP),
 		Message:       message,
 	}
 
