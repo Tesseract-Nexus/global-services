@@ -201,6 +201,32 @@ export interface ResetPasswordResponse {
   error_code?: string;
 }
 
+// ============================================================================
+// TOTP Types
+// ============================================================================
+
+export interface SaveTotpSecretRequest {
+  user_id: string;
+  tenant_id: string;
+  totp_secret_encrypted: string;
+  backup_code_hashes: string[];
+}
+
+export interface GetTotpSecretResponse {
+  success: boolean;
+  totp_enabled: boolean;
+  totp_secret_encrypted?: string;
+  backup_code_hashes?: string[];
+  backup_codes_remaining?: number;
+  message?: string;
+}
+
+export interface ConsumBackupCodeResponse {
+  success: boolean;
+  backup_codes_remaining?: number;
+  message?: string;
+}
+
 // Internal API response types
 interface ApiResponse {
   success?: boolean;
@@ -897,6 +923,182 @@ class TenantServiceClient {
       }
     } catch (error) {
       logger.error({ error, email: this.maskEmail(email) }, 'Error updating staff auth method (non-blocking)');
+    }
+  }
+
+  // ============================================================================
+  // TOTP Methods
+  // ============================================================================
+
+  /**
+   * Save TOTP secret and backup code hashes for a user
+   */
+  async saveTotpSecret(
+    userId: string,
+    tenantId: string,
+    encryptedSecret: string,
+    backupCodeHashes: string[]
+  ): Promise<{ success: boolean; message?: string }> {
+    try {
+      logger.info({ userId, tenantId }, 'Saving TOTP secret');
+
+      const response = await this.fetch('/api/v1/auth/totp/save', {
+        method: 'POST',
+        body: JSON.stringify({
+          user_id: userId,
+          tenant_id: tenantId,
+          totp_secret_encrypted: encryptedSecret,
+          backup_code_hashes: backupCodeHashes,
+        }),
+      });
+
+      const data = await response.json() as ApiResponse;
+
+      if (!response.ok) {
+        logger.warn({ userId, status: response.status }, 'Failed to save TOTP secret');
+        return { success: false, message: data.message || 'Failed to save TOTP secret' };
+      }
+
+      return { success: true };
+    } catch (error) {
+      logger.error({ error, userId }, 'Error saving TOTP secret');
+      return { success: false, message: 'Service temporarily unavailable' };
+    }
+  }
+
+  /**
+   * Get TOTP secret and backup code info for a user
+   */
+  async getTotpSecret(
+    userId: string,
+    tenantId: string
+  ): Promise<GetTotpSecretResponse> {
+    try {
+      const response = await this.fetch('/api/v1/auth/totp/status', {
+        method: 'POST',
+        body: JSON.stringify({ user_id: userId, tenant_id: tenantId }),
+      });
+
+      const data = await response.json() as ApiResponse & {
+        totp_enabled?: boolean;
+        totp_secret_encrypted?: string;
+        backup_code_hashes?: string[];
+        backup_codes_remaining?: number;
+      };
+
+      if (!response.ok) {
+        return {
+          success: false,
+          totp_enabled: false,
+          message: data.message || 'Failed to get TOTP status',
+        };
+      }
+
+      return {
+        success: true,
+        totp_enabled: data.totp_enabled || false,
+        totp_secret_encrypted: data.totp_secret_encrypted,
+        backup_code_hashes: data.backup_code_hashes,
+        backup_codes_remaining: data.backup_codes_remaining,
+      };
+    } catch (error) {
+      logger.error({ error, userId }, 'Error getting TOTP secret');
+      return { success: false, totp_enabled: false, message: 'Service temporarily unavailable' };
+    }
+  }
+
+  /**
+   * Disable TOTP for a user (removes secret and backup codes)
+   */
+  async disableTotp(
+    userId: string,
+    tenantId: string
+  ): Promise<{ success: boolean; message?: string }> {
+    try {
+      logger.info({ userId, tenantId }, 'Disabling TOTP');
+
+      const response = await this.fetch('/api/v1/auth/totp/disable', {
+        method: 'POST',
+        body: JSON.stringify({ user_id: userId, tenant_id: tenantId }),
+      });
+
+      const data = await response.json() as ApiResponse;
+
+      if (!response.ok) {
+        return { success: false, message: data.message || 'Failed to disable TOTP' };
+      }
+
+      return { success: true };
+    } catch (error) {
+      logger.error({ error, userId }, 'Error disabling TOTP');
+      return { success: false, message: 'Service temporarily unavailable' };
+    }
+  }
+
+  /**
+   * Consume a backup code (marks it as used)
+   */
+  async consumeBackupCode(
+    userId: string,
+    tenantId: string,
+    codeHash: string
+  ): Promise<ConsumBackupCodeResponse> {
+    try {
+      const response = await this.fetch('/api/v1/auth/totp/consume-backup-code', {
+        method: 'POST',
+        body: JSON.stringify({
+          user_id: userId,
+          tenant_id: tenantId,
+          code_hash: codeHash,
+        }),
+      });
+
+      const data = await response.json() as ApiResponse & { backup_codes_remaining?: number };
+
+      if (!response.ok) {
+        return { success: false, message: data.message || 'Failed to consume backup code' };
+      }
+
+      return {
+        success: true,
+        backup_codes_remaining: data.backup_codes_remaining,
+      };
+    } catch (error) {
+      logger.error({ error, userId }, 'Error consuming backup code');
+      return { success: false, message: 'Service temporarily unavailable' };
+    }
+  }
+
+  /**
+   * Update backup code hashes (regenerate)
+   */
+  async updateBackupCodes(
+    userId: string,
+    tenantId: string,
+    newHashes: string[]
+  ): Promise<{ success: boolean; message?: string }> {
+    try {
+      logger.info({ userId, tenantId }, 'Updating backup codes');
+
+      const response = await this.fetch('/api/v1/auth/totp/update-backup-codes', {
+        method: 'POST',
+        body: JSON.stringify({
+          user_id: userId,
+          tenant_id: tenantId,
+          backup_code_hashes: newHashes,
+        }),
+      });
+
+      const data = await response.json() as ApiResponse;
+
+      if (!response.ok) {
+        return { success: false, message: data.message || 'Failed to update backup codes' };
+      }
+
+      return { success: true };
+    } catch (error) {
+      logger.error({ error, userId }, 'Error updating backup codes');
+      return { success: false, message: 'Service temporarily unavailable' };
     }
   }
 

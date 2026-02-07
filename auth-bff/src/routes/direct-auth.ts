@@ -28,6 +28,7 @@ import { sessionStore } from '../session-store';
 import { createLogger } from '../logger';
 import { v4 as uuidv4 } from 'uuid';
 import { callVerificationService } from '../verification-client';
+import { verifyTotpCode, decryptTotpSecret, verifyBackupCode, hashBackupCode } from '../totp';
 
 const logger = createLogger('direct-auth');
 
@@ -616,7 +617,17 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
       }
     }
 
-    // MANDATORY MFA: No trusted device — require email OTP
+    // MANDATORY MFA: No trusted device — require MFA
+    // Check if user has TOTP enabled to determine available MFA methods
+    let totpEnabled = false;
+    try {
+      const totpInfo = await tenantServiceClient.getTotpSecret(data.user_id!, data.tenant_id);
+      totpEnabled = totpInfo.totp_enabled;
+    } catch {
+      // If TOTP check fails, default to email-only
+      logger.warn({ userId: data.user_id }, 'Failed to check TOTP status, defaulting to email MFA');
+    }
+
     const mfaSessionId = uuidv4();
     await sessionStore.saveMfaSession(mfaSessionId, {
       userId: data.user_id!,
@@ -635,13 +646,16 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
       rememberMe: remember_me,
     });
 
-    logger.info({ email: maskEmail(email), tenant_slug }, 'Admin login password verified, MFA required');
+    const mfaMethods = totpEnabled ? ['totp', 'email'] : ['email'];
+
+    logger.info({ email: maskEmail(email), tenant_slug, mfaMethods }, 'Admin login password verified, MFA required');
 
     return reply.send({
       success: true,
       mfa_required: true,
       mfa_session: mfaSessionId,
-      mfa_methods: ['email'],
+      mfa_methods: mfaMethods,
+      totp_enabled: totpEnabled,
       message: 'Multi-factor authentication required.',
     });
   });
@@ -721,16 +735,45 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
       });
     }
 
-    // Verify OTP via verification-service
-    const verifyResult = await callVerificationService('/verify/code', 'POST', {
-      recipient: mfaData.email,
-      code,
-      purpose: 'staff_mfa_verification',
-    });
+    // Branch on MFA method: TOTP (local verification) vs email (verification-service)
+    let mfaVerified = false;
 
-    if (!verifyResult.success) {
-      const verifyData = verifyResult.data as { remaining_attempts?: number; message?: string } | undefined;
-      logger.info({ mfa_session, method, status: verifyResult.status }, 'MFA verification failed');
+    if (method === 'totp') {
+      // TOTP: verify locally — fetch secret from tenant-service, decrypt, verify
+      try {
+        const totpInfo = await tenantServiceClient.getTotpSecret(mfaData.userId, mfaData.tenantId);
+
+        if (totpInfo.totp_enabled && totpInfo.totp_secret_encrypted) {
+          const secret = decryptTotpSecret(totpInfo.totp_secret_encrypted);
+          mfaVerified = verifyTotpCode(secret, code);
+
+          // If TOTP didn't match, try as a backup code
+          if (!mfaVerified && totpInfo.backup_code_hashes) {
+            const backupIndex = verifyBackupCode(code, totpInfo.backup_code_hashes);
+            if (backupIndex >= 0) {
+              mfaVerified = true;
+              // Consume the backup code
+              const codeHash = hashBackupCode(code);
+              await tenantServiceClient.consumeBackupCode(mfaData.userId, mfaData.tenantId, codeHash);
+              logger.info({ userId: mfaData.userId }, 'MFA verified via backup code');
+            }
+          }
+        }
+      } catch (error) {
+        logger.error({ error, userId: mfaData.userId }, 'Error during TOTP verification');
+      }
+    } else {
+      // Email OTP: verify via verification-service
+      const verifyResult = await callVerificationService('/verify/code', 'POST', {
+        recipient: mfaData.email,
+        code,
+        purpose: 'staff_mfa_verification',
+      });
+      mfaVerified = verifyResult.success;
+    }
+
+    if (!mfaVerified) {
+      logger.info({ mfa_session, method }, 'MFA verification failed');
 
       // Track attempts
       const attemptCount = (mfaData.attemptCount || 0) + 1;
@@ -748,7 +791,7 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
       return reply.code(401).send({
         success: false,
         error: 'INVALID_MFA_CODE',
-        message: verifyData?.message || 'Invalid verification code.',
+        message: 'Invalid verification code.',
         remaining_attempts: 5 - attemptCount,
       });
     }

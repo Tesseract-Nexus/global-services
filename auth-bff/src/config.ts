@@ -48,6 +48,9 @@ const envSchema = z.object({
   VERIFICATION_SERVICE_URL: z.string().url().optional(),
   VERIFICATION_SERVICE_API_KEY: z.string().optional(),
 
+  // TOTP encryption
+  TOTP_ENCRYPTION_KEY: z.string().min(32).optional(),
+
   // Trusted Proxies
   TRUST_PROXY: z.string().default('true'),
 });
@@ -111,6 +114,7 @@ export const config = {
   staffServiceUrl: env.STAFF_SERVICE_URL || 'http://staff-service.marketplace.svc.cluster.local:8080',
   verificationServiceUrl: env.VERIFICATION_SERVICE_URL || 'http://verification-service.global-services.svc.cluster.local:8080',
   verificationServiceApiKey: env.VERIFICATION_SERVICE_API_KEY || '',
+  totpEncryptionKey: env.TOTP_ENCRYPTION_KEY || '',
 } as const;
 
 /**
