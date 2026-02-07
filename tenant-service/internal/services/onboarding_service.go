@@ -797,7 +797,7 @@ func (s *OnboardingService) initializeSessionTasks(ctx context.Context, sessionI
 			Description:           "Verify your email address",
 			TaskType:              "verification",
 			Status:                "pending",
-			IsRequired:            true,
+			IsRequired:            false,
 			OrderIndex:            4,
 			EstimatedDurationMins: 2,
 		},
@@ -1076,14 +1076,14 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 		return nil, fmt.Errorf("first and last name are required - please complete the contact details step")
 	}
 
-	// Validate email is verified (check verification status)
+	// Email verification is no longer required during onboarding
+	// The welcome email sent after account setup serves as implicit verification
 	if s.verificationSvc != nil {
 		isVerified, verifyErr := s.verificationSvc.IsEmailVerifiedByRecipient(ctx, primaryContact.Email, "email_verification")
 		if verifyErr != nil {
 			log.Printf("[OnboardingService] Warning: Could not check email verification status: %v", verifyErr)
-			// Don't fail - verification service might be unavailable
 		} else if !isVerified {
-			return nil, fmt.Errorf("email address must be verified before setting up your account")
+			log.Printf("[OnboardingService] Email not verified for %s, proceeding anyway (verification not required)", primaryContact.Email)
 		}
 	}
 
@@ -1904,7 +1904,7 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 		"use_custom_domain": isCustomDomainUsed,
 		"custom_domain":     customDomain,
 	}
-	if updateErr := tx.WithContext(ctx).Model(&models.Tenant{}).
+	if updateErr := s.db.WithContext(ctx).Model(&models.Tenant{}).
 		Where("id = ?", tenantID).
 		Updates(tenantURLs).Error; updateErr != nil {
 		log.Printf("[OnboardingService] WARNING: Failed to update tenant URLs: %v", updateErr)
