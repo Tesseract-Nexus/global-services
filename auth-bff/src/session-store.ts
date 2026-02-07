@@ -80,6 +80,17 @@ export interface MfaSessionData {
   rememberMe?: boolean;
 }
 
+// TOTP setup session (holds unconfirmed secret + backup codes during setup)
+export interface TotpSetupSessionData {
+  userId?: string; // set for authenticated users, absent during onboarding
+  email: string;
+  tenantId?: string;
+  tenantSlug?: string;
+  encryptedSecret: string;
+  backupCodeHashes: string[];
+  createdAt: number;
+}
+
 // Device trust for MFA bypass on remembered devices
 export interface DeviceTrustData {
   userId: string;
@@ -97,12 +108,14 @@ class SessionStore {
   private readonly SESSION_TRANSFER_PREFIX = 'bff:session_transfer:';
   private readonly MFA_SESSION_PREFIX = 'bff:mfa_session:';
   private readonly DEVICE_TRUST_PREFIX = 'bff:device_trust:';
+  private readonly TOTP_SETUP_PREFIX = 'bff:totp_setup:';
   private readonly SESSION_TTL = config.session.maxAge;
   private readonly AUTH_FLOW_TTL = 600; // 10 minutes for auth flow state
   private readonly WS_TICKET_TTL = 30; // 30 seconds for WebSocket tickets
   private readonly SESSION_TRANSFER_TTL = 60; // 60 seconds for session transfer
   private readonly MFA_SESSION_TTL = 300; // 5 minutes for MFA session
   private readonly DEVICE_TRUST_TTL = 2592000; // 30 days for device trust
+  private readonly TOTP_SETUP_TTL = 600; // 10 minutes for TOTP setup
 
   constructor() {
     if (config.redis.url) {
@@ -371,6 +384,27 @@ class SessionStore {
 
   async deleteDeviceTrust(token: string): Promise<boolean> {
     const result = await this.redis.del(this.DEVICE_TRUST_PREFIX + token);
+    return result > 0;
+  }
+
+  // TOTP Setup Session Management
+  async saveTotpSetupSession(sessionId: string, data: TotpSetupSessionData): Promise<void> {
+    await this.redis.setex(
+      this.TOTP_SETUP_PREFIX + sessionId,
+      this.TOTP_SETUP_TTL,
+      JSON.stringify(data)
+    );
+    logger.debug({ sessionId }, 'TOTP setup session saved');
+  }
+
+  async getTotpSetupSession(sessionId: string): Promise<TotpSetupSessionData | null> {
+    const data = await this.redis.get(this.TOTP_SETUP_PREFIX + sessionId);
+    if (!data) return null;
+    return JSON.parse(data) as TotpSetupSessionData;
+  }
+
+  async deleteTotpSetupSession(sessionId: string): Promise<boolean> {
+    const result = await this.redis.del(this.TOTP_SETUP_PREFIX + sessionId);
     return result > 0;
   }
 
