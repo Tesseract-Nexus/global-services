@@ -24,13 +24,14 @@ type SMTPProvider struct {
 
 // NewSMTPProvider creates a new SMTP email provider
 func NewSMTPProvider(config *ProviderConfig) *SMTPProvider {
+	fromName := config.PostalFromName
 	return &SMTPProvider{
 		host:     config.SMTPHost,
 		port:     fmt.Sprintf("%d", config.SMTPPort),
 		username: config.SMTPUsername,
 		password: config.SMTPPassword,
 		from:     config.SMTPFrom,
-		fromName: "Tesseract Hub",
+		fromName: fromName,
 	}
 }
 
@@ -216,10 +217,14 @@ type SendGridProvider struct {
 
 // NewSendGridProvider creates a new SendGrid email provider
 func NewSendGridProvider(config *ProviderConfig) *SendGridProvider {
+	fromName := config.SendGridFromName
+	if fromName == "" {
+		fromName = config.PostalFromName
+	}
 	return &SendGridProvider{
 		apiKey:   config.SendGridAPIKey,
 		from:     config.SendGridFrom,
-		fromName: "Tesseract Hub",
+		fromName: fromName,
 		client:   sendgrid.NewSendClient(config.SendGridAPIKey),
 	}
 }

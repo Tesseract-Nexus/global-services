@@ -115,8 +115,9 @@ type EmailConfig struct {
 	SMTPFrom     string
 
 	// SendGrid settings (fallback)
-	SendGridAPIKey string
-	SendGridFrom   string
+	SendGridAPIKey   string
+	SendGridFrom     string
+	SendGridFromName string
 
 	// Mautic settings (newsletters + automated emails)
 	MauticURL      string
@@ -229,8 +230,9 @@ func Load() (*Config, error) {
 			SMTPPassword: secrets.GetSecretOrEnv("SMTP_PASSWORD_SECRET_NAME", "SMTP_PASSWORD", ""),
 			SMTPFrom:     getEnv("SMTP_FROM", ""),
 			// SendGrid (fallback)
-			SendGridAPIKey: secrets.GetSecretOrEnv("SENDGRID_API_KEY_SECRET_NAME", "SENDGRID_API_KEY", ""),
-			SendGridFrom:   getEnv("SENDGRID_FROM", ""),
+			SendGridAPIKey:   secrets.GetSecretOrEnv("SENDGRID_API_KEY_SECRET_NAME", "SENDGRID_API_KEY", ""),
+			SendGridFrom:     getEnv("SENDGRID_FROM", ""),
+			SendGridFromName: getEnv("SENDGRID_FROM_NAME", ""),
 			// Mautic (newsletters)
 			MauticURL:      getEnv("MAUTIC_URL", ""),
 			MauticUsername: getEnv("MAUTIC_USERNAME", ""),

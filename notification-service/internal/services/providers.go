@@ -77,8 +77,9 @@ type ProviderConfig struct {
 	SMTPFrom     string
 
 	// SendGrid (fallback email)
-	SendGridAPIKey string
-	SendGridFrom   string
+	SendGridAPIKey   string
+	SendGridFrom     string
+	SendGridFromName string
 
 	// Mautic (newsletters + automated emails)
 	MauticURL      string

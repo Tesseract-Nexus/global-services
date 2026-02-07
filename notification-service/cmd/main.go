@@ -302,8 +302,10 @@ func initEmailProvider(cfg *config.Config) services.Provider {
 	// 3. Tertiary: SendGrid API (final fallback)
 	if cfg.Email.SendGridAPIKey != "" {
 		sendgridConfig := &services.ProviderConfig{
-			SendGridAPIKey: cfg.Email.SendGridAPIKey,
-			SendGridFrom:   cfg.Email.SendGridFrom,
+			SendGridAPIKey:   cfg.Email.SendGridAPIKey,
+			SendGridFrom:     cfg.Email.SendGridFrom,
+			SendGridFromName: cfg.Email.SendGridFromName,
+			PostalFromName:   cfg.Email.PostalFromName,
 		}
 		sendgrid := services.NewSendGridProvider(sendgridConfig)
 		providers = append(providers, sendgrid)
