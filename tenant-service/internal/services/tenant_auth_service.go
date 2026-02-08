@@ -1382,27 +1382,80 @@ func (s *TenantAuthService) SyncExistingCustomersToEvents(ctx context.Context, t
 // TOTP Operations (called by auth-bff)
 // ============================================================================
 
+// resolveUserID resolves a Keycloak ID or local ID to the local user ID
+// Auth-bff sends Keycloak subject IDs, but tenant_credentials uses local user IDs
+func (s *TenantAuthService) resolveUserID(ctx context.Context, userID uuid.UUID) (uuid.UUID, error) {
+	user, err := s.GetUserByKeycloakOrLocalID(ctx, userID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return user.ID, nil
+}
+
+// ensureCredentialExists ensures a tenant_credentials record exists for a user,
+// creating one without password if missing (for OIDC-registered users)
+func (s *TenantAuthService) ensureCredentialExists(ctx context.Context, localUserID, tenantID uuid.UUID) error {
+	cred, err := s.credentialRepo.GetCredential(ctx, localUserID, tenantID)
+	if err != nil {
+		return err
+	}
+	if cred != nil {
+		return nil // Already exists
+	}
+	// Create credential record without password (Keycloak is the password source)
+	_, err = s.credentialRepo.CreateCredentialWithoutPassword(ctx, localUserID, tenantID, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create credential for TOTP: %w", err)
+	}
+	log.Printf("[TenantAuthService] Created credential record for user %s in tenant %s (for TOTP setup)", localUserID, tenantID)
+	return nil
+}
+
 // GetCredential returns the credential record for a user in a tenant
 func (s *TenantAuthService) GetCredential(ctx context.Context, userID, tenantID uuid.UUID) (*models.TenantCredential, error) {
-	return s.credentialRepo.GetCredential(ctx, userID, tenantID)
+	localID, err := s.resolveUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return s.credentialRepo.GetCredential(ctx, localID, tenantID)
 }
 
 // EnableTOTP enables TOTP MFA for a user, saving the encrypted secret and backup code hashes
 func (s *TenantAuthService) EnableTOTP(ctx context.Context, userID, tenantID uuid.UUID, encryptedSecret string, backupCodeHashes models.JSONB) error {
-	return s.credentialRepo.EnableTOTP(ctx, userID, tenantID, encryptedSecret, backupCodeHashes)
+	localID, err := s.resolveUserID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("failed to resolve user: %w", err)
+	}
+	// Ensure credential record exists (OIDC users may not have one)
+	if err := s.ensureCredentialExists(ctx, localID, tenantID); err != nil {
+		return err
+	}
+	return s.credentialRepo.EnableTOTP(ctx, localID, tenantID, encryptedSecret, backupCodeHashes)
 }
 
 // DisableTOTP disables TOTP MFA for a user
 func (s *TenantAuthService) DisableTOTP(ctx context.Context, userID, tenantID uuid.UUID) error {
-	return s.credentialRepo.DisableMFA(ctx, userID, tenantID)
+	localID, err := s.resolveUserID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("failed to resolve user: %w", err)
+	}
+	return s.credentialRepo.DisableMFA(ctx, localID, tenantID)
 }
 
 // UpdateBackupCodes replaces the backup code hashes for a user
 func (s *TenantAuthService) UpdateBackupCodes(ctx context.Context, userID, tenantID uuid.UUID, backupCodeHashes models.JSONB) error {
-	return s.credentialRepo.UpdateBackupCodes(ctx, userID, tenantID, backupCodeHashes)
+	localID, err := s.resolveUserID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("failed to resolve user: %w", err)
+	}
+	return s.credentialRepo.UpdateBackupCodes(ctx, localID, tenantID, backupCodeHashes)
 }
 
 // ConsumeBackupCode removes a used backup code hash and returns remaining count
 func (s *TenantAuthService) ConsumeBackupCode(ctx context.Context, userID, tenantID uuid.UUID, codeHash string) (int, error) {
-	return s.credentialRepo.ConsumeBackupCode(ctx, userID, tenantID, codeHash)
+	localID, err := s.resolveUserID(ctx, userID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to resolve user: %w", err)
+	}
+	return s.credentialRepo.ConsumeBackupCode(ctx, localID, tenantID, codeHash)
 }
