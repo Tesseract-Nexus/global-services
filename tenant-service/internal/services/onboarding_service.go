@@ -1000,7 +1000,7 @@ type KeycloakSetupResult struct {
 }
 
 // CompleteAccountSetup creates tenant and user account from onboarding session
-func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID uuid.UUID, password, authMethod, timezone, currency, businessModel string) (*CompleteAccountSetupResponse, error) {
+func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID uuid.UUID, password, authMethod, timezone, currency, businessModel, totpSecretEncrypted string, backupCodeHashes []string) (*CompleteAccountSetupResponse, error) {
 	// Get onboarding session with all related data including application_configurations
 	// which contains store setup data (currency, timezone) saved during onboarding
 	session, err := s.onboardingRepo.GetSessionByID(ctx, sessionID, []string{"business_information", "contact_information", "business_addresses", "application_configurations"})
@@ -1487,6 +1487,21 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 			log.Printf("[OnboardingService] Warning: Failed to create tenant credential record for user %s in tenant %s: %v", userID, tenantID, credErr)
 		} else {
 			log.Printf("[OnboardingService] Created tenant credential record (Keycloak-only password) for user %s in tenant %s", userID, tenantID)
+
+			// Enable TOTP MFA if set up during onboarding
+			if totpSecretEncrypted != "" {
+				var backupCodesJSONB models.JSONB
+				if len(backupCodeHashes) > 0 {
+					if backupJSON, jsonErr := json.Marshal(backupCodeHashes); jsonErr == nil {
+						backupCodesJSONB = models.JSONB(backupJSON)
+					}
+				}
+				if mfaErr := s.credentialRepo.EnableTOTP(ctx, userID, tenantID, totpSecretEncrypted, backupCodesJSONB); mfaErr != nil {
+					log.Printf("[OnboardingService] Warning: Failed to enable TOTP MFA for user %s in tenant %s: %v", userID, tenantID, mfaErr)
+				} else {
+					log.Printf("[OnboardingService] Enabled TOTP MFA for user %s in tenant %s", userID, tenantID)
+				}
+			}
 		}
 
 		// Create default auth policy for the tenant

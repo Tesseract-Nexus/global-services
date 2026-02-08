@@ -547,11 +547,13 @@ func (h *OnboardingHandler) CompleteAccountSetup(c *gin.Context) {
 	}
 
 	var req struct {
-		Password      string `json:"password"`
-		AuthMethod    string `json:"auth_method" binding:"required,oneof=password google"`
-		Timezone      string `json:"timezone"`
-		Currency      string `json:"currency"`
-		BusinessModel string `json:"business_model"`
+		Password             string   `json:"password"`
+		AuthMethod           string   `json:"auth_method" binding:"required,oneof=password google"`
+		Timezone             string   `json:"timezone"`
+		Currency             string   `json:"currency"`
+		BusinessModel        string   `json:"business_model"`
+		TotpSecretEncrypted  string   `json:"totp_secret_encrypted"`
+		BackupCodeHashes     []string `json:"backup_code_hashes"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -576,7 +578,7 @@ func (h *OnboardingHandler) CompleteAccountSetup(c *gin.Context) {
 		req.BusinessModel = "ONLINE_STORE"
 	}
 
-	result, err := h.onboardingService.CompleteAccountSetup(c.Request.Context(), sessionID, req.Password, req.AuthMethod, req.Timezone, req.Currency, req.BusinessModel)
+	result, err := h.onboardingService.CompleteAccountSetup(c.Request.Context(), sessionID, req.Password, req.AuthMethod, req.Timezone, req.Currency, req.BusinessModel, req.TotpSecretEncrypted, req.BackupCodeHashes)
 	if err != nil {
 		// Return 400 for password policy violations from Keycloak
 		errMsg := err.Error()
