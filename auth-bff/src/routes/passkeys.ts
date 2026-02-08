@@ -137,7 +137,7 @@ export async function passkeyRoutes(fastify: FastifyInstance) {
       attestationType: 'none',
       excludeCredentials: existingCredentials,
       authenticatorSelection: {
-        residentKey: 'preferred',
+        residentKey: 'required',
         userVerification: 'preferred',
       },
     });
