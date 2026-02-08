@@ -22,7 +22,7 @@
 
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { config, getSessionCookieName } from '../config';
+import { config, getSessionCookieName, isAdminHost } from '../config';
 import { tenantServiceClient, maskEmail } from '../tenant-service-client';
 import { sessionStore } from '../session-store';
 import { createLogger } from '../logger';
@@ -229,6 +229,8 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
     const { email, password, tenant_slug, tenant_id, remember_me } = validation.data;
     const clientIP = request.ip;
     const userAgent = request.headers['user-agent'] || 'unknown';
+    const reqHost = request.headers['x-forwarded-host'] as string | undefined;
+    const clientType: 'internal' | 'customer' = isAdminHost(reqHost) ? 'internal' : 'customer';
 
     // Rate limit by IP + email combination
     const rateLimitKey = `login:${clientIP}:${email.toLowerCase()}`;
@@ -244,10 +246,11 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
     }
 
     // Validate credentials with tenant-service
-    // SECURITY: Pass auth_context: 'customer' to prevent staff from logging into storefront
-    // This ensures store owners/staff cannot use admin credentials on customer-facing storefront
+    // auth_context determines which Keycloak realm to authenticate against:
+    //   'staff' → internal realm (for admin dashboard hosts)
+    //   'customer' → customer realm (for storefronts)
     const result = await tenantServiceClient.validateCredentials(
-      { email, password, tenant_slug, tenant_id, auth_context: 'customer' },
+      { email, password, tenant_slug, tenant_id, auth_context: clientType === 'internal' ? 'staff' : 'customer' },
       clientIP,
       userAgent
     );
@@ -302,7 +305,7 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
         tenantSlug: data.tenant_slug,
         mfaEnabled: data.mfa_enabled,
         createdAt: Date.now(),
-        clientType: 'customer',
+        clientType,
         accessToken: data.access_token,
         idToken: data.id_token,
         refreshToken: data.refresh_token,
@@ -351,7 +354,7 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
       userId: data.user_id!,
       tenantId: data.tenant_id,
       tenantSlug: data.tenant_slug,
-      clientType: 'customer',
+      clientType,
       accessToken: data.access_token,
       idToken: data.id_token,
       refreshToken: data.refresh_token,

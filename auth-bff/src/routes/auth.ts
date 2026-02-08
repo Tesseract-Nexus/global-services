@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
-import { config, getSessionCookieName } from '../config';
+import { config, getSessionCookieName, isAdminHost } from '../config';
 import { oidcClient } from '../oidc-client';
 import { sessionStore, SessionData, WsTicketData, SessionTransferData } from '../session-store';
 import { tenantServiceClient } from '../tenant-service-client';
@@ -768,12 +768,13 @@ export async function authRoutes(fastify: FastifyInstance) {
 
       // Create transfer code directly without creating a session first
       const transferCode = uuidv4();
+      const fwdHost = request.headers['x-forwarded-host'] as string | undefined;
       const transferData: SessionTransferData = {
         sessionId: uuidv4(), // Will be replaced when session is created on accept
         userId: user_id,
         tenantId: tenant_id,
         tenantSlug: tenant_slug,
-        clientType: 'customer',
+        clientType: isAdminHost(fwdHost) ? 'internal' : 'customer',
         accessToken: access_token,
         refreshToken: refresh_token,
         expiresAt,
@@ -810,12 +811,11 @@ export async function authRoutes(fastify: FastifyInstance) {
 
 // Helper functions
 function determineClientType(request: FastifyRequest): 'internal' | 'customer' {
-  // Tenant admin apps ({slug}-admin.{domain}) use customer IDP
-  // Platform admin (admin.{domain}) uses internal IDP for Tesserix employees
+  // All admin apps ({slug}-admin.{domain} and admin.{domain}) use internal IDP
   // Storefronts and custom domains use customer IDP
   const forwardedHost = (request.headers['x-forwarded-host'] as string || request.hostname || '').split(':')[0];
   const baseDomain = config.baseDomain;
-  if (forwardedHost === `admin.${baseDomain}`) {
+  if (forwardedHost === `admin.${baseDomain}` || isAdminHost(forwardedHost)) {
     return 'internal';
   }
   return 'customer';
