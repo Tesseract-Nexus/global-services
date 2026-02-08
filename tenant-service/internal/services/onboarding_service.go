@@ -1146,6 +1146,37 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 		}
 		adminURL := fmt.Sprintf("https://%s-admin.%s", tenant.Slug, baseDomain)
 
+		// Ensure credential record exists and TOTP is enabled (may have been missed on first run)
+		if s.credentialRepo != nil {
+			credential, credGetErr := s.credentialRepo.GetCredential(ctx, user.ID, tenantID)
+			if credGetErr != nil {
+				log.Printf("[OnboardingService] Warning: Failed to check credential for user %s in tenant %s: %v", user.ID, tenantID, credGetErr)
+			}
+			if credential == nil {
+				// Credential record was never created - create it now
+				if _, credErr := s.credentialRepo.CreateCredentialWithoutPassword(ctx, user.ID, tenantID, &user.ID); credErr != nil {
+					log.Printf("[OnboardingService] Warning: Failed to create credential on re-run for user %s in tenant %s: %v", user.ID, tenantID, credErr)
+				} else {
+					log.Printf("[OnboardingService] Created credential record on re-run for user %s in tenant %s", user.ID, tenantID)
+				}
+			}
+
+			// Enable TOTP if provided and not already enabled
+			if totpSecretEncrypted != "" && (credential == nil || !credential.MFAEnabled) {
+				var backupCodesJSONB models.JSONB
+				if len(backupCodeHashes) > 0 {
+					if backupJSON, jsonErr := json.Marshal(backupCodeHashes); jsonErr == nil {
+						backupCodesJSONB = models.JSONB(backupJSON)
+					}
+				}
+				if mfaErr := s.credentialRepo.EnableTOTP(ctx, user.ID, tenantID, totpSecretEncrypted, backupCodesJSONB); mfaErr != nil {
+					log.Printf("[OnboardingService] Warning: Failed to enable TOTP on re-run for user %s in tenant %s: %v", user.ID, tenantID, mfaErr)
+				} else {
+					log.Printf("[OnboardingService] Enabled TOTP MFA on re-run for user %s in tenant %s", user.ID, tenantID)
+				}
+			}
+		}
+
 		// Tokens are already obtained and verified by setupUserInKeycloak
 		return &CompleteAccountSetupResponse{
 			TenantID:     tenantID,
@@ -1482,25 +1513,36 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 	// NOTE: Password is stored ONLY in Keycloak (single source of truth)
 	// This simplifies the auth flow and prevents password sync issues
 	if s.credentialRepo != nil {
-		if _, credErr := s.credentialRepo.CreateCredentialWithoutPassword(ctx, userID, tenantID, &userID); credErr != nil {
-			// Log error but don't fail - credential record can be created on first login
-			log.Printf("[OnboardingService] Warning: Failed to create tenant credential record for user %s in tenant %s: %v", userID, tenantID, credErr)
+		// Ensure credential record exists (check first, create if needed)
+		credentialExists := false
+		existingCred, credGetErr := s.credentialRepo.GetCredential(ctx, userID, tenantID)
+		if credGetErr != nil {
+			log.Printf("[OnboardingService] Warning: Failed to check existing credential for user %s in tenant %s: %v", userID, tenantID, credGetErr)
+		}
+		if existingCred != nil {
+			credentialExists = true
+			log.Printf("[OnboardingService] Credential record already exists for user %s in tenant %s", userID, tenantID)
 		} else {
-			log.Printf("[OnboardingService] Created tenant credential record (Keycloak-only password) for user %s in tenant %s", userID, tenantID)
+			if _, credErr := s.credentialRepo.CreateCredentialWithoutPassword(ctx, userID, tenantID, &userID); credErr != nil {
+				log.Printf("[OnboardingService] Warning: Failed to create tenant credential record for user %s in tenant %s: %v", userID, tenantID, credErr)
+			} else {
+				credentialExists = true
+				log.Printf("[OnboardingService] Created tenant credential record (Keycloak-only password) for user %s in tenant %s", userID, tenantID)
+			}
+		}
 
-			// Enable TOTP MFA if set up during onboarding
-			if totpSecretEncrypted != "" {
-				var backupCodesJSONB models.JSONB
-				if len(backupCodeHashes) > 0 {
-					if backupJSON, jsonErr := json.Marshal(backupCodeHashes); jsonErr == nil {
-						backupCodesJSONB = models.JSONB(backupJSON)
-					}
+		// Enable TOTP MFA if set up during onboarding (independent of credential creation path)
+		if credentialExists && totpSecretEncrypted != "" {
+			var backupCodesJSONB models.JSONB
+			if len(backupCodeHashes) > 0 {
+				if backupJSON, jsonErr := json.Marshal(backupCodeHashes); jsonErr == nil {
+					backupCodesJSONB = models.JSONB(backupJSON)
 				}
-				if mfaErr := s.credentialRepo.EnableTOTP(ctx, userID, tenantID, totpSecretEncrypted, backupCodesJSONB); mfaErr != nil {
-					log.Printf("[OnboardingService] Warning: Failed to enable TOTP MFA for user %s in tenant %s: %v", userID, tenantID, mfaErr)
-				} else {
-					log.Printf("[OnboardingService] Enabled TOTP MFA for user %s in tenant %s", userID, tenantID)
-				}
+			}
+			if mfaErr := s.credentialRepo.EnableTOTP(ctx, userID, tenantID, totpSecretEncrypted, backupCodesJSONB); mfaErr != nil {
+				log.Printf("[OnboardingService] Warning: Failed to enable TOTP MFA for user %s in tenant %s: %v", userID, tenantID, mfaErr)
+			} else {
+				log.Printf("[OnboardingService] Enabled TOTP MFA for user %s in tenant %s", userID, tenantID)
 			}
 		}
 
