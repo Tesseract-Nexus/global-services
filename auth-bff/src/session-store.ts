@@ -69,6 +69,7 @@ export interface MfaSessionData {
   mfaEnabled: boolean;
   attemptCount?: number;
   createdAt: number;
+  clientType?: 'customer' | 'internal';
   // Stored after successful password auth for deferred session creation
   accessToken?: string;
   idToken?: string;

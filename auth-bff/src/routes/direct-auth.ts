@@ -302,6 +302,15 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
         tenantSlug: data.tenant_slug,
         mfaEnabled: data.mfa_enabled,
         createdAt: Date.now(),
+        clientType: 'customer',
+        accessToken: data.access_token,
+        idToken: data.id_token,
+        refreshToken: data.refresh_token,
+        keycloakUserId: data.keycloak_user_id,
+        firstName: data.first_name,
+        lastName: data.last_name,
+        role: data.role,
+        rememberMe: remember_me,
       });
 
       return reply.send({
@@ -575,6 +584,7 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
       tenantSlug: data.tenant_slug,
       mfaEnabled: data.mfa_enabled,
       createdAt: Date.now(),
+      clientType: 'internal',
       accessToken: data.access_token,
       idToken: data.id_token,
       refreshToken: data.refresh_token,
@@ -736,12 +746,13 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
     }
 
     // OTP verified — create session with stored tokens
+    const isInternal = mfaData.clientType === 'internal';
     const sessionExpirySeconds = 86400; // 24 hours
     const session = await sessionStore.createSession({
       userId: mfaData.userId,
       tenantId: mfaData.tenantId,
       tenantSlug: mfaData.tenantSlug,
-      clientType: 'internal',
+      clientType: mfaData.clientType || 'internal',
       accessToken: mfaData.accessToken!,
       idToken: mfaData.idToken,
       refreshToken: mfaData.refreshToken,
@@ -757,7 +768,7 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
         tenant_id: mfaData.tenantId,
         tenant_slug: mfaData.tenantSlug,
         role: mfaData.role,
-        is_staff: true,
+        is_staff: isInternal,
         realm_access: {
           roles: mfaData.role ? [mfaData.role] : [],
         },
@@ -799,7 +810,8 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
       userId: session.userId,
       sessionId: session.id,
       tenantSlug: mfaData.tenantSlug,
-    }, 'Admin MFA verification successful, session created');
+      clientType: mfaData.clientType,
+    }, 'MFA verification successful, session created');
 
     return reply.send({
       success: true,
@@ -812,7 +824,7 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
         tenant_id: mfaData.tenantId,
         tenant_slug: mfaData.tenantSlug,
         role: mfaData.role,
-        is_staff: true,
+        is_staff: isInternal,
       },
       session: {
         expires_at: session.expiresAt,
