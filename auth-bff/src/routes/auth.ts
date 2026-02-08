@@ -376,15 +376,13 @@ export async function authRoutes(fastify: FastifyInstance) {
     Querystring: z.infer<typeof logoutQuerySchema>;
   }>('/auth/logout', async (request, reply) => {
     const session = await getSession(request);
-    const query = logoutQuerySchema.parse(request.query);
-    const returnTo = query.returnTo || '/login';
+    const forwardedHost = request.headers['x-forwarded-host'] as string || request.hostname;
 
     if (session) {
       // Delete session
       await sessionStore.deleteSession(session.id);
 
       // Clear cookie with dynamic domain for custom domain support
-      const forwardedHost = request.headers['x-forwarded-host'] as string || request.hostname;
       clearSessionCookie(reply, forwardedHost);
 
       // Revoke tokens with Keycloak (but don't redirect to Keycloak UI)
@@ -397,13 +395,10 @@ export async function authRoutes(fastify: FastifyInstance) {
       }
 
       logger.info({ userId: session.userId, sessionId: session.id }, 'User logged out');
-
-      // Redirect to app's login page instead of Keycloak
-      return reply.redirect(returnTo);
     }
 
-    // No session, just redirect to login
-    return reply.redirect(returnTo);
+    // Return JSON for programmatic callers (storefront uses fetch + client-side navigation)
+    return reply.send({ success: true, logged_out: !!session });
   });
 
   // ============================================================================
