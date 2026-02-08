@@ -193,6 +193,7 @@ export async function passkeyRoutes(fastify: FastifyInstance) {
         expectedChallenge: challengeData.challenge,
         expectedOrigin,
         expectedRPID: challengeData.rpId,
+        requireUserVerification: false, // Options use userVerification: 'preferred'
       });
 
       if (!verification.verified || !verification.registrationInfo) {
@@ -229,7 +230,7 @@ export async function passkeyRoutes(fastify: FastifyInstance) {
 
       return reply.send({ success: true, message: 'Passkey registered successfully.' });
     } catch (error) {
-      logger.error({ error }, 'Passkey registration verification error');
+      logger.error({ err: error, errorMessage: error instanceof Error ? error.message : String(error) }, 'Passkey registration verification error');
       return reply.code(400).send({ success: false, error: 'VERIFICATION_ERROR', message: 'Failed to verify passkey.' });
     }
   });
@@ -314,6 +315,7 @@ export async function passkeyRoutes(fastify: FastifyInstance) {
         expectedChallenge: challengeData.challenge,
         expectedOrigin,
         expectedRPID: challengeData.rpId,
+        requireUserVerification: false, // Options use userVerification: 'preferred'
         authenticator: {
           credentialID: credentialIdBase64url,
           credentialPublicKey: Uint8Array.from(Buffer.from(lookupResult.passkey.public_key, 'base64url')),
@@ -395,7 +397,7 @@ export async function passkeyRoutes(fastify: FastifyInstance) {
         },
       });
     } catch (error) {
-      logger.error({ error, credentialId: credentialIdBase64url }, 'Passkey authentication verification error');
+      logger.error({ err: error, errorMessage: error instanceof Error ? error.message : String(error), credentialId: credentialIdBase64url }, 'Passkey authentication verification error');
       return reply.code(400).send({ success: false, error: 'VERIFICATION_ERROR', message: 'Failed to verify passkey.' });
     }
   });
