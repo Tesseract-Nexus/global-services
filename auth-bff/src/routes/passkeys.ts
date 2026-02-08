@@ -36,6 +36,26 @@ import { createLogger } from '../logger';
 const logger = createLogger('passkeys');
 
 /**
+ * Extract the effective forwarded host from a Fastify request.
+ * Handles comma-separated values from multiple proxies (e.g. ingress → Istio → BFF)
+ * and falls back to Fastify's request.hostname (which respects trust proxy settings).
+ */
+function getEffectiveHost(request: { headers: Record<string, string | string[] | undefined>; hostname: string }): string | undefined {
+  const raw = request.headers['x-forwarded-host'];
+  if (raw) {
+    const value = Array.isArray(raw) ? raw[0] : raw;
+    // Take the first value if comma-separated (leftmost is the original client host)
+    return value.split(',')[0].trim();
+  }
+  // Fallback: use Fastify's hostname (resolved via trust proxy)
+  const hostname = request.hostname;
+  if (hostname && !hostname.includes('.svc.cluster.local') && hostname !== '127.0.0.1') {
+    return hostname;
+  }
+  return undefined;
+}
+
+/**
  * Derive the RP ID (Relying Party Identifier) from the forwarded host.
  * - For *.tesserix.app subdomains: use "tesserix.app" (allows cross-subdomain passkeys)
  * - For localhost: use "localhost"
@@ -80,7 +100,7 @@ export async function passkeyRoutes(fastify: FastifyInstance) {
   // Generate WebAuthn registration options (requires active session)
   // ==========================================================================
   fastify.post('/auth/passkeys/registration/options', async (request, reply) => {
-    const forwardedHost = request.headers['x-forwarded-host'] as string | undefined;
+    const forwardedHost = getEffectiveHost(request);
     const cookieName = getSessionCookieName(forwardedHost);
     const sessionId = request.cookies[cookieName];
 
@@ -161,7 +181,7 @@ export async function passkeyRoutes(fastify: FastifyInstance) {
     }
 
     // Verify session
-    const forwardedHost = request.headers['x-forwarded-host'] as string | undefined;
+    const forwardedHost = getEffectiveHost(request);
     const cookieName = getSessionCookieName(forwardedHost);
     const sessionId = request.cookies[cookieName];
 
@@ -240,7 +260,7 @@ export async function passkeyRoutes(fastify: FastifyInstance) {
   // Generate WebAuthn authentication options (NO session required)
   // ==========================================================================
   fastify.post('/auth/passkeys/authentication/options', async (request, reply) => {
-    const forwardedHost = request.headers['x-forwarded-host'] as string | undefined;
+    const forwardedHost = getEffectiveHost(request);
     const rpId = deriveRpId(forwardedHost);
 
     const options = await generateAuthenticationOptions({
@@ -306,7 +326,7 @@ export async function passkeyRoutes(fastify: FastifyInstance) {
       return reply.code(401).send({ success: false, error: 'PASSKEY_NOT_FOUND', message: 'Passkey not recognized.' });
     }
 
-    const forwardedHost = request.headers['x-forwarded-host'] as string | undefined;
+    const forwardedHost = getEffectiveHost(request);
     const expectedOrigin = deriveExpectedOrigin(forwardedHost);
 
     try {
@@ -407,7 +427,7 @@ export async function passkeyRoutes(fastify: FastifyInstance) {
   // List user's registered passkeys (requires session)
   // ==========================================================================
   fastify.get('/auth/passkeys/list', async (request, reply) => {
-    const forwardedHost = request.headers['x-forwarded-host'] as string | undefined;
+    const forwardedHost = getEffectiveHost(request);
     const cookieName = getSessionCookieName(forwardedHost);
     const sessionId = request.cookies[cookieName];
 
@@ -452,7 +472,7 @@ export async function passkeyRoutes(fastify: FastifyInstance) {
       return reply.code(400).send({ success: false, error: 'VALIDATION_ERROR', message: 'credential_id and name are required.' });
     }
 
-    const forwardedHost = request.headers['x-forwarded-host'] as string | undefined;
+    const forwardedHost = getEffectiveHost(request);
     const cookieName = getSessionCookieName(forwardedHost);
     const sessionId = request.cookies[cookieName];
 
@@ -492,7 +512,7 @@ export async function passkeyRoutes(fastify: FastifyInstance) {
       return reply.code(400).send({ success: false, error: 'VALIDATION_ERROR', message: 'credential_id is required.' });
     }
 
-    const forwardedHost = request.headers['x-forwarded-host'] as string | undefined;
+    const forwardedHost = getEffectiveHost(request);
     const cookieName = getSessionCookieName(forwardedHost);
     const sessionId = request.cookies[cookieName];
 
