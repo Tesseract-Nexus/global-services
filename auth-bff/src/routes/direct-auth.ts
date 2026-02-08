@@ -486,7 +486,8 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
     }
 
     // Check if we received tokens from tenant-service
-    if (!data.access_token) {
+    // Skip when auth policy requires MFA — tokens are intentionally withheld and will come with Fix 4
+    if (!data.access_token && !data.mfa_required) {
       logger.error({ email: maskEmail(email), tenant_slug }, 'No tokens received from tenant-service for staff');
       return reply.code(500).send({
         success: false,
@@ -496,7 +497,8 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
     }
 
     // Block password login for Google-linked users
-    const adminTokenPayload = decodeJwtPayload(data.access_token);
+    // access_token is guaranteed present: either by the guard above or by tenant-service always including tokens for staff
+    const adminTokenPayload = decodeJwtPayload(data.access_token!);
     if (adminTokenPayload?.google_linked === true || adminTokenPayload?.google_linked === 'true') {
       logger.info({ email: maskEmail(email), tenant_slug }, 'Admin password login blocked for Google-linked user');
       return reply.code(403).send({
@@ -519,7 +521,7 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
           tenantId: data.tenant_id,
           tenantSlug: data.tenant_slug,
           clientType: 'internal',
-          accessToken: data.access_token,
+          accessToken: data.access_token!,
           idToken: data.id_token,
           refreshToken: data.refresh_token,
           expiresAt: Math.floor(Date.now() / 1000) + sessionExpirySeconds,
