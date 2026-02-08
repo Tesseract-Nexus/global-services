@@ -333,6 +333,11 @@ func (s *TenantAuthService) ValidateCredentials(ctx context.Context, req *Valida
 	// Check if user has MFA enabled
 	mfaEnabled := credential != nil && credential.MFAEnabled
 
+	// If user has voluntarily enabled MFA, require it on login
+	if mfaEnabled {
+		mfaRequired = true
+	}
+
 	// Log successful auth event
 	s.logSuccessAuthEvent(ctx, tenant.ID, &user.ID, req.IPAddress, req.UserAgent)
 
