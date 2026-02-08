@@ -602,6 +602,15 @@ func setupRouter(
 			authRoutes.POST("/totp/disable", authHandler.DisableTotp)                         // Disable TOTP for a user
 			authRoutes.POST("/totp/update-backup-codes", authHandler.UpdateBackupCodes)       // Update backup code hashes
 			authRoutes.POST("/totp/consume-backup-code", authHandler.ConsumeBackupCode)       // Consume a backup code
+
+			// Passkey (WebAuthn) endpoints (called by auth-bff for passkey management)
+			authRoutes.POST("/passkeys/save", authHandler.HandleSavePasskey)                  // Save a new passkey credential
+			authRoutes.POST("/passkeys/list", authHandler.HandleListPasskeys)                 // List all passkeys for a user
+			authRoutes.POST("/passkeys/authenticate", authHandler.HandleAuthenticatePasskey)  // Look up passkey for authentication
+			authRoutes.POST("/passkeys/update-counter", authHandler.HandleUpdatePasskeyCounter)   // Update signature counter
+			authRoutes.POST("/passkeys/update-last-used", authHandler.HandleUpdatePasskeyLastUsed) // Update last used timestamp
+			authRoutes.POST("/passkeys/rename", authHandler.HandleRenamePasskey)              // Rename a passkey
+			authRoutes.POST("/passkeys/delete", authHandler.HandleDeletePasskey)              // Delete a passkey
 		}
 
 		// Protected auth endpoints (require Istio JWT auth)
@@ -700,6 +709,8 @@ func autoMigrate(db *gorm.DB) error {
 		&models.DeactivatedMembership{}, // Archive of deactivated customer accounts
 		// Password reset tokens
 		&models.PasswordResetToken{}, // Secure tokens for password reset flow
+		// Passkey (WebAuthn) credentials
+		&models.PasskeyCredential{}, // WebAuthn passkey credentials for passwordless auth
 	}
 
 	for _, model := range modelsToMigrate {

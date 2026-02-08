@@ -807,3 +807,98 @@ func (r *CredentialRepository) DeleteTenantCredentials(ctx context.Context, tena
 	}
 	return nil
 }
+
+// ============================================================================
+// Passkey (WebAuthn) Operations
+// ============================================================================
+
+// SavePasskey creates a new passkey credential record
+func (r *CredentialRepository) SavePasskey(ctx context.Context, cred *models.PasskeyCredential) error {
+	if err := r.db.WithContext(ctx).Create(cred).Error; err != nil {
+		return fmt.Errorf("failed to save passkey: %w", err)
+	}
+	return nil
+}
+
+// GetPasskeysByUser returns all passkeys for a user in a tenant
+func (r *CredentialRepository) GetPasskeysByUser(ctx context.Context, userID, tenantID uuid.UUID) ([]models.PasskeyCredential, error) {
+	var passkeys []models.PasskeyCredential
+	if err := r.db.WithContext(ctx).
+		Where("user_id = ? AND tenant_id = ?", userID, tenantID).
+		Order("created_at DESC").
+		Find(&passkeys).Error; err != nil {
+		return nil, fmt.Errorf("failed to get passkeys: %w", err)
+	}
+	return passkeys, nil
+}
+
+// GetPasskeyByCredentialID looks up a passkey by its WebAuthn credential ID
+func (r *CredentialRepository) GetPasskeyByCredentialID(ctx context.Context, credentialID string) (*models.PasskeyCredential, error) {
+	var passkey models.PasskeyCredential
+	if err := r.db.WithContext(ctx).
+		Where("credential_id = ?", credentialID).
+		First(&passkey).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get passkey by credential ID: %w", err)
+	}
+	return &passkey, nil
+}
+
+// UpdatePasskeyCounter updates the signature counter for clone detection
+func (r *CredentialRepository) UpdatePasskeyCounter(ctx context.Context, credentialID string, counter uint32) error {
+	result := r.db.WithContext(ctx).
+		Model(&models.PasskeyCredential{}).
+		Where("credential_id = ?", credentialID).
+		Update("counter", counter)
+	if result.Error != nil {
+		return fmt.Errorf("failed to update passkey counter: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("passkey not found: %s", credentialID)
+	}
+	return nil
+}
+
+// UpdatePasskeyLastUsed sets the last_used_at timestamp to now
+func (r *CredentialRepository) UpdatePasskeyLastUsed(ctx context.Context, credentialID string) error {
+	now := time.Now()
+	result := r.db.WithContext(ctx).
+		Model(&models.PasskeyCredential{}).
+		Where("credential_id = ?", credentialID).
+		Update("last_used_at", now)
+	if result.Error != nil {
+		return fmt.Errorf("failed to update passkey last used: %w", result.Error)
+	}
+	return nil
+}
+
+// RenamePasskey renames a passkey (user must own it)
+func (r *CredentialRepository) RenamePasskey(ctx context.Context, credentialID string, userID, tenantID uuid.UUID, name string) error {
+	result := r.db.WithContext(ctx).
+		Model(&models.PasskeyCredential{}).
+		Where("credential_id = ? AND user_id = ? AND tenant_id = ?", credentialID, userID, tenantID).
+		Update("name", name)
+	if result.Error != nil {
+		return fmt.Errorf("failed to rename passkey: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("passkey not found or access denied")
+	}
+	return nil
+}
+
+// DeletePasskey deletes a passkey (user must own it)
+func (r *CredentialRepository) DeletePasskey(ctx context.Context, credentialID string, userID, tenantID uuid.UUID) error {
+	result := r.db.WithContext(ctx).
+		Where("credential_id = ? AND user_id = ? AND tenant_id = ?", credentialID, userID, tenantID).
+		Delete(&models.PasskeyCredential{})
+	if result.Error != nil {
+		return fmt.Errorf("failed to delete passkey: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("passkey not found or access denied")
+	}
+	return nil
+}

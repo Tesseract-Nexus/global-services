@@ -951,6 +951,43 @@ const (
 	MFATypeHardwareToken = "hardware_token"
 )
 
+// ============================================================================
+// PASSKEY (WebAuthn) CREDENTIAL MODEL
+// ============================================================================
+// Stores WebAuthn/passkey credentials for passwordless authentication.
+// Each user can have multiple passkeys (e.g., fingerprint, security key).
+// Separate table from TenantCredential because each passkey needs individual
+// counter and last_used_at tracking.
+
+// PasskeyCredential represents a WebAuthn passkey credential
+type PasskeyCredential struct {
+	ID           uuid.UUID  `json:"id" gorm:"type:uuid;primary_key;default:uuid_generate_v4()"`
+	UserID       uuid.UUID  `json:"user_id" gorm:"type:uuid;not null;index"`
+	TenantID     uuid.UUID  `json:"tenant_id" gorm:"type:uuid;not null;index"`
+	CredentialID string     `json:"credential_id" gorm:"type:text;not null;uniqueIndex"`
+	PublicKey    string     `json:"public_key" gorm:"type:text;not null"`
+	Counter      uint32     `json:"counter" gorm:"default:0"`
+	DeviceType   string     `json:"device_type" gorm:"size:50"`
+	BackedUp     bool       `json:"backed_up" gorm:"default:false"`
+	Transports   JSONB      `json:"transports" gorm:"type:jsonb;default:'[]'"`
+	Name         string     `json:"name" gorm:"size:255"`
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
+	LastUsedAt   *time.Time `json:"last_used_at"`
+}
+
+// TableName specifies the table name for PasskeyCredential
+func (PasskeyCredential) TableName() string {
+	return "passkey_credentials"
+}
+
+func (p *PasskeyCredential) BeforeCreate(tx *gorm.DB) error {
+	if p.ID == uuid.Nil {
+		p.ID = uuid.New()
+	}
+	return nil
+}
+
 func (t *Tenant) BeforeCreate(tx *gorm.DB) error {
 	if t.ID == uuid.Nil {
 		t.ID = uuid.New()

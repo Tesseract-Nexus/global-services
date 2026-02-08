@@ -1464,3 +1464,160 @@ func (s *TenantAuthService) ConsumeBackupCode(ctx context.Context, userID, tenan
 	}
 	return s.credentialRepo.ConsumeBackupCode(ctx, localID, tenantID, codeHash)
 }
+
+// ============================================================================
+// Passkey (WebAuthn) Operations (called by auth-bff)
+// ============================================================================
+
+// SavePasskey saves a new passkey credential for a user
+func (s *TenantAuthService) SavePasskey(ctx context.Context, userID, tenantID uuid.UUID, credentialID, publicKey string, counter uint32, deviceType string, backedUp bool, transports models.JSONB, name string) error {
+	localID, err := s.resolveUserID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("failed to resolve user: %w", err)
+	}
+	if err := s.ensureCredentialExists(ctx, localID, tenantID); err != nil {
+		return err
+	}
+	cred := &models.PasskeyCredential{
+		UserID:       localID,
+		TenantID:     tenantID,
+		CredentialID: credentialID,
+		PublicKey:    publicKey,
+		Counter:      counter,
+		DeviceType:   deviceType,
+		BackedUp:     backedUp,
+		Transports:   transports,
+		Name:         name,
+	}
+	return s.credentialRepo.SavePasskey(ctx, cred)
+}
+
+// ListPasskeys returns all passkeys for a user in a tenant
+func (s *TenantAuthService) ListPasskeys(ctx context.Context, userID, tenantID uuid.UUID) ([]models.PasskeyCredential, error) {
+	localID, err := s.resolveUserID(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve user: %w", err)
+	}
+	return s.credentialRepo.GetPasskeysByUser(ctx, localID, tenantID)
+}
+
+// AuthenticatePasskeyResponse contains all data needed by auth-bff for passkey login
+type AuthenticatePasskeyResponse struct {
+	Passkey        *models.PasskeyCredential `json:"passkey"`
+	UserID         string                    `json:"user_id"`
+	KeycloakUserID string                    `json:"keycloak_user_id"`
+	Email          string                    `json:"email"`
+	FirstName      string                    `json:"first_name"`
+	LastName       string                    `json:"last_name"`
+	TenantID       string                    `json:"tenant_id"`
+	TenantSlug     string                    `json:"tenant_slug"`
+	Role           string                    `json:"role"`
+	AccessToken    string                    `json:"access_token"`
+	RefreshToken   string                    `json:"refresh_token"`
+	IDToken        string                    `json:"id_token"`
+}
+
+// AuthenticatePasskey looks up a passkey by credential ID, retrieves user/tenant info, and issues Keycloak tokens
+func (s *TenantAuthService) AuthenticatePasskey(ctx context.Context, credentialID, rpID string) (*AuthenticatePasskeyResponse, error) {
+	// Look up the passkey
+	passkey, err := s.credentialRepo.GetPasskeyByCredentialID(ctx, credentialID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to look up passkey: %w", err)
+	}
+	if passkey == nil {
+		return nil, fmt.Errorf("passkey not found")
+	}
+
+	// Get the user
+	var user models.User
+	if err := s.db.WithContext(ctx).Where("id = ?", passkey.UserID).First(&user).Error; err != nil {
+		return nil, fmt.Errorf("failed to get user for passkey: %w", err)
+	}
+
+	// Get the tenant
+	tenant, err := s.membershipRepo.GetTenantByID(ctx, passkey.TenantID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tenant for passkey: %w", err)
+	}
+
+	// Get membership to find user's role
+	membership, err := s.membershipRepo.GetMembership(ctx, passkey.UserID, passkey.TenantID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get membership: %w", err)
+	}
+	if membership == nil || !membership.IsActive {
+		return nil, fmt.Errorf("user does not have active membership in this tenant")
+	}
+
+	// Get Keycloak user ID
+	keycloakUserID := ""
+	if user.KeycloakID != nil {
+		keycloakUserID = user.KeycloakID.String()
+	}
+	if keycloakUserID == "" {
+		return nil, fmt.Errorf("user does not have a Keycloak account")
+	}
+
+	// Get tokens via token exchange (user already validated by WebAuthn signature)
+	var accessToken, refreshToken, idToken string
+	if s.keycloakClient != nil && s.keycloakConfig != nil {
+		tokenResp, err := s.keycloakClient.ImpersonateUser(
+			ctx,
+			keycloakUserID,
+			s.keycloakConfig.ClientID,
+			s.keycloakConfig.ClientSecret,
+		)
+		if err != nil {
+			log.Printf("[TenantAuthService] Warning: Failed to get tokens for passkey auth: %v", err)
+			return nil, fmt.Errorf("failed to issue tokens: %w", err)
+		}
+		accessToken = tokenResp.AccessToken
+		refreshToken = tokenResp.RefreshToken
+		idToken = tokenResp.IDToken
+	} else {
+		return nil, fmt.Errorf("authentication service not properly configured")
+	}
+
+	return &AuthenticatePasskeyResponse{
+		Passkey:        passkey,
+		UserID:         passkey.UserID.String(),
+		KeycloakUserID: keycloakUserID,
+		Email:          user.Email,
+		FirstName:      user.FirstName,
+		LastName:       user.LastName,
+		TenantID:       passkey.TenantID.String(),
+		TenantSlug:     tenant.Slug,
+		Role:           membership.Role,
+		AccessToken:    accessToken,
+		RefreshToken:   refreshToken,
+		IDToken:        idToken,
+	}, nil
+}
+
+// UpdatePasskeyCounter updates the signature counter for a passkey
+func (s *TenantAuthService) UpdatePasskeyCounter(ctx context.Context, credentialID string, counter uint32) error {
+	return s.credentialRepo.UpdatePasskeyCounter(ctx, credentialID, counter)
+}
+
+// UpdatePasskeyLastUsed sets the last_used_at timestamp for a passkey
+func (s *TenantAuthService) UpdatePasskeyLastUsed(ctx context.Context, credentialID string) error {
+	return s.credentialRepo.UpdatePasskeyLastUsed(ctx, credentialID)
+}
+
+// RenamePasskey renames a passkey
+func (s *TenantAuthService) RenamePasskey(ctx context.Context, credentialID string, userID, tenantID uuid.UUID, name string) error {
+	localID, err := s.resolveUserID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("failed to resolve user: %w", err)
+	}
+	return s.credentialRepo.RenamePasskey(ctx, credentialID, localID, tenantID, name)
+}
+
+// DeletePasskey deletes a passkey
+func (s *TenantAuthService) DeletePasskey(ctx context.Context, credentialID string, userID, tenantID uuid.UUID) error {
+	localID, err := s.resolveUserID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("failed to resolve user: %w", err)
+	}
+	return s.credentialRepo.DeletePasskey(ctx, credentialID, localID, tenantID)
+}

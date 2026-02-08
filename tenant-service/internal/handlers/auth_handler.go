@@ -1243,6 +1243,237 @@ func (h *AuthHandler) UpdateBackupCodes(c *gin.Context) {
 	})
 }
 
+// ============================================================================
+// Passkey (WebAuthn) Endpoints (called by auth-bff for passkey management)
+// ============================================================================
+
+// HandleSavePasskey saves a new passkey credential for a user
+// POST /api/v1/auth/passkeys/save
+func (h *AuthHandler) HandleSavePasskey(c *gin.Context) {
+	var req struct {
+		UserID       string   `json:"user_id" binding:"required"`
+		TenantID     string   `json:"tenant_id" binding:"required"`
+		CredentialID string   `json:"credential_id" binding:"required"`
+		PublicKey    string   `json:"public_key" binding:"required"`
+		Counter      uint32   `json:"counter"`
+		DeviceType   string   `json:"device_type"`
+		BackedUp     bool     `json:"backed_up"`
+		Transports   []string `json:"transports"`
+		Name         string   `json:"name"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+
+	userID, err := uuid.Parse(req.UserID)
+	if err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid user_id format", err)
+		return
+	}
+
+	tenantID, err := uuid.Parse(req.TenantID)
+	if err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid tenant_id format", err)
+		return
+	}
+
+	// Serialize transports as JSONB
+	transportsJSON, err := json.Marshal(req.Transports)
+	if err != nil {
+		ErrorResponse(c, http.StatusInternalServerError, "Failed to serialize transports", err)
+		return
+	}
+
+	if err := h.authSvc.SavePasskey(c.Request.Context(), userID, tenantID, req.CredentialID, req.PublicKey, req.Counter, req.DeviceType, req.BackedUp, models.JSONB(transportsJSON), req.Name); err != nil {
+		ErrorResponse(c, http.StatusInternalServerError, "Failed to save passkey", err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// HandleListPasskeys lists all passkeys for a user
+// POST /api/v1/auth/passkeys/list
+func (h *AuthHandler) HandleListPasskeys(c *gin.Context) {
+	var req struct {
+		UserID   string `json:"user_id" binding:"required"`
+		TenantID string `json:"tenant_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+
+	userID, err := uuid.Parse(req.UserID)
+	if err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid user_id format", err)
+		return
+	}
+
+	tenantID, err := uuid.Parse(req.TenantID)
+	if err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid tenant_id format", err)
+		return
+	}
+
+	passkeys, err := h.authSvc.ListPasskeys(c.Request.Context(), userID, tenantID)
+	if err != nil {
+		ErrorResponse(c, http.StatusInternalServerError, "Failed to list passkeys", err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success":  true,
+		"passkeys": passkeys,
+	})
+}
+
+// HandleAuthenticatePasskey looks up a passkey by credential ID for authentication
+// POST /api/v1/auth/passkeys/authenticate
+func (h *AuthHandler) HandleAuthenticatePasskey(c *gin.Context) {
+	var req struct {
+		CredentialID string `json:"credential_id" binding:"required"`
+		RPID         string `json:"rp_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+
+	result, err := h.authSvc.AuthenticatePasskey(c.Request.Context(), req.CredentialID, req.RPID)
+	if err != nil {
+		log.Printf("[AuthHandler] Passkey authentication failed: %v", err)
+		c.JSON(http.StatusNotFound, gin.H{
+			"success": false,
+			"message": "Passkey not found or authentication failed",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success":          true,
+		"passkey":          result.Passkey,
+		"user_id":          result.UserID,
+		"keycloak_user_id": result.KeycloakUserID,
+		"email":            result.Email,
+		"first_name":       result.FirstName,
+		"last_name":        result.LastName,
+		"tenant_id":        result.TenantID,
+		"tenant_slug":      result.TenantSlug,
+		"role":             result.Role,
+		"access_token":     result.AccessToken,
+		"refresh_token":    result.RefreshToken,
+		"id_token":         result.IDToken,
+	})
+}
+
+// HandleUpdatePasskeyCounter updates the signature counter for clone detection
+// POST /api/v1/auth/passkeys/update-counter
+func (h *AuthHandler) HandleUpdatePasskeyCounter(c *gin.Context) {
+	var req struct {
+		CredentialID string `json:"credential_id" binding:"required"`
+		Counter      uint32 `json:"counter"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+
+	if err := h.authSvc.UpdatePasskeyCounter(c.Request.Context(), req.CredentialID, req.Counter); err != nil {
+		ErrorResponse(c, http.StatusInternalServerError, "Failed to update passkey counter", err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// HandleUpdatePasskeyLastUsed updates the last_used_at timestamp
+// POST /api/v1/auth/passkeys/update-last-used
+func (h *AuthHandler) HandleUpdatePasskeyLastUsed(c *gin.Context) {
+	var req struct {
+		CredentialID string `json:"credential_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+
+	if err := h.authSvc.UpdatePasskeyLastUsed(c.Request.Context(), req.CredentialID); err != nil {
+		ErrorResponse(c, http.StatusInternalServerError, "Failed to update passkey last used", err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// HandleRenamePasskey renames a passkey
+// POST /api/v1/auth/passkeys/rename
+func (h *AuthHandler) HandleRenamePasskey(c *gin.Context) {
+	var req struct {
+		CredentialID string `json:"credential_id" binding:"required"`
+		UserID       string `json:"user_id" binding:"required"`
+		TenantID     string `json:"tenant_id" binding:"required"`
+		Name         string `json:"name" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+
+	userID, err := uuid.Parse(req.UserID)
+	if err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid user_id format", err)
+		return
+	}
+
+	tenantID, err := uuid.Parse(req.TenantID)
+	if err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid tenant_id format", err)
+		return
+	}
+
+	if err := h.authSvc.RenamePasskey(c.Request.Context(), req.CredentialID, userID, tenantID, req.Name); err != nil {
+		ErrorResponse(c, http.StatusInternalServerError, "Failed to rename passkey", err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// HandleDeletePasskey deletes a passkey
+// POST /api/v1/auth/passkeys/delete
+func (h *AuthHandler) HandleDeletePasskey(c *gin.Context) {
+	var req struct {
+		CredentialID string `json:"credential_id" binding:"required"`
+		UserID       string `json:"user_id" binding:"required"`
+		TenantID     string `json:"tenant_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+
+	userID, err := uuid.Parse(req.UserID)
+	if err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid user_id format", err)
+		return
+	}
+
+	tenantID, err := uuid.Parse(req.TenantID)
+	if err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid tenant_id format", err)
+		return
+	}
+
+	if err := h.authSvc.DeletePasskey(c.Request.Context(), req.CredentialID, userID, tenantID); err != nil {
+		ErrorResponse(c, http.StatusInternalServerError, "Failed to delete passkey", err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
 // ConsumeBackupCode removes a used backup code hash and returns remaining count
 // POST /api/v1/auth/totp/consume-backup-code
 func (h *AuthHandler) ConsumeBackupCode(c *gin.Context) {
