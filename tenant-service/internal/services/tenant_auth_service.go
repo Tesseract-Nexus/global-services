@@ -365,8 +365,9 @@ func (s *TenantAuthService) ValidateCredentials(ctx context.Context, req *Valida
 	}
 
 	// Attach tokens from Keycloak validation (already obtained during password validation)
-	// Skip if MFA is required - tokens will be issued after MFA verification
-	if keycloakTokens != nil && !mfaRequired {
+	// Tokens are returned even when MFA is required — the auth-bff stores them in the
+	// MFA session and only creates the user session after MFA is verified.
+	if keycloakTokens != nil {
 		log.Printf("[TenantAuthService] Attaching tokens from Keycloak validation")
 		response.AccessToken = keycloakTokens.AccessToken
 		response.RefreshToken = keycloakTokens.RefreshToken
