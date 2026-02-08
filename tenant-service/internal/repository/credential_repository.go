@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -632,6 +633,98 @@ func (r *CredentialRepository) RecordMFAUsage(ctx context.Context, userID, tenan
 		return fmt.Errorf("failed to record MFA usage: %w", err)
 	}
 	return nil
+}
+
+// EnableTOTP enables TOTP MFA with encrypted secret and backup code hashes
+func (r *CredentialRepository) EnableTOTP(ctx context.Context, userID, tenantID uuid.UUID, encryptedSecret string, backupCodeHashes models.JSONB) error {
+	now := time.Now()
+	updates := map[string]interface{}{
+		"mfa_enabled":      true,
+		"mfa_type":         "totp",
+		"mfa_secret":       encryptedSecret,
+		"mfa_backup_codes": backupCodeHashes,
+		"updated_at":       now,
+	}
+
+	result := r.db.WithContext(ctx).
+		Model(&models.TenantCredential{}).
+		Where("user_id = ? AND tenant_id = ?", userID, tenantID).
+		Updates(updates)
+
+	if result.Error != nil {
+		return fmt.Errorf("failed to enable TOTP: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("credential not found for user %s in tenant %s", userID, tenantID)
+	}
+	return nil
+}
+
+// UpdateBackupCodes replaces the backup code hashes for a user's TOTP credential
+func (r *CredentialRepository) UpdateBackupCodes(ctx context.Context, userID, tenantID uuid.UUID, backupCodeHashes models.JSONB) error {
+	now := time.Now()
+	result := r.db.WithContext(ctx).
+		Model(&models.TenantCredential{}).
+		Where("user_id = ? AND tenant_id = ? AND mfa_enabled = ?", userID, tenantID, true).
+		Updates(map[string]interface{}{
+			"mfa_backup_codes": backupCodeHashes,
+			"updated_at":       now,
+		})
+
+	if result.Error != nil {
+		return fmt.Errorf("failed to update backup codes: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("MFA credential not found for user %s in tenant %s", userID, tenantID)
+	}
+	return nil
+}
+
+// ConsumeBackupCode removes a used backup code hash and returns the remaining count
+func (r *CredentialRepository) ConsumeBackupCode(ctx context.Context, userID, tenantID uuid.UUID, codeHash string) (int, error) {
+	credential, err := r.GetCredential(ctx, userID, tenantID)
+	if err != nil {
+		return 0, err
+	}
+	if credential == nil || !credential.MFAEnabled {
+		return 0, fmt.Errorf("MFA not enabled for user %s in tenant %s", userID, tenantID)
+	}
+
+	// Parse existing backup code hashes
+	var hashes []string
+	if len(credential.MFABackupCodes) > 0 {
+		if err := json.Unmarshal([]byte(credential.MFABackupCodes), &hashes); err != nil {
+			return 0, fmt.Errorf("failed to parse backup codes: %w", err)
+		}
+	}
+
+	// Remove the consumed hash
+	newHashes := make([]string, 0, len(hashes))
+	for _, h := range hashes {
+		if h != codeHash {
+			newHashes = append(newHashes, h)
+		}
+	}
+
+	// Save updated hashes
+	hashesJSON, err := json.Marshal(newHashes)
+	if err != nil {
+		return 0, fmt.Errorf("failed to serialize backup codes: %w", err)
+	}
+
+	now := time.Now()
+	if err := r.db.WithContext(ctx).
+		Model(&models.TenantCredential{}).
+		Where("user_id = ? AND tenant_id = ?", userID, tenantID).
+		Updates(map[string]interface{}{
+			"mfa_backup_codes": models.JSONB(hashesJSON),
+			"mfa_last_used_at": now,
+			"updated_at":       now,
+		}).Error; err != nil {
+		return 0, fmt.Errorf("failed to consume backup code: %w", err)
+	}
+
+	return len(newHashes), nil
 }
 
 // ============================================================================

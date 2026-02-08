@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"tenant-service/internal/clients"
+	"tenant-service/internal/models"
 	"tenant-service/internal/services"
 )
 
@@ -1045,5 +1047,235 @@ func (h *AuthHandler) SyncCustomersToEvents(c *gin.Context) {
 
 	SuccessResponse(c, http.StatusOK, "Customers synced to events", map[string]interface{}{
 		"synced_count": count,
+	})
+}
+
+// ============================================================================
+// TOTP Endpoints (called by auth-bff for TOTP management)
+// ============================================================================
+
+// GetTotpStatus returns the TOTP status for a user in a tenant
+// POST /api/v1/auth/totp/status
+func (h *AuthHandler) GetTotpStatus(c *gin.Context) {
+	var req struct {
+		UserID   string `json:"user_id" binding:"required"`
+		TenantID string `json:"tenant_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+
+	userID, err := uuid.Parse(req.UserID)
+	if err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid user_id format", err)
+		return
+	}
+
+	tenantID, err := uuid.Parse(req.TenantID)
+	if err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid tenant_id format", err)
+		return
+	}
+
+	credential, err := h.authSvc.GetCredential(c.Request.Context(), userID, tenantID)
+	if err != nil {
+		ErrorResponse(c, http.StatusInternalServerError, "Failed to get credential", err)
+		return
+	}
+	if credential == nil {
+		c.JSON(http.StatusOK, gin.H{
+			"totp_enabled":         false,
+			"backup_codes_remaining": 0,
+		})
+		return
+	}
+
+	// Parse backup code hashes to count remaining
+	backupCodesRemaining := 0
+	if credential.MFAEnabled && len(credential.MFABackupCodes) > 0 {
+		var hashes []string
+		if err := json.Unmarshal([]byte(credential.MFABackupCodes), &hashes); err == nil {
+			backupCodesRemaining = len(hashes)
+		}
+	}
+
+	response := gin.H{
+		"totp_enabled":         credential.MFAEnabled && credential.MFAType == "totp",
+		"backup_codes_remaining": backupCodesRemaining,
+	}
+
+	// Include encrypted secret and hashes if TOTP is enabled (needed by auth-bff for verification)
+	if credential.MFAEnabled && credential.MFAType == "totp" {
+		response["totp_secret_encrypted"] = credential.MFASecret
+		if len(credential.MFABackupCodes) > 0 {
+			var hashes []string
+			if err := json.Unmarshal([]byte(credential.MFABackupCodes), &hashes); err == nil {
+				response["backup_code_hashes"] = hashes
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+// SaveTotpSecret saves a TOTP secret and backup codes for a user
+// POST /api/v1/auth/totp/save
+func (h *AuthHandler) SaveTotpSecret(c *gin.Context) {
+	var req struct {
+		UserID              string   `json:"user_id" binding:"required"`
+		TenantID            string   `json:"tenant_id" binding:"required"`
+		TotpSecretEncrypted string   `json:"totp_secret_encrypted" binding:"required"`
+		BackupCodeHashes    []string `json:"backup_code_hashes" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+
+	userID, err := uuid.Parse(req.UserID)
+	if err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid user_id format", err)
+		return
+	}
+
+	tenantID, err := uuid.Parse(req.TenantID)
+	if err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid tenant_id format", err)
+		return
+	}
+
+	// Serialize backup code hashes as JSON
+	hashesJSON, err := json.Marshal(req.BackupCodeHashes)
+	if err != nil {
+		ErrorResponse(c, http.StatusInternalServerError, "Failed to serialize backup codes", err)
+		return
+	}
+
+	// Enable MFA with TOTP type and save backup codes
+	if err := h.authSvc.EnableTOTP(c.Request.Context(), userID, tenantID, req.TotpSecretEncrypted, models.JSONB(hashesJSON)); err != nil {
+		ErrorResponse(c, http.StatusInternalServerError, "Failed to save TOTP secret", err)
+		return
+	}
+
+	log.Printf("[AuthHandler] TOTP enabled for user %s in tenant %s", userID, tenantID)
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "TOTP secret saved successfully",
+	})
+}
+
+// DisableTotp disables TOTP for a user
+// POST /api/v1/auth/totp/disable
+func (h *AuthHandler) DisableTotp(c *gin.Context) {
+	var req struct {
+		UserID   string `json:"user_id" binding:"required"`
+		TenantID string `json:"tenant_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+
+	userID, err := uuid.Parse(req.UserID)
+	if err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid user_id format", err)
+		return
+	}
+
+	tenantID, err := uuid.Parse(req.TenantID)
+	if err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid tenant_id format", err)
+		return
+	}
+
+	if err := h.authSvc.DisableTOTP(c.Request.Context(), userID, tenantID); err != nil {
+		ErrorResponse(c, http.StatusInternalServerError, "Failed to disable TOTP", err)
+		return
+	}
+
+	log.Printf("[AuthHandler] TOTP disabled for user %s in tenant %s", userID, tenantID)
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "TOTP disabled successfully",
+	})
+}
+
+// UpdateBackupCodes replaces backup code hashes for a user
+// POST /api/v1/auth/totp/update-backup-codes
+func (h *AuthHandler) UpdateBackupCodes(c *gin.Context) {
+	var req struct {
+		UserID           string   `json:"user_id" binding:"required"`
+		TenantID         string   `json:"tenant_id" binding:"required"`
+		BackupCodeHashes []string `json:"backup_code_hashes" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+
+	userID, err := uuid.Parse(req.UserID)
+	if err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid user_id format", err)
+		return
+	}
+
+	tenantID, err := uuid.Parse(req.TenantID)
+	if err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid tenant_id format", err)
+		return
+	}
+
+	hashesJSON, err := json.Marshal(req.BackupCodeHashes)
+	if err != nil {
+		ErrorResponse(c, http.StatusInternalServerError, "Failed to serialize backup codes", err)
+		return
+	}
+
+	if err := h.authSvc.UpdateBackupCodes(c.Request.Context(), userID, tenantID, models.JSONB(hashesJSON)); err != nil {
+		ErrorResponse(c, http.StatusInternalServerError, "Failed to update backup codes", err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "Backup codes updated successfully",
+	})
+}
+
+// ConsumeBackupCode removes a used backup code hash and returns remaining count
+// POST /api/v1/auth/totp/consume-backup-code
+func (h *AuthHandler) ConsumeBackupCode(c *gin.Context) {
+	var req struct {
+		UserID   string `json:"user_id" binding:"required"`
+		TenantID string `json:"tenant_id" binding:"required"`
+		CodeHash string `json:"code_hash" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+
+	userID, err := uuid.Parse(req.UserID)
+	if err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid user_id format", err)
+		return
+	}
+
+	tenantID, err := uuid.Parse(req.TenantID)
+	if err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid tenant_id format", err)
+		return
+	}
+
+	remaining, err := h.authSvc.ConsumeBackupCode(c.Request.Context(), userID, tenantID, req.CodeHash)
+	if err != nil {
+		ErrorResponse(c, http.StatusInternalServerError, "Failed to consume backup code", err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success":                true,
+		"backup_codes_remaining": remaining,
 	})
 }

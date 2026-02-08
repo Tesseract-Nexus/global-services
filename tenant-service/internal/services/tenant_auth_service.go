@@ -1377,3 +1377,32 @@ func (s *TenantAuthService) SyncExistingCustomersToEvents(ctx context.Context, t
 	log.Printf("[TenantAuthService] Synced %d/%d customer users to events", syncCount, len(users))
 	return syncCount, nil
 }
+
+// ============================================================================
+// TOTP Operations (called by auth-bff)
+// ============================================================================
+
+// GetCredential returns the credential record for a user in a tenant
+func (s *TenantAuthService) GetCredential(ctx context.Context, userID, tenantID uuid.UUID) (*models.TenantCredential, error) {
+	return s.credentialRepo.GetCredential(ctx, userID, tenantID)
+}
+
+// EnableTOTP enables TOTP MFA for a user, saving the encrypted secret and backup code hashes
+func (s *TenantAuthService) EnableTOTP(ctx context.Context, userID, tenantID uuid.UUID, encryptedSecret string, backupCodeHashes models.JSONB) error {
+	return s.credentialRepo.EnableTOTP(ctx, userID, tenantID, encryptedSecret, backupCodeHashes)
+}
+
+// DisableTOTP disables TOTP MFA for a user
+func (s *TenantAuthService) DisableTOTP(ctx context.Context, userID, tenantID uuid.UUID) error {
+	return s.credentialRepo.DisableMFA(ctx, userID, tenantID)
+}
+
+// UpdateBackupCodes replaces the backup code hashes for a user
+func (s *TenantAuthService) UpdateBackupCodes(ctx context.Context, userID, tenantID uuid.UUID, backupCodeHashes models.JSONB) error {
+	return s.credentialRepo.UpdateBackupCodes(ctx, userID, tenantID, backupCodeHashes)
+}
+
+// ConsumeBackupCode removes a used backup code hash and returns remaining count
+func (s *TenantAuthService) ConsumeBackupCode(ctx context.Context, userID, tenantID uuid.UUID, codeHash string) (int, error) {
+	return s.credentialRepo.ConsumeBackupCode(ctx, userID, tenantID, codeHash)
+}

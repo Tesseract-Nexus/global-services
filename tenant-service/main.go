@@ -595,6 +595,13 @@ func setupRouter(
 			authRoutes.POST("/request-password-reset", authHandler.RequestPasswordReset) // Request password reset email
 			authRoutes.POST("/validate-reset-token", authHandler.ValidateResetToken)     // Validate reset token
 			authRoutes.POST("/reset-password", authHandler.ResetPassword)                // Reset password with token
+
+			// TOTP endpoints (called by auth-bff for TOTP management)
+			authRoutes.POST("/totp/status", authHandler.GetTotpStatus)                        // Get TOTP status for a user
+			authRoutes.POST("/totp/save", authHandler.SaveTotpSecret)                         // Save TOTP secret and backup codes
+			authRoutes.POST("/totp/disable", authHandler.DisableTotp)                         // Disable TOTP for a user
+			authRoutes.POST("/totp/update-backup-codes", authHandler.UpdateBackupCodes)       // Update backup code hashes
+			authRoutes.POST("/totp/consume-backup-code", authHandler.ConsumeBackupCode)       // Consume a backup code
 		}
 
 		// Protected auth endpoints (require Istio JWT auth)
