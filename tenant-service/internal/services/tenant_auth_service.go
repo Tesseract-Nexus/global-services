@@ -5,7 +5,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -47,8 +50,13 @@ type StaffClientInterface interface {
 
 // KeycloakAuthConfig holds Keycloak configuration for multi-tenant auth
 type KeycloakAuthConfig struct {
-	ClientID     string // Public client ID for token exchange
+	ClientID     string // Public client ID for token exchange (e.g. marketplace-dashboard)
 	ClientSecret string // Client secret (if confidential client)
+	// Admin client config for token exchange (needed to get admin token for impersonation)
+	AdminBaseURL      string // Keycloak base URL (e.g. http://keycloak.identity-internal.svc.cluster.local:8080)
+	AdminRealm        string // Realm name (e.g. tesserix-internal)
+	AdminClientID     string // Admin client ID (e.g. marketplace-onboarding-admin)
+	AdminClientSecret string // Admin client secret
 }
 
 // NewTenantAuthService creates a new tenant authentication service
@@ -1501,6 +1509,87 @@ func (s *TenantAuthService) ListPasskeys(ctx context.Context, userID, tenantID u
 	return s.credentialRepo.GetPasskeysByUser(ctx, localID, tenantID)
 }
 
+// impersonateUserWithRefresh performs Keycloak token exchange with refresh_token type,
+// returning both access_token and refresh_token needed for session management.
+// This is a local implementation that doesn't depend on go-shared's ImpersonateUser
+// (which only requests access_token type and returns no refresh_token).
+func (s *TenantAuthService) impersonateUserWithRefresh(ctx context.Context, keycloakUserID string) (*auth.TokenResponse, error) {
+	if s.keycloakConfig == nil {
+		return nil, fmt.Errorf("keycloak config not set")
+	}
+
+	tokenURL := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/token",
+		s.keycloakConfig.AdminBaseURL, s.keycloakConfig.AdminRealm)
+
+	// Step 1: Authenticate as admin client to get admin token
+	adminData := url.Values{}
+	adminData.Set("grant_type", "client_credentials")
+	adminData.Set("client_id", s.keycloakConfig.AdminClientID)
+	adminData.Set("client_secret", s.keycloakConfig.AdminClientSecret)
+
+	adminReq, err := http.NewRequestWithContext(ctx, "POST", tokenURL, strings.NewReader(adminData.Encode()))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create admin auth request: %w", err)
+	}
+	adminReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	adminReq.Header.Set("User-Agent", "Tesserix-Service/1.0 (Tenant Auth Service)")
+
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	adminResp, err := httpClient.Do(adminReq)
+	if err != nil {
+		return nil, fmt.Errorf("admin auth request failed: %w", err)
+	}
+	defer adminResp.Body.Close()
+
+	if adminResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(adminResp.Body)
+		return nil, fmt.Errorf("admin auth failed with status %d: %s", adminResp.StatusCode, string(body))
+	}
+
+	var adminToken auth.TokenResponse
+	if err := json.NewDecoder(adminResp.Body).Decode(&adminToken); err != nil {
+		return nil, fmt.Errorf("failed to decode admin token: %w", err)
+	}
+
+	// Step 2: Token exchange — request refresh_token type to get both access and refresh tokens
+	exchangeData := url.Values{}
+	exchangeData.Set("grant_type", "urn:ietf:params:oauth:grant-type:token-exchange")
+	exchangeData.Set("client_id", s.keycloakConfig.ClientID)
+	if s.keycloakConfig.ClientSecret != "" {
+		exchangeData.Set("client_secret", s.keycloakConfig.ClientSecret)
+	}
+	exchangeData.Set("requested_token_type", "urn:ietf:params:oauth:token-type:refresh_token")
+	exchangeData.Set("subject_token", adminToken.AccessToken)
+	exchangeData.Set("subject_token_type", "urn:ietf:params:oauth:token-type:access_token")
+	exchangeData.Set("requested_subject", keycloakUserID)
+	exchangeData.Set("scope", "openid")
+
+	exchangeReq, err := http.NewRequestWithContext(ctx, "POST", tokenURL, strings.NewReader(exchangeData.Encode()))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create token exchange request: %w", err)
+	}
+	exchangeReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	exchangeReq.Header.Set("User-Agent", "Tesserix-Service/1.0 (Tenant Auth Service)")
+
+	exchangeResp, err := httpClient.Do(exchangeReq)
+	if err != nil {
+		return nil, fmt.Errorf("token exchange request failed: %w", err)
+	}
+	defer exchangeResp.Body.Close()
+
+	if exchangeResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(exchangeResp.Body)
+		return nil, fmt.Errorf("token exchange failed with status %d: %s", exchangeResp.StatusCode, string(body))
+	}
+
+	var tokenResp auth.TokenResponse
+	if err := json.NewDecoder(exchangeResp.Body).Decode(&tokenResp); err != nil {
+		return nil, fmt.Errorf("failed to decode token exchange response: %w", err)
+	}
+
+	return &tokenResp, nil
+}
+
 // AuthenticatePasskeyResponse contains all data needed by auth-bff for passkey login
 type AuthenticatePasskeyResponse struct {
 	Passkey        *models.PasskeyCredential `json:"passkey"`
@@ -1559,14 +1648,11 @@ func (s *TenantAuthService) AuthenticatePasskey(ctx context.Context, credentialI
 	}
 
 	// Get tokens via token exchange (user already validated by WebAuthn signature)
+	// Uses local impersonateUserWithRefresh to request refresh_token type, which returns
+	// both access_token and refresh_token needed for session management
 	var accessToken, refreshToken, idToken string
-	if s.keycloakClient != nil && s.keycloakConfig != nil {
-		tokenResp, err := s.keycloakClient.ImpersonateUser(
-			ctx,
-			keycloakUserID,
-			s.keycloakConfig.ClientID,
-			s.keycloakConfig.ClientSecret,
-		)
+	if s.keycloakConfig != nil && s.keycloakConfig.AdminBaseURL != "" {
+		tokenResp, err := s.impersonateUserWithRefresh(ctx, keycloakUserID)
 		if err != nil {
 			log.Printf("[TenantAuthService] Warning: Failed to get tokens for passkey auth: %v", err)
 			return nil, fmt.Errorf("failed to issue tokens: %w", err)

@@ -204,8 +204,12 @@ func main() {
 		}
 
 		tenantAuthSvc = services.NewTenantAuthService(db, keycloakClient, &services.KeycloakAuthConfig{
-			ClientID:     getEnv("KEYCLOAK_CLIENT_ID", "marketplace-dashboard"),
-			ClientSecret: keycloakClientSecret,
+			ClientID:          getEnv("KEYCLOAK_CLIENT_ID", "marketplace-dashboard"),
+			ClientSecret:      keycloakClientSecret,
+			AdminBaseURL:      keycloakBaseURL,
+			AdminRealm:        keycloakRealm,
+			AdminClientID:     keycloakAdminClientID,
+			AdminClientSecret: keycloakAdminSecret,
 		})
 		log.Println("TenantAuthService initialized for multi-tenant credential isolation")
 	} else {

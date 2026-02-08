@@ -17,14 +17,6 @@ RUN addgroup -g 1000 -S appgroup && adduser -D -u 1000 -S appuser -G appgroup
 # Set working directory
 WORKDIR /build
 
-# Configure private Go module access
-ARG GITHUB_TOKEN
-RUN if [ -n "$GITHUB_TOKEN" ]; then \
-      git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"; \
-    fi
-ENV GOPRIVATE=github.com/Tesseract-Nexus/*
-ENV GONOSUMCHECK=github.com/Tesseract-Nexus/*
-
 # Copy go.mod and go.sum first for better layer caching
 COPY go.mod go.sum ./
 

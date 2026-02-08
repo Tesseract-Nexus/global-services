@@ -27,7 +27,7 @@ import {
   verifyAuthenticationResponse,
 } from '@simplewebauthn/server';
 import { v4 as uuidv4 } from 'uuid';
-import { config, getSessionCookieName } from '../config';
+import { config, getSessionCookieName, isAdminHost } from '../config';
 import { sessionStore } from '../session-store';
 import { tenantServiceClient } from '../tenant-service-client';
 import { setSessionCookie } from '../cookie-helpers';
@@ -349,7 +349,7 @@ export async function passkeyRoutes(fastify: FastifyInstance) {
         userId: lookupResult.user_id!,
         tenantId: lookupResult.tenant_id,
         tenantSlug: lookupResult.tenant_slug,
-        clientType: 'customer',
+        clientType: isAdminHost(forwardedHost) ? 'internal' : 'customer',
         accessToken: lookupResult.access_token,
         idToken: lookupResult.id_token,
         refreshToken: lookupResult.refresh_token,
