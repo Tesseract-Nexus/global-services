@@ -144,7 +144,9 @@ const clearSessionCookie = (reply: FastifyReply, forwardedHost?: string) => {
 
 // Get session from request (uses hostname to determine which cookie to read)
 const getSession = async (request: FastifyRequest): Promise<SessionData | null> => {
-  const forwardedHost = request.headers['x-forwarded-host'] as string | undefined;
+  // Use x-forwarded-host, handling comma-separated multi-proxy values, with fallback to request.hostname
+  const rawForwardedHost = request.headers['x-forwarded-host'] as string | undefined;
+  const forwardedHost = rawForwardedHost?.split(',')[0]?.trim() || request.hostname;
   const cookieName = getSessionCookieName(forwardedHost);
   const sessionId = request.cookies[cookieName];
   if (!sessionId) {
