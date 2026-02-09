@@ -1516,13 +1516,15 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
         || userEmail;
 
       // Create session (no tenant context for platform admins)
+      // Use 24-hour session expiry (not token expiry) — tokens are refreshed via refresh_token
+      const sessionExpirySeconds = 86400;
       const session = await sessionStore.createSession({
         userId: userSub,
         clientType: 'internal',
         accessToken: tokens.accessToken,
         idToken: tokens.idToken,
         refreshToken: tokens.refreshToken,
-        expiresAt: tokens.expiresAt,
+        expiresAt: Math.floor(Date.now() / 1000) + sessionExpirySeconds,
         userInfo: {
           sub: userSub,
           email: userEmail,
