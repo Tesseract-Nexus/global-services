@@ -1401,3 +1401,25 @@ export function maskEmail(email: string): string {
     : '***';
   return `${maskedLocal}@${domain}`;
 }
+
+/**
+ * Mask IP address for safe logging.
+ * IPv4: 192.168.1.100 → 192.168.xxx.xxx
+ * IPv6: first 4 groups preserved, rest masked
+ */
+export function maskIP(ip: string): string {
+  if (!ip) return '***';
+  if (ip.includes('.')) {
+    const parts = ip.split('.');
+    if (parts.length === 4) {
+      return `${parts[0]}.${parts[1]}.xxx.xxx`;
+    }
+  }
+  if (ip.includes(':')) {
+    const parts = ip.split(':');
+    if (parts.length > 4) {
+      return parts.slice(0, 4).join(':') + ':xxxx:xxxx:xxxx:xxxx';
+    }
+  }
+  return '***';
+}

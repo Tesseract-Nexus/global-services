@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { config, getSessionCookieName, isAdminHost } from '../config';
 import { oidcClient } from '../oidc-client';
 import { sessionStore, SessionData, WsTicketData, SessionTransferData } from '../session-store';
-import { tenantServiceClient } from '../tenant-service-client';
+import { tenantServiceClient, maskEmail, maskIP } from '../tenant-service-client';
 import { natsClient } from '../nats-client';
 import { v4 as uuidv4 } from 'uuid';
 import { createLogger } from '../logger';
@@ -336,7 +336,7 @@ export async function authRoutes(fastify: FastifyInstance) {
             }
           }
         } catch (err) {
-          logger.warn({ error: err, email }, 'Failed to resolve tenant role (non-blocking)');
+          logger.warn({ error: err, email: maskEmail(email) }, 'Failed to resolve tenant role (non-blocking)');
         }
       }
 
@@ -741,7 +741,7 @@ export async function authRoutes(fastify: FastifyInstance) {
     const clientIP = request.ip;
     const rateLimit = await sessionStore.checkRateLimit(`accept-transfer:${clientIP}`, 10, 60);
     if (!rateLimit.allowed) {
-      logger.warn({ ip: clientIP }, 'Rate limit exceeded for session transfer');
+      logger.warn({ ip: maskIP(clientIP) }, 'Rate limit exceeded for session transfer');
       return reply.redirect('/login?error=rate_limited');
     }
 

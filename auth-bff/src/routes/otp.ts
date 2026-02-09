@@ -15,6 +15,7 @@ import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { createLogger } from '../logger';
 import { callVerificationService } from '../verification-client';
+import { maskEmail, maskIP } from '../tenant-service-client';
 
 const logger = createLogger('otp-routes');
 
@@ -108,7 +109,7 @@ export async function otpRoutes(fastify: FastifyInstance) {
     const rateLimitKey = 'otp-send:' + clientIP + ':' + email.toLowerCase();
     const rateLimit = checkRateLimit(rateLimitKey, RATE_LIMIT_SEND_MAX);
     if (!rateLimit.allowed) {
-      logger.warn({ ip: clientIP, email }, 'Rate limit exceeded for OTP send');
+      logger.warn({ ip: maskIP(clientIP), email: maskEmail(email) }, 'Rate limit exceeded for OTP send');
       return reply.code(429).send({
         success: false,
         error: 'RATE_LIMITED',
@@ -126,7 +127,7 @@ export async function otpRoutes(fastify: FastifyInstance) {
     });
 
     if (!result.success) {
-      logger.error({ email, error: result.error }, 'Failed to send OTP');
+      logger.error({ email: maskEmail(email), error: result.error }, 'Failed to send OTP');
       return reply.code(result.status).send({
         success: false,
         error: 'SEND_FAILED',
@@ -136,7 +137,7 @@ export async function otpRoutes(fastify: FastifyInstance) {
 
     const responseData = result.data as Record<string, unknown>;
 
-    logger.info({ email, purpose }, 'OTP sent successfully');
+    logger.info({ email: maskEmail(email), purpose }, 'OTP sent successfully');
     return reply.send({
       success: true,
       message: 'Verification code sent successfully',
@@ -171,7 +172,7 @@ export async function otpRoutes(fastify: FastifyInstance) {
     const rateLimitKey = 'otp-verify:' + clientIP + ':' + email.toLowerCase();
     const rateLimit = checkRateLimit(rateLimitKey, RATE_LIMIT_VERIFY_MAX);
     if (!rateLimit.allowed) {
-      logger.warn({ ip: clientIP, email }, 'Rate limit exceeded for OTP verify');
+      logger.warn({ ip: maskIP(clientIP), email: maskEmail(email) }, 'Rate limit exceeded for OTP verify');
       return reply.code(429).send({
         success: false,
         verified: false,
@@ -190,7 +191,7 @@ export async function otpRoutes(fastify: FastifyInstance) {
 
     if (!result.success) {
       const responseData = result.data as Record<string, unknown>;
-      logger.info({ email, error: result.error }, 'OTP verification failed');
+      logger.info({ email: maskEmail(email), error: result.error }, 'OTP verification failed');
       return reply.code(200).send({
         success: false,
         verified: false,
@@ -203,7 +204,7 @@ export async function otpRoutes(fastify: FastifyInstance) {
     const isVerified = responseData?.data?.verified ?? true;
 
     if (!isVerified) {
-      logger.info({ email }, 'OTP code incorrect');
+      logger.info({ email: maskEmail(email) }, 'OTP code incorrect');
       return reply.send({
         success: false,
         verified: false,
@@ -211,7 +212,7 @@ export async function otpRoutes(fastify: FastifyInstance) {
       });
     }
 
-    logger.info({ email, purpose }, 'OTP verified successfully');
+    logger.info({ email: maskEmail(email), purpose }, 'OTP verified successfully');
     return reply.send({
       success: true,
       verified: true,
@@ -243,7 +244,7 @@ export async function otpRoutes(fastify: FastifyInstance) {
     const rateLimitKey = 'otp-send:' + clientIP + ':' + email.toLowerCase();
     const rateLimit = checkRateLimit(rateLimitKey, RATE_LIMIT_SEND_MAX);
     if (!rateLimit.allowed) {
-      logger.warn({ ip: clientIP, email }, 'Rate limit exceeded for OTP resend');
+      logger.warn({ ip: maskIP(clientIP), email: maskEmail(email) }, 'Rate limit exceeded for OTP resend');
       return reply.code(429).send({
         success: false,
         error: 'RATE_LIMITED',
@@ -261,7 +262,7 @@ export async function otpRoutes(fastify: FastifyInstance) {
     });
 
     if (!result.success) {
-      logger.error({ email, error: result.error }, 'Failed to resend OTP');
+      logger.error({ email: maskEmail(email), error: result.error }, 'Failed to resend OTP');
       return reply.code(result.status).send({
         success: false,
         error: 'RESEND_FAILED',
@@ -271,7 +272,7 @@ export async function otpRoutes(fastify: FastifyInstance) {
 
     const responseData = result.data as Record<string, unknown>;
 
-    logger.info({ email, purpose }, 'OTP resent successfully');
+    logger.info({ email: maskEmail(email), purpose }, 'OTP resent successfully');
     return reply.send({
       success: true,
       message: 'Verification code resent successfully',

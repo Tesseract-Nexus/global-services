@@ -29,6 +29,8 @@ const baseLogger = pino({
       '*.refreshToken',
       '*.accessToken',
       '*.idToken',
+      'req.body.email',
+      'req.query.email',
     ],
     censor: '[REDACTED]',
   },

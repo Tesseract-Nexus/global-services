@@ -23,7 +23,7 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { config, getSessionCookieName, isAdminHost } from '../config';
-import { tenantServiceClient, maskEmail } from '../tenant-service-client';
+import { tenantServiceClient, maskEmail, maskIP } from '../tenant-service-client';
 import { sessionStore } from '../session-store';
 import { createLogger } from '../logger';
 import { v4 as uuidv4 } from 'uuid';
@@ -135,7 +135,7 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
     const rateLimitKey = `tenant-lookup:${clientIP}`;
     const rateLimit = await sessionStore.checkRateLimit(rateLimitKey);
     if (!rateLimit.allowed) {
-      logger.warn({ ip: clientIP }, 'Rate limit exceeded for tenant lookup');
+      logger.warn({ ip: maskIP(clientIP) }, 'Rate limit exceeded for tenant lookup');
       return reply.code(429).send({
         success: false,
         error: 'RATE_LIMITED',
@@ -207,7 +207,7 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
     const rateLimitKey = `login:${clientIP}:${email.toLowerCase()}`;
     const rateLimit = await sessionStore.checkRateLimit(rateLimitKey);
     if (!rateLimit.allowed) {
-      logger.warn({ ip: clientIP, email: maskEmail(email) }, 'Rate limit exceeded for login');
+      logger.warn({ ip: maskIP(clientIP), email: maskEmail(email) }, 'Rate limit exceeded for login');
       return reply.code(429).send({
         success: false,
         error: 'RATE_LIMITED',
@@ -402,7 +402,7 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
     const rateLimitKey = `admin-login:${clientIP}:${email.toLowerCase()}`;
     const rateLimit = await sessionStore.checkRateLimit(rateLimitKey);
     if (!rateLimit.allowed) {
-      logger.warn({ ip: clientIP, email: maskEmail(email) }, 'Rate limit exceeded for admin login');
+      logger.warn({ ip: maskIP(clientIP), email: maskEmail(email) }, 'Rate limit exceeded for admin login');
       return reply.code(429).send({
         success: false,
         error: 'RATE_LIMITED',
@@ -890,7 +890,7 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
     const rateLimitKey = `register:${clientIP}`;
     const rateLimit = await sessionStore.checkRateLimit(rateLimitKey);
     if (!rateLimit.allowed) {
-      logger.warn({ ip: clientIP }, 'Rate limit exceeded for registration');
+      logger.warn({ ip: maskIP(clientIP) }, 'Rate limit exceeded for registration');
       return reply.code(429).send({
         success: false,
         error: 'RATE_LIMITED',
@@ -1077,7 +1077,7 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
     const rateLimitKey = `reactivate:${clientIP}:${email.toLowerCase()}`;
     const rateLimit = await sessionStore.checkRateLimit(rateLimitKey);
     if (!rateLimit.allowed) {
-      logger.warn({ ip: clientIP, email: maskEmail(email) }, 'Rate limit exceeded for reactivation');
+      logger.warn({ ip: maskIP(clientIP), email: maskEmail(email) }, 'Rate limit exceeded for reactivation');
       return reply.code(429).send({
         success: false,
         error: 'RATE_LIMITED',
@@ -1246,7 +1246,7 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
     const rateLimitKey = `password-reset:${clientIP}:${email.toLowerCase()}`;
     const rateLimit = await sessionStore.checkRateLimit(rateLimitKey);
     if (!rateLimit.allowed) {
-      logger.warn({ ip: clientIP, email: maskEmail(email) }, 'Rate limit exceeded for password reset request');
+      logger.warn({ ip: maskIP(clientIP), email: maskEmail(email) }, 'Rate limit exceeded for password reset request');
       // Still return success to not reveal if email exists
       return reply.send({
         success: true,
