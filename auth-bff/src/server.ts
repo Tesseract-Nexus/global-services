@@ -21,6 +21,7 @@ import { totpRoutes } from './routes/totp';
 import { passkeyRoutes } from './routes/passkeys';
 import { sessionStore } from './session-store';
 import { oidcClient } from './oidc-client';
+import { logtoClient } from './logto-client';
 
 const log = createLogger('server');
 
@@ -96,9 +97,10 @@ async function buildApp() {
     max: 300,
     timeWindow: '1 minute',
     keyGenerator: (request) => {
-      // Use session ID if available for authenticated users (check both admin and storefront cookies)
+      // Use session ID if available for authenticated users (check admin, storefront, and home cookies)
       const sessionId = request.cookies[config.session.cookieName]
-        || request.cookies[config.session.storefrontCookieName];
+        || request.cookies[config.session.storefrontCookieName]
+        || request.cookies[config.session.homeCookieName];
       if (sessionId) {
         return sessionId;
       }
@@ -188,6 +190,10 @@ export async function startServer() {
     // Initialize OIDC clients on startup to avoid rate limiting during request handling
     log.info('Initializing OIDC clients...');
     await oidcClient.initialize();
+
+    // Initialize Logto OIDC client (if configured)
+    log.info('Initializing Logto client...');
+    await logtoClient.initialize();
 
     await fastify.listen({
       port: config.server.port,

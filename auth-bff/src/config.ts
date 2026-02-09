@@ -21,11 +21,17 @@ const envSchema = z.object({
   KEYCLOAK_CUSTOMER_CLIENT_ID: z.string(),
   KEYCLOAK_CUSTOMER_CLIENT_SECRET: z.string(),
 
+  // Logto - for tesserix-home (platform admin) authentication
+  LOGTO_ENDPOINT: z.string().url().optional(),
+  LOGTO_HOME_CLIENT_ID: z.string().optional(),
+  LOGTO_HOME_CLIENT_SECRET: z.string().optional(),
+
   // Session
   SESSION_SECRET: z.string().min(32),
   SESSION_MAX_AGE: z.string().default('86400'), // 24 hours in seconds
   SESSION_COOKIE_NAME: z.string().default('bff_session'),
   STOREFRONT_SESSION_COOKIE_NAME: z.string().default('bff_storefront_session'),
+  HOME_SESSION_COOKIE_NAME: z.string().default('bff_home_session'),
   SESSION_COOKIE_DOMAIN: z.string().optional(),
 
   // CSRF
@@ -62,6 +68,9 @@ const envSchema = z.object({
 
   // Base domain for hostname matching (tesserix.app for staging, mark8ly.com for prod)
   BASE_DOMAIN: z.string().default('tesserix.app'),
+
+  // Home domain for tesserix-home (always tesserix.app, not environment-dependent)
+  HOME_DOMAIN: z.string().default('tesserix.app'),
 
   // Trusted Proxies
   TRUST_PROXY: z.string().default('true'),
@@ -104,11 +113,19 @@ export const config = {
       issuer: `${env.KEYCLOAK_CUSTOMER_URL}/realms/${env.KEYCLOAK_CUSTOMER_REALM}`,
     },
   },
+  logto: {
+    endpoint: env.LOGTO_ENDPOINT || '',
+    home: {
+      clientId: env.LOGTO_HOME_CLIENT_ID || '',
+      clientSecret: env.LOGTO_HOME_CLIENT_SECRET || '',
+    },
+  },
   session: {
     secret: env.SESSION_SECRET,
     maxAge: parseInt(env.SESSION_MAX_AGE, 10),
     cookieName: env.SESSION_COOKIE_NAME,
     storefrontCookieName: env.STOREFRONT_SESSION_COOKIE_NAME,
+    homeCookieName: env.HOME_SESSION_COOKIE_NAME,
     cookieDomain: env.SESSION_COOKIE_DOMAIN,
   },
   csrf: {
@@ -122,6 +139,7 @@ export const config = {
     tls: env.REDIS_TLS === 'true',
   },
   baseDomain: env.BASE_DOMAIN,
+  homeDomain: env.HOME_DOMAIN,
   allowedOrigins: env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()),
   apiGatewayUrl: env.API_GATEWAY_URL,
   tenantServiceUrl: env.TENANT_SERVICE_URL || 'http://tenant-service.marketplace.svc.cluster.local:8080',
@@ -147,14 +165,44 @@ export function isAdminHost(forwardedHost: string | undefined): boolean {
 }
 
 /**
- * Returns the appropriate session cookie name based on whether the request
- * comes from an admin host or a storefront/custom domain.
- * Admin uses the default `bff_session`; storefront uses `bff_storefront_session`.
- * When host is unknown (internal/server-side calls), defaults to `bff_session`
- * for backward compatibility with admin's auth-helper calls.
+ * Determine if the request originates from a tesserix-home host.
+ * Home hosts: tesserix.app, www.tesserix.app, localhost:3002 (dev)
+ * Uses HOME_DOMAIN (always tesserix.app) rather than BASE_DOMAIN
+ * (which is mark8ly.com in prod for marketplace apps).
+ */
+export function isHomeHost(forwardedHost: string | undefined): boolean {
+  if (!forwardedHost) return false;
+  const hostname = forwardedHost.split(':')[0].toLowerCase();
+  const port = forwardedHost.split(':')[1];
+  const homeDomain = config.homeDomain;
+  return (
+    hostname === homeDomain ||
+    hostname === `www.${homeDomain}` ||
+    hostname === `company.${homeDomain}` ||
+    (hostname === 'localhost' && port === '3002')
+  );
+}
+
+/**
+ * Determine if this host should use Logto for authentication.
+ * Currently only tesserix-home hosts use Logto; all others use Keycloak.
+ * Extend this as more apps migrate from Keycloak to Logto
+ * (e.g., hospital management, or marketplace apps in the future).
+ */
+export function isLogtoHost(forwardedHost: string | undefined): boolean {
+  return isHomeHost(forwardedHost);
+}
+
+/**
+ * Returns the appropriate session cookie name based on the request host.
+ * - Home (tesserix.app) uses `bff_home_session`
+ * - Admin (*-admin.tesserix.app) uses `bff_session`
+ * - Storefront/custom domains use `bff_storefront_session`
+ * - Unknown defaults to `bff_session` for backward compatibility.
  */
 export function getSessionCookieName(forwardedHost: string | undefined): string {
   if (!forwardedHost) return config.session.cookieName;
+  if (isHomeHost(forwardedHost)) return config.session.homeCookieName;
   return isAdminHost(forwardedHost)
     ? config.session.cookieName
     : config.session.storefrontCookieName;

@@ -11,6 +11,8 @@ export interface SessionData {
   tenantId?: string;
   tenantSlug?: string;
   clientType: 'internal' | 'customer';
+  /** Auth provider — defaults to 'keycloak' for existing sessions without this field */
+  provider?: 'keycloak' | 'logto';
   accessToken: string;
   idToken?: string;
   refreshToken?: string;
@@ -27,6 +29,8 @@ export interface AuthFlowState {
   codeVerifier: string;
   redirectUri: string;
   clientType: 'internal' | 'customer';
+  /** Auth provider for this flow — defaults to 'keycloak' for existing states */
+  provider?: 'keycloak' | 'logto';
   returnTo?: string;
   // Tenant context for multi-tenant storefront authentication
   // These are passed by the storefront and used to scope the session

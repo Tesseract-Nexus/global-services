@@ -1,7 +1,8 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
-import { config, getSessionCookieName, isAdminHost } from '../config';
+import { config, getSessionCookieName, isAdminHost, isLogtoHost } from '../config';
 import { oidcClient } from '../oidc-client';
+import { logtoClient } from '../logto-client';
 import { sessionStore, SessionData, WsTicketData, SessionTransferData } from '../session-store';
 import { tenantServiceClient, maskEmail, maskIP } from '../tenant-service-client';
 import { natsClient } from '../nats-client';
@@ -189,10 +190,14 @@ export async function authRoutes(fastify: FastifyInstance) {
       logger.info({ tenantId, tenantSlug }, 'Login initiated with tenant context');
     }
 
-    // Generate PKCE values
-    const state = oidcClient.generateState();
-    const nonce = oidcClient.generateNonce();
-    const codeVerifier = oidcClient.generateCodeVerifier();
+    // Determine if this host uses Logto
+    const forwardedHostLogin = request.headers['x-forwarded-host'] as string | undefined;
+    const useLogto = isLogtoHost(forwardedHostLogin) && logtoClient.isConfigured;
+
+    // Generate PKCE values (use the appropriate client's generators)
+    const state = useLogto ? logtoClient.generateState() : oidcClient.generateState();
+    const nonce = useLogto ? logtoClient.generateNonce() : oidcClient.generateNonce();
+    const codeVerifier = useLogto ? logtoClient.generateCodeVerifier() : oidcClient.generateCodeVerifier();
 
     // Determine redirect URI based on request
     const redirectUri = getCallbackUrl(request, clientType);
@@ -204,6 +209,7 @@ export async function authRoutes(fastify: FastifyInstance) {
       codeVerifier,
       redirectUri,
       clientType,
+      provider: useLogto ? 'logto' : 'keycloak',
       returnTo: query.returnTo,
       tenantId,
       tenantSlug,
@@ -211,7 +217,23 @@ export async function authRoutes(fastify: FastifyInstance) {
       createdAt: Date.now(),
     });
 
-    // Get authorization URL
+    if (useLogto) {
+      // Logto OIDC flow — no Keycloak-specific params (kc_idp_hint, kc_action)
+      const authUrl = await logtoClient.getAuthorizationUrl({
+        redirectUri,
+        scope: 'openid profile email offline_access',
+        state,
+        nonce,
+        codeVerifier,
+        loginHint: query.loginHint || query.login_hint,
+      });
+
+      logger.info({ state, provider: 'logto' }, 'Initiating Logto auth flow');
+
+      return reply.redirect(authUrl);
+    }
+
+    // Keycloak OIDC flow (existing behavior)
     // Support both loginHint and login_hint formats (storefront uses login_hint)
     const loginHint = query.loginHint || query.login_hint;
 
@@ -237,8 +259,8 @@ export async function authRoutes(fastify: FastifyInstance) {
     });
 
     logger.info(
-      { clientType, state, kcIdpHint: query.kc_idp_hint, kcAction, tenantSlug },
-      'Initiating auth flow'
+      { clientType, state, kcIdpHint: query.kc_idp_hint, kcAction, tenantSlug, provider: 'keycloak' },
+      'Initiating Keycloak auth flow'
     );
 
     return reply.redirect(authUrl);
@@ -267,22 +289,37 @@ export async function authRoutes(fastify: FastifyInstance) {
     }
 
     try {
-      // Exchange code for tokens
-      const tokens = await oidcClient.exchangeCode(
-        authState.clientType,
-        {
-          code: query.code,
-          state: query.state,
-          iss: query.iss,
-          session_state: query.session_state,
-        },
-        authState.redirectUri,
-        authState.codeVerifier,
-        authState.nonce
-      );
+      // Determine provider from auth flow state (defaults to 'keycloak' for existing flows)
+      const provider = authState.provider || 'keycloak';
+      const isLogto = provider === 'logto';
 
-      // Get user info
-      const userInfo = await oidcClient.getUserInfo(authState.clientType, tokens.accessToken);
+      // Exchange code for tokens using the appropriate provider
+      let tokens;
+      let userInfo: Record<string, unknown>;
+
+      if (isLogto) {
+        tokens = await logtoClient.exchangeCode(
+          { code: query.code, state: query.state },
+          authState.redirectUri,
+          authState.codeVerifier,
+          authState.nonce
+        );
+        userInfo = await logtoClient.getUserInfo(tokens.accessToken);
+      } else {
+        tokens = await oidcClient.exchangeCode(
+          authState.clientType,
+          {
+            code: query.code,
+            state: query.state,
+            iss: query.iss,
+            session_state: query.session_state,
+          },
+          authState.redirectUri,
+          authState.codeVerifier,
+          authState.nonce
+        );
+        userInfo = await oidcClient.getUserInfo(authState.clientType, tokens.accessToken);
+      }
 
       // Determine tenant context:
       // 1. Use auth state tenant context if provided (from storefront/admin login)
@@ -356,12 +393,13 @@ export async function authRoutes(fastify: FastifyInstance) {
         ...(userRole ? { realm_access: { roles: [userRole, ...(((userInfo.realm_access as any)?.roles) || [])] } } : {}),
       };
 
-      // Create session with tenant context
+      // Create session with tenant context and provider info
       const session = await sessionStore.createSession({
         userId: userInfo.sub as string,
         tenantId,
         tenantSlug,
         clientType: authState.clientType,
+        provider: isLogto ? 'logto' : 'keycloak',
         accessToken: tokens.accessToken,
         idToken: tokens.idToken,
         refreshToken: tokens.refreshToken,
@@ -415,7 +453,7 @@ export async function authRoutes(fastify: FastifyInstance) {
 
   // ============================================================================
   // POST /auth/logout
-  // Logs out the user - clears session locally without redirecting to Keycloak
+  // Logs out the user - clears session locally without redirecting to IDP
   // ============================================================================
   fastify.post<{
     Querystring: z.infer<typeof logoutQuerySchema>;
@@ -430,16 +468,20 @@ export async function authRoutes(fastify: FastifyInstance) {
       // Clear cookie with dynamic domain for custom domain support
       clearSessionCookie(reply, forwardedHost);
 
-      // Revoke tokens with Keycloak (but don't redirect to Keycloak UI)
+      // Revoke tokens with the appropriate provider
       if (session.refreshToken) {
         try {
-          await oidcClient.revokeToken(session.clientType, session.refreshToken, 'refresh_token');
+          if (session.provider === 'logto') {
+            await logtoClient.revokeToken(session.refreshToken, 'refresh_token');
+          } else {
+            await oidcClient.revokeToken(session.clientType, session.refreshToken, 'refresh_token');
+          }
         } catch (error) {
-          logger.warn({ error }, 'Failed to revoke refresh token');
+          logger.warn({ error, provider: session.provider || 'keycloak' }, 'Failed to revoke refresh token');
         }
       }
 
-      logger.info({ userId: session.userId, sessionId: session.id }, 'User logged out');
+      logger.info({ userId: session.userId, sessionId: session.id, provider: session.provider || 'keycloak' }, 'User logged out');
     }
 
     // Return JSON for programmatic callers (storefront uses fetch + client-side navigation)
@@ -461,18 +503,22 @@ export async function authRoutes(fastify: FastifyInstance) {
       const forwardedHost = request.headers['x-forwarded-host'] as string || request.hostname;
       clearSessionCookie(reply, forwardedHost);
 
-      // Revoke tokens with Keycloak (but don't redirect to Keycloak UI)
+      // Revoke tokens with the appropriate provider
       if (session.refreshToken) {
         try {
-          await oidcClient.revokeToken(session.clientType, session.refreshToken, 'refresh_token');
+          if (session.provider === 'logto') {
+            await logtoClient.revokeToken(session.refreshToken, 'refresh_token');
+          } else {
+            await oidcClient.revokeToken(session.clientType, session.refreshToken, 'refresh_token');
+          }
         } catch (error) {
-          logger.warn({ error }, 'Failed to revoke refresh token');
+          logger.warn({ error, provider: session.provider || 'keycloak' }, 'Failed to revoke refresh token');
         }
       }
 
-      logger.info({ userId: session.userId, sessionId: session.id }, 'User logged out');
+      logger.info({ userId: session.userId, sessionId: session.id, provider: session.provider || 'keycloak' }, 'User logged out');
 
-      // Redirect to app's login page instead of Keycloak
+      // Redirect to app's login page
       return reply.redirect(returnTo);
     }
 
@@ -535,7 +581,13 @@ export async function authRoutes(fastify: FastifyInstance) {
     }
 
     try {
-      const newTokens = await oidcClient.refreshTokens(session.clientType, session.refreshToken);
+      // Use the correct provider for token refresh
+      let newTokens;
+      if (session.provider === 'logto') {
+        newTokens = await logtoClient.refreshTokens(session.refreshToken);
+      } else {
+        newTokens = await oidcClient.refreshTokens(session.clientType, session.refreshToken);
+      }
 
       await sessionStore.updateSession(session.id, {
         accessToken: newTokens.accessToken,
@@ -549,7 +601,7 @@ export async function authRoutes(fastify: FastifyInstance) {
         expiresAt: newTokens.expiresAt,
       });
     } catch (error) {
-      logger.error({ error }, 'Token refresh failed');
+      logger.error({ error, provider: session.provider || 'keycloak' }, 'Token refresh failed');
       await sessionStore.deleteSession(session.id);
       const forwardedHost = request.headers['x-forwarded-host'] as string || request.hostname;
       clearSessionCookie(reply, forwardedHost);
@@ -652,7 +704,12 @@ export async function authRoutes(fastify: FastifyInstance) {
       // Try to refresh if we have a refresh token
       if (session.refreshToken) {
         try {
-          const newTokens = await oidcClient.refreshTokens(session.clientType, session.refreshToken);
+          let newTokens;
+          if (session.provider === 'logto') {
+            newTokens = await logtoClient.refreshTokens(session.refreshToken);
+          } else {
+            newTokens = await oidcClient.refreshTokens(session.clientType, session.refreshToken);
+          }
           await sessionStore.updateSession(session.id, {
             accessToken: newTokens.accessToken,
             idToken: newTokens.idToken,
@@ -668,7 +725,7 @@ export async function authRoutes(fastify: FastifyInstance) {
             expires_at: newTokens.expiresAt,
           });
         } catch (error) {
-          logger.error({ error, sessionId: session.id }, 'Token refresh failed during internal get-token');
+          logger.error({ error, sessionId: session.id, provider: session.provider || 'keycloak' }, 'Token refresh failed during internal get-token');
           return reply.code(401).send({ error: 'session_expired' });
         }
       }
