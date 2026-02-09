@@ -30,6 +30,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { callVerificationService } from '../verification-client';
 import { verifyTotpCode, decryptTotpSecret, verifyBackupCode, hashBackupCode } from '../totp';
 import { getCookieDomain, setSessionCookie } from '../cookie-helpers';
+import { oidcClient } from '../oidc-client';
 
 const logger = createLogger('direct-auth');
 
@@ -96,6 +97,12 @@ const resetPasswordSchema = z.object({
 const changePasswordSchema = z.object({
   current_password: z.string().min(1, 'Current password is required'),
   new_password: z.string().min(8, 'New password must be at least 8 characters'),
+});
+
+const platformLoginSchema = z.object({
+  email: z.string().email('Invalid email format'),
+  password: z.string().min(1, 'Password is required'),
+  remember_me: z.boolean().optional().default(false),
 });
 
 /**
@@ -1446,5 +1453,124 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
       success: true,
       message: result.message || 'Your password has been changed successfully.',
     });
+  });
+
+  // ==========================================================================
+  // POST /auth/direct/platform/login
+  // Authenticates PLATFORM ADMINISTRATORS directly against internal Keycloak
+  // via ROPC (Resource Owner Password Credentials) grant.
+  // No tenant_slug required — platform admins manage all tenants.
+  // ==========================================================================
+  fastify.post<{
+    Body: z.infer<typeof platformLoginSchema>;
+  }>('/auth/direct/platform/login', async (request, reply) => {
+    const validation = platformLoginSchema.safeParse(request.body);
+    if (!validation.success) {
+      return reply.code(400).send({
+        success: false,
+        error: 'VALIDATION_ERROR',
+        message: validation.error.issues[0]?.message || 'Invalid request',
+      });
+    }
+
+    const { email, password, remember_me } = validation.data;
+    const clientIP = request.ip;
+
+    // Rate limit by IP + email
+    const rateLimitKey = `platform-login:${clientIP}:${email.toLowerCase()}`;
+    const rateLimit = await sessionStore.checkRateLimit(rateLimitKey);
+    if (!rateLimit.allowed) {
+      logger.warn({ ip: maskIP(clientIP), email: maskEmail(email) }, 'Rate limit exceeded for platform login');
+      return reply.code(429).send({
+        success: false,
+        error: 'RATE_LIMITED',
+        message: 'Too many login attempts. Please try again later.',
+        retry_after: Math.ceil(rateLimit.resetIn / 1000),
+      });
+    }
+
+    try {
+      // Authenticate directly against internal Keycloak via ROPC grant
+      const tokens = await oidcClient.passwordGrant('internal', email, password);
+
+      // Get user info from Keycloak
+      const userInfo = await oidcClient.getUserInfo('internal', tokens.accessToken);
+
+      // Create session (no tenant context for platform admins)
+      const session = await sessionStore.createSession({
+        userId: userInfo.sub as string,
+        clientType: 'internal',
+        accessToken: tokens.accessToken,
+        idToken: tokens.idToken,
+        refreshToken: tokens.refreshToken,
+        expiresAt: tokens.expiresAt,
+        userInfo: {
+          sub: userInfo.sub,
+          email: userInfo.email,
+          given_name: userInfo.given_name,
+          family_name: userInfo.family_name,
+          name: (userInfo.name as string)
+            || [userInfo.given_name, userInfo.family_name].filter(Boolean).join(' ')
+            || (userInfo.email as string),
+          is_platform_admin: true,
+          realm_access: (userInfo.realm_access as Record<string, unknown>) || { roles: [] },
+        },
+      });
+
+      // Set session cookie
+      const forwardedHost = request.headers['x-forwarded-host'] as string || request.hostname;
+      setSessionCookie(reply, session.id, forwardedHost, remember_me);
+
+      logger.info({
+        userId: session.userId,
+        sessionId: session.id,
+        email: maskEmail(email),
+      }, 'Platform admin login successful');
+
+      return reply.send({
+        success: true,
+        authenticated: true,
+        user: {
+          id: userInfo.sub,
+          email: userInfo.email,
+          name: userInfo.name,
+          first_name: userInfo.given_name,
+          last_name: userInfo.family_name,
+          is_platform_admin: true,
+        },
+      });
+    } catch (error: any) {
+      // Handle Keycloak ROPC errors
+      const errorCode = error?.error;
+
+      if (errorCode === 'invalid_grant') {
+        logger.info({ email: maskEmail(email) }, 'Platform login failed: invalid credentials');
+        return reply.code(401).send({
+          success: false,
+          error: 'INVALID_CREDENTIALS',
+          message: 'Invalid email or password.',
+        });
+      }
+
+      if (errorCode === 'unauthorized_client') {
+        logger.error({ email: maskEmail(email) }, 'Platform login failed: direct access grants not enabled on Keycloak client');
+        return reply.code(503).send({
+          success: false,
+          error: 'SERVICE_CONFIG_ERROR',
+          message: 'Authentication service configuration error. Please contact support.',
+        });
+      }
+
+      logger.error({
+        email: maskEmail(email),
+        error: errorCode || error?.message,
+      }, 'Platform login failed');
+
+      return reply.code(401).send({
+        success: false,
+        error: 'AUTH_FAILED',
+        message: 'Authentication failed. Please check your credentials and try again.',
+      });
+    }
   });
 }

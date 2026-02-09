@@ -396,6 +396,26 @@ class OIDCClientManager {
     return result as { active: boolean; [key: string]: unknown };
   }
 
+  async passwordGrant(
+    type: 'internal' | 'customer',
+    username: string,
+    password: string,
+    scope?: string
+  ): Promise<TokenResponse> {
+    const client = await this.getClient(type);
+
+    logger.debug({ type }, 'Performing password grant (ROPC)');
+
+    const tokenSet = await client.grant({
+      grant_type: 'password',
+      username,
+      password,
+      scope: scope || 'openid profile email offline_access',
+    });
+
+    return this.tokenSetToResponse(tokenSet);
+  }
+
   private tokenSetToResponse(tokenSet: TokenSet): TokenResponse {
     return {
       accessToken: tokenSet.access_token!,
