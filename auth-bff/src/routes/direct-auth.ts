@@ -1534,9 +1534,19 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
         },
       });
 
-      // Set session cookie
+      // Set session cookie — platform admin always uses the admin cookie name (bff_session)
+      // because company.tesserix.app doesn't match *-admin.tesserix.app pattern
       const forwardedHost = request.headers['x-forwarded-host'] as string || request.hostname;
-      setSessionCookie(reply, session.id, forwardedHost, remember_me);
+      const domain = getCookieDomain(forwardedHost);
+      const maxAge = remember_me ? config.session.maxAge * 7 : config.session.maxAge;
+      reply.setCookie(config.session.cookieName, session.id, {
+        httpOnly: true,
+        secure: config.server.nodeEnv === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge,
+        ...(domain ? { domain } : {}),
+      });
 
       logger.info({
         userId: session.userId,
