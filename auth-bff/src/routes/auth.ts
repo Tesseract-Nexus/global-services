@@ -36,19 +36,17 @@ function sanitizeReturnTo(url: string | undefined, fallback: string): string {
 /**
  * Verify that the request includes a valid internal service key.
  * Used to protect /internal/* endpoints from external access.
+ * When INTERNAL_SERVICE_KEY is not configured, requests pass through (with a warning log).
+ * When configured, the X-Internal-Service-Key header must match exactly.
  */
 function requireInternalServiceKey(request: FastifyRequest, reply: FastifyReply, done: () => void) {
-  const serviceKey = request.headers['x-internal-service-key'] as string | undefined;
   if (!config.internalServiceKey) {
-    // No key configured — allow in development, block in production
-    if (config.server.nodeEnv === 'production') {
-      logger.error('INTERNAL_SERVICE_KEY not configured in production — blocking internal request');
-      reply.code(403).send({ error: 'forbidden', message: 'Internal endpoint not configured' });
-      return;
-    }
+    // No key configured — allow through but warn so operators know to set it
+    logger.warn({ path: request.url }, 'INTERNAL_SERVICE_KEY not configured — internal endpoint unprotected');
     done();
     return;
   }
+  const serviceKey = request.headers['x-internal-service-key'] as string | undefined;
   if (!serviceKey || serviceKey !== config.internalServiceKey) {
     logger.warn({ hasKey: !!serviceKey }, 'Unauthorized internal endpoint access attempt');
     reply.code(403).send({ error: 'forbidden', message: 'Invalid or missing internal service key' });
