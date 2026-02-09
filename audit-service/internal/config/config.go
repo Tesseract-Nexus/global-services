@@ -36,9 +36,9 @@ type FallbackDBConfig struct {
 
 // RetentionConfig holds audit log retention configuration
 type RetentionConfig struct {
-	DefaultDays     int    // Default retention period in days (180 = 6 months)
-	MinDays         int    // Minimum allowed retention (90 = 3 months)
-	MaxDays         int    // Maximum allowed retention (365 = 1 year)
+	DefaultDays     int    // Default retention period in days (730 = 2 years, GDPR/SOC 2 minimum)
+	MinDays         int    // Minimum allowed retention (730 = 2 years for compliance)
+	MaxDays         int    // Maximum allowed retention (2555 = 7 years for financial/tax)
 	CleanupEnabled  bool   // Whether auto-cleanup is enabled
 	CleanupSchedule string // Cron schedule for cleanup job
 	BatchSize       int    // Batch size for cleanup operations
@@ -148,9 +148,9 @@ func Load() (*Config, error) {
 			IdleTimeout:     getEnvAsInt("POOL_IDLE_TIMEOUT", 600),      // 10 minutes
 		},
 		Retention: RetentionConfig{
-			DefaultDays:     getEnvAsInt("AUDIT_RETENTION_DAYS", 180),      // 6 months default
-			MinDays:         getEnvAsInt("AUDIT_MIN_RETENTION_DAYS", 90),   // 3 months minimum
-			MaxDays:         getEnvAsInt("AUDIT_MAX_RETENTION_DAYS", 365),  // 1 year maximum
+			DefaultDays:     getEnvAsInt("AUDIT_RETENTION_DAYS", 730),       // 2 years default (GDPR/SOC 2 minimum)
+			MinDays:         getEnvAsInt("AUDIT_MIN_RETENTION_DAYS", 730),   // 2 years minimum for compliance
+			MaxDays:         getEnvAsInt("AUDIT_MAX_RETENTION_DAYS", 2555),  // 7 years maximum (financial/tax)
 			CleanupEnabled:  getEnvAsBool("AUDIT_CLEANUP_ENABLED", true),
 			CleanupSchedule: getEnv("AUDIT_CLEANUP_SCHEDULE", "0 2 * * *"), // 2 AM daily
 			BatchSize:       getEnvAsInt("AUDIT_BATCH_SIZE", 100),

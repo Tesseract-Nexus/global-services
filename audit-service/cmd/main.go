@@ -392,6 +392,16 @@ func setupRouter(cfg *config.Config, auditHandlers *handlers.AuditHandlers, stat
 			auditLogs.GET("/retention", auditHandlers.GetRetentionSettings)
 			auditLogs.PUT("/retention", auditHandlers.SetRetentionSettings)
 			auditLogs.POST("/cleanup", auditHandlers.TriggerCleanup)
+
+			// Compliance endpoints (PII access, encryption audit, consent tracking)
+			compliance := auditLogs.Group("/compliance")
+			{
+				compliance.GET("/report", auditHandlers.GetComplianceReport)
+				compliance.GET("/pii-access", auditHandlers.GetPIIAccessLogs)
+				compliance.GET("/consent/:customer_id", auditHandlers.GetConsentHistory)
+				compliance.POST("/encryption", auditHandlers.LogEncryptionEvent)
+				compliance.POST("/consent", auditHandlers.LogConsentChange)
+			}
 		}
 
 		// Cache management (internal use)

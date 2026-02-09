@@ -349,12 +349,12 @@ func (s *AuditService) GetRetentionSettings(ctx context.Context, tenantID string
 
 // SetRetentionSettings saves retention settings for a tenant
 func (s *AuditService) SetRetentionSettings(ctx context.Context, tenantID string, retentionDays int) (*models.RetentionSettings, error) {
-	// Validate retention days (3-12 months)
-	if retentionDays < 90 {
-		retentionDays = 90
+	// Validate retention days (minimum 2 years for GDPR/SOC 2 compliance)
+	if retentionDays < 730 {
+		retentionDays = 730
 	}
-	if retentionDays > 365 {
-		retentionDays = 365
+	if retentionDays > 2555 {
+		retentionDays = 2555 // Max 7 years
 	}
 
 	settings := &models.RetentionSettings{
@@ -408,4 +408,242 @@ func (s *AuditService) CleanupOldLogs(ctx context.Context, tenantID string) (int
 // GetRetentionOptions returns available retention period options
 func (s *AuditService) GetRetentionOptions() []models.RetentionOption {
 	return models.GetRetentionOptions()
+}
+
+// ============================================================================
+// Field-level PII Access Logging
+// ============================================================================
+
+// LogPIIAccess logs which PII fields were accessed for a given customer/resource
+func (s *AuditService) LogPIIAccess(ctx context.Context, tenantID string, userID uuid.UUID, username string, customerID string, fieldsAccessed []string, resource models.AuditResource, resourceID string) error {
+	fieldsJSON, _ := json.Marshal(fieldsAccessed)
+
+	log := &models.AuditLog{
+		TenantID:          tenantID,
+		UserID:            userID,
+		Username:          username,
+		Action:            models.ActionPIIAccess,
+		Resource:          resource,
+		ResourceID:        resourceID,
+		Status:            models.StatusSuccess,
+		Severity:          models.SeverityMedium,
+		PIIFieldsAccessed: fieldsJSON,
+		Description:       fmt.Sprintf("PII fields accessed on %s/%s: %v", resource, resourceID, fieldsAccessed),
+		ServiceName:       "audit-service",
+		Timestamp:         time.Now(),
+	}
+
+	return s.LogAction(ctx, tenantID, log)
+}
+
+// GetPIIAccessLogs retrieves all PII access events for a specific customer/resource
+func (s *AuditService) GetPIIAccessLogs(ctx context.Context, tenantID string, customerID string, fromDate, toDate time.Time) ([]models.AuditLog, int64, error) {
+	filter := &models.AuditLogFilter{
+		TenantID:   tenantID,
+		Action:     models.ActionPIIAccess,
+		ResourceID: customerID,
+		FromDate:   &fromDate,
+		ToDate:     &toDate,
+		Limit:      1000,
+		SortBy:     "timestamp",
+		SortOrder:  "DESC",
+	}
+
+	return s.SearchAuditLogs(ctx, tenantID, filter)
+}
+
+// ============================================================================
+// Encryption/Decryption Audit Logging
+// ============================================================================
+
+// LogEncryptionOperation logs an encryption or decryption operation
+func (s *AuditService) LogEncryptionOperation(ctx context.Context, tenantID string, userID uuid.UUID, operation string, entityType string, entityID string, success bool, errorMsg string) error {
+	action := models.ActionEncrypt
+	if operation == "decrypt" {
+		action = models.ActionDecrypt
+	}
+
+	status := models.StatusSuccess
+	severity := models.SeverityLow
+	if !success {
+		if operation == "decrypt" {
+			action = models.ActionDecryptFail
+		} else {
+			action = models.ActionEncryptFail
+		}
+		status = models.StatusFailure
+		severity = models.SeverityCritical
+	}
+
+	log := &models.AuditLog{
+		TenantID:     tenantID,
+		UserID:       userID,
+		Action:       action,
+		Resource:     models.ResourceEncryption,
+		ResourceID:   entityID,
+		ResourceName: entityType,
+		Status:       status,
+		Severity:     severity,
+		Description:  fmt.Sprintf("Encryption operation '%s' on %s/%s", operation, entityType, entityID),
+		ErrorMessage: errorMsg,
+		ServiceName:  "audit-service",
+		Timestamp:    time.Now(),
+	}
+
+	return s.LogAction(ctx, tenantID, log)
+}
+
+// ============================================================================
+// Failed Authorization Logging
+// ============================================================================
+
+// LogFailedAuthorization logs a failed authorization attempt with full context
+func (s *AuditService) LogFailedAuthorization(ctx context.Context, tenantID string, userID uuid.UUID, username string, resource models.AuditResource, resourceID string, requiredPermission string, userRoles []string, ipAddress string, path string) error {
+	authzContext, _ := json.Marshal(map[string]interface{}{
+		"required_permission": requiredPermission,
+		"user_roles":          userRoles,
+		"attempted_resource":  fmt.Sprintf("%s/%s", resource, resourceID),
+	})
+
+	log := &models.AuditLog{
+		TenantID:     tenantID,
+		UserID:       userID,
+		Username:     username,
+		Action:       models.ActionAuthzDenied,
+		Resource:     resource,
+		ResourceID:   resourceID,
+		Status:       models.StatusFailure,
+		Severity:     models.SeverityHigh,
+		IPAddress:    ipAddress,
+		Path:         path,
+		AuthzContext: authzContext,
+		Description:  fmt.Sprintf("Authorization denied for %s: required permission '%s', user roles: %v", username, requiredPermission, userRoles),
+		ServiceName:  "audit-service",
+		Timestamp:    time.Now(),
+	}
+
+	return s.LogAction(ctx, tenantID, log)
+}
+
+// ============================================================================
+// Consent Change Tracking
+// ============================================================================
+
+// LogConsentChange logs a consent grant, withdrawal, or update
+func (s *AuditService) LogConsentChange(ctx context.Context, tenantID string, userID uuid.UUID, username string, action models.AuditAction, consentPurpose string, customerID string, ipAddress string) error {
+	log := &models.AuditLog{
+		TenantID:       tenantID,
+		UserID:         userID,
+		Username:       username,
+		Action:         action,
+		Resource:       models.ResourceConsent,
+		ResourceID:     customerID,
+		Status:         models.StatusSuccess,
+		Severity:       models.SeverityHigh,
+		IPAddress:      ipAddress,
+		ConsentPurpose: consentPurpose,
+		Description:    fmt.Sprintf("Consent %s: purpose '%s' for customer %s", action, consentPurpose, customerID),
+		ServiceName:    "audit-service",
+		Timestamp:      time.Now(),
+	}
+
+	return s.LogAction(ctx, tenantID, log)
+}
+
+// GetConsentHistory retrieves consent change history for a customer
+func (s *AuditService) GetConsentHistory(ctx context.Context, tenantID string, customerID string) ([]models.AuditLog, int64, error) {
+	filter := &models.AuditLogFilter{
+		TenantID:   tenantID,
+		Resource:   models.ResourceConsent,
+		ResourceID: customerID,
+		Limit:      500,
+		SortBy:     "timestamp",
+		SortOrder:  "DESC",
+	}
+
+	return s.SearchAuditLogs(ctx, tenantID, filter)
+}
+
+// ============================================================================
+// Compliance Query Endpoint
+// ============================================================================
+
+// ComplianceReport represents a compliance summary report
+type ComplianceReport struct {
+	TenantID           string                 `json:"tenantId"`
+	GeneratedAt        time.Time              `json:"generatedAt"`
+	Period             TimeRange              `json:"period"`
+	RetentionSettings  *models.RetentionSettings `json:"retentionSettings"`
+	TotalAuditLogs     int64                  `json:"totalAuditLogs"`
+	PIIAccessCount     int64                  `json:"piiAccessCount"`
+	EncryptionOps      map[string]int64       `json:"encryptionOps"`
+	FailedAuthAttempts int64                  `json:"failedAuthAttempts"`
+	AuthzDenials       int64                  `json:"authzDenials"`
+	ConsentChanges     map[string]int64       `json:"consentChanges"`
+	CriticalEvents     int64                  `json:"criticalEvents"`
+	DataExports        int64                  `json:"dataExports"`
+}
+
+// TimeRange represents a time range
+type TimeRange struct {
+	From time.Time `json:"from"`
+	To   time.Time `json:"to"`
+}
+
+// GenerateComplianceReport generates a compliance report for the given period
+func (s *AuditService) GenerateComplianceReport(ctx context.Context, tenantID string, fromDate, toDate time.Time) (*ComplianceReport, error) {
+	report := &ComplianceReport{
+		TenantID:    tenantID,
+		GeneratedAt: time.Now(),
+		Period:      TimeRange{From: fromDate, To: toDate},
+	}
+
+	// Get retention settings
+	settings, err := s.GetRetentionSettings(ctx, tenantID)
+	if err == nil {
+		report.RetentionSettings = settings
+	}
+
+	// Get summary for the period
+	summary, err := s.GetSummary(ctx, tenantID, fromDate, toDate)
+	if err == nil {
+		report.TotalAuditLogs = summary.TotalLogs
+		if count, ok := summary.ByAction[string(models.ActionPIIAccess)]; ok {
+			report.PIIAccessCount = count
+		}
+		if count, ok := summary.ByAction[string(models.ActionLoginFailed)]; ok {
+			report.FailedAuthAttempts = count
+		}
+		if count, ok := summary.ByAction[string(models.ActionAuthzDenied)]; ok {
+			report.AuthzDenials = count
+		}
+		if count, ok := summary.BySeverity[string(models.SeverityCritical)]; ok {
+			report.CriticalEvents = count
+		}
+		if count, ok := summary.ByAction[string(models.ActionExport)]; ok {
+			report.DataExports = count
+		}
+	}
+
+	// Aggregate encryption operations
+	report.EncryptionOps = map[string]int64{}
+	for _, action := range []models.AuditAction{models.ActionEncrypt, models.ActionDecrypt, models.ActionEncryptFail, models.ActionDecryptFail} {
+		if summary != nil {
+			if count, ok := summary.ByAction[string(action)]; ok {
+				report.EncryptionOps[string(action)] = count
+			}
+		}
+	}
+
+	// Aggregate consent changes
+	report.ConsentChanges = map[string]int64{}
+	for _, action := range []models.AuditAction{models.ActionConsentGrant, models.ActionConsentWithdraw, models.ActionConsentUpdate} {
+		if summary != nil {
+			if count, ok := summary.ByAction[string(action)]; ok {
+				report.ConsentChanges[string(action)] = count
+			}
+		}
+	}
+
+	return report, nil
 }

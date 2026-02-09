@@ -10,6 +10,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	"github.com/Tesseract-Nexus/go-shared/security"
+
 	"audit-service/internal/models"
 	"audit-service/internal/services"
 )
@@ -108,16 +110,54 @@ func AuditMiddleware(auditService *services.AuditService) gin.HandlerFunc {
 		metadata["method"] = c.Request.Method
 		metadata["path"] = c.Request.URL.Path
 
-		// Only log request body for non-sensitive endpoints
-		if !isSensitiveEndpoint(c.Request.URL.Path) && len(requestBody) > 0 && len(requestBody) < 1024 {
+		// Log request body with appropriate masking strategy
+		if len(requestBody) > 0 && len(requestBody) < 1024 {
 			var bodyJSON map[string]interface{}
 			if err := json.Unmarshal(requestBody, &bodyJSON); err == nil {
-				// Remove sensitive fields
-				delete(bodyJSON, "password")
-				delete(bodyJSON, "token")
-				delete(bodyJSON, "secret")
-				metadata["request_body"] = bodyJSON
+				if isPaymentEndpoint(c.Request.URL.Path) {
+					// Whitelist approach for payment endpoints — only allow safe fields through
+					bodyJSON = whitelistPaymentFields(bodyJSON)
+				} else if !isSensitiveEndpoint(c.Request.URL.Path) {
+					// Remove auth-sensitive fields entirely
+					delete(bodyJSON, "password")
+					delete(bodyJSON, "token")
+					delete(bodyJSON, "secret")
+					delete(bodyJSON, "card_number")
+					delete(bodyJSON, "cvv")
+					delete(bodyJSON, "pan")
+					delete(bodyJSON, "gstin")
+					// Mask PII fields using go-shared security utilities
+					bodyJSON = security.SecureLogFields(bodyJSON)
+				} else {
+					// Sensitive endpoint — don't log body at all
+					bodyJSON = nil
+				}
+				if bodyJSON != nil {
+					metadata["request_body"] = bodyJSON
+				}
 			}
+		}
+
+		// Track PII field access for compliance (on read operations to PII-containing resources)
+		if c.Request.Method == "GET" && isPIIResource(c.Request.URL.Path) && statusCode >= 200 && statusCode < 300 {
+			piiFields := detectPIIFieldsInPath(c.Request.URL.Path)
+			if len(piiFields) > 0 {
+				piiJSON, _ := json.Marshal(piiFields)
+				log.PIIFieldsAccessed = piiJSON
+				log.Action = models.ActionPIIAccess
+			}
+		}
+
+		// Enrich failed authorization logs with context
+		if statusCode == 403 {
+			log.Action = models.ActionAuthzDenied
+			log.Severity = models.SeverityHigh
+			authzCtx, _ := json.Marshal(map[string]interface{}{
+				"path":       c.Request.URL.Path,
+				"method":     c.Request.Method,
+				"user_agent": c.Request.UserAgent(),
+			})
+			log.AuthzContext = authzCtx
 		}
 
 		if metadataJSON, err := json.Marshal(metadata); err == nil {
@@ -257,6 +297,12 @@ func isSensitiveEndpoint(path string) bool {
 		"/key",
 		"/payment",
 		"/card",
+		"/customer",
+		"/order",
+		"/address",
+		"/checkout",
+		"/refund",
+		"/profile",
 	}
 
 	for _, pattern := range sensitivePatterns {
@@ -279,4 +325,71 @@ func indexAt(s, substr string) int {
 		}
 	}
 	return -1
+}
+
+// isPaymentEndpoint checks if the endpoint is payment-related (uses whitelist masking)
+func isPaymentEndpoint(path string) bool {
+	paymentPatterns := []string{"/payment", "/card", "/checkout", "/refund"}
+	for _, pattern := range paymentPatterns {
+		if contains(path, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
+// whitelistPaymentFields only keeps explicitly safe fields from payment request bodies.
+// Everything not on this whitelist is dropped — the opposite of a blacklist approach.
+func whitelistPaymentFields(body map[string]interface{}) map[string]interface{} {
+	allowedFields := map[string]bool{
+		"amount":        true,
+		"currency":      true,
+		"method":        true,
+		"status":        true,
+		"order_id":      true,
+		"payment_id":    true,
+		"provider":      true,
+		"is_test_mode":  true,
+		"gateway_type":  true,
+		"display_order": true,
+		"is_enabled":    true,
+		"reason":        true,
+	}
+
+	safe := make(map[string]interface{})
+	for key, val := range body {
+		if allowedFields[key] {
+			safe[key] = val
+		}
+	}
+	return safe
+}
+
+// isPIIResource checks if the endpoint accesses PII-containing resources
+func isPIIResource(path string) bool {
+	piiResources := []string{"/customer", "/order", "/user", "/staff", "/profile", "/address"}
+	for _, resource := range piiResources {
+		if contains(path, resource) {
+			return true
+		}
+	}
+	return false
+}
+
+// detectPIIFieldsInPath returns which PII fields are likely accessed based on the resource path
+func detectPIIFieldsInPath(path string) []string {
+	var fields []string
+	switch {
+	case contains(path, "/customer"):
+		fields = []string{"email", "phone", "first_name", "last_name", "address"}
+	case contains(path, "/order"):
+		fields = []string{"customer_email", "customer_name", "shipping_address", "billing_address"}
+	case contains(path, "/user") || contains(path, "/staff"):
+		fields = []string{"email", "phone", "first_name", "last_name"}
+	case contains(path, "/address"):
+		fields = []string{"street", "city", "state", "postal_code", "phone"}
+	case contains(path, "/profile"):
+		fields = []string{"email", "phone", "first_name", "last_name", "address"}
+	}
+	return fields
 }

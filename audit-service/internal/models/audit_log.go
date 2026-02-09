@@ -40,8 +40,24 @@ const (
 	ActionPermissionRevoke AuditAction = "PERMISSION_REVOKE"
 
 	// Configuration actions
-	ActionConfigUpdate AuditAction = "CONFIG_UPDATE"
+	ActionConfigUpdate  AuditAction = "CONFIG_UPDATE"
 	ActionSettingChange AuditAction = "SETTING_CHANGE"
+
+	// PII and encryption actions
+	ActionPIIAccess   AuditAction = "PII_ACCESS"
+	ActionPIIExport   AuditAction = "PII_EXPORT"
+	ActionEncrypt     AuditAction = "ENCRYPT"
+	ActionDecrypt     AuditAction = "DECRYPT"
+	ActionEncryptFail AuditAction = "ENCRYPT_FAIL"
+	ActionDecryptFail AuditAction = "DECRYPT_FAIL"
+
+	// Consent actions
+	ActionConsentGrant    AuditAction = "CONSENT_GRANT"
+	ActionConsentWithdraw AuditAction = "CONSENT_WITHDRAW"
+	ActionConsentUpdate   AuditAction = "CONSENT_UPDATE"
+
+	// Authorization actions
+	ActionAuthzDenied AuditAction = "AUTHZ_DENIED"
 
 	// Other action
 	ActionOther AuditAction = "OTHER"
@@ -79,6 +95,8 @@ const (
 	ResourceShippingRate AuditResource = "SHIPPING_RATE"
 	ResourceCampaign     AuditResource = "CAMPAIGN"
 	ResourceLoyalty      AuditResource = "LOYALTY"
+	ResourceConsent      AuditResource = "CONSENT"
+	ResourceEncryption   AuditResource = "ENCRYPTION"
 	ResourceOther        AuditResource = "OTHER"
 )
 
@@ -133,6 +151,11 @@ type AuditLog struct {
 	OldValue datatypes.JSON `json:"oldValue" gorm:"type:jsonb"` // Previous state
 	NewValue datatypes.JSON `json:"newValue" gorm:"type:jsonb"` // New state
 	Changes  datatypes.JSON `json:"changes" gorm:"type:jsonb"`  // Diff of changes
+
+	// PII access tracking (field-level)
+	PIIFieldsAccessed datatypes.JSON `json:"piiFieldsAccessed,omitempty" gorm:"type:jsonb"` // List of PII fields accessed (e.g., ["email","phone","address"])
+	ConsentPurpose    string         `json:"consentPurpose,omitempty" gorm:"type:varchar(100)"`  // Consent purpose for this action
+	AuthzContext      datatypes.JSON `json:"authzContext,omitempty" gorm:"type:jsonb"`      // Authorization context for denied requests
 
 	// Additional context
 	Description string         `json:"description" gorm:"type:text"` // Human-readable description
@@ -260,6 +283,14 @@ func (a *AuditLog) GetActionCategory() string {
 		return "Workflow"
 	case ActionConfigUpdate, ActionSettingChange:
 		return "Configuration"
+	case ActionPIIAccess, ActionPIIExport:
+		return "PII Access"
+	case ActionEncrypt, ActionDecrypt, ActionEncryptFail, ActionDecryptFail:
+		return "Encryption"
+	case ActionConsentGrant, ActionConsentWithdraw, ActionConsentUpdate:
+		return "Consent"
+	case ActionAuthzDenied:
+		return "Authorization"
 	default:
 		return "Other"
 	}
@@ -279,6 +310,21 @@ func (a *AuditLog) ShouldAlert() bool {
 
 	// Alert on RBAC changes
 	if a.GetActionCategory() == "RBAC" {
+		return true
+	}
+
+	// Alert on encryption failures
+	if a.Action == ActionEncryptFail || a.Action == ActionDecryptFail {
+		return true
+	}
+
+	// Alert on authorization denials
+	if a.Action == ActionAuthzDenied {
+		return true
+	}
+
+	// Alert on consent withdrawals
+	if a.Action == ActionConsentWithdraw {
 		return true
 	}
 
@@ -302,7 +348,7 @@ func CreateAuditLog(tenantID string, userID uuid.UUID, action AuditAction, resou
 type RetentionSettings struct {
 	ID             uuid.UUID `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
 	TenantID       string    `json:"tenantId" gorm:"type:varchar(255);uniqueIndex;not null"`
-	RetentionDays  int       `json:"retentionDays" gorm:"not null;default:180"`  // 3-12 months (90-365 days)
+	RetentionDays  int       `json:"retentionDays" gorm:"not null;default:730"`  // Minimum 2 years (730 days) for compliance
 	LastCleanupAt  *time.Time `json:"lastCleanupAt"`
 	LogsDeleted    int64     `json:"logsDeleted"`  // Total logs deleted in last cleanup
 	CreatedAt      time.Time `json:"createdAt"`
@@ -321,18 +367,13 @@ type RetentionOption struct {
 	Label  string `json:"label"`
 }
 
-// GetRetentionOptions returns available retention period options (3-12 months)
+// GetRetentionOptions returns available retention period options (2-7 years for compliance)
 func GetRetentionOptions() []RetentionOption {
 	return []RetentionOption{
-		{Months: 3, Days: 90, Label: "3 months"},
-		{Months: 4, Days: 120, Label: "4 months"},
-		{Months: 5, Days: 150, Label: "5 months"},
-		{Months: 6, Days: 180, Label: "6 months (Default)"},
-		{Months: 7, Days: 210, Label: "7 months"},
-		{Months: 8, Days: 240, Label: "8 months"},
-		{Months: 9, Days: 270, Label: "9 months"},
-		{Months: 10, Days: 300, Label: "10 months"},
-		{Months: 11, Days: 330, Label: "11 months"},
-		{Months: 12, Days: 365, Label: "12 months (1 year)"},
+		{Months: 24, Days: 730, Label: "2 years (Minimum - GDPR/SOC 2)"},
+		{Months: 36, Days: 1095, Label: "3 years (Recommended)"},
+		{Months: 48, Days: 1460, Label: "4 years"},
+		{Months: 60, Days: 1825, Label: "5 years (Transactional data)"},
+		{Months: 84, Days: 2555, Label: "7 years (Financial/tax compliance)"},
 	}
 }

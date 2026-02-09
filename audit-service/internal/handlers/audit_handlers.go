@@ -542,14 +542,14 @@ func (h *AuditHandlers) SetRetentionSettings(c *gin.Context) {
 	}
 
 	var request struct {
-		RetentionDays int `json:"retentionDays" binding:"required,min=90,max=365"`
+		RetentionDays int `json:"retentionDays" binding:"required,min=730,max=2555"`
 	}
 
 	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":   "Invalid request body",
 			"details": err.Error(),
-			"hint":    "Retention days must be between 90 (3 months) and 365 (1 year)",
+			"hint":    "Retention days must be between 730 (2 years, compliance minimum) and 2555 (7 years)",
 		})
 		return
 	}
@@ -587,6 +587,185 @@ func (h *AuditHandlers) TriggerCleanup(c *gin.Context) {
 		"message":      "Cleanup completed successfully",
 		"logs_deleted": deleted,
 	})
+}
+
+// ============================================================================
+// Compliance Endpoints
+// ============================================================================
+
+// GetComplianceReport generates a compliance report for the given period
+// GET /api/v1/audit-logs/compliance/report
+func (h *AuditHandlers) GetComplianceReport(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	if tenantID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Tenant ID is required"})
+		return
+	}
+
+	// Parse date range (default to last 90 days)
+	toDate := time.Now()
+	fromDate := toDate.AddDate(0, 0, -90)
+
+	if fromDateStr := c.Query("from_date"); fromDateStr != "" {
+		if parsed, err := time.Parse(time.RFC3339, fromDateStr); err == nil {
+			fromDate = parsed
+		}
+	}
+	if toDateStr := c.Query("to_date"); toDateStr != "" {
+		if parsed, err := time.Parse(time.RFC3339, toDateStr); err == nil {
+			toDate = parsed
+		}
+	}
+
+	report, err := h.service.GenerateComplianceReport(c.Request.Context(), tenantID, fromDate, toDate)
+	if err != nil {
+		h.logger.WithError(err).WithField("tenant_id", tenantID).Error("Failed to generate compliance report")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate compliance report"})
+		return
+	}
+
+	c.JSON(http.StatusOK, report)
+}
+
+// GetPIIAccessLogs retrieves PII field-level access logs
+// GET /api/v1/audit-logs/compliance/pii-access
+func (h *AuditHandlers) GetPIIAccessLogs(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	if tenantID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Tenant ID is required"})
+		return
+	}
+
+	customerID := c.Query("customer_id")
+
+	// Parse date range (default to last 30 days)
+	toDate := time.Now()
+	fromDate := toDate.AddDate(0, 0, -30)
+
+	if fromDateStr := c.Query("from_date"); fromDateStr != "" {
+		if parsed, err := time.Parse(time.RFC3339, fromDateStr); err == nil {
+			fromDate = parsed
+		}
+	}
+	if toDateStr := c.Query("to_date"); toDateStr != "" {
+		if parsed, err := time.Parse(time.RFC3339, toDateStr); err == nil {
+			toDate = parsed
+		}
+	}
+
+	logs, total, err := h.service.GetPIIAccessLogs(c.Request.Context(), tenantID, customerID, fromDate, toDate)
+	if err != nil {
+		h.logger.WithError(err).WithField("tenant_id", tenantID).Error("Failed to get PII access logs")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get PII access logs"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":        logs,
+		"total":       total,
+		"customer_id": customerID,
+		"period":      gin.H{"from": fromDate, "to": toDate},
+	})
+}
+
+// GetConsentHistory retrieves consent change history for a customer
+// GET /api/v1/audit-logs/compliance/consent/:customer_id
+func (h *AuditHandlers) GetConsentHistory(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	if tenantID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Tenant ID is required"})
+		return
+	}
+
+	customerID := c.Param("customer_id")
+	if customerID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Customer ID is required"})
+		return
+	}
+
+	logs, total, err := h.service.GetConsentHistory(c.Request.Context(), tenantID, customerID)
+	if err != nil {
+		h.logger.WithError(err).WithField("tenant_id", tenantID).Error("Failed to get consent history")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get consent history"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":        logs,
+		"total":       total,
+		"customer_id": customerID,
+	})
+}
+
+// LogEncryptionEvent logs an encryption/decryption operation
+// POST /api/v1/audit-logs/compliance/encryption
+func (h *AuditHandlers) LogEncryptionEvent(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	if tenantID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Tenant ID is required"})
+		return
+	}
+
+	var req struct {
+		Operation  string `json:"operation" binding:"required,oneof=encrypt decrypt"`
+		EntityType string `json:"entity_type" binding:"required"`
+		EntityID   string `json:"entity_id" binding:"required"`
+		Success    bool   `json:"success"`
+		Error      string `json:"error"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		return
+	}
+
+	userIDStr := c.GetString("user_id")
+	userID, _ := uuid.Parse(userIDStr)
+
+	if err := h.service.LogEncryptionOperation(
+		c.Request.Context(), tenantID, userID, req.Operation,
+		req.EntityType, req.EntityID, req.Success, req.Error,
+	); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to log encryption event"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"message": "Encryption event logged"})
+}
+
+// LogConsentChange logs a consent change event
+// POST /api/v1/audit-logs/compliance/consent
+func (h *AuditHandlers) LogConsentChange(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	if tenantID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Tenant ID is required"})
+		return
+	}
+
+	var req struct {
+		Action     string `json:"action" binding:"required,oneof=CONSENT_GRANT CONSENT_WITHDRAW CONSENT_UPDATE"`
+		Purpose    string `json:"purpose" binding:"required"`
+		CustomerID string `json:"customer_id" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		return
+	}
+
+	userIDStr := c.GetString("user_id")
+	userID, _ := uuid.Parse(userIDStr)
+	username := c.GetString("username")
+
+	if err := h.service.LogConsentChange(
+		c.Request.Context(), tenantID, userID, username,
+		models.AuditAction(req.Action), req.Purpose, req.CustomerID, c.ClientIP(),
+	); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to log consent change"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"message": "Consent change logged"})
 }
 
 // streamWithPolling is the fallback polling-based implementation
