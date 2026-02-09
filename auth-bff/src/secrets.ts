@@ -74,6 +74,9 @@ export async function loadSecrets(): Promise<Record<string, string>> {
     REDIS_PASSWORD: `${prefix}-marketplace-redis-password`,
     VERIFICATION_SERVICE_API_KEY: `${prefix}-marketplace-api-key`,
     TOTP_ENCRYPTION_KEY: `${prefix}-totp-encryption-key`,
+    BACKUP_CODE_HMAC_KEY: `${prefix}-backup-code-hmac-key`,
+    TOTP_KEY_DERIVATION_SECRET: `${prefix}-totp-key-derivation-secret`,
+    INTERNAL_SERVICE_KEY: `${prefix}-internal-service-key`,
   };
 
   // Check for custom secret name overrides via environment variables
@@ -85,6 +88,9 @@ export async function loadSecrets(): Promise<Record<string, string>> {
     REDIS_PASSWORD: process.env.REDIS_PASSWORD_SECRET_NAME,
     VERIFICATION_SERVICE_API_KEY: process.env.VERIFICATION_SERVICE_API_KEY_SECRET_NAME,
     TOTP_ENCRYPTION_KEY: process.env.TOTP_ENCRYPTION_KEY_SECRET_NAME,
+    BACKUP_CODE_HMAC_KEY: process.env.BACKUP_CODE_HMAC_KEY_SECRET_NAME,
+    TOTP_KEY_DERIVATION_SECRET: process.env.TOTP_KEY_DERIVATION_SECRET_SECRET_NAME,
+    INTERNAL_SERVICE_KEY: process.env.INTERNAL_SERVICE_KEY_SECRET_NAME,
   };
 
   const secrets: Record<string, string> = {};
@@ -107,7 +113,9 @@ export async function loadSecrets(): Promise<Record<string, string>> {
       logger.debug({ envVar, secretName }, 'Loaded secret from GCP');
     } catch (error) {
       // Some secrets might be optional
-      const isOptional = envVar === 'VERIFICATION_SERVICE_API_KEY' || envVar === 'TOTP_ENCRYPTION_KEY';
+      const isOptional = envVar === 'VERIFICATION_SERVICE_API_KEY' || envVar === 'TOTP_ENCRYPTION_KEY'
+        || envVar === 'BACKUP_CODE_HMAC_KEY' || envVar === 'TOTP_KEY_DERIVATION_SECRET'
+        || envVar === 'INTERNAL_SERVICE_KEY';
       if (isOptional) {
         logger.warn({ envVar, secretName }, 'Optional secret not found, continuing');
       } else {

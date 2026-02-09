@@ -104,7 +104,7 @@ export function generateBackupCodes(count: number = 10): BackupCodesResult {
  */
 export function hashBackupCode(code: string): string {
   const normalized = code.replace(/-/g, '').toUpperCase();
-  return createHmac('sha256', 'tesserix-backup-code')
+  return createHmac('sha256', config.backupCodeHmacKey)
     .update(normalized)
     .digest('hex');
 }
@@ -171,6 +171,6 @@ function getEncryptionKey(): Buffer {
   }
   // If key is 32+ chars but not 64 hex chars, derive a 32-byte key via SHA-256
   return Buffer.from(
-    createHmac('sha256', 'tesserix-totp-key').update(keyHex).digest()
+    createHmac('sha256', config.totpKeyDerivationSecret).update(keyHex).digest()
   );
 }

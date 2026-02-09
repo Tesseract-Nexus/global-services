@@ -15,6 +15,7 @@ import (
 
 // Auth BFF URL for ticket validation
 var authBffURL = getAuthBffURL()
+var internalServiceKey = os.Getenv("INTERNAL_SERVICE_KEY")
 
 func getAuthBffURL() string {
 	if url := os.Getenv("AUTH_BFF_URL"); url != "" {
@@ -40,7 +41,15 @@ func validateTicket(ticket string) (*TicketValidationResponse, error) {
 	url := fmt.Sprintf("%s/internal/validate-ws-ticket", authBffURL)
 
 	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Post(url, "application/json", bytes.NewBuffer(reqBody))
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(reqBody))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if internalServiceKey != "" {
+		req.Header.Set("X-Internal-Service-Key", internalServiceKey)
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to call auth-bff: %w", err)
 	}

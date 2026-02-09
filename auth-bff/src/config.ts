@@ -51,6 +51,13 @@ const envSchema = z.object({
   // TOTP encryption
   TOTP_ENCRYPTION_KEY: z.string().min(32).optional(),
 
+  // HMAC keys for backup codes and TOTP key derivation
+  BACKUP_CODE_HMAC_KEY: z.string().min(16).default('tesserix-backup-code'),
+  TOTP_KEY_DERIVATION_SECRET: z.string().min(16).default('tesserix-totp-key'),
+
+  // Internal service authentication (for /internal/* endpoints)
+  INTERNAL_SERVICE_KEY: z.string().min(32).optional(),
+
   // Base domain for hostname matching (tesserix.app for staging, mark8ly.com for prod)
   BASE_DOMAIN: z.string().default('tesserix.app'),
 
@@ -119,6 +126,9 @@ export const config = {
   verificationServiceUrl: env.VERIFICATION_SERVICE_URL || 'http://verification-service.global-services.svc.cluster.local:8080',
   verificationServiceApiKey: env.VERIFICATION_SERVICE_API_KEY || '',
   totpEncryptionKey: env.TOTP_ENCRYPTION_KEY || '',
+  backupCodeHmacKey: env.BACKUP_CODE_HMAC_KEY,
+  totpKeyDerivationSecret: env.TOTP_KEY_DERIVATION_SECRET,
+  internalServiceKey: env.INTERNAL_SERVICE_KEY || '',
 } as const;
 
 /**

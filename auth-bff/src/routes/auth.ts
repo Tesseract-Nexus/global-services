@@ -33,6 +33,30 @@ function sanitizeReturnTo(url: string | undefined, fallback: string): string {
   return isValidReturnTo(url) ? url : fallback;
 }
 
+/**
+ * Verify that the request includes a valid internal service key.
+ * Used to protect /internal/* endpoints from external access.
+ */
+function requireInternalServiceKey(request: FastifyRequest, reply: FastifyReply, done: () => void) {
+  const serviceKey = request.headers['x-internal-service-key'] as string | undefined;
+  if (!config.internalServiceKey) {
+    // No key configured — allow in development, block in production
+    if (config.server.nodeEnv === 'production') {
+      logger.error('INTERNAL_SERVICE_KEY not configured in production — blocking internal request');
+      reply.code(403).send({ error: 'forbidden', message: 'Internal endpoint not configured' });
+      return;
+    }
+    done();
+    return;
+  }
+  if (!serviceKey || serviceKey !== config.internalServiceKey) {
+    logger.warn({ hasKey: !!serviceKey }, 'Unauthorized internal endpoint access attempt');
+    reply.code(403).send({ error: 'forbidden', message: 'Invalid or missing internal service key' });
+    return;
+  }
+  done();
+}
+
 // Request schemas
 const loginQuerySchema = z.object({
   returnTo: z.string().optional(),
@@ -587,7 +611,7 @@ export async function authRoutes(fastify: FastifyInstance) {
   // ============================================================================
   fastify.post<{
     Body: { ticket: string };
-  }>('/internal/validate-ws-ticket', async (request, reply) => {
+  }>('/internal/validate-ws-ticket', { preHandler: requireInternalServiceKey }, async (request, reply) => {
     const { ticket } = request.body as { ticket: string };
 
     if (!ticket) {
@@ -617,7 +641,7 @@ export async function authRoutes(fastify: FastifyInstance) {
   // This enables server-side API calls to backend services with proper auth
   // SECURITY: Should only be accessible from internal services (not exposed externally)
   // ============================================================================
-  fastify.get('/internal/get-token', async (request, reply) => {
+  fastify.get('/internal/get-token', { preHandler: requireInternalServiceKey }, async (request, reply) => {
     const session = await getSession(request);
 
     if (!session) {
@@ -749,6 +773,7 @@ export async function authRoutes(fastify: FastifyInstance) {
   // POST /auth/import-tokens
   // Creates a session and transfer code from Keycloak tokens
   // Used by onboarding to auto-login users after account creation
+  // SECURITY: Internal-only endpoint, protected by service key
   // ============================================================================
   fastify.post<{
     Body: {
@@ -762,7 +787,7 @@ export async function authRoutes(fastify: FastifyInstance) {
       first_name?: string;
       last_name?: string;
     };
-  }>('/auth/import-tokens', async (request, reply) => {
+  }>('/auth/import-tokens', { preHandler: requireInternalServiceKey }, async (request, reply) => {
     const {
       access_token,
       refresh_token,
