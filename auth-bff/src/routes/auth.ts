@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
-import { config, getSessionCookieName, isAdminHost, isLogtoHost } from '../config';
+import { config, getSessionCookieName, isAdminHost, isHomeHost, isLogtoHost } from '../config';
 import { oidcClient } from '../oidc-client';
 import { logtoClient } from '../logto-client';
 import { sessionStore, SessionData, WsTicketData, SessionTransferData } from '../session-store';
@@ -942,5 +942,8 @@ function determineClientType(request: FastifyRequest): 'internal' | 'customer' {
 function getCallbackUrl(request: FastifyRequest, _clientType: 'internal' | 'customer'): string {
   const protocol = request.headers['x-forwarded-proto'] || 'https';
   const host = request.headers['x-forwarded-host'] || request.hostname;
-  return `${protocol}://${host}/auth/callback`;
+  // tesserix-home proxies auth routes through /api/auth/*, so the callback
+  // URL needs the /api prefix for the Next.js catch-all route to handle it
+  const callbackPath = isHomeHost(host as string) ? '/api/auth/callback' : '/auth/callback';
+  return `${protocol}://${host}${callbackPath}`;
 }
