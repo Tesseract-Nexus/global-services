@@ -798,6 +798,10 @@ class TenantServiceClient {
 
       const response = await this.fetch('/api/v1/auth/deactivate-account', {
         method: 'POST',
+        headers: {
+          'x-jwt-claim-sub': request.user_id,
+          'x-jwt-claim-tenant-id': request.tenant_id,
+        },
         body: JSON.stringify(request),
       });
 
@@ -977,6 +981,10 @@ class TenantServiceClient {
 
       const response = await this.fetch('/api/v1/auth/change-password', {
         method: 'POST',
+        headers: {
+          'x-jwt-claim-sub': request.user_id,
+          'x-jwt-claim-tenant-id': request.tenant_id,
+        },
         body: JSON.stringify(request),
       });
 
