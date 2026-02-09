@@ -265,7 +265,10 @@ func main() {
 	// Initialize password reset service for self-service password recovery
 	var passwordResetSvc *services.PasswordResetService
 	if keycloakClient != nil {
-		passwordResetSvc = services.NewPasswordResetService(db, keycloakClient, notificationClient)
+		passwordResetSvc = services.NewPasswordResetService(db, keycloakClient, &services.KeycloakAuthConfig{
+			ClientID:     getEnv("KEYCLOAK_CLIENT_ID", "marketplace-dashboard"),
+			ClientSecret: secrets.GetSecretOrEnv("KEYCLOAK_CLIENT_SECRET_NAME", "KEYCLOAK_CLIENT_SECRET", keycloakAdminSecret),
+		}, notificationClient)
 		log.Println("PasswordResetService initialized for self-service password recovery")
 	} else {
 		log.Println("Warning: PasswordResetService not initialized (Keycloak client not available)")

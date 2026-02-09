@@ -142,8 +142,6 @@ func (r *CredentialRepository) UpdatePassword(ctx context.Context, userID, tenan
 		return fmt.Errorf("failed to hash password: %w", err)
 	}
 
-	// TODO: Add current password to history and check against history
-
 	now := time.Now()
 	updates := map[string]interface{}{
 		"password_hash":           string(hashedPassword),
@@ -160,6 +158,87 @@ func (r *CredentialRepository) UpdatePassword(ctx context.Context, userID, tenan
 		Where("user_id = ? AND tenant_id = ?", userID, tenantID).
 		Updates(updates).Error; err != nil {
 		return fmt.Errorf("failed to update password: %w", err)
+	}
+
+	return nil
+}
+
+// CheckPasswordHistory checks if a plaintext password matches any of the stored
+// password history hashes. Returns true if the password was previously used.
+func (r *CredentialRepository) CheckPasswordHistory(ctx context.Context, userID, tenantID uuid.UUID, password string, maxHistory int) (bool, error) {
+	credential, err := r.GetCredential(ctx, userID, tenantID)
+	if err != nil {
+		return false, err
+	}
+	if credential == nil {
+		return false, nil // No credential → no history to check
+	}
+
+	// Parse password history JSON array of bcrypt hashes
+	var hashes []string
+	if len(credential.PasswordHistory) > 0 {
+		if err := json.Unmarshal([]byte(credential.PasswordHistory), &hashes); err != nil {
+			return false, fmt.Errorf("failed to parse password history: %w", err)
+		}
+	}
+
+	// Only check against the most recent N entries
+	start := 0
+	if maxHistory > 0 && len(hashes) > maxHistory {
+		start = len(hashes) - maxHistory
+	}
+
+	for _, h := range hashes[start:] {
+		if bcrypt.CompareHashAndPassword([]byte(h), []byte(password)) == nil {
+			return true, nil // Password was previously used
+		}
+	}
+
+	return false, nil
+}
+
+// AddToPasswordHistory adds a bcrypt hash of the password to the credential's history.
+// Keeps only the most recent maxHistory entries.
+func (r *CredentialRepository) AddToPasswordHistory(ctx context.Context, userID, tenantID uuid.UUID, password string, maxHistory int) error {
+	credential, err := r.GetCredential(ctx, userID, tenantID)
+	if err != nil {
+		return err
+	}
+	if credential == nil {
+		return nil // No credential record — nothing to update
+	}
+
+	// Hash the password for history storage
+	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("failed to hash password for history: %w", err)
+	}
+
+	// Parse existing history
+	var hashes []string
+	if len(credential.PasswordHistory) > 0 {
+		if err := json.Unmarshal([]byte(credential.PasswordHistory), &hashes); err != nil {
+			hashes = []string{} // Reset on parse error
+		}
+	}
+
+	// Append new hash and trim to maxHistory
+	hashes = append(hashes, string(hashed))
+	if maxHistory > 0 && len(hashes) > maxHistory {
+		hashes = hashes[len(hashes)-maxHistory:]
+	}
+
+	// Serialize and update
+	historyJSON, err := json.Marshal(hashes)
+	if err != nil {
+		return fmt.Errorf("failed to serialize password history: %w", err)
+	}
+
+	if err := r.db.WithContext(ctx).
+		Model(&models.TenantCredential{}).
+		Where("user_id = ? AND tenant_id = ?", userID, tenantID).
+		Update("password_history", models.JSONB(historyJSON)).Error; err != nil {
+		return fmt.Errorf("failed to update password history: %w", err)
 	}
 
 	return nil

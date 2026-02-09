@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/Tesseract-Nexus/go-shared/security"
 	"github.com/gin-gonic/gin"
@@ -252,6 +253,15 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 
 	// Change password
 	if err := h.authSvc.ChangePassword(c.Request.Context(), userID, tenantID, req.CurrentPassword, req.NewPassword, &userID); err != nil {
+		if strings.HasPrefix(err.Error(), "SAME_PASSWORD:") {
+			msg := strings.TrimPrefix(err.Error(), "SAME_PASSWORD: ")
+			c.JSON(http.StatusBadRequest, gin.H{
+				"success":    false,
+				"error_code": "SAME_PASSWORD",
+				"message":    msg,
+			})
+			return
+		}
 		ErrorResponse(c, http.StatusBadRequest, "Failed to change password", err)
 		return
 	}
@@ -821,10 +831,14 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 	}
 
 	if !result.Success {
-		c.JSON(http.StatusBadRequest, gin.H{
+		response := gin.H{
 			"success": false,
 			"message": result.Message,
-		})
+		}
+		if result.ErrorCode != "" {
+			response["error_code"] = result.ErrorCode
+		}
+		c.JSON(http.StatusBadRequest, response)
 		return
 	}
 

@@ -1352,10 +1352,10 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
     });
 
     if (!result.success) {
-      logger.warn({ success: false }, 'Password reset failed');
+      logger.warn({ success: false, error_code: result.error_code }, 'Password reset failed');
       return reply.code(400).send({
         success: false,
-        error: 'RESET_FAILED',
+        error: result.error_code || 'RESET_FAILED',
         message: result.message || 'Failed to reset password. The link may be invalid or expired.',
       });
     }

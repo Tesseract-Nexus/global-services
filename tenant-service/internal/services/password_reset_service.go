@@ -22,13 +22,15 @@ import (
 type PasswordResetService struct {
 	db                 *gorm.DB
 	membershipRepo     *repository.MembershipRepository
+	credentialRepo     *repository.CredentialRepository
 	keycloakClient     *auth.KeycloakAdminClient
+	keycloakConfig     *KeycloakAuthConfig // For password validation via direct grant
 	notificationClient *clients.NotificationClient
 	baseDomain         string // e.g., "tesserix.app" - used to construct tenant-specific URLs
 }
 
 // NewPasswordResetService creates a new password reset service
-func NewPasswordResetService(db *gorm.DB, keycloakClient *auth.KeycloakAdminClient, notificationClient *clients.NotificationClient) *PasswordResetService {
+func NewPasswordResetService(db *gorm.DB, keycloakClient *auth.KeycloakAdminClient, keycloakConfig *KeycloakAuthConfig, notificationClient *clients.NotificationClient) *PasswordResetService {
 	baseDomain := os.Getenv("BASE_DOMAIN")
 	if baseDomain == "" {
 		baseDomain = "tesserix.app"
@@ -36,20 +38,28 @@ func NewPasswordResetService(db *gorm.DB, keycloakClient *auth.KeycloakAdminClie
 	return &PasswordResetService{
 		db:                 db,
 		membershipRepo:     repository.NewMembershipRepository(db),
+		credentialRepo:     repository.NewCredentialRepository(db),
 		keycloakClient:     keycloakClient,
+		keycloakConfig:     keycloakConfig,
 		notificationClient: notificationClient,
 		baseDomain:         baseDomain,
 	}
 }
 
-// getResetURL constructs the tenant-specific URL for password reset
-// Storefront pattern: https://{slug}.{baseDomain}
-// Admin pattern: https://{slug}-admin.{baseDomain}
-func (s *PasswordResetService) getResetURL(tenantSlug string, context string) string {
+// getResetURL returns the tenant-specific base URL for password reset
+// Uses pre-computed tenant URLs (which account for custom domains) when available,
+// falling back to constructing from baseDomain for tenants without stored URLs
+func (s *PasswordResetService) getResetURL(tenant *models.Tenant, context string) string {
 	if context == "admin" {
-		return fmt.Sprintf("https://%s-admin.%s", tenantSlug, s.baseDomain)
+		if tenant.AdminURL != "" {
+			return tenant.AdminURL
+		}
+		return fmt.Sprintf("https://%s-admin.%s", tenant.Slug, s.baseDomain)
 	}
-	return fmt.Sprintf("https://%s.%s", tenantSlug, s.baseDomain)
+	if tenant.StorefrontURL != "" {
+		return tenant.StorefrontURL
+	}
+	return fmt.Sprintf("https://%s.%s", tenant.Slug, s.baseDomain)
 }
 
 // RequestPasswordResetInput represents input for requesting a password reset
@@ -131,7 +141,8 @@ func (s *PasswordResetService) RequestPasswordReset(ctx context.Context, input *
 	}
 
 	// Build reset link with raw (unhashed) token using tenant-specific URL
-	resetURL := s.getResetURL(tenant.Slug, input.Context)
+	// Uses pre-computed tenant URLs that account for custom domains
+	resetURL := s.getResetURL(tenant, input.Context)
 	resetLink := fmt.Sprintf("%s/reset-password?token=%s", resetURL, rawToken)
 
 	// Send password reset email
@@ -219,8 +230,9 @@ type ResetPasswordInput struct {
 
 // ResetPasswordOutput represents the response from resetting a password
 type ResetPasswordOutput struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
+	Success   bool   `json:"success"`
+	Message   string `json:"message"`
+	ErrorCode string `json:"error_code,omitempty"`
 }
 
 // ResetPassword resets the password using a valid token
@@ -261,6 +273,46 @@ func (s *PasswordResetService) ResetPassword(ctx context.Context, input *ResetPa
 		return nil, fmt.Errorf("authentication service not properly configured")
 	}
 
+	// Check if new password is the same as current password
+	// Use Keycloak direct grant to verify — if auth succeeds, the new password matches current
+	if s.keycloakConfig != nil {
+		_, sameErr := s.keycloakClient.GetTokenWithPassword(
+			ctx,
+			s.keycloakConfig.ClientID,
+			s.keycloakConfig.ClientSecret,
+			user.Email,
+			input.NewPassword,
+		)
+		if sameErr == nil {
+			// Auth succeeded → new password is the same as current password
+			log.Printf("[PasswordResetService] Password reset rejected: same password reuse for user %s", maskEmail(user.Email))
+			return &ResetPasswordOutput{
+				Success:   false,
+				ErrorCode: "SAME_PASSWORD",
+				Message:   "New password must be different from your current password.",
+			}, nil
+		}
+		// Auth failed → new password is different, proceed with reset
+	}
+
+	// Check new password against password history (prevent reuse of recent passwords)
+	historyCount := 3 // Default: prevent reuse of last 3 passwords
+	policy, _ := s.credentialRepo.GetAuthPolicy(ctx, tokenRecord.TenantID)
+	if policy != nil && policy.PasswordHistoryCount > 0 {
+		historyCount = policy.PasswordHistoryCount
+	}
+	reused, histErr := s.credentialRepo.CheckPasswordHistory(ctx, user.ID, tokenRecord.TenantID, input.NewPassword, historyCount)
+	if histErr != nil {
+		log.Printf("[PasswordResetService] Warning: Failed to check password history: %v", histErr)
+	} else if reused {
+		log.Printf("[PasswordResetService] Password reset rejected: password in history for user %s", maskEmail(user.Email))
+		return &ResetPasswordOutput{
+			Success:   false,
+			ErrorCode: "SAME_PASSWORD",
+			Message:   "This password was recently used. Please choose a different password.",
+		}, nil
+	}
+
 	if err := s.keycloakClient.SetUserPassword(ctx, user.KeycloakID.String(), input.NewPassword, false); err != nil {
 		log.Printf("[PasswordResetService] Failed to set password in Keycloak: %v", err)
 		return &ResetPasswordOutput{
@@ -296,7 +348,12 @@ func (s *PasswordResetService) ResetPassword(ctx context.Context, input *ResetPa
 		log.Printf("[PasswordResetService] Warning: Failed to log password reset event: %v", auditErr)
 	}
 
-	log.Printf("[PasswordResetService] Password reset successful for user %s", user.Email)
+	// Add the NEW password to history so it can't be reused in the future
+	if addErr := s.credentialRepo.AddToPasswordHistory(ctx, user.ID, tokenRecord.TenantID, input.NewPassword, historyCount); addErr != nil {
+		log.Printf("[PasswordResetService] Warning: Failed to add password to history: %v", addErr)
+	}
+
+	log.Printf("[PasswordResetService] Password reset successful for user %s", maskEmail(user.Email))
 
 	return &ResetPasswordOutput{
 		Success: true,
