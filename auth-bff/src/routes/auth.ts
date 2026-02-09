@@ -737,6 +737,14 @@ export async function authRoutes(fastify: FastifyInstance) {
       return reply.redirect('/login?error=missing_transfer_code');
     }
 
+    // Rate limit by IP to prevent brute-force transfer code guessing
+    const clientIP = request.ip;
+    const rateLimit = await sessionStore.checkRateLimit(`accept-transfer:${clientIP}`, 10, 60);
+    if (!rateLimit.allowed) {
+      logger.warn({ ip: clientIP }, 'Rate limit exceeded for session transfer');
+      return reply.redirect('/login?error=rate_limited');
+    }
+
     const transferData = await sessionStore.consumeSessionTransfer(code);
 
     if (!transferData) {

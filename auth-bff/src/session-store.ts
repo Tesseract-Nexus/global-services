@@ -461,6 +461,27 @@ class SessionStore {
     }
   }
 
+  // Rate Limiting (distributed via Redis)
+  async checkRateLimit(key: string, maxAttempts: number = 10, windowSeconds: number = 60): Promise<{ allowed: boolean; remaining: number; resetIn: number }> {
+    const redisKey = `rate_limit:${key}`;
+    try {
+      const count = await this.redis.incr(redisKey);
+      if (count === 1) {
+        await this.redis.expire(redisKey, windowSeconds);
+      }
+      const ttl = await this.redis.ttl(redisKey);
+      const resetIn = (ttl > 0 ? ttl : windowSeconds) * 1000;
+      if (count > maxAttempts) {
+        return { allowed: false, remaining: 0, resetIn };
+      }
+      return { allowed: true, remaining: maxAttempts - count, resetIn };
+    } catch (error) {
+      // If Redis fails, allow the request (fail-open) to avoid blocking legitimate users
+      logger.error({ error, key }, 'Redis rate limit check failed, allowing request');
+      return { allowed: true, remaining: maxAttempts, resetIn: windowSeconds * 1000 };
+    }
+  }
+
   async close(): Promise<void> {
     await this.redis.quit();
     logger.info('Redis connection closed gracefully');
