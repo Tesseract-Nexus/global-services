@@ -202,6 +202,23 @@ export interface ResetPasswordResponse {
 }
 
 // ============================================================================
+// Change Password Types
+// ============================================================================
+
+export interface ChangePasswordRequest {
+  user_id: string;
+  tenant_id: string;
+  current_password: string;
+  new_password: string;
+}
+
+export interface ChangePasswordResponse {
+  success: boolean;
+  message?: string;
+  error_code?: string;
+}
+
+// ============================================================================
 // TOTP Types
 // ============================================================================
 
@@ -934,6 +951,50 @@ class TenantServiceClient {
       };
     } catch (error) {
       logger.error({ error }, 'Error resetting password');
+      return {
+        success: false,
+        error_code: 'SERVICE_UNAVAILABLE',
+        message: 'Service temporarily unavailable',
+      };
+    }
+  }
+
+  /**
+   * Change password for an authenticated user
+   * Requires current password verification
+   */
+  async changePassword(
+    request: ChangePasswordRequest
+  ): Promise<ChangePasswordResponse> {
+    try {
+      logger.info({
+        user_id: request.user_id,
+        tenant_id: request.tenant_id,
+      }, 'Changing password');
+
+      const response = await this.fetch('/api/v1/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify(request),
+      });
+
+      const data = await response.json() as ApiResponse;
+
+      if (!response.ok) {
+        logger.warn({ user_id: request.user_id, error_code: data.error_code }, 'Password change failed');
+        return {
+          success: false,
+          error_code: data.error_code || 'CHANGE_PASSWORD_FAILED',
+          message: data.message || 'Failed to change password.',
+        };
+      }
+
+      logger.info({ user_id: request.user_id }, 'Password changed successfully');
+      return {
+        success: true,
+        message: data.message || 'Your password has been changed successfully.',
+      };
+    } catch (error) {
+      logger.error({ error }, 'Error changing password');
       return {
         success: false,
         error_code: 'SERVICE_UNAVAILABLE',

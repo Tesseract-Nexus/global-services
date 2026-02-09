@@ -92,6 +92,11 @@ const resetPasswordSchema = z.object({
   new_password: z.string().min(8, 'Password must be at least 8 characters'),
 });
 
+const changePasswordSchema = z.object({
+  current_password: z.string().min(1, 'Current password is required'),
+  new_password: z.string().min(8, 'New password must be at least 8 characters'),
+});
+
 /**
  * Decode JWT payload without verification (token already validated by tenant-service/Keycloak).
  * Used to inspect claims like google_linked.
@@ -1348,6 +1353,93 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
     return reply.send({
       success: true,
       message: result.message || 'Your password has been reset successfully. You can now sign in with your new password.',
+    });
+  });
+
+  // ==========================================================================
+  // POST /auth/direct/change-password
+  // Changes password for the authenticated user (requires valid session)
+  // ==========================================================================
+  fastify.post<{
+    Body: z.infer<typeof changePasswordSchema>;
+  }>('/auth/direct/change-password', async (request, reply) => {
+    // Get session from cookie
+    const forwardedHost = request.headers['x-forwarded-host'] as string | undefined;
+    const cookieName = getSessionCookieName(forwardedHost);
+    const sessionId = request.cookies[cookieName];
+    if (!sessionId) {
+      return reply.code(401).send({
+        success: false,
+        error: 'UNAUTHORIZED',
+        message: 'You must be logged in to change your password.',
+      });
+    }
+
+    const session = await sessionStore.getSession(sessionId);
+    if (!session) {
+      return reply.code(401).send({
+        success: false,
+        error: 'SESSION_EXPIRED',
+        message: 'Your session has expired. Please log in again.',
+      });
+    }
+
+    const validation = changePasswordSchema.safeParse(request.body);
+    if (!validation.success) {
+      return reply.code(400).send({
+        success: false,
+        error: 'VALIDATION_ERROR',
+        message: validation.error.issues[0]?.message || 'Invalid request',
+      });
+    }
+
+    const { current_password, new_password } = validation.data;
+    const clientIP = request.ip;
+
+    // Rate limit by IP + userId
+    const rateLimitKey = `change-password:${clientIP}:${session.userId}`;
+    const rateLimit = await sessionStore.checkRateLimit(rateLimitKey);
+    if (!rateLimit.allowed) {
+      logger.warn({ ip: maskIP(clientIP), userId: session.userId }, 'Rate limit exceeded for password change');
+      return reply.code(429).send({
+        success: false,
+        error: 'RATE_LIMITED',
+        message: 'Too many attempts. Please try again later.',
+        retry_after: Math.ceil(rateLimit.resetIn / 1000),
+      });
+    }
+
+    if (!session.tenantId) {
+      return reply.code(400).send({
+        success: false,
+        error: 'NO_TENANT_CONTEXT',
+        message: 'No tenant context found. Please log in again.',
+      });
+    }
+
+    const result = await tenantServiceClient.changePassword({
+      user_id: session.userId,
+      tenant_id: session.tenantId,
+      current_password,
+      new_password,
+    });
+
+    if (!result.success) {
+      logger.warn({ userId: session.userId, error_code: result.error_code }, 'Password change failed');
+
+      const statusCode = result.error_code === 'INVALID_PASSWORD' ? 401 : 400;
+      return reply.code(statusCode).send({
+        success: false,
+        error: result.error_code || 'CHANGE_PASSWORD_FAILED',
+        message: result.message || 'Failed to change password.',
+      });
+    }
+
+    logger.info({ userId: session.userId }, 'Password changed successfully');
+
+    return reply.send({
+      success: true,
+      message: result.message || 'Your password has been changed successfully.',
     });
   });
 }
