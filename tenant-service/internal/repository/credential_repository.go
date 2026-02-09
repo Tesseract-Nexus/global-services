@@ -543,6 +543,29 @@ func (r *CredentialRepository) UnlockAccount(ctx context.Context, userID, tenant
 	return nil
 }
 
+// ClearLockout resets lockout counters after a successful password reset.
+// Unlike UnlockAccount (admin operation), this doesn't require an admin user ID
+// and is designed for self-service password reset flows.
+func (r *CredentialRepository) ClearLockout(ctx context.Context, userID, tenantID uuid.UUID) error {
+	now := time.Now()
+	result := r.db.WithContext(ctx).
+		Model(&models.TenantCredential{}).
+		Where("user_id = ? AND tenant_id = ?", userID, tenantID).
+		Updates(map[string]interface{}{
+			"login_attempts":      0,
+			"locked_until":        nil,
+			"permanently_locked":  false,
+			"permanent_locked_at": nil,
+			"current_tier":        0,
+			"updated_at":          now,
+		})
+	if result.Error != nil {
+		return fmt.Errorf("failed to clear lockout: %w", result.Error)
+	}
+	// No error if credential doesn't exist — user may not have a credential record yet
+	return nil
+}
+
 // LockedAccountInfo contains information about a locked account for admin listing
 type LockedAccountInfo struct {
 	UserID              uuid.UUID  `json:"user_id"`

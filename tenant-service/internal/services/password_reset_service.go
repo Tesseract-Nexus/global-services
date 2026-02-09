@@ -326,6 +326,19 @@ func (s *PasswordResetService) ResetPassword(ctx context.Context, input *ResetPa
 		}, nil
 	}
 
+	// Clear Keycloak brute force lockout after successful password reset.
+	// Keycloak's brute force protection may have disabled the user account (permanentLockout).
+	// A successful password reset should restore access — re-enable the account and clear the lockout.
+	if err := s.keycloakClient.ClearBruteForceStatus(ctx, user.KeycloakID.String()); err != nil {
+		log.Printf("[PasswordResetService] Warning: Failed to clear brute force status: %v", err)
+		// Don't fail the reset — the password was already changed, and the user can contact support
+	}
+
+	// Also clear tenant-level lockout counters so the user isn't blocked by our own lockout logic
+	if err := s.credentialRepo.ClearLockout(ctx, user.ID, tokenRecord.TenantID); err != nil {
+		log.Printf("[PasswordResetService] Warning: Failed to clear tenant lockout: %v", err)
+	}
+
 	// Mark token as used
 	now := time.Now()
 	if err := s.db.WithContext(ctx).
