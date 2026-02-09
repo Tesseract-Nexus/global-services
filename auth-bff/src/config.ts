@@ -9,6 +9,7 @@ const envSchema = z.object({
 
   // Keycloak - Internal IDP (for admin dashboard)
   KEYCLOAK_INTERNAL_URL: z.string().url(),
+  KEYCLOAK_INTERNAL_INTERNAL_URL: z.string().url().optional(), // Internal URL to bypass Cloudflare for server-to-server calls
   KEYCLOAK_INTERNAL_REALM: z.string().default('tesserix-internal'),
   KEYCLOAK_INTERNAL_CLIENT_ID: z.string(),
   KEYCLOAK_INTERNAL_CLIENT_SECRET: z.string(),
@@ -88,7 +89,7 @@ export const config = {
   keycloak: {
     internal: {
       url: env.KEYCLOAK_INTERNAL_URL,
-      internalUrl: undefined as string | undefined,
+      internalUrl: env.KEYCLOAK_INTERNAL_INTERNAL_URL,
       realm: env.KEYCLOAK_INTERNAL_REALM,
       clientId: env.KEYCLOAK_INTERNAL_CLIENT_ID,
       clientSecret: env.KEYCLOAK_INTERNAL_CLIENT_SECRET,

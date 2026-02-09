@@ -1495,27 +1495,42 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
       // Authenticate directly against internal Keycloak via ROPC grant
       const tokens = await oidcClient.passwordGrant('internal', email, password);
 
-      // Get user info from Keycloak
-      const userInfo = await oidcClient.getUserInfo('internal', tokens.accessToken);
+      // Decode user info from the JWT access token directly
+      // This avoids a round-trip to the userinfo endpoint (which may fail through Cloudflare)
+      const tokenPayload = decodeJwtPayload(tokens.accessToken);
+      if (!tokenPayload) {
+        logger.error({ email: maskEmail(email) }, 'Platform login: failed to decode access token');
+        return reply.code(500).send({
+          success: false,
+          error: 'TOKEN_ERROR',
+          message: 'Failed to process authentication token.',
+        });
+      }
+
+      const userSub = tokenPayload.sub as string;
+      const userEmail = (tokenPayload.email as string) || email;
+      const givenName = tokenPayload.given_name as string | undefined;
+      const familyName = tokenPayload.family_name as string | undefined;
+      const fullName = (tokenPayload.name as string)
+        || [givenName, familyName].filter(Boolean).join(' ')
+        || userEmail;
 
       // Create session (no tenant context for platform admins)
       const session = await sessionStore.createSession({
-        userId: userInfo.sub as string,
+        userId: userSub,
         clientType: 'internal',
         accessToken: tokens.accessToken,
         idToken: tokens.idToken,
         refreshToken: tokens.refreshToken,
         expiresAt: tokens.expiresAt,
         userInfo: {
-          sub: userInfo.sub,
-          email: userInfo.email,
-          given_name: userInfo.given_name,
-          family_name: userInfo.family_name,
-          name: (userInfo.name as string)
-            || [userInfo.given_name, userInfo.family_name].filter(Boolean).join(' ')
-            || (userInfo.email as string),
+          sub: userSub,
+          email: userEmail,
+          given_name: givenName,
+          family_name: familyName,
+          name: fullName,
           is_platform_admin: true,
-          realm_access: (userInfo.realm_access as Record<string, unknown>) || { roles: [] },
+          realm_access: (tokenPayload.realm_access as Record<string, unknown>) || { roles: [] },
         },
       });
 
@@ -1533,11 +1548,11 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
         success: true,
         authenticated: true,
         user: {
-          id: userInfo.sub,
-          email: userInfo.email,
-          name: userInfo.name,
-          first_name: userInfo.given_name,
-          last_name: userInfo.family_name,
+          id: userSub,
+          email: userEmail,
+          name: fullName,
+          first_name: givenName,
+          last_name: familyName,
           is_platform_admin: true,
         },
       });
