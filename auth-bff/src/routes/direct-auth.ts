@@ -81,6 +81,7 @@ const deactivateAccountSchema = z.object({
 const requestPasswordResetSchema = z.object({
   email: z.string().email('Invalid email format'),
   tenant_slug: z.string().min(1, 'Store is required'),
+  context: z.enum(['admin', 'storefront']).optional(),
 });
 
 const validateResetTokenSchema = z.object({
@@ -1243,9 +1244,12 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
       });
     }
 
-    const { email, tenant_slug } = validation.data;
+    const { email, tenant_slug, context } = validation.data;
     const clientIP = request.ip;
     const userAgent = request.headers['user-agent'] || 'unknown';
+
+    // Auto-detect context from X-Auth-Context header if not provided in body
+    const authContext = context || (request.headers['x-auth-context'] === 'admin' ? 'admin' : 'storefront');
 
     // Rate limit by IP + email (more strict for password reset, distributed via Redis)
     const rateLimitKey = `password-reset:${clientIP}:${email.toLowerCase()}`;
@@ -1262,6 +1266,7 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
     const result = await tenantServiceClient.requestPasswordReset({
       email,
       tenant_slug,
+      context: authContext as 'admin' | 'storefront',
       ip_address: clientIP,
       user_agent: userAgent,
     });

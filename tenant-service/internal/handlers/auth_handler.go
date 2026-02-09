@@ -695,6 +695,7 @@ func (h *AuthHandler) ReactivateAccount(c *gin.Context) {
 type RequestPasswordResetRequest struct {
 	Email      string `json:"email" binding:"required,email"`
 	TenantSlug string `json:"tenant_slug" binding:"required"`
+	Context    string `json:"context"` // "admin" or "storefront" (default)
 }
 
 // RequestPasswordReset initiates the password reset flow
@@ -718,6 +719,7 @@ func (h *AuthHandler) RequestPasswordReset(c *gin.Context) {
 	result, err := h.passwordResetSvc.RequestPasswordReset(c.Request.Context(), &services.RequestPasswordResetInput{
 		Email:      req.Email,
 		TenantSlug: req.TenantSlug,
+		Context:    req.Context,
 		IPAddress:  clientIP,
 		UserAgent:  userAgent,
 	})

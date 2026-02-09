@@ -42,16 +42,21 @@ func NewPasswordResetService(db *gorm.DB, keycloakClient *auth.KeycloakAdminClie
 	}
 }
 
-// getStorefrontURL constructs the tenant-specific storefront URL
-// URL pattern: https://{slug}-store.{baseDomain}
-func (s *PasswordResetService) getStorefrontURL(tenantSlug string) string {
-	return fmt.Sprintf("https://%s-store.%s", tenantSlug, s.baseDomain)
+// getResetURL constructs the tenant-specific URL for password reset
+// Storefront pattern: https://{slug}.{baseDomain}
+// Admin pattern: https://{slug}-admin.{baseDomain}
+func (s *PasswordResetService) getResetURL(tenantSlug string, context string) string {
+	if context == "admin" {
+		return fmt.Sprintf("https://%s-admin.%s", tenantSlug, s.baseDomain)
+	}
+	return fmt.Sprintf("https://%s.%s", tenantSlug, s.baseDomain)
 }
 
 // RequestPasswordResetInput represents input for requesting a password reset
 type RequestPasswordResetInput struct {
 	Email      string `json:"email" validate:"required,email"`
 	TenantSlug string `json:"tenant_slug" validate:"required"`
+	Context    string `json:"context,omitempty"` // "admin" or "storefront" (default)
 	IPAddress  string `json:"ip_address,omitempty"`
 	UserAgent  string `json:"user_agent,omitempty"`
 }
@@ -126,8 +131,8 @@ func (s *PasswordResetService) RequestPasswordReset(ctx context.Context, input *
 	}
 
 	// Build reset link with raw (unhashed) token using tenant-specific URL
-	storefrontURL := s.getStorefrontURL(tenant.Slug)
-	resetLink := fmt.Sprintf("%s/reset-password?token=%s", storefrontURL, rawToken)
+	resetURL := s.getResetURL(tenant.Slug, input.Context)
+	resetLink := fmt.Sprintf("%s/reset-password?token=%s", resetURL, rawToken)
 
 	// Send password reset email
 	if s.notificationClient != nil {

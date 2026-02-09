@@ -169,6 +169,7 @@ export interface DeactivateAccountResponse {
 export interface RequestPasswordResetRequest {
   email: string;
   tenant_slug: string;
+  context?: 'admin' | 'storefront';
   ip_address?: string;
   user_agent?: string;
 }
