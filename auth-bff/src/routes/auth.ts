@@ -144,9 +144,14 @@ const clearSessionCookie = (reply: FastifyReply, forwardedHost?: string) => {
 
 // Get session from request (uses hostname to determine which cookie to read)
 const getSession = async (request: FastifyRequest): Promise<SessionData | null> => {
-  // Use x-forwarded-host, handling comma-separated multi-proxy values, with fallback to request.hostname
+  // Use x-forwarded-host, handling comma-separated multi-proxy values, with fallback to request.hostname.
+  // When called internally (e.g., from admin Next.js at auth-bff.marketplace.svc.cluster.local),
+  // request.hostname resolves to the K8s service name — treat it as undefined so
+  // getSessionCookieName() returns the default "bff_session" cookie name.
   const rawForwardedHost = request.headers['x-forwarded-host'] as string | undefined;
-  const forwardedHost = rawForwardedHost?.split(',')[0]?.trim() || request.hostname;
+  const rawHostname = request.hostname;
+  const isInternalHost = rawHostname.includes('.svc.cluster.local') || rawHostname.endsWith('.local');
+  const forwardedHost = rawForwardedHost?.split(',')[0]?.trim() || (isInternalHost ? undefined : rawHostname);
   const cookieName = getSessionCookieName(forwardedHost);
   const sessionId = request.cookies[cookieName];
   if (!sessionId) {
