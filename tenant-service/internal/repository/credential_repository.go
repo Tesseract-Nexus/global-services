@@ -163,9 +163,43 @@ func (r *CredentialRepository) UpdatePassword(ctx context.Context, userID, tenan
 	return nil
 }
 
+// passwordHistoryEntry stores a bcrypt hash with its auth context (admin vs storefront).
+// Admin and storefront use different Keycloak identities, so history must be scoped.
+type passwordHistoryEntry struct {
+	Hash    string `json:"hash"`
+	Context string `json:"ctx"` // "admin" or "storefront"
+}
+
+// parsePasswordHistory parses the JSONB history, handling both the new format
+// (array of {hash, ctx} objects) and legacy format (array of plain strings).
+func parsePasswordHistory(raw []byte) []passwordHistoryEntry {
+	if len(raw) == 0 {
+		return nil
+	}
+
+	// Try new format first: [{"hash":"...","ctx":"..."}]
+	var entries []passwordHistoryEntry
+	if err := json.Unmarshal(raw, &entries); err == nil && len(entries) > 0 && entries[0].Hash != "" {
+		return entries
+	}
+
+	// Fall back to legacy format: ["hash1", "hash2"] — treat as context-less
+	var hashes []string
+	if err := json.Unmarshal(raw, &hashes); err == nil {
+		legacy := make([]passwordHistoryEntry, len(hashes))
+		for i, h := range hashes {
+			legacy[i] = passwordHistoryEntry{Hash: h, Context: ""}
+		}
+		return legacy
+	}
+
+	return nil
+}
+
 // CheckPasswordHistory checks if a plaintext password matches any of the stored
-// password history hashes. Returns true if the password was previously used.
-func (r *CredentialRepository) CheckPasswordHistory(ctx context.Context, userID, tenantID uuid.UUID, password string, maxHistory int) (bool, error) {
+// password history hashes for the given auth context. Returns true if the password was previously used.
+// authContext should be "admin" or "storefront" — only entries matching the context are checked.
+func (r *CredentialRepository) CheckPasswordHistory(ctx context.Context, userID, tenantID uuid.UUID, password string, maxHistory int, authContext string) (bool, error) {
 	credential, err := r.GetCredential(ctx, userID, tenantID)
 	if err != nil {
 		return false, err
@@ -174,22 +208,24 @@ func (r *CredentialRepository) CheckPasswordHistory(ctx context.Context, userID,
 		return false, nil // No credential → no history to check
 	}
 
-	// Parse password history JSON array of bcrypt hashes
-	var hashes []string
-	if len(credential.PasswordHistory) > 0 {
-		if err := json.Unmarshal([]byte(credential.PasswordHistory), &hashes); err != nil {
-			return false, fmt.Errorf("failed to parse password history: %w", err)
+	entries := parsePasswordHistory([]byte(credential.PasswordHistory))
+
+	// Filter to entries matching the auth context (legacy entries with empty context match all)
+	var contextEntries []passwordHistoryEntry
+	for _, e := range entries {
+		if e.Context == authContext || e.Context == "" {
+			contextEntries = append(contextEntries, e)
 		}
 	}
 
-	// Only check against the most recent N entries
+	// Only check against the most recent N entries for this context
 	start := 0
-	if maxHistory > 0 && len(hashes) > maxHistory {
-		start = len(hashes) - maxHistory
+	if maxHistory > 0 && len(contextEntries) > maxHistory {
+		start = len(contextEntries) - maxHistory
 	}
 
-	for _, h := range hashes[start:] {
-		if bcrypt.CompareHashAndPassword([]byte(h), []byte(password)) == nil {
+	for _, e := range contextEntries[start:] {
+		if bcrypt.CompareHashAndPassword([]byte(e.Hash), []byte(password)) == nil {
 			return true, nil // Password was previously used
 		}
 	}
@@ -197,9 +233,9 @@ func (r *CredentialRepository) CheckPasswordHistory(ctx context.Context, userID,
 	return false, nil
 }
 
-// AddToPasswordHistory adds a bcrypt hash of the password to the credential's history.
-// Keeps only the most recent maxHistory entries.
-func (r *CredentialRepository) AddToPasswordHistory(ctx context.Context, userID, tenantID uuid.UUID, password string, maxHistory int) error {
+// AddToPasswordHistory adds a bcrypt hash of the password to the credential's history
+// scoped to the given auth context. Keeps only the most recent maxHistory entries per context.
+func (r *CredentialRepository) AddToPasswordHistory(ctx context.Context, userID, tenantID uuid.UUID, password string, maxHistory int, authContext string) error {
 	credential, err := r.GetCredential(ctx, userID, tenantID)
 	if err != nil {
 		return err
@@ -214,22 +250,34 @@ func (r *CredentialRepository) AddToPasswordHistory(ctx context.Context, userID,
 		return fmt.Errorf("failed to hash password for history: %w", err)
 	}
 
-	// Parse existing history
-	var hashes []string
-	if len(credential.PasswordHistory) > 0 {
-		if err := json.Unmarshal([]byte(credential.PasswordHistory), &hashes); err != nil {
-			hashes = []string{} // Reset on parse error
-		}
-	}
+	entries := parsePasswordHistory([]byte(credential.PasswordHistory))
 
-	// Append new hash and trim to maxHistory
-	hashes = append(hashes, string(hashed))
-	if maxHistory > 0 && len(hashes) > maxHistory {
-		hashes = hashes[len(hashes)-maxHistory:]
+	// Append new entry with context
+	entries = append(entries, passwordHistoryEntry{Hash: string(hashed), Context: authContext})
+
+	// Trim per-context: keep only the most recent maxHistory entries for each context
+	if maxHistory > 0 {
+		contextCounts := map[string]int{}
+		// Count backwards to find which entries to keep
+		keep := make([]bool, len(entries))
+		for i := len(entries) - 1; i >= 0; i-- {
+			c := entries[i].Context
+			if contextCounts[c] < maxHistory {
+				keep[i] = true
+			}
+			contextCounts[c]++
+		}
+		var trimmed []passwordHistoryEntry
+		for i, e := range entries {
+			if keep[i] {
+				trimmed = append(trimmed, e)
+			}
+		}
+		entries = trimmed
 	}
 
 	// Serialize and update
-	historyJSON, err := json.Marshal(hashes)
+	historyJSON, err := json.Marshal(entries)
 	if err != nil {
 		return fmt.Errorf("failed to serialize password history: %w", err)
 	}

@@ -192,6 +192,7 @@ export interface ValidateResetTokenResponse {
 export interface ResetPasswordRequest {
   token: string;
   new_password: string;
+  context?: string; // "admin" or "storefront" — scopes password history per identity
   ip_address?: string;
   user_agent?: string;
 }
@@ -211,6 +212,7 @@ export interface ChangePasswordRequest {
   tenant_id: string;
   current_password: string;
   new_password: string;
+  auth_context?: string; // "admin" or "storefront" — scopes password history per identity
 }
 
 export interface ChangePasswordResponse {

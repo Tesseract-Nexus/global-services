@@ -524,7 +524,8 @@ func (s *TenantAuthService) validateGlobalPassword(hashedPassword, plainPassword
 }
 
 // ChangePassword changes a user's password in Keycloak
-func (s *TenantAuthService) ChangePassword(ctx context.Context, userID, tenantID uuid.UUID, currentPassword, newPassword string, changedBy *uuid.UUID) error {
+// authContext should be "admin" or "storefront" to scope password history per identity
+func (s *TenantAuthService) ChangePassword(ctx context.Context, userID, tenantID uuid.UUID, currentPassword, newPassword string, changedBy *uuid.UUID, authContext string) error {
 	// Reject same password before any other processing
 	if currentPassword == newPassword {
 		return fmt.Errorf("SAME_PASSWORD: new password must be different from your current password")
@@ -569,7 +570,10 @@ func (s *TenantAuthService) ChangePassword(ctx context.Context, userID, tenantID
 	if policy != nil && policy.PasswordHistoryCount > 0 {
 		historyCount = policy.PasswordHistoryCount
 	}
-	reused, err := s.credentialRepo.CheckPasswordHistory(ctx, user.ID, tenantID, newPassword, historyCount)
+	if authContext == "" {
+		authContext = "storefront" // Default for backward compatibility
+	}
+	reused, err := s.credentialRepo.CheckPasswordHistory(ctx, user.ID, tenantID, newPassword, historyCount, authContext)
 	if err != nil {
 		log.Printf("[TenantAuthService] Warning: Failed to check password history: %v", err)
 		// Don't block on history check failure — proceed with change
@@ -583,7 +587,7 @@ func (s *TenantAuthService) ChangePassword(ctx context.Context, userID, tenantID
 	}
 
 	// Add the new password to history (so it can't be reused in the future)
-	if addErr := s.credentialRepo.AddToPasswordHistory(ctx, user.ID, tenantID, newPassword, historyCount); addErr != nil {
+	if addErr := s.credentialRepo.AddToPasswordHistory(ctx, user.ID, tenantID, newPassword, historyCount, authContext); addErr != nil {
 		log.Printf("[TenantAuthService] Warning: Failed to add password to history: %v", addErr)
 	}
 

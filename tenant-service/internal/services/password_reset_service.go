@@ -224,6 +224,7 @@ func (s *PasswordResetService) ValidateResetToken(ctx context.Context, input *Va
 type ResetPasswordInput struct {
 	Token       string `json:"token" validate:"required"`
 	NewPassword string `json:"new_password" validate:"required,min=8"`
+	Context     string `json:"context,omitempty"` // "admin" or "storefront" — scopes password history
 	IPAddress   string `json:"ip_address,omitempty"`
 	UserAgent   string `json:"user_agent,omitempty"`
 }
@@ -301,7 +302,11 @@ func (s *PasswordResetService) ResetPassword(ctx context.Context, input *ResetPa
 	if policy != nil && policy.PasswordHistoryCount > 0 {
 		historyCount = policy.PasswordHistoryCount
 	}
-	reused, histErr := s.credentialRepo.CheckPasswordHistory(ctx, user.ID, tokenRecord.TenantID, input.NewPassword, historyCount)
+	authContext := input.Context
+	if authContext == "" {
+		authContext = "storefront" // Default to storefront for backward compatibility
+	}
+	reused, histErr := s.credentialRepo.CheckPasswordHistory(ctx, user.ID, tokenRecord.TenantID, input.NewPassword, historyCount, authContext)
 	if histErr != nil {
 		log.Printf("[PasswordResetService] Warning: Failed to check password history: %v", histErr)
 	} else if reused {
@@ -349,7 +354,7 @@ func (s *PasswordResetService) ResetPassword(ctx context.Context, input *ResetPa
 	}
 
 	// Add the NEW password to history so it can't be reused in the future
-	if addErr := s.credentialRepo.AddToPasswordHistory(ctx, user.ID, tokenRecord.TenantID, input.NewPassword, historyCount); addErr != nil {
+	if addErr := s.credentialRepo.AddToPasswordHistory(ctx, user.ID, tokenRecord.TenantID, input.NewPassword, historyCount, authContext); addErr != nil {
 		log.Printf("[PasswordResetService] Warning: Failed to add password to history: %v", addErr)
 	}
 

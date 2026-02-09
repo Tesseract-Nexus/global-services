@@ -217,6 +217,7 @@ type ChangePasswordRequest struct {
 	CurrentPassword string `json:"current_password" binding:"required"`
 	NewPassword     string `json:"new_password" binding:"required,min=8"`
 	TenantID        string `json:"tenant_id" binding:"required"`
+	AuthContext     string `json:"auth_context,omitempty"` // "admin" or "storefront"
 }
 
 // ChangePassword changes a user's password for a specific tenant
@@ -251,8 +252,8 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 		return
 	}
 
-	// Change password
-	if err := h.authSvc.ChangePassword(c.Request.Context(), userID, tenantID, req.CurrentPassword, req.NewPassword, &userID); err != nil {
+	// Change password (pass auth context to scope password history per identity)
+	if err := h.authSvc.ChangePassword(c.Request.Context(), userID, tenantID, req.CurrentPassword, req.NewPassword, &userID, req.AuthContext); err != nil {
 		if strings.HasPrefix(err.Error(), "SAME_PASSWORD:") {
 			msg := strings.TrimPrefix(err.Error(), "SAME_PASSWORD: ")
 			c.JSON(http.StatusBadRequest, gin.H{
@@ -794,6 +795,7 @@ func (h *AuthHandler) ValidateResetToken(c *gin.Context) {
 type ResetPasswordHandlerRequest struct {
 	Token       string `json:"token" binding:"required"`
 	NewPassword string `json:"new_password" binding:"required,min=8"`
+	Context     string `json:"context,omitempty"` // "admin" or "storefront"
 }
 
 // ResetPassword resets the password using a valid token
@@ -817,6 +819,7 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 	result, err := h.passwordResetSvc.ResetPassword(c.Request.Context(), &services.ResetPasswordInput{
 		Token:       req.Token,
 		NewPassword: req.NewPassword,
+		Context:     req.Context,
 		IPAddress:   clientIP,
 		UserAgent:   userAgent,
 	})

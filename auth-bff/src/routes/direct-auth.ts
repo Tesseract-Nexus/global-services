@@ -1346,9 +1346,13 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
     const clientIP = request.ip;
     const userAgent = request.headers['user-agent'] || 'unknown';
 
+    // Detect auth context from X-Auth-Context header (admin vs storefront)
+    const authContext = request.headers['x-auth-context'] === 'admin' ? 'admin' : 'storefront';
+
     const result = await tenantServiceClient.resetPassword({
       token,
       new_password,
+      context: authContext,
       ip_address: clientIP,
       user_agent: userAgent,
     });
@@ -1431,11 +1435,15 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
       });
     }
 
+    // Detect auth context from X-Auth-Context header or session client type
+    const changeAuthContext = request.headers['x-auth-context'] === 'admin' ? 'admin' : 'storefront';
+
     const result = await tenantServiceClient.changePassword({
       user_id: session.userId,
       tenant_id: session.tenantId,
       current_password,
       new_password,
+      auth_context: changeAuthContext,
     });
 
     if (!result.success) {
