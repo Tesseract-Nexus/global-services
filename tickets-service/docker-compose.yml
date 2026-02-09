@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  tickets-db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: tickets_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5437:5432"
+    volumes:
+      - tickets_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  tickets-service:
+    build: .
+    ports:
+      - "8085:8085"
+    environment:
+      - DB_HOST=tickets-db
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=password
+      - DB_NAME=tickets_db
+      - DB_SSL_MODE=disable
+      - PORT=8085
+      - ENVIRONMENT=development
+      - JWT_SECRET=your-secret-key
+      - NOTIFICATION_SERVICE_URL=http://localhost:8092
+      - ESCALATION_SERVICE_URL=http://localhost:8093
+      - MAX_TICKET_LENGTH=10000
+      - MAX_ATTACHMENTS_PER_TICKET=20
+      - DEFAULT_SLA_HOURS=24
+      - AUTO_ESCALATION_ENABLED=true
+    depends_on:
+      tickets-db:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    working_dir: /app
+
+volumes:
+  tickets_postgres_data:

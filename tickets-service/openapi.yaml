@@ -1,0 +1,448 @@
+openapi: 3.0.3
+info:
+  title: Tickets Service API
+  description: Support ticket management with escalation and AI features
+  version: 1.0.0
+servers:
+  - url: http://localhost:8085
+    description: Local development
+tags:
+  - name: Tickets
+  - name: Comments
+  - name: Attachments
+  - name: Bulk Operations
+  - name: Analytics
+
+paths:
+  /api/v1/tickets:
+    get:
+      tags: [Tickets]
+      summary: List tickets
+      operationId: listTickets
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Tickets list
+    post:
+      tags: [Tickets]
+      summary: Create ticket
+      operationId: createTicket
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: Ticket created
+
+  /api/v1/tickets/{id}:
+    get:
+      tags: [Tickets]
+      summary: Get ticket
+      operationId: getTicket
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Ticket details
+    put:
+      tags: [Tickets]
+      summary: Update ticket
+      operationId: updateTicket
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Ticket updated
+    delete:
+      tags: [Tickets]
+      summary: Delete ticket
+      operationId: deleteTicket
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Ticket deleted
+
+  /api/v1/tickets/{id}/status:
+    put:
+      tags: [Tickets]
+      summary: Update ticket status
+      operationId: updateTicketStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Status updated
+
+  /api/v1/tickets/{id}/assign:
+    post:
+      tags: [Tickets]
+      summary: Assign ticket
+      operationId: assignTicket
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Ticket assigned
+
+  /api/v1/tickets/{id}/assign/{assigneeId}:
+    delete:
+      tags: [Tickets]
+      summary: Unassign ticket
+      operationId: unassignTicket
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: assigneeId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Ticket unassigned
+
+  /api/v1/tickets/{id}/comments:
+    post:
+      tags: [Comments]
+      summary: Add comment
+      operationId: addComment
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '201':
+          description: Comment added
+
+  /api/v1/tickets/{id}/comments/{commentId}:
+    put:
+      tags: [Comments]
+      summary: Update comment
+      operationId: updateComment
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Comment updated
+    delete:
+      tags: [Comments]
+      summary: Delete comment
+      operationId: deleteComment
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Comment deleted
+
+  /api/v1/tickets/{id}/attachments:
+    get:
+      tags: [Attachments]
+      summary: Get attachments
+      operationId: getAttachments
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Attachments list
+    post:
+      tags: [Attachments]
+      summary: Add attachment
+      operationId: addAttachment
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '201':
+          description: Attachment added
+
+  /api/v1/tickets/{id}/attachments/{attachmentId}:
+    delete:
+      tags: [Attachments]
+      summary: Delete attachment
+      operationId: deleteAttachment
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: attachmentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Attachment deleted
+
+  /api/v1/tickets/attachments/upload:
+    post:
+      tags: [Attachments]
+      summary: Upload attachment
+      operationId: uploadAttachment
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Attachment uploaded
+
+  /api/v1/tickets/{id}/attachments/presigned-url:
+    post:
+      tags: [Attachments]
+      summary: Generate presigned URL
+      operationId: generatePresignedUrl
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Presigned URL
+
+  /api/v1/tickets/bulk/status:
+    post:
+      tags: [Bulk Operations]
+      summary: Bulk update status
+      operationId: bulkUpdateStatus
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Statuses updated
+
+  /api/v1/tickets/bulk/assign:
+    post:
+      tags: [Bulk Operations]
+      summary: Bulk assign
+      operationId: bulkAssign
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Tickets assigned
+
+  /api/v1/tickets/bulk/priority:
+    post:
+      tags: [Bulk Operations]
+      summary: Bulk update priority
+      operationId: bulkUpdatePriority
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Priorities updated
+
+  /api/v1/tickets/{id}/escalate:
+    post:
+      tags: [Tickets]
+      summary: Escalate ticket
+      operationId: escalateTicket
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Ticket escalated
+
+  /api/v1/tickets/{id}/clone:
+    post:
+      tags: [Tickets]
+      summary: Clone ticket
+      operationId: cloneTicket
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '201':
+          description: Ticket cloned
+
+  /api/v1/tickets/search:
+    post:
+      tags: [Tickets]
+      summary: Search tickets
+      operationId: searchTickets
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Search results
+
+  /api/v1/tickets/{id}/similar:
+    get:
+      tags: [Tickets]
+      summary: Get similar tickets
+      operationId: getSimilarTickets
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Similar tickets
+
+  /api/v1/tickets/analytics:
+    get:
+      tags: [Analytics]
+      summary: Get analytics
+      operationId: getAnalytics
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Analytics data
+
+  /api/v1/tickets/stats:
+    get:
+      tags: [Analytics]
+      summary: Get statistics
+      operationId: getStats
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Statistics
+
+  /api/v1/tickets/export:
+    post:
+      tags: [Analytics]
+      summary: Export tickets
+      operationId: exportTickets
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Export initiated
+
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: Healthy
+
+  /ready:
+    get:
+      summary: Readiness check
+      responses:
+        '200':
+          description: Ready
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
