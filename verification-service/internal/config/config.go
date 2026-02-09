@@ -35,7 +35,7 @@ type DatabaseConfig struct {
 
 // EmailConfig holds email provider configuration
 type EmailConfig struct {
-	Provider               string // notification-service (recommended), resend, sendgrid
+	Provider               string // notification-service (handles Postal/SendGrid delivery)
 	APIKey                 string // Not required when using notification-service
 	FromEmail              string
 	FromName               string

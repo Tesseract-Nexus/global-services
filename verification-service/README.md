@@ -7,7 +7,7 @@ OTP verification and transactional email microservice for the Tesseract Hub plat
 - **OTP Generation**: Cryptographically secure 6-digit codes
 - **Code Encryption**: AES-256-GCM encryption for stored codes
 - **Rate Limiting**: Configurable limits on code sends and attempts
-- **Email Delivery**: Resend and SendGrid provider support
+- **Email Delivery**: Via notification-service (Postal/SendGrid)
 - **Email Templates**: Pre-built templates for common scenarios
 - **Prometheus Metrics**: Built-in monitoring and metrics
 
@@ -55,9 +55,9 @@ DB_PASSWORD=password
 DB_NAME=tesseract_hub
 DB_SSLMODE=disable
 
-# Email Provider
-EMAIL_PROVIDER=resend
-EMAIL_API_KEY=your-api-key
+# Email Provider (routed through notification-service)
+EMAIL_PROVIDER=notification-service
+NOTIFICATION_SERVICE_URL=http://notification-service.devtest.svc.cluster.local:8090
 EMAIL_FROM=onboarding@tesserix.app
 EMAIL_FROM_NAME=Tesserix Hub
 
