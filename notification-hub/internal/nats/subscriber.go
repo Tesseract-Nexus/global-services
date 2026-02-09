@@ -821,7 +821,7 @@ func (s *Subscriber) handleApprovalEvent(msg *nats.Msg) {
 
 	s.broadcastNotification(&event, event.TenantID)
 	msg.Ack()
-	log.Printf("Processed approval event: %s for %s", event.EventType, event.EntityType)
+	log.Printf("Processed approval event: %s for %s", event.EventType, event.ResourceType)
 }
 
 func (s *Subscriber) handleGiftCardEvent(msg *nats.Msg) {
