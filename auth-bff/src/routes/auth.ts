@@ -299,7 +299,7 @@ export async function authRoutes(fastify: FastifyInstance) {
 
       if (isLogto) {
         tokens = await logtoClient.exchangeCode(
-          { code: query.code, state: query.state },
+          { code: query.code, state: query.state, iss: query.iss },
           authState.redirectUri,
           authState.codeVerifier,
           authState.nonce

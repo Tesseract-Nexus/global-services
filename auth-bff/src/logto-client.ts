@@ -220,6 +220,7 @@ class LogtoClientManager {
     callbackParams: {
       code: string;
       state: string;
+      iss?: string;
     },
     redirectUri: string,
     codeVerifier?: string,
