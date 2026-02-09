@@ -1258,15 +1258,17 @@ export async function directAuthRoutes(fastify: FastifyInstance) {
     // Auto-detect context from X-Auth-Context header if not provided in body
     const authContext = context || (request.headers['x-auth-context'] === 'admin' ? 'admin' : 'storefront');
 
-    // Rate limit by IP + email (more strict for password reset, distributed via Redis)
+    // Rate limit by IP + email — max 7 requests per 30 minutes
     const rateLimitKey = `password-reset:${clientIP}:${email.toLowerCase()}`;
-    const rateLimit = await sessionStore.checkRateLimit(rateLimitKey);
+    const rateLimit = await sessionStore.checkRateLimit(rateLimitKey, 7, 1800);
     if (!rateLimit.allowed) {
-      logger.warn({ ip: maskIP(clientIP), email: maskEmail(email) }, 'Rate limit exceeded for password reset request');
-      // Still return success to not reveal if email exists
-      return reply.send({
-        success: true,
-        message: 'If an account exists with this email, you will receive a password reset link shortly.',
+      logger.warn({ ip: maskIP(clientIP), email: maskEmail(email), resetIn: rateLimit.resetIn }, 'Rate limit exceeded for password reset request');
+      const retryMinutes = Math.ceil(rateLimit.resetIn / 60);
+      return reply.code(429).send({
+        success: false,
+        error: 'RATE_LIMITED',
+        message: `Too many password reset requests. Please wait ${retryMinutes} minutes or contact support for assistance.`,
+        retry_after: rateLimit.resetIn,
       });
     }
 
