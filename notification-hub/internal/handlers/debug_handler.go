@@ -93,7 +93,7 @@ func (h *DebugHandler) SeedNotifications(c *gin.Context) {
 			Title:         "Low Stock Alert",
 			Message:       "Premium Wireless Headphones has only 5 units left",
 			Icon:          "alert-triangle",
-			ActionURL:     "/inventory/PROD-001",
+			ActionURL:     "/products/PROD-001",
 			SourceService: "inventory-service",
 			SourceEventID: "seed-inventory-1-" + time.Now().Format("20060102150405"),
 			EntityType:    "product",

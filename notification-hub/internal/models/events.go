@@ -498,7 +498,7 @@ func inventoryEventToNotification(e *InventoryEvent, userID uuid.UUID) *Notifica
 		Title:         title,
 		Message:       message,
 		Icon:          icon,
-		ActionURL:     "/inventory/" + e.ProductID,
+		ActionURL:     "/products/" + e.ProductID,
 		SourceService: "inventory-service",
 		SourceEventID: e.SourceID,
 		EntityType:    "product",
