@@ -35,6 +35,7 @@ const envSchema = z.object({
   REDIS_HOST: z.string().default('localhost'),
   REDIS_PORT: z.string().default('6379'),
   REDIS_PASSWORD: z.string().optional(),
+  REDIS_TLS: z.string().default('false'),
 
   // Allowed Origins for CORS
   ALLOWED_ORIGINS: z.string().default('https://*.tesserix.app,http://localhost:3000,http://localhost:3001'),
@@ -117,6 +118,7 @@ export const config = {
     host: env.REDIS_HOST,
     port: parseInt(env.REDIS_PORT, 10),
     password: env.REDIS_PASSWORD,
+    tls: env.REDIS_TLS === 'true',
   },
   baseDomain: env.BASE_DOMAIN,
   allowedOrigins: env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()),

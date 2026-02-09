@@ -132,8 +132,9 @@ class SessionStore {
   private readonly PASSKEY_CHALLENGE_TTL = 300; // 5 minutes for passkey challenges
 
   constructor() {
+    const tlsOption = config.redis.tls ? { tls: {} } : {};
     if (config.redis.url) {
-      this.redis = new Redis(config.redis.url);
+      this.redis = new Redis(config.redis.url, { ...tlsOption });
     } else {
       this.redis = new Redis({
         host: config.redis.host,
@@ -141,6 +142,7 @@ class SessionStore {
         password: config.redis.password,
         maxRetriesPerRequest: 3,
         retryStrategy: (times) => Math.min(times * 100, 3000),
+        ...tlsOption,
       });
     }
 
