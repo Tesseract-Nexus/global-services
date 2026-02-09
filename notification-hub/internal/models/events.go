@@ -267,15 +267,24 @@ type VendorEvent struct {
 }
 
 // ApprovalEvent represents approval workflow events
+// Field names match go-shared/events.ApprovalEvent JSON tags
 type ApprovalEvent struct {
 	BaseEvent
-	ApprovalID   string `json:"approvalId"`
-	EntityType   string `json:"entityType"`   // order, refund, vendor, etc.
-	EntityID     string `json:"entityId"`
-	RequestedBy  string `json:"requestedBy"`
-	ApprovedBy   string `json:"approvedBy"`
-	Status       string `json:"status"`
-	Reason       string `json:"reason"`
+	ApprovalRequestID string `json:"approvalRequestId"`
+	WorkflowName      string `json:"workflowName,omitempty"`
+	RequesterID       string `json:"requesterId"`
+	RequesterName     string `json:"requesterName,omitempty"`
+	RequesterEmail    string `json:"requesterEmail,omitempty"`
+	ApproverID        string `json:"approverId,omitempty"`
+	ApproverName      string `json:"approverName,omitempty"`
+	ApproverEmail     string `json:"approverEmail,omitempty"`
+	ActionType        string `json:"actionType"`
+	ResourceType      string `json:"resourceType,omitempty"`
+	ResourceID        string `json:"resourceId,omitempty"`
+	Status            string `json:"status"`
+	Decision          string `json:"decision,omitempty"`
+	DecisionReason    string `json:"decisionReason,omitempty"`
+	Priority          string `json:"priority,omitempty"`
 }
 
 // GiftCardEvent represents gift card-related events
@@ -956,30 +965,36 @@ func approvalEventToNotification(e *ApprovalEvent, userID uuid.UUID) *Notificati
 	var title, message, icon string
 	priority := PriorityNormal
 
+	// Use resourceType for display, fall back to actionType
+	entityLabel := e.ResourceType
+	if entityLabel == "" {
+		entityLabel = e.ActionType
+	}
+
 	switch e.EventType {
 	case SubjectApprovalRequested:
 		title = "📋 Approval Requested"
-		message = "New " + e.EntityType + " approval request needs your review"
+		message = "New " + entityLabel + " approval request needs your review"
 		icon = "clipboard"
 		priority = PriorityHigh
 	case SubjectApprovalGranted:
 		title = "✅ Approval Granted"
-		message = "The " + e.EntityType + " has been approved"
+		message = "The " + entityLabel + " has been approved"
 		icon = "check-circle"
 	case SubjectApprovalRejected:
 		title = "❌ Approval Rejected"
-		message = "The " + e.EntityType + " has been rejected"
-		if e.Reason != "" {
-			message += ". Reason: " + e.Reason
+		message = "The " + entityLabel + " has been rejected"
+		if e.DecisionReason != "" {
+			message += ". Reason: " + e.DecisionReason
 		}
 		icon = "x-circle"
 	default:
 		title = "📋 Approval Activity"
-		message = "Approval status updated for " + e.EntityType
+		message = "Approval status updated for " + entityLabel
 		icon = "clipboard"
 	}
 
-	approvalID, _ := uuid.Parse(e.ApprovalID)
+	approvalID, _ := uuid.Parse(e.ApprovalRequestID)
 	return &Notification{
 		TenantID:      e.TenantID,
 		UserID:        userID,
@@ -988,18 +1003,20 @@ func approvalEventToNotification(e *ApprovalEvent, userID uuid.UUID) *Notificati
 		Title:         title,
 		Message:       message,
 		Icon:          icon,
-		ActionURL:     "/approvals/" + e.ApprovalID,
+		ActionURL:     "/approvals/" + e.ApprovalRequestID,
 		SourceService: "approval-service",
 		SourceEventID: e.SourceID,
 		EntityType:    "approval",
 		EntityID:      &approvalID,
 		Priority:      priority,
-		GroupKey:      "approval:" + e.ApprovalID,
+		GroupKey:      "approval:" + e.ApprovalRequestID,
 		Metadata: JSONB{
-			"entityType":  e.EntityType,
-			"entityId":    e.EntityID,
-			"requestedBy": e.RequestedBy,
-			"status":      e.Status,
+			"resourceType":  e.ResourceType,
+			"resourceId":    e.ResourceID,
+			"actionType":    e.ActionType,
+			"requesterName": e.RequesterName,
+			"approverName":  e.ApproverName,
+			"status":        e.Status,
 		},
 	}
 }
