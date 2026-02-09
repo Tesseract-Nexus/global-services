@@ -304,7 +304,11 @@ export async function authRoutes(fastify: FastifyInstance) {
           authState.codeVerifier,
           authState.nonce
         );
-        userInfo = await logtoClient.getUserInfo(tokens.accessToken);
+        // Logto returns opaque access tokens (not JWT) unless a resource is specified.
+        // Extract user info from the ID token claims instead of calling the userinfo endpoint.
+        userInfo = tokens.idToken
+          ? logtoClient.parseIdTokenClaims(tokens.idToken)
+          : await logtoClient.getUserInfo(tokens.accessToken);
       } else {
         tokens = await oidcClient.exchangeCode(
           authState.clientType,

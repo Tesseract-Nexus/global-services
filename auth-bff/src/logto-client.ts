@@ -264,6 +264,22 @@ class LogtoClientManager {
     return userInfo;
   }
 
+  /**
+   * Extract user info from ID token claims.
+   * Used when Logto returns opaque access tokens (no resource specified).
+   */
+  parseIdTokenClaims(idToken: string): Record<string, unknown> {
+    try {
+      const payload = idToken.split('.')[1];
+      const claims = JSON.parse(Buffer.from(payload, 'base64url').toString());
+      logger.debug({ sub: claims.sub, email: claims.email }, 'Parsed Logto ID token claims');
+      return claims;
+    } catch (err) {
+      logger.error({ err }, 'Failed to parse Logto ID token');
+      return {};
+    }
+  }
+
   async revokeToken(token: string, tokenTypeHint?: 'access_token' | 'refresh_token'): Promise<void> {
     const client = await this.getClient();
 
