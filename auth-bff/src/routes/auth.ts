@@ -10,6 +10,29 @@ import { createLogger } from '../logger';
 
 const logger = createLogger('auth-routes');
 
+/**
+ * Validate returnTo URL to prevent open redirect attacks.
+ * Allows relative paths and URLs on trusted domains only.
+ */
+function isValidReturnTo(url: string): boolean {
+  // Relative paths are always safe
+  if (url.startsWith('/')) return true;
+  try {
+    const parsed = new URL(url);
+    // Only allow HTTPS (or HTTP for localhost in dev)
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return false;
+    // Allow subdomains of the configured base domain
+    return parsed.hostname === config.baseDomain || parsed.hostname.endsWith('.' + config.baseDomain);
+  } catch {
+    return false;
+  }
+}
+
+function sanitizeReturnTo(url: string | undefined, fallback: string): string {
+  if (!url) return fallback;
+  return isValidReturnTo(url) ? url : fallback;
+}
+
 // Request schemas
 const loginQuerySchema = z.object({
   returnTo: z.string().optional(),
@@ -352,8 +375,8 @@ export async function authRoutes(fastify: FastifyInstance) {
         });
       }
 
-      // Redirect to return URL or default
-      const returnTo = authState.returnTo || '/';
+      // Redirect to return URL or default (validated to prevent open redirects)
+      const returnTo = sanitizeReturnTo(authState.returnTo, '/');
       return reply.redirect(returnTo);
     } catch (error: any) {
       logger.error({
@@ -409,7 +432,7 @@ export async function authRoutes(fastify: FastifyInstance) {
   }>('/auth/logout', async (request, reply) => {
     const session = await getSession(request);
     const query = logoutQuerySchema.parse(request.query);
-    const returnTo = query.returnTo || '/login';
+    const returnTo = sanitizeReturnTo(query.returnTo, '/login');
 
     if (session) {
       await sessionStore.deleteSession(session.id);
@@ -718,8 +741,8 @@ export async function authRoutes(fastify: FastifyInstance) {
 
     logger.info({ userId: session.userId, sessionId: session.id, forwardedHost }, 'Session transfer accepted');
 
-    // Redirect to return URL or default dashboard
-    return reply.redirect(returnTo || '/');
+    // Redirect to return URL or default dashboard (validated to prevent open redirects)
+    return reply.redirect(sanitizeReturnTo(returnTo, '/'));
   });
 
   // ============================================================================
