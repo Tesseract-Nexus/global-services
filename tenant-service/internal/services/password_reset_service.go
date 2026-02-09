@@ -329,10 +329,7 @@ func (s *PasswordResetService) ResetPassword(ctx context.Context, input *ResetPa
 	// Clear Keycloak brute force lockout after successful password reset.
 	// Keycloak's brute force protection may have disabled the user account (permanentLockout).
 	// A successful password reset should restore access — re-enable the account and clear the lockout.
-	if err := s.keycloakClient.ClearBruteForceStatus(ctx, user.KeycloakID.String()); err != nil {
-		log.Printf("[PasswordResetService] Warning: Failed to clear brute force status: %v", err)
-		// Don't fail the reset — the password was already changed, and the user can contact support
-	}
+	s.clearKeycloakLockout(ctx, user.KeycloakID.String())
 
 	// Also clear tenant-level lockout counters so the user isn't blocked by our own lockout logic
 	if err := s.credentialRepo.ClearLockout(ctx, user.ID, tokenRecord.TenantID); err != nil {
@@ -444,4 +441,35 @@ func maskEmail(email string) string {
 		}
 	}
 	return string(parts)
+}
+
+// clearKeycloakLockout re-enables a Keycloak user account if it was disabled by brute force protection.
+// After a successful password reset, the user should be able to log in regardless of prior lockout state.
+func (s *PasswordResetService) clearKeycloakLockout(ctx context.Context, keycloakUserID string) {
+	if s.keycloakClient == nil {
+		return
+	}
+
+	// Check if the user account is disabled in Keycloak
+	kcUser, err := s.keycloakClient.GetUserByID(ctx, keycloakUserID)
+	if err != nil {
+		log.Printf("[PasswordResetService] Warning: Failed to check Keycloak user status: %v", err)
+		return
+	}
+	if kcUser == nil {
+		return
+	}
+
+	// If the user is disabled (likely due to permanentLockout), re-enable them
+	if !kcUser.Enabled {
+		log.Printf("[PasswordResetService] Re-enabling Keycloak user %s (was disabled, likely brute force lockout)", keycloakUserID)
+		kcUser.Enabled = true
+		// Clear the disabledReason attribute set by Keycloak brute force protection
+		if kcUser.Attributes != nil {
+			delete(kcUser.Attributes, "disabledReason")
+		}
+		if err := s.keycloakClient.UpdateUser(ctx, keycloakUserID, *kcUser); err != nil {
+			log.Printf("[PasswordResetService] Warning: Failed to re-enable Keycloak user: %v", err)
+		}
+	}
 }
