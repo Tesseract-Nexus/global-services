@@ -168,13 +168,14 @@ func (h *TicketsHandler) GetTickets(c *gin.Context) {
 		Type:     c.Query("type"),
 	}
 
-	// For non-admin users (storefront), filter by their own user ID
-	// Admin users (from admin portal) can see all tickets
-	if !isAdminRole(userRole) {
+	// Platform owners (tesserix-home) and admin-role users can see all tickets.
+	// Non-admin users (storefront) are filtered to their own tickets only.
+	isPlatformOwner := c.GetBool("is_platform_owner")
+	if !isPlatformOwner && !isAdminRole(userRole) {
 		// Regular user can only see their own tickets
 		filters.CreatedBy = userID
 	} else if createdBy := c.Query("createdBy"); createdBy != "" {
-		// Admin can optionally filter by createdBy
+		// Admin/platform owner can optionally filter by createdBy
 		filters.CreatedBy = createdBy
 	}
 
@@ -238,8 +239,10 @@ func (h *TicketsHandler) GetTicket(c *gin.Context) {
 		return
 	}
 
-	// For non-admin users, only allow viewing their own tickets
-	if !isAdminRole(userRole) {
+	// Platform owners and admin-role users can view any ticket.
+	// Non-admin users can only view their own tickets.
+	isPlatformOwner := c.GetBool("is_platform_owner")
+	if !isPlatformOwner && !isAdminRole(userRole) {
 		if ticket.CreatedBy != userID {
 			c.JSON(http.StatusForbidden, models.ErrorResponse{
 				Success: false,
@@ -290,8 +293,9 @@ func (h *TicketsHandler) UpdateTicket(c *gin.Context) {
 		return
 	}
 
-	// Only admin/staff can update any ticket; users can only update their own
-	if !isAdminRole(userRole) {
+	// Platform owners, admin/staff can update any ticket; users can only update their own
+	isPlatformOwner := c.GetBool("is_platform_owner")
+	if !isPlatformOwner && !isAdminRole(userRole) {
 		if existingTicket.CreatedBy != userID {
 			c.JSON(http.StatusForbidden, models.ErrorResponse{
 				Success: false,
@@ -433,8 +437,9 @@ func (h *TicketsHandler) DeleteTicket(c *gin.Context) {
 		return
 	}
 
-	// Only admin/staff can delete tickets
-	if !isAdminRole(userRole) {
+	// Platform owners and admin/staff can delete any ticket
+	isPlatformOwner := c.GetBool("is_platform_owner")
+	if !isPlatformOwner && !isAdminRole(userRole) {
 		if existingTicket.CreatedBy != userID {
 			c.JSON(http.StatusForbidden, models.ErrorResponse{
 				Success: false,
@@ -513,8 +518,9 @@ func (h *TicketsHandler) UpdateTicketStatus(c *gin.Context) {
 		return
 	}
 
-	// Only admin/staff can update status on any ticket
-	if !isAdminRole(userRole) {
+	// Platform owners and admin/staff can update status on any ticket
+	isPlatformOwner := c.GetBool("is_platform_owner")
+	if !isPlatformOwner && !isAdminRole(userRole) {
 		if existingTicket.CreatedBy != userID {
 			c.JSON(http.StatusForbidden, models.ErrorResponse{
 				Success: false,
@@ -689,8 +695,9 @@ func (h *TicketsHandler) AddComment(c *gin.Context) {
 		return
 	}
 
-	// Only admin/staff can comment on any ticket; users can only comment on their own
-	if !isAdminRole(userRole) {
+	// Platform owners and admin/staff can comment on any ticket; users can only comment on their own
+	isPlatformOwner := c.GetBool("is_platform_owner")
+	if !isPlatformOwner && !isAdminRole(userRole) {
 		if existingTicket.CreatedBy != userID {
 			c.JSON(http.StatusForbidden, models.ErrorResponse{
 				Success: false,
