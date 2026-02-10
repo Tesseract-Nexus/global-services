@@ -14,7 +14,6 @@ import (
 	"subscription-service/internal/config"
 	"subscription-service/internal/handlers"
 	"subscription-service/internal/middleware"
-	"subscription-service/internal/models"
 	"subscription-service/internal/repository"
 	"subscription-service/internal/services"
 )
@@ -36,22 +35,8 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	// Auto-migrate models
-	if err := db.AutoMigrate(
-		&models.SubscriptionPlan{},
-		&models.TenantSubscription{},
-		&models.SubscriptionInvoice{},
-		&models.SubscriptionEvent{},
-	); err != nil {
-		log.Printf("Warning: Auto-migration failed: %v", err)
-	}
-
-	// Seed plans
-	if err := repository.SeedPlans(db); err != nil {
-		log.Printf("Warning: Failed to seed plans: %v", err)
-	}
-
 	// Initialize layers
+	// Note: Schema creation and plan seeding is handled by db-schema-bootstrap CronJob
 	repo := repository.NewSubscriptionRepository(db)
 	tenantClient := clients.NewTenantClient()
 
