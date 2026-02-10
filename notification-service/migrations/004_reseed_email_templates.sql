@@ -1,26 +1,24 @@
 -- 004_reseed_email_templates.sql
--- Clean reseed of all email templates with consistent branding, categories, and variables.
+-- Clean reseed of all email templates with professional design.
 --
--- Fixes:
---   - Categories now match frontend: order, payment, customer, auth, etc. (was: orders, marketing, security)
---   - Variables use snake_case (was: camelCase)
---   - HTML uses Tesserix slate design system (#0F172A banner, slate palette)
---   - tenant_id consistently 'platform' for platform templates, 'default-tenant' for mark8ly
---   - Covers all 18 frontend categories (4 platform + 14 mark8ly)
+-- Design system:
+--   - Zinc palette (neutral gray, no blue tint)
+--   - White card with 3px accent line at top (brand color)
+--   - Logo/name inside card, centered
+--   - Clean typography, system font stack
+--   - Subtle info boxes (#fafafa, no border)
+--   - Minimal footer (store name + "Powered by Mark8ly" for store emails, "Powered by Tesserix" for platform emails)
+--
+-- Template types:
+--   - 18 mark8ly templates (tenant_id = 'default-tenant') — use brand_primary_color, brand_logo_url
+--   - 4 platform templates (tenant_id = 'platform') — use platform_logo_url
+--
+-- Variable convention: snake_case (matches frontend EmailTemplate interface)
 
 BEGIN;
 
 -- Wipe old seeds so we start clean
 DELETE FROM notification_templates WHERE tenant_id IN ('system', 'default-tenant', 'platform');
-
--- ============================================================================
--- HELPER: Consistent HTML wrapper
--- All templates share the same structure:
---   - Slate-900 (#0F172A) banner
---   - White card on slate-50 background
---   - Slate-700 body text, slate-500 secondary text
---   - Consistent button styling
--- ============================================================================
 
 -- ============================================================================
 -- MARK8LY TEMPLATES (tenant_id = 'default-tenant')
@@ -37,45 +35,46 @@ INSERT INTO notification_templates (
     'Order Confirmation',
     'Sent to the customer when a new order is placed',
     'EMAIL', 'order',
-    'Order Confirmed - #{{.order_id}}',
+    'Order confirmed — #{{.order_id}}',
     'Hi {{.customer_name}},
 
-Thank you for your order!
+Thanks for your order. We''ll send you an update when it ships.
 
-Order Number: {{.order_id}}
+Order: {{.order_id}}
 Total: {{.order_total}}
 
-We will notify you when your order ships.
-
-Thanks for shopping with {{.store_name}}!',
+{{.store_name}}',
     '<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background-color:#F8FAFC;font-family:''Source Sans 3'',''Inter'',''Segoe UI'',Arial,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F8FAFC;">
-<tr><td style="padding:40px 20px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;">
-  <!-- Banner -->
-  <tr><td style="background-color:{{if .brand_primary_color}}{{.brand_primary_color}}{{else}}#0F172A{{end}};padding:24px 32px;border-radius:10px 10px 0 0;">
-    {{if .brand_logo_url}}<img src="{{.brand_logo_url}}" alt="{{.store_name}}" style="max-height:32px;">{{else}}<p style="margin:0;color:#FFFFFF;font-size:18px;font-weight:600;">{{.store_name}}</p>{{end}}
-  </td></tr>
-  <!-- Body -->
-  <tr><td style="background-color:#FFFFFF;padding:32px;border:1px solid #E2E8F0;border-top:none;">
-    <h1 style="margin:0 0 16px;color:#0F172A;font-size:24px;font-weight:700;">Order Confirmed!</h1>
-    <p style="margin:0 0 16px;color:#334155;font-size:16px;line-height:1.6;">Hi {{.customer_name}},</p>
-    <p style="margin:0 0 24px;color:#334155;font-size:16px;line-height:1.6;">Thank you for your order. We''re getting it ready for you.</p>
-    <div style="background-color:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:20px;margin:0 0 24px;">
-      <p style="margin:0 0 8px;color:#64748B;font-size:14px;">Order Number</p>
-      <p style="margin:0 0 16px;color:#0F172A;font-size:18px;font-weight:600;">{{.order_id}}</p>
-      <p style="margin:0 0 8px;color:#64748B;font-size:14px;">Total</p>
-      <p style="margin:0;color:#0F172A;font-size:18px;font-weight:600;">{{.order_total}}</p>
-    </div>
-    <p style="margin:0 0 24px;color:#334155;font-size:16px;line-height:1.6;">We''ll notify you when your order ships.</p>
-    <a href="{{.store_url}}" style="display:inline-block;background-color:#0F172A;color:#FFFFFF;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">Visit Store</a>
-  </td></tr>
-  <!-- Footer -->
-  <tr><td style="padding:24px 32px;border:1px solid #E2E8F0;border-top:none;border-radius:0 0 10px 10px;background-color:#FFFFFF;">
-    <p style="margin:0;color:#94A3B8;font-size:12px;text-align:center;">{{.store_name}} &mdash; Powered by Tesserix</p>
-  </td></tr>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,''Segoe UI'',Roboto,''Helvetica Neue'',Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;"><tr><td style="padding:48px 24px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:512px;margin:0 auto;">
+<tr><td>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;border:1px solid #e4e4e7;">
+    <tr><td style="height:3px;background:{{if .brand_primary_color}}{{.brand_primary_color}}{{else}}#18181b{{end}};border-radius:12px 12px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
+    <tr><td style="padding:32px 32px 0;text-align:center;">
+      {{if .brand_logo_url}}<img src="{{.brand_logo_url}}" alt="{{.store_name}}" height="28" style="height:28px;max-width:140px;">{{else}}<span style="font-size:15px;font-weight:600;color:#18181b;letter-spacing:-.2px;">{{.store_name}}</span>{{end}}
+    </td></tr>
+    <tr><td style="padding:28px 32px 36px;">
+      <h1 style="margin:0 0 4px;font-size:20px;font-weight:600;color:#18181b;">Order confirmed</h1>
+      <p style="margin:0 0 24px;font-size:14px;color:#71717a;">Order #{{.order_id}}</p>
+      <p style="margin:0 0 20px;font-size:15px;line-height:1.65;color:#3f3f46;">Hi {{.customer_name}}, thanks for your order. We''ll send you an update when it ships.</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td style="padding:16px 20px;background:#fafafa;border-radius:8px;">
+        <p style="margin:0 0 2px;font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;">Order number</p>
+        <p style="margin:0 0 14px;font-size:15px;font-weight:600;color:#18181b;">{{.order_id}}</p>
+        <p style="margin:0 0 2px;font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;">Total</p>
+        <p style="margin:0;font-size:15px;font-weight:600;color:#18181b;">{{.order_total}}</p>
+      </td></tr></table>
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="background:#18181b;border-radius:6px;">
+        <a href="{{.store_url}}" style="display:inline-block;padding:11px 24px;font-size:14px;font-weight:500;color:#fff;text-decoration:none;">View order</a>
+      </td></tr></table>
+    </td></tr>
+  </table>
+</td></tr>
+<tr><td style="padding:20px 0 0;text-align:center;">
+  <p style="margin:0;font-size:12px;color:#a1a1aa;">{{.store_name}}</p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">Mark8ly</a></p>
+</td></tr>
 </table>
 </td></tr></table>
 </body></html>',
@@ -92,40 +91,45 @@ INSERT INTO notification_templates (
     'Order Shipped',
     'Sent when an order has shipped with tracking info',
     'EMAIL', 'order',
-    'Your Order #{{.order_id}} Has Shipped!',
+    'Your order #{{.order_id}} is on the way',
     'Hi {{.customer_name}},
 
-Great news! Your order has shipped.
+Your order has shipped.
 
 Order: {{.order_id}}
 Tracking: {{.tracking_number}}
 Track: {{.tracking_url}}
 
-Thanks for shopping with {{.store_name}}!',
+{{.store_name}}',
     '<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background-color:#F8FAFC;font-family:''Source Sans 3'',''Inter'',''Segoe UI'',Arial,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F8FAFC;">
-<tr><td style="padding:40px 20px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;">
-  <tr><td style="background-color:{{if .brand_primary_color}}{{.brand_primary_color}}{{else}}#0F172A{{end}};padding:24px 32px;border-radius:10px 10px 0 0;">
-    {{if .brand_logo_url}}<img src="{{.brand_logo_url}}" alt="{{.store_name}}" style="max-height:32px;">{{else}}<p style="margin:0;color:#FFFFFF;font-size:18px;font-weight:600;">{{.store_name}}</p>{{end}}
-  </td></tr>
-  <tr><td style="background-color:#FFFFFF;padding:32px;border:1px solid #E2E8F0;border-top:none;">
-    <h1 style="margin:0 0 16px;color:#0F172A;font-size:24px;font-weight:700;">Your Order Has Shipped!</h1>
-    <p style="margin:0 0 16px;color:#334155;font-size:16px;line-height:1.6;">Hi {{.customer_name}},</p>
-    <p style="margin:0 0 24px;color:#334155;font-size:16px;line-height:1.6;">Great news &mdash; your order is on its way!</p>
-    <div style="background-color:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:20px;margin:0 0 24px;">
-      <p style="margin:0 0 8px;color:#64748B;font-size:14px;">Order Number</p>
-      <p style="margin:0 0 16px;color:#0F172A;font-size:18px;font-weight:600;">{{.order_id}}</p>
-      <p style="margin:0 0 8px;color:#64748B;font-size:14px;">Tracking Number</p>
-      <p style="margin:0;color:#0F172A;font-size:18px;font-weight:600;">{{.tracking_number}}</p>
-    </div>
-    <a href="{{.tracking_url}}" style="display:inline-block;background-color:#0F172A;color:#FFFFFF;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">Track Your Package</a>
-  </td></tr>
-  <tr><td style="padding:24px 32px;border:1px solid #E2E8F0;border-top:none;border-radius:0 0 10px 10px;background-color:#FFFFFF;">
-    <p style="margin:0;color:#94A3B8;font-size:12px;text-align:center;">{{.store_name}} &mdash; Powered by Tesserix</p>
-  </td></tr>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,''Segoe UI'',Roboto,''Helvetica Neue'',Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;"><tr><td style="padding:48px 24px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:512px;margin:0 auto;">
+<tr><td>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;border:1px solid #e4e4e7;">
+    <tr><td style="height:3px;background:{{if .brand_primary_color}}{{.brand_primary_color}}{{else}}#18181b{{end}};border-radius:12px 12px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
+    <tr><td style="padding:32px 32px 0;text-align:center;">
+      {{if .brand_logo_url}}<img src="{{.brand_logo_url}}" alt="{{.store_name}}" height="28" style="height:28px;max-width:140px;">{{else}}<span style="font-size:15px;font-weight:600;color:#18181b;letter-spacing:-.2px;">{{.store_name}}</span>{{end}}
+    </td></tr>
+    <tr><td style="padding:28px 32px 36px;">
+      <h1 style="margin:0 0 4px;font-size:20px;font-weight:600;color:#18181b;">Your order is on the way</h1>
+      <p style="margin:0 0 24px;font-size:14px;color:#71717a;">Order #{{.order_id}}</p>
+      <p style="margin:0 0 20px;font-size:15px;line-height:1.65;color:#3f3f46;">Hi {{.customer_name}}, your order has shipped. You can track it using the details below.</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td style="padding:16px 20px;background:#fafafa;border-radius:8px;">
+        <p style="margin:0 0 2px;font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;">Tracking number</p>
+        <p style="margin:0;font-size:15px;font-weight:600;color:#18181b;">{{.tracking_number}}</p>
+      </td></tr></table>
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="background:#18181b;border-radius:6px;">
+        <a href="{{.tracking_url}}" style="display:inline-block;padding:11px 24px;font-size:14px;font-weight:500;color:#fff;text-decoration:none;">Track package</a>
+      </td></tr></table>
+    </td></tr>
+  </table>
+</td></tr>
+<tr><td style="padding:20px 0 0;text-align:center;">
+  <p style="margin:0;font-size:12px;color:#a1a1aa;">{{.store_name}}</p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">Mark8ly</a></p>
+</td></tr>
 </table>
 </td></tr></table>
 </body></html>',
@@ -142,37 +146,37 @@ INSERT INTO notification_templates (
     'Order Cancelled',
     'Sent when an order is cancelled',
     'EMAIL', 'order',
-    'Order #{{.order_id}} Has Been Cancelled',
+    'Order #{{.order_id}} has been cancelled',
     'Hi {{.customer_name}},
 
-Your order #{{.order_id}} has been cancelled.
-
-If you did not request this, please contact us.
+Your order #{{.order_id}} has been cancelled. If you didn''t request this, please contact us.
 
 {{.store_name}}',
     '<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background-color:#F8FAFC;font-family:''Source Sans 3'',''Inter'',''Segoe UI'',Arial,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F8FAFC;">
-<tr><td style="padding:40px 20px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;">
-  <tr><td style="background-color:{{if .brand_primary_color}}{{.brand_primary_color}}{{else}}#0F172A{{end}};padding:24px 32px;border-radius:10px 10px 0 0;">
-    {{if .brand_logo_url}}<img src="{{.brand_logo_url}}" alt="{{.store_name}}" style="max-height:32px;">{{else}}<p style="margin:0;color:#FFFFFF;font-size:18px;font-weight:600;">{{.store_name}}</p>{{end}}
-  </td></tr>
-  <tr><td style="background-color:#FFFFFF;padding:32px;border:1px solid #E2E8F0;border-top:none;">
-    <h1 style="margin:0 0 16px;color:#0F172A;font-size:24px;font-weight:700;">Order Cancelled</h1>
-    <p style="margin:0 0 16px;color:#334155;font-size:16px;line-height:1.6;">Hi {{.customer_name}},</p>
-    <p style="margin:0 0 24px;color:#334155;font-size:16px;line-height:1.6;">Your order has been cancelled.</p>
-    <div style="background-color:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:20px;margin:0 0 24px;">
-      <p style="margin:0 0 8px;color:#64748B;font-size:14px;">Order Number</p>
-      <p style="margin:0;color:#DC2626;font-size:18px;font-weight:600;">{{.order_id}}</p>
-    </div>
-    <p style="margin:0 0 24px;color:#334155;font-size:16px;line-height:1.6;">If you did not request this cancellation, please contact us immediately.</p>
-    <a href="{{.store_url}}" style="display:inline-block;background-color:#0F172A;color:#FFFFFF;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">Contact Support</a>
-  </td></tr>
-  <tr><td style="padding:24px 32px;border:1px solid #E2E8F0;border-top:none;border-radius:0 0 10px 10px;background-color:#FFFFFF;">
-    <p style="margin:0;color:#94A3B8;font-size:12px;text-align:center;">{{.store_name}} &mdash; Powered by Tesserix</p>
-  </td></tr>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,''Segoe UI'',Roboto,''Helvetica Neue'',Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;"><tr><td style="padding:48px 24px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:512px;margin:0 auto;">
+<tr><td>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;border:1px solid #e4e4e7;">
+    <tr><td style="height:3px;background:{{if .brand_primary_color}}{{.brand_primary_color}}{{else}}#18181b{{end}};border-radius:12px 12px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
+    <tr><td style="padding:32px 32px 0;text-align:center;">
+      {{if .brand_logo_url}}<img src="{{.brand_logo_url}}" alt="{{.store_name}}" height="28" style="height:28px;max-width:140px;">{{else}}<span style="font-size:15px;font-weight:600;color:#18181b;letter-spacing:-.2px;">{{.store_name}}</span>{{end}}
+    </td></tr>
+    <tr><td style="padding:28px 32px 36px;">
+      <h1 style="margin:0 0 4px;font-size:20px;font-weight:600;color:#18181b;">Order cancelled</h1>
+      <p style="margin:0 0 24px;font-size:14px;color:#71717a;">Order #{{.order_id}}</p>
+      <p style="margin:0 0 20px;font-size:15px;line-height:1.65;color:#3f3f46;">Hi {{.customer_name}}, your order has been cancelled. If you didn''t request this, please reach out to us.</p>
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="background:#18181b;border-radius:6px;">
+        <a href="{{.store_url}}" style="display:inline-block;padding:11px 24px;font-size:14px;font-weight:500;color:#fff;text-decoration:none;">Contact support</a>
+      </td></tr></table>
+    </td></tr>
+  </table>
+</td></tr>
+<tr><td style="padding:20px 0 0;text-align:center;">
+  <p style="margin:0;font-size:12px;color:#a1a1aa;">{{.store_name}}</p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">Mark8ly</a></p>
+</td></tr>
 </table>
 </td></tr></table>
 </body></html>',
@@ -191,7 +195,7 @@ INSERT INTO notification_templates (
     'Payment Confirmation',
     'Sent when a payment is successfully processed',
     'EMAIL', 'payment',
-    'Payment Received - {{.payment_amount}}',
+    'Payment received — {{.payment_amount}}',
     'Hi {{.customer_name}},
 
 We''ve received your payment of {{.payment_amount}}.
@@ -199,33 +203,37 @@ We''ve received your payment of {{.payment_amount}}.
 Transaction: {{.transaction_id}}
 Method: {{.payment_method}}
 
-Thank you!
 {{.store_name}}',
     '<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background-color:#F8FAFC;font-family:''Source Sans 3'',''Inter'',''Segoe UI'',Arial,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F8FAFC;">
-<tr><td style="padding:40px 20px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;">
-  <tr><td style="background-color:{{if .brand_primary_color}}{{.brand_primary_color}}{{else}}#0F172A{{end}};padding:24px 32px;border-radius:10px 10px 0 0;">
-    {{if .brand_logo_url}}<img src="{{.brand_logo_url}}" alt="{{.store_name}}" style="max-height:32px;">{{else}}<p style="margin:0;color:#FFFFFF;font-size:18px;font-weight:600;">{{.store_name}}</p>{{end}}
-  </td></tr>
-  <tr><td style="background-color:#FFFFFF;padding:32px;border:1px solid #E2E8F0;border-top:none;">
-    <h1 style="margin:0 0 16px;color:#0F172A;font-size:24px;font-weight:700;">Payment Received</h1>
-    <p style="margin:0 0 16px;color:#334155;font-size:16px;line-height:1.6;">Hi {{.customer_name}},</p>
-    <p style="margin:0 0 24px;color:#334155;font-size:16px;line-height:1.6;">Your payment has been processed successfully.</p>
-    <div style="background-color:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:20px;margin:0 0 24px;">
-      <p style="margin:0 0 8px;color:#64748B;font-size:14px;">Amount</p>
-      <p style="margin:0 0 16px;color:#059669;font-size:20px;font-weight:700;">{{.payment_amount}}</p>
-      <p style="margin:0 0 8px;color:#64748B;font-size:14px;">Transaction ID</p>
-      <p style="margin:0 0 16px;color:#0F172A;font-size:14px;font-weight:600;">{{.transaction_id}}</p>
-      <p style="margin:0 0 8px;color:#64748B;font-size:14px;">Payment Method</p>
-      <p style="margin:0;color:#0F172A;font-size:14px;font-weight:600;">{{.payment_method}}</p>
-    </div>
-  </td></tr>
-  <tr><td style="padding:24px 32px;border:1px solid #E2E8F0;border-top:none;border-radius:0 0 10px 10px;background-color:#FFFFFF;">
-    <p style="margin:0;color:#94A3B8;font-size:12px;text-align:center;">{{.store_name}} &mdash; Powered by Tesserix</p>
-  </td></tr>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,''Segoe UI'',Roboto,''Helvetica Neue'',Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;"><tr><td style="padding:48px 24px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:512px;margin:0 auto;">
+<tr><td>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;border:1px solid #e4e4e7;">
+    <tr><td style="height:3px;background:{{if .brand_primary_color}}{{.brand_primary_color}}{{else}}#18181b{{end}};border-radius:12px 12px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
+    <tr><td style="padding:32px 32px 0;text-align:center;">
+      {{if .brand_logo_url}}<img src="{{.brand_logo_url}}" alt="{{.store_name}}" height="28" style="height:28px;max-width:140px;">{{else}}<span style="font-size:15px;font-weight:600;color:#18181b;letter-spacing:-.2px;">{{.store_name}}</span>{{end}}
+    </td></tr>
+    <tr><td style="padding:28px 32px 36px;">
+      <h1 style="margin:0 0 4px;font-size:20px;font-weight:600;color:#18181b;">Payment received</h1>
+      <p style="margin:0 0 24px;font-size:14px;color:#71717a;">{{.payment_amount}}</p>
+      <p style="margin:0 0 20px;font-size:15px;line-height:1.65;color:#3f3f46;">Hi {{.customer_name}}, your payment has been processed successfully.</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td style="padding:16px 20px;background:#fafafa;border-radius:8px;">
+        <p style="margin:0 0 2px;font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;">Amount</p>
+        <p style="margin:0 0 14px;font-size:15px;font-weight:600;color:#18181b;">{{.payment_amount}}</p>
+        <p style="margin:0 0 2px;font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;">Transaction</p>
+        <p style="margin:0 0 14px;font-size:13px;color:#3f3f46;font-family:''SF Mono'',SFMono-Regular,Menlo,monospace;">{{.transaction_id}}</p>
+        <p style="margin:0 0 2px;font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;">Method</p>
+        <p style="margin:0;font-size:15px;color:#3f3f46;">{{.payment_method}}</p>
+      </td></tr></table>
+    </td></tr>
+  </table>
+</td></tr>
+<tr><td style="padding:20px 0 0;text-align:center;">
+  <p style="margin:0;font-size:12px;color:#a1a1aa;">{{.store_name}}</p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">Mark8ly</a></p>
+</td></tr>
 </table>
 </td></tr></table>
 </body></html>',
@@ -242,35 +250,37 @@ INSERT INTO notification_templates (
     'Payment Failed',
     'Sent when a payment attempt fails',
     'EMAIL', 'payment',
-    'Payment Failed - Action Required',
+    'Payment failed — action required',
     'Hi {{.customer_name}},
 
-Your payment of {{.payment_amount}} could not be processed.
-
-Please update your payment method and try again.
+Your payment of {{.payment_amount}} could not be processed. Please update your payment method and try again.
 
 {{.store_name}}',
     '<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background-color:#F8FAFC;font-family:''Source Sans 3'',''Inter'',''Segoe UI'',Arial,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F8FAFC;">
-<tr><td style="padding:40px 20px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;">
-  <tr><td style="background-color:{{if .brand_primary_color}}{{.brand_primary_color}}{{else}}#0F172A{{end}};padding:24px 32px;border-radius:10px 10px 0 0;">
-    {{if .brand_logo_url}}<img src="{{.brand_logo_url}}" alt="{{.store_name}}" style="max-height:32px;">{{else}}<p style="margin:0;color:#FFFFFF;font-size:18px;font-weight:600;">{{.store_name}}</p>{{end}}
-  </td></tr>
-  <tr><td style="background-color:#FFFFFF;padding:32px;border:1px solid #E2E8F0;border-top:none;">
-    <h1 style="margin:0 0 16px;color:#DC2626;font-size:24px;font-weight:700;">Payment Failed</h1>
-    <p style="margin:0 0 16px;color:#334155;font-size:16px;line-height:1.6;">Hi {{.customer_name}},</p>
-    <p style="margin:0 0 24px;color:#334155;font-size:16px;line-height:1.6;">Unfortunately, your payment of <strong>{{.payment_amount}}</strong> could not be processed.</p>
-    <div style="background-color:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:20px;margin:0 0 24px;">
-      <p style="margin:0;color:#DC2626;font-size:14px;font-weight:600;">Please update your payment method and try again.</p>
-    </div>
-    <a href="{{.store_url}}" style="display:inline-block;background-color:#0F172A;color:#FFFFFF;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">Update Payment</a>
-  </td></tr>
-  <tr><td style="padding:24px 32px;border:1px solid #E2E8F0;border-top:none;border-radius:0 0 10px 10px;background-color:#FFFFFF;">
-    <p style="margin:0;color:#94A3B8;font-size:12px;text-align:center;">{{.store_name}} &mdash; Powered by Tesserix</p>
-  </td></tr>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,''Segoe UI'',Roboto,''Helvetica Neue'',Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;"><tr><td style="padding:48px 24px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:512px;margin:0 auto;">
+<tr><td>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;border:1px solid #e4e4e7;">
+    <tr><td style="height:3px;background:{{if .brand_primary_color}}{{.brand_primary_color}}{{else}}#18181b{{end}};border-radius:12px 12px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
+    <tr><td style="padding:32px 32px 0;text-align:center;">
+      {{if .brand_logo_url}}<img src="{{.brand_logo_url}}" alt="{{.store_name}}" height="28" style="height:28px;max-width:140px;">{{else}}<span style="font-size:15px;font-weight:600;color:#18181b;letter-spacing:-.2px;">{{.store_name}}</span>{{end}}
+    </td></tr>
+    <tr><td style="padding:28px 32px 36px;">
+      <h1 style="margin:0 0 4px;font-size:20px;font-weight:600;color:#18181b;">Payment failed</h1>
+      <p style="margin:0 0 24px;font-size:14px;color:#71717a;">Action required</p>
+      <p style="margin:0 0 24px;font-size:15px;line-height:1.65;color:#3f3f46;">Hi {{.customer_name}}, your payment of <strong>{{.payment_amount}}</strong> could not be processed. Please update your payment method and try again.</p>
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="background:#18181b;border-radius:6px;">
+        <a href="{{.store_url}}" style="display:inline-block;padding:11px 24px;font-size:14px;font-weight:500;color:#fff;text-decoration:none;">Update payment</a>
+      </td></tr></table>
+    </td></tr>
+  </table>
+</td></tr>
+<tr><td style="padding:20px 0 0;text-align:center;">
+  <p style="margin:0;font-size:12px;color:#a1a1aa;">{{.store_name}}</p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">Mark8ly</a></p>
+</td></tr>
 </table>
 </td></tr></table>
 </body></html>',
@@ -289,32 +299,36 @@ INSERT INTO notification_templates (
     'Customer Welcome',
     'Sent to new customers when they create an account',
     'EMAIL', 'customer',
-    'Welcome to {{.store_name}}!',
+    'Welcome to {{.store_name}}',
     'Hi {{.customer_name}},
 
-Welcome to {{.store_name}}! We''re excited to have you.
+Welcome to {{.store_name}}. Your account is ready.
 
-Start browsing: {{.store_url}}
-
-Happy shopping!',
+Start browsing: {{.store_url}}',
     '<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background-color:#F8FAFC;font-family:''Source Sans 3'',''Inter'',''Segoe UI'',Arial,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F8FAFC;">
-<tr><td style="padding:40px 20px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;">
-  <tr><td style="background-color:{{if .brand_primary_color}}{{.brand_primary_color}}{{else}}#0F172A{{end}};padding:24px 32px;border-radius:10px 10px 0 0;">
-    {{if .brand_logo_url}}<img src="{{.brand_logo_url}}" alt="{{.store_name}}" style="max-height:32px;">{{else}}<p style="margin:0;color:#FFFFFF;font-size:18px;font-weight:600;">{{.store_name}}</p>{{end}}
-  </td></tr>
-  <tr><td style="background-color:#FFFFFF;padding:32px;border:1px solid #E2E8F0;border-top:none;">
-    <h1 style="margin:0 0 16px;color:#0F172A;font-size:24px;font-weight:700;">Welcome!</h1>
-    <p style="margin:0 0 16px;color:#334155;font-size:16px;line-height:1.6;">Hi {{.customer_name}},</p>
-    <p style="margin:0 0 24px;color:#334155;font-size:16px;line-height:1.6;">Thanks for joining {{.store_name}}. Your account is ready and you can start shopping right away.</p>
-    <a href="{{.store_url}}" style="display:inline-block;background-color:#0F172A;color:#FFFFFF;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">Start Shopping</a>
-  </td></tr>
-  <tr><td style="padding:24px 32px;border:1px solid #E2E8F0;border-top:none;border-radius:0 0 10px 10px;background-color:#FFFFFF;">
-    <p style="margin:0;color:#94A3B8;font-size:12px;text-align:center;">{{.store_name}} &mdash; Powered by Tesserix</p>
-  </td></tr>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,''Segoe UI'',Roboto,''Helvetica Neue'',Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;"><tr><td style="padding:48px 24px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:512px;margin:0 auto;">
+<tr><td>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;border:1px solid #e4e4e7;">
+    <tr><td style="height:3px;background:{{if .brand_primary_color}}{{.brand_primary_color}}{{else}}#18181b{{end}};border-radius:12px 12px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
+    <tr><td style="padding:32px 32px 0;text-align:center;">
+      {{if .brand_logo_url}}<img src="{{.brand_logo_url}}" alt="{{.store_name}}" height="28" style="height:28px;max-width:140px;">{{else}}<span style="font-size:15px;font-weight:600;color:#18181b;letter-spacing:-.2px;">{{.store_name}}</span>{{end}}
+    </td></tr>
+    <tr><td style="padding:28px 32px 36px;">
+      <h1 style="margin:0 0 24px;font-size:20px;font-weight:600;color:#18181b;">Welcome to {{.store_name}}</h1>
+      <p style="margin:0 0 24px;font-size:15px;line-height:1.65;color:#3f3f46;">Hi {{.customer_name}}, your account is ready. You can now browse products, track orders, and more.</p>
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="background:#18181b;border-radius:6px;">
+        <a href="{{.store_url}}" style="display:inline-block;padding:11px 24px;font-size:14px;font-weight:500;color:#fff;text-decoration:none;">Start shopping</a>
+      </td></tr></table>
+    </td></tr>
+  </table>
+</td></tr>
+<tr><td style="padding:20px 0 0;text-align:center;">
+  <p style="margin:0;font-size:12px;color:#a1a1aa;">{{.store_name}}</p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">Mark8ly</a></p>
+</td></tr>
 </table>
 </td></tr></table>
 </body></html>',
@@ -333,39 +347,39 @@ INSERT INTO notification_templates (
     'Password Reset',
     'Sent when a user requests a password reset',
     'EMAIL', 'auth',
-    'Reset Your Password',
-    'Hi {{.user_name}},
-
-We received a request to reset your password.
+    'Reset your password',
+    'We received a request to reset your password.
 
 Reset here: {{.reset_url}}
 
-If you didn''t request this, ignore this email.
-
-This link expires in 1 hour.
+If you didn''t request this, ignore this email. This link expires in 1 hour.
 
 {{.store_name}}',
     '<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background-color:#F8FAFC;font-family:''Source Sans 3'',''Inter'',''Segoe UI'',Arial,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F8FAFC;">
-<tr><td style="padding:40px 20px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;">
-  <tr><td style="background-color:{{if .brand_primary_color}}{{.brand_primary_color}}{{else}}#0F172A{{end}};padding:24px 32px;border-radius:10px 10px 0 0;">
-    {{if .brand_logo_url}}<img src="{{.brand_logo_url}}" alt="{{.store_name}}" style="max-height:32px;">{{else}}<p style="margin:0;color:#FFFFFF;font-size:18px;font-weight:600;">{{.store_name}}</p>{{end}}
-  </td></tr>
-  <tr><td style="background-color:#FFFFFF;padding:32px;border:1px solid #E2E8F0;border-top:none;">
-    <h1 style="margin:0 0 16px;color:#0F172A;font-size:24px;font-weight:700;">Reset Your Password</h1>
-    <p style="margin:0 0 24px;color:#334155;font-size:16px;line-height:1.6;">We received a request to reset your password. Click the button below to choose a new one.</p>
-    <div style="text-align:center;margin:0 0 24px;">
-      <a href="{{.reset_url}}" style="display:inline-block;background-color:#0F172A;color:#FFFFFF;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">Reset Password</a>
-    </div>
-    <p style="margin:0 0 8px;color:#64748B;font-size:14px;line-height:1.6;">If you didn''t request this, you can safely ignore this email.</p>
-    <p style="margin:0;color:#94A3B8;font-size:12px;">This link expires in 1 hour.</p>
-  </td></tr>
-  <tr><td style="padding:24px 32px;border:1px solid #E2E8F0;border-top:none;border-radius:0 0 10px 10px;background-color:#FFFFFF;">
-    <p style="margin:0;color:#94A3B8;font-size:12px;text-align:center;">{{.store_name}} &mdash; Powered by Tesserix</p>
-  </td></tr>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,''Segoe UI'',Roboto,''Helvetica Neue'',Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;"><tr><td style="padding:48px 24px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:512px;margin:0 auto;">
+<tr><td>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;border:1px solid #e4e4e7;">
+    <tr><td style="height:3px;background:{{if .brand_primary_color}}{{.brand_primary_color}}{{else}}#18181b{{end}};border-radius:12px 12px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
+    <tr><td style="padding:32px 32px 0;text-align:center;">
+      {{if .brand_logo_url}}<img src="{{.brand_logo_url}}" alt="{{.store_name}}" height="28" style="height:28px;max-width:140px;">{{else}}<span style="font-size:15px;font-weight:600;color:#18181b;letter-spacing:-.2px;">{{.store_name}}</span>{{end}}
+    </td></tr>
+    <tr><td style="padding:28px 32px 36px;">
+      <h1 style="margin:0 0 24px;font-size:20px;font-weight:600;color:#18181b;">Reset your password</h1>
+      <p style="margin:0 0 24px;font-size:15px;line-height:1.65;color:#3f3f46;">We received a request to reset your password. Click below to choose a new one.</p>
+      <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td style="background:#18181b;border-radius:6px;">
+        <a href="{{.reset_url}}" style="display:inline-block;padding:11px 24px;font-size:14px;font-weight:500;color:#fff;text-decoration:none;">Reset password</a>
+      </td></tr></table>
+      <p style="margin:0;font-size:13px;line-height:1.5;color:#a1a1aa;">If you didn''t request this, you can ignore this email. This link expires in 1 hour.</p>
+    </td></tr>
+  </table>
+</td></tr>
+<tr><td style="padding:20px 0 0;text-align:center;">
+  <p style="margin:0;font-size:12px;color:#a1a1aa;">{{.store_name}}</p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">Mark8ly</a></p>
+</td></tr>
 </table>
 </td></tr></table>
 </body></html>',
@@ -382,34 +396,37 @@ INSERT INTO notification_templates (
     'Email Verification',
     'Sent to verify a user''s email address',
     'EMAIL', 'auth',
-    'Verify Your Email',
-    'Hi {{.user_name}},
-
-Your verification code is: {{.verification_code}}
+    'Verify your email',
+    'Your verification code is: {{.verification_code}}
 
 This code expires in 10 minutes.
 
 {{.store_name}}',
     '<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background-color:#F8FAFC;font-family:''Source Sans 3'',''Inter'',''Segoe UI'',Arial,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F8FAFC;">
-<tr><td style="padding:40px 20px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;">
-  <tr><td style="background-color:{{if .brand_primary_color}}{{.brand_primary_color}}{{else}}#0F172A{{end}};padding:24px 32px;border-radius:10px 10px 0 0;">
-    {{if .brand_logo_url}}<img src="{{.brand_logo_url}}" alt="{{.store_name}}" style="max-height:32px;">{{else}}<p style="margin:0;color:#FFFFFF;font-size:18px;font-weight:600;">{{.store_name}}</p>{{end}}
-  </td></tr>
-  <tr><td style="background-color:#FFFFFF;padding:32px;border:1px solid #E2E8F0;border-top:none;">
-    <h1 style="margin:0 0 16px;color:#0F172A;font-size:24px;font-weight:700;">Verify Your Email</h1>
-    <p style="margin:0 0 24px;color:#334155;font-size:16px;line-height:1.6;">Use the code below to verify your email address.</p>
-    <div style="text-align:center;margin:0 0 24px;">
-      <span style="display:inline-block;background-color:#F1F5F9;padding:16px 32px;font-size:32px;letter-spacing:8px;font-weight:700;border-radius:8px;color:#0F172A;border:1px solid #E2E8F0;">{{.verification_code}}</span>
-    </div>
-    <p style="margin:0;color:#94A3B8;font-size:12px;text-align:center;">This code expires in 10 minutes.</p>
-  </td></tr>
-  <tr><td style="padding:24px 32px;border:1px solid #E2E8F0;border-top:none;border-radius:0 0 10px 10px;background-color:#FFFFFF;">
-    <p style="margin:0;color:#94A3B8;font-size:12px;text-align:center;">{{.store_name}} &mdash; Powered by Tesserix</p>
-  </td></tr>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,''Segoe UI'',Roboto,''Helvetica Neue'',Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;"><tr><td style="padding:48px 24px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:512px;margin:0 auto;">
+<tr><td>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;border:1px solid #e4e4e7;">
+    <tr><td style="height:3px;background:{{if .brand_primary_color}}{{.brand_primary_color}}{{else}}#18181b{{end}};border-radius:12px 12px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
+    <tr><td style="padding:32px 32px 0;text-align:center;">
+      {{if .brand_logo_url}}<img src="{{.brand_logo_url}}" alt="{{.store_name}}" height="28" style="height:28px;max-width:140px;">{{else}}<span style="font-size:15px;font-weight:600;color:#18181b;letter-spacing:-.2px;">{{.store_name}}</span>{{end}}
+    </td></tr>
+    <tr><td style="padding:28px 32px 36px;">
+      <h1 style="margin:0 0 24px;font-size:20px;font-weight:600;color:#18181b;">Verify your email</h1>
+      <p style="margin:0 0 24px;font-size:15px;line-height:1.65;color:#3f3f46;">Enter this code to verify your email address:</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td style="text-align:center;padding:24px;background:#fafafa;border-radius:8px;">
+        <span style="font-size:32px;font-weight:700;letter-spacing:6px;color:#18181b;">{{.verification_code}}</span>
+      </td></tr></table>
+      <p style="margin:0;font-size:13px;color:#a1a1aa;text-align:center;">This code expires in 10 minutes.</p>
+    </td></tr>
+  </table>
+</td></tr>
+<tr><td style="padding:20px 0 0;text-align:center;">
+  <p style="margin:0;font-size:12px;color:#a1a1aa;">{{.store_name}}</p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">Mark8ly</a></p>
+</td></tr>
 </table>
 </td></tr></table>
 </body></html>',
@@ -428,35 +445,38 @@ INSERT INTO notification_templates (
     'Review Request',
     'Sent to ask a customer to review their purchase',
     'EMAIL', 'review',
-    'How was your purchase, {{.customer_name}}?',
+    'How was {{.product_name}}?',
     'Hi {{.customer_name}},
 
-We hope you''re enjoying {{.product_name}}!
+We''d love to hear what you think of {{.product_name}}.
 
-We''d love to hear your thoughts. Leave a review: {{.review_url}}
+Leave a review: {{.review_url}}
 
-Thanks!
 {{.store_name}}',
     '<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background-color:#F8FAFC;font-family:''Source Sans 3'',''Inter'',''Segoe UI'',Arial,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F8FAFC;">
-<tr><td style="padding:40px 20px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;">
-  <tr><td style="background-color:{{if .brand_primary_color}}{{.brand_primary_color}}{{else}}#0F172A{{end}};padding:24px 32px;border-radius:10px 10px 0 0;">
-    {{if .brand_logo_url}}<img src="{{.brand_logo_url}}" alt="{{.store_name}}" style="max-height:32px;">{{else}}<p style="margin:0;color:#FFFFFF;font-size:18px;font-weight:600;">{{.store_name}}</p>{{end}}
-  </td></tr>
-  <tr><td style="background-color:#FFFFFF;padding:32px;border:1px solid #E2E8F0;border-top:none;">
-    <h1 style="margin:0 0 16px;color:#0F172A;font-size:24px;font-weight:700;">How was your purchase?</h1>
-    <p style="margin:0 0 16px;color:#334155;font-size:16px;line-height:1.6;">Hi {{.customer_name}},</p>
-    <p style="margin:0 0 24px;color:#334155;font-size:16px;line-height:1.6;">We hope you''re enjoying <strong>{{.product_name}}</strong>. Your feedback helps other shoppers and helps us improve.</p>
-    <div style="text-align:center;margin:0 0 24px;">
-      <a href="{{.review_url}}" style="display:inline-block;background-color:#0F172A;color:#FFFFFF;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">Write a Review</a>
-    </div>
-  </td></tr>
-  <tr><td style="padding:24px 32px;border:1px solid #E2E8F0;border-top:none;border-radius:0 0 10px 10px;background-color:#FFFFFF;">
-    <p style="margin:0;color:#94A3B8;font-size:12px;text-align:center;">{{.store_name}} &mdash; Powered by Tesserix</p>
-  </td></tr>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,''Segoe UI'',Roboto,''Helvetica Neue'',Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;"><tr><td style="padding:48px 24px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:512px;margin:0 auto;">
+<tr><td>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;border:1px solid #e4e4e7;">
+    <tr><td style="height:3px;background:{{if .brand_primary_color}}{{.brand_primary_color}}{{else}}#18181b{{end}};border-radius:12px 12px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
+    <tr><td style="padding:32px 32px 0;text-align:center;">
+      {{if .brand_logo_url}}<img src="{{.brand_logo_url}}" alt="{{.store_name}}" height="28" style="height:28px;max-width:140px;">{{else}}<span style="font-size:15px;font-weight:600;color:#18181b;letter-spacing:-.2px;">{{.store_name}}</span>{{end}}
+    </td></tr>
+    <tr><td style="padding:28px 32px 36px;">
+      <h1 style="margin:0 0 24px;font-size:20px;font-weight:600;color:#18181b;">How was your purchase?</h1>
+      <p style="margin:0 0 24px;font-size:15px;line-height:1.65;color:#3f3f46;">Hi {{.customer_name}}, we''d love to hear what you think of <strong>{{.product_name}}</strong>. Your feedback helps other shoppers.</p>
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="background:#18181b;border-radius:6px;">
+        <a href="{{.review_url}}" style="display:inline-block;padding:11px 24px;font-size:14px;font-weight:500;color:#fff;text-decoration:none;">Write a review</a>
+      </td></tr></table>
+    </td></tr>
+  </table>
+</td></tr>
+<tr><td style="padding:20px 0 0;text-align:center;">
+  <p style="margin:0;font-size:12px;color:#a1a1aa;">{{.store_name}}</p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">Mark8ly</a></p>
+</td></tr>
 </table>
 </td></tr></table>
 </body></html>',
@@ -475,41 +495,44 @@ INSERT INTO notification_templates (
     'Ticket Created',
     'Sent when a support ticket is created',
     'EMAIL', 'ticket',
-    'Ticket #{{.ticket_id}} - {{.ticket_subject}}',
+    'Re: {{.ticket_subject}} (#{{.ticket_id}})',
     'Hi {{.customer_name}},
 
-Your support ticket has been created.
+We''ve received your request and will get back to you shortly.
 
 Ticket: {{.ticket_id}}
 Subject: {{.ticket_subject}}
 
-We''ll get back to you shortly.
-
 {{.store_name}}',
     '<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background-color:#F8FAFC;font-family:''Source Sans 3'',''Inter'',''Segoe UI'',Arial,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F8FAFC;">
-<tr><td style="padding:40px 20px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;">
-  <tr><td style="background-color:{{if .brand_primary_color}}{{.brand_primary_color}}{{else}}#0F172A{{end}};padding:24px 32px;border-radius:10px 10px 0 0;">
-    {{if .brand_logo_url}}<img src="{{.brand_logo_url}}" alt="{{.store_name}}" style="max-height:32px;">{{else}}<p style="margin:0;color:#FFFFFF;font-size:18px;font-weight:600;">{{.store_name}}</p>{{end}}
-  </td></tr>
-  <tr><td style="background-color:#FFFFFF;padding:32px;border:1px solid #E2E8F0;border-top:none;">
-    <h1 style="margin:0 0 16px;color:#0F172A;font-size:24px;font-weight:700;">Ticket Created</h1>
-    <p style="margin:0 0 16px;color:#334155;font-size:16px;line-height:1.6;">Hi {{.customer_name}},</p>
-    <p style="margin:0 0 24px;color:#334155;font-size:16px;line-height:1.6;">We''ve received your support request and will get back to you shortly.</p>
-    <div style="background-color:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:20px;margin:0 0 24px;">
-      <p style="margin:0 0 8px;color:#64748B;font-size:14px;">Ticket ID</p>
-      <p style="margin:0 0 16px;color:#0F172A;font-size:16px;font-weight:600;">{{.ticket_id}}</p>
-      <p style="margin:0 0 8px;color:#64748B;font-size:14px;">Subject</p>
-      <p style="margin:0;color:#0F172A;font-size:16px;font-weight:600;">{{.ticket_subject}}</p>
-    </div>
-    <a href="{{.ticket_url}}" style="display:inline-block;background-color:#0F172A;color:#FFFFFF;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">View Ticket</a>
-  </td></tr>
-  <tr><td style="padding:24px 32px;border:1px solid #E2E8F0;border-top:none;border-radius:0 0 10px 10px;background-color:#FFFFFF;">
-    <p style="margin:0;color:#94A3B8;font-size:12px;text-align:center;">{{.store_name}} &mdash; Powered by Tesserix</p>
-  </td></tr>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,''Segoe UI'',Roboto,''Helvetica Neue'',Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;"><tr><td style="padding:48px 24px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:512px;margin:0 auto;">
+<tr><td>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;border:1px solid #e4e4e7;">
+    <tr><td style="height:3px;background:{{if .brand_primary_color}}{{.brand_primary_color}}{{else}}#18181b{{end}};border-radius:12px 12px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
+    <tr><td style="padding:32px 32px 0;text-align:center;">
+      {{if .brand_logo_url}}<img src="{{.brand_logo_url}}" alt="{{.store_name}}" height="28" style="height:28px;max-width:140px;">{{else}}<span style="font-size:15px;font-weight:600;color:#18181b;letter-spacing:-.2px;">{{.store_name}}</span>{{end}}
+    </td></tr>
+    <tr><td style="padding:28px 32px 36px;">
+      <h1 style="margin:0 0 4px;font-size:20px;font-weight:600;color:#18181b;">We got your message</h1>
+      <p style="margin:0 0 24px;font-size:14px;color:#71717a;">Ticket #{{.ticket_id}}</p>
+      <p style="margin:0 0 20px;font-size:15px;line-height:1.65;color:#3f3f46;">Hi {{.customer_name}}, we''ve received your request and will get back to you shortly.</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td style="padding:16px 20px;background:#fafafa;border-radius:8px;">
+        <p style="margin:0 0 2px;font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;">Subject</p>
+        <p style="margin:0;font-size:15px;color:#3f3f46;">{{.ticket_subject}}</p>
+      </td></tr></table>
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="background:#18181b;border-radius:6px;">
+        <a href="{{.ticket_url}}" style="display:inline-block;padding:11px 24px;font-size:14px;font-weight:500;color:#fff;text-decoration:none;">View ticket</a>
+      </td></tr></table>
+    </td></tr>
+  </table>
+</td></tr>
+<tr><td style="padding:20px 0 0;text-align:center;">
+  <p style="margin:0;font-size:12px;color:#a1a1aa;">{{.store_name}}</p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">Mark8ly</a></p>
+</td></tr>
 </table>
 </td></tr></table>
 </body></html>',
@@ -528,37 +551,42 @@ INSERT INTO notification_templates (
     'Vendor Application Received',
     'Sent when a new vendor applies to sell on the marketplace',
     'EMAIL', 'vendor',
-    'New Vendor Application - {{.vendor_name}}',
-    'Hello,
-
-A new vendor has applied to {{.store_name}}.
+    'New vendor application — {{.vendor_name}}',
+    'A new vendor has applied to {{.store_name}}.
 
 Vendor: {{.vendor_name}} ({{.vendor_email}})
 
 Review: {{.action_url}}',
     '<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background-color:#F8FAFC;font-family:''Source Sans 3'',''Inter'',''Segoe UI'',Arial,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F8FAFC;">
-<tr><td style="padding:40px 20px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;">
-  <tr><td style="background-color:{{if .brand_primary_color}}{{.brand_primary_color}}{{else}}#0F172A{{end}};padding:24px 32px;border-radius:10px 10px 0 0;">
-    {{if .brand_logo_url}}<img src="{{.brand_logo_url}}" alt="{{.store_name}}" style="max-height:32px;">{{else}}<p style="margin:0;color:#FFFFFF;font-size:18px;font-weight:600;">{{.store_name}}</p>{{end}}
-  </td></tr>
-  <tr><td style="background-color:#FFFFFF;padding:32px;border:1px solid #E2E8F0;border-top:none;">
-    <h1 style="margin:0 0 16px;color:#0F172A;font-size:24px;font-weight:700;">New Vendor Application</h1>
-    <p style="margin:0 0 24px;color:#334155;font-size:16px;line-height:1.6;">A new vendor has applied to sell on your marketplace.</p>
-    <div style="background-color:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:20px;margin:0 0 24px;">
-      <p style="margin:0 0 8px;color:#64748B;font-size:14px;">Vendor</p>
-      <p style="margin:0 0 16px;color:#0F172A;font-size:16px;font-weight:600;">{{.vendor_name}}</p>
-      <p style="margin:0 0 8px;color:#64748B;font-size:14px;">Email</p>
-      <p style="margin:0;color:#0F172A;font-size:14px;">{{.vendor_email}}</p>
-    </div>
-    <a href="{{.action_url}}" style="display:inline-block;background-color:#0F172A;color:#FFFFFF;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">Review Application</a>
-  </td></tr>
-  <tr><td style="padding:24px 32px;border:1px solid #E2E8F0;border-top:none;border-radius:0 0 10px 10px;background-color:#FFFFFF;">
-    <p style="margin:0;color:#94A3B8;font-size:12px;text-align:center;">{{.store_name}} &mdash; Powered by Tesserix</p>
-  </td></tr>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,''Segoe UI'',Roboto,''Helvetica Neue'',Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;"><tr><td style="padding:48px 24px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:512px;margin:0 auto;">
+<tr><td>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;border:1px solid #e4e4e7;">
+    <tr><td style="height:3px;background:{{if .brand_primary_color}}{{.brand_primary_color}}{{else}}#18181b{{end}};border-radius:12px 12px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
+    <tr><td style="padding:32px 32px 0;text-align:center;">
+      {{if .brand_logo_url}}<img src="{{.brand_logo_url}}" alt="{{.store_name}}" height="28" style="height:28px;max-width:140px;">{{else}}<span style="font-size:15px;font-weight:600;color:#18181b;letter-spacing:-.2px;">{{.store_name}}</span>{{end}}
+    </td></tr>
+    <tr><td style="padding:28px 32px 36px;">
+      <h1 style="margin:0 0 24px;font-size:20px;font-weight:600;color:#18181b;">New vendor application</h1>
+      <p style="margin:0 0 20px;font-size:15px;line-height:1.65;color:#3f3f46;">A new vendor has applied to sell on your marketplace.</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td style="padding:16px 20px;background:#fafafa;border-radius:8px;">
+        <p style="margin:0 0 2px;font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;">Vendor</p>
+        <p style="margin:0 0 14px;font-size:15px;font-weight:600;color:#18181b;">{{.vendor_name}}</p>
+        <p style="margin:0 0 2px;font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;">Email</p>
+        <p style="margin:0;font-size:15px;color:#3f3f46;">{{.vendor_email}}</p>
+      </td></tr></table>
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="background:#18181b;border-radius:6px;">
+        <a href="{{.action_url}}" style="display:inline-block;padding:11px 24px;font-size:14px;font-weight:500;color:#fff;text-decoration:none;">Review application</a>
+      </td></tr></table>
+    </td></tr>
+  </table>
+</td></tr>
+<tr><td style="padding:20px 0 0;text-align:center;">
+  <p style="margin:0;font-size:12px;color:#a1a1aa;">{{.store_name}}</p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">Mark8ly</a></p>
+</td></tr>
 </table>
 </td></tr></table>
 </body></html>',
@@ -577,10 +605,10 @@ INSERT INTO notification_templates (
     'Coupon Created',
     'Sent when a new coupon is available for a customer',
     'EMAIL', 'coupon',
-    'You''ve got a discount! Code: {{.coupon_code}}',
+    'Your discount code: {{.coupon_code}}',
     'Hi {{.customer_name}},
 
-Great news! Use code {{.coupon_code}} to get {{.discount_amount}} off.
+Use code {{.coupon_code}} to get {{.discount_amount}} off.
 
 Expires: {{.expiry_date}}
 
@@ -589,29 +617,33 @@ Shop now: {{.store_url}}
 {{.store_name}}',
     '<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background-color:#F8FAFC;font-family:''Source Sans 3'',''Inter'',''Segoe UI'',Arial,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F8FAFC;">
-<tr><td style="padding:40px 20px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;">
-  <tr><td style="background-color:{{if .brand_primary_color}}{{.brand_primary_color}}{{else}}#0F172A{{end}};padding:24px 32px;border-radius:10px 10px 0 0;">
-    {{if .brand_logo_url}}<img src="{{.brand_logo_url}}" alt="{{.store_name}}" style="max-height:32px;">{{else}}<p style="margin:0;color:#FFFFFF;font-size:18px;font-weight:600;">{{.store_name}}</p>{{end}}
-  </td></tr>
-  <tr><td style="background-color:#FFFFFF;padding:32px;border:1px solid #E2E8F0;border-top:none;">
-    <h1 style="margin:0 0 16px;color:#0F172A;font-size:24px;font-weight:700;">You''ve Got a Discount!</h1>
-    <p style="margin:0 0 16px;color:#334155;font-size:16px;line-height:1.6;">Hi {{.customer_name}},</p>
-    <div style="background-color:#F0FDF4;border:2px dashed #10B981;border-radius:8px;padding:24px;margin:0 0 24px;text-align:center;">
-      <p style="margin:0 0 8px;color:#059669;font-size:14px;font-weight:600;">YOUR CODE</p>
-      <p style="margin:0 0 8px;color:#0F172A;font-size:28px;font-weight:700;letter-spacing:2px;">{{.coupon_code}}</p>
-      <p style="margin:0;color:#059669;font-size:16px;font-weight:600;">{{.discount_amount}} off</p>
-    </div>
-    <p style="margin:0 0 24px;color:#64748B;font-size:14px;text-align:center;">Expires {{.expiry_date}}</p>
-    <div style="text-align:center;">
-      <a href="{{.store_url}}" style="display:inline-block;background-color:#0F172A;color:#FFFFFF;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">Shop Now</a>
-    </div>
-  </td></tr>
-  <tr><td style="padding:24px 32px;border:1px solid #E2E8F0;border-top:none;border-radius:0 0 10px 10px;background-color:#FFFFFF;">
-    <p style="margin:0;color:#94A3B8;font-size:12px;text-align:center;">{{.store_name}} &mdash; Powered by Tesserix</p>
-  </td></tr>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,''Segoe UI'',Roboto,''Helvetica Neue'',Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;"><tr><td style="padding:48px 24px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:512px;margin:0 auto;">
+<tr><td>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;border:1px solid #e4e4e7;">
+    <tr><td style="height:3px;background:{{if .brand_primary_color}}{{.brand_primary_color}}{{else}}#18181b{{end}};border-radius:12px 12px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
+    <tr><td style="padding:32px 32px 0;text-align:center;">
+      {{if .brand_logo_url}}<img src="{{.brand_logo_url}}" alt="{{.store_name}}" height="28" style="height:28px;max-width:140px;">{{else}}<span style="font-size:15px;font-weight:600;color:#18181b;letter-spacing:-.2px;">{{.store_name}}</span>{{end}}
+    </td></tr>
+    <tr><td style="padding:28px 32px 36px;">
+      <h1 style="margin:0 0 24px;font-size:20px;font-weight:600;color:#18181b;">You have a discount</h1>
+      <p style="margin:0 0 24px;font-size:15px;line-height:1.65;color:#3f3f46;">Hi {{.customer_name}}, here''s a discount code for you:</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 8px;"><tr><td style="text-align:center;padding:24px;background:#fafafa;border:1px dashed #e4e4e7;border-radius:8px;">
+        <p style="margin:0 0 6px;font-size:24px;font-weight:700;letter-spacing:2px;color:#18181b;">{{.coupon_code}}</p>
+        <p style="margin:0;font-size:15px;font-weight:600;color:#71717a;">{{.discount_amount}} off</p>
+      </td></tr></table>
+      <p style="margin:0 0 24px;font-size:13px;color:#a1a1aa;text-align:center;">Expires {{.expiry_date}}</p>
+      <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;"><tr><td style="background:#18181b;border-radius:6px;">
+        <a href="{{.store_url}}" style="display:inline-block;padding:11px 24px;font-size:14px;font-weight:500;color:#fff;text-decoration:none;">Shop now</a>
+      </td></tr></table>
+    </td></tr>
+  </table>
+</td></tr>
+<tr><td style="padding:20px 0 0;text-align:center;">
+  <p style="margin:0;font-size:12px;color:#a1a1aa;">{{.store_name}}</p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">Mark8ly</a></p>
+</td></tr>
 </table>
 </td></tr></table>
 </body></html>',
@@ -630,7 +662,7 @@ INSERT INTO notification_templates (
     'Low Stock Alert',
     'Sent to store admin when product stock falls below threshold',
     'EMAIL', 'inventory',
-    'Low Stock Alert: {{.product_name}}',
+    'Low stock: {{.product_name}}',
     'Low stock warning for {{.product_name}} (SKU: {{.sku}}).
 
 Current stock: {{.current_stock}} (threshold: {{.threshold}})
@@ -640,27 +672,36 @@ Manage inventory: {{.inventory_url}}
 {{.store_name}}',
     '<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background-color:#F8FAFC;font-family:''Source Sans 3'',''Inter'',''Segoe UI'',Arial,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F8FAFC;">
-<tr><td style="padding:40px 20px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;">
-  <tr><td style="background-color:{{if .brand_primary_color}}{{.brand_primary_color}}{{else}}#0F172A{{end}};padding:24px 32px;border-radius:10px 10px 0 0;">
-    {{if .brand_logo_url}}<img src="{{.brand_logo_url}}" alt="{{.store_name}}" style="max-height:32px;">{{else}}<p style="margin:0;color:#FFFFFF;font-size:18px;font-weight:600;">{{.store_name}}</p>{{end}}
-  </td></tr>
-  <tr><td style="background-color:#FFFFFF;padding:32px;border:1px solid #E2E8F0;border-top:none;">
-    <h1 style="margin:0 0 16px;color:#D97706;font-size:24px;font-weight:700;">Low Stock Alert</h1>
-    <p style="margin:0 0 24px;color:#334155;font-size:16px;line-height:1.6;">A product has fallen below the low-stock threshold.</p>
-    <div style="background-color:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:20px;margin:0 0 24px;">
-      <p style="margin:0 0 8px;color:#64748B;font-size:14px;">Product</p>
-      <p style="margin:0 0 16px;color:#0F172A;font-size:16px;font-weight:600;">{{.product_name}} ({{.sku}})</p>
-      <p style="margin:0 0 8px;color:#64748B;font-size:14px;">Current Stock / Threshold</p>
-      <p style="margin:0;color:#D97706;font-size:20px;font-weight:700;">{{.current_stock}} / {{.threshold}}</p>
-    </div>
-    <a href="{{.inventory_url}}" style="display:inline-block;background-color:#0F172A;color:#FFFFFF;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">Manage Inventory</a>
-  </td></tr>
-  <tr><td style="padding:24px 32px;border:1px solid #E2E8F0;border-top:none;border-radius:0 0 10px 10px;background-color:#FFFFFF;">
-    <p style="margin:0;color:#94A3B8;font-size:12px;text-align:center;">{{.store_name}} &mdash; Powered by Tesserix</p>
-  </td></tr>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,''Segoe UI'',Roboto,''Helvetica Neue'',Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;"><tr><td style="padding:48px 24px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:512px;margin:0 auto;">
+<tr><td>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;border:1px solid #e4e4e7;">
+    <tr><td style="height:3px;background:{{if .brand_primary_color}}{{.brand_primary_color}}{{else}}#18181b{{end}};border-radius:12px 12px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
+    <tr><td style="padding:32px 32px 0;text-align:center;">
+      {{if .brand_logo_url}}<img src="{{.brand_logo_url}}" alt="{{.store_name}}" height="28" style="height:28px;max-width:140px;">{{else}}<span style="font-size:15px;font-weight:600;color:#18181b;letter-spacing:-.2px;">{{.store_name}}</span>{{end}}
+    </td></tr>
+    <tr><td style="padding:28px 32px 36px;">
+      <h1 style="margin:0 0 24px;font-size:20px;font-weight:600;color:#18181b;">Low stock alert</h1>
+      <p style="margin:0 0 20px;font-size:15px;line-height:1.65;color:#3f3f46;">A product has fallen below its stock threshold and may need restocking.</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td style="padding:16px 20px;background:#fafafa;border-radius:8px;">
+        <p style="margin:0 0 2px;font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;">Product</p>
+        <p style="margin:0 0 14px;font-size:15px;font-weight:600;color:#18181b;">{{.product_name}} ({{.sku}})</p>
+        <p style="margin:0 0 2px;font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;">Current stock</p>
+        <p style="margin:0 0 14px;font-size:15px;font-weight:600;color:#18181b;">{{.current_stock}}</p>
+        <p style="margin:0 0 2px;font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;">Threshold</p>
+        <p style="margin:0;font-size:15px;font-weight:600;color:#18181b;">{{.threshold}}</p>
+      </td></tr></table>
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="background:#18181b;border-radius:6px;">
+        <a href="{{.inventory_url}}" style="display:inline-block;padding:11px 24px;font-size:14px;font-weight:500;color:#fff;text-decoration:none;">Manage inventory</a>
+      </td></tr></table>
+    </td></tr>
+  </table>
+</td></tr>
+<tr><td style="padding:20px 0 0;text-align:center;">
+  <p style="margin:0;font-size:12px;color:#a1a1aa;">{{.store_name}}</p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">Mark8ly</a></p>
+</td></tr>
 </table>
 </td></tr></table>
 </body></html>',
@@ -679,8 +720,8 @@ INSERT INTO notification_templates (
     'Approval Required',
     'Sent when an item needs approval',
     'EMAIL', 'approval',
-    'Approval Needed: {{.item_name}}',
-    '{{.requester_name}} has submitted "{{.item_name}}" for approval.
+    'Approval needed: {{.item_name}}',
+    '{{.requester_name}} submitted "{{.item_name}}" for approval.
 
 Type: {{.approval_type}}
 Review: {{.approval_url}}
@@ -688,27 +729,34 @@ Review: {{.approval_url}}
 {{.store_name}}',
     '<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background-color:#F8FAFC;font-family:''Source Sans 3'',''Inter'',''Segoe UI'',Arial,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F8FAFC;">
-<tr><td style="padding:40px 20px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;">
-  <tr><td style="background-color:{{if .brand_primary_color}}{{.brand_primary_color}}{{else}}#0F172A{{end}};padding:24px 32px;border-radius:10px 10px 0 0;">
-    {{if .brand_logo_url}}<img src="{{.brand_logo_url}}" alt="{{.store_name}}" style="max-height:32px;">{{else}}<p style="margin:0;color:#FFFFFF;font-size:18px;font-weight:600;">{{.store_name}}</p>{{end}}
-  </td></tr>
-  <tr><td style="background-color:#FFFFFF;padding:32px;border:1px solid #E2E8F0;border-top:none;">
-    <h1 style="margin:0 0 16px;color:#0F172A;font-size:24px;font-weight:700;">Approval Required</h1>
-    <p style="margin:0 0 24px;color:#334155;font-size:16px;line-height:1.6;"><strong>{{.requester_name}}</strong> has submitted an item for your approval.</p>
-    <div style="background-color:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:20px;margin:0 0 24px;">
-      <p style="margin:0 0 8px;color:#64748B;font-size:14px;">Item</p>
-      <p style="margin:0 0 16px;color:#0F172A;font-size:16px;font-weight:600;">{{.item_name}}</p>
-      <p style="margin:0 0 8px;color:#64748B;font-size:14px;">Type</p>
-      <p style="margin:0;color:#0F172A;font-size:14px;">{{.approval_type}}</p>
-    </div>
-    <a href="{{.approval_url}}" style="display:inline-block;background-color:#0F172A;color:#FFFFFF;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">Review Now</a>
-  </td></tr>
-  <tr><td style="padding:24px 32px;border:1px solid #E2E8F0;border-top:none;border-radius:0 0 10px 10px;background-color:#FFFFFF;">
-    <p style="margin:0;color:#94A3B8;font-size:12px;text-align:center;">{{.store_name}} &mdash; Powered by Tesserix</p>
-  </td></tr>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,''Segoe UI'',Roboto,''Helvetica Neue'',Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;"><tr><td style="padding:48px 24px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:512px;margin:0 auto;">
+<tr><td>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;border:1px solid #e4e4e7;">
+    <tr><td style="height:3px;background:{{if .brand_primary_color}}{{.brand_primary_color}}{{else}}#18181b{{end}};border-radius:12px 12px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
+    <tr><td style="padding:32px 32px 0;text-align:center;">
+      {{if .brand_logo_url}}<img src="{{.brand_logo_url}}" alt="{{.store_name}}" height="28" style="height:28px;max-width:140px;">{{else}}<span style="font-size:15px;font-weight:600;color:#18181b;letter-spacing:-.2px;">{{.store_name}}</span>{{end}}
+    </td></tr>
+    <tr><td style="padding:28px 32px 36px;">
+      <h1 style="margin:0 0 24px;font-size:20px;font-weight:600;color:#18181b;">Approval needed</h1>
+      <p style="margin:0 0 20px;font-size:15px;line-height:1.65;color:#3f3f46;"><strong>{{.requester_name}}</strong> submitted an item for your review.</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td style="padding:16px 20px;background:#fafafa;border-radius:8px;">
+        <p style="margin:0 0 2px;font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;">Item</p>
+        <p style="margin:0 0 14px;font-size:15px;font-weight:600;color:#18181b;">{{.item_name}}</p>
+        <p style="margin:0 0 2px;font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;">Type</p>
+        <p style="margin:0;font-size:15px;color:#3f3f46;">{{.approval_type}}</p>
+      </td></tr></table>
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="background:#18181b;border-radius:6px;">
+        <a href="{{.approval_url}}" style="display:inline-block;padding:11px 24px;font-size:14px;font-weight:500;color:#fff;text-decoration:none;">Review</a>
+      </td></tr></table>
+    </td></tr>
+  </table>
+</td></tr>
+<tr><td style="padding:20px 0 0;text-align:center;">
+  <p style="margin:0;font-size:12px;color:#a1a1aa;">{{.store_name}}</p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">Mark8ly</a></p>
+</td></tr>
 </table>
 </td></tr></table>
 </body></html>',
@@ -727,8 +775,8 @@ INSERT INTO notification_templates (
     'Domain Verified',
     'Sent when a custom domain passes DNS verification',
     'EMAIL', 'domain',
-    'Domain Verified: {{.domain_name}}',
-    'Great news! Your domain {{.domain_name}} has been verified and is now active.
+    'Domain verified: {{.domain_name}}',
+    'Your domain {{.domain_name}} has been verified and is now active.
 
 DNS: {{.dns_status}}
 SSL: {{.ssl_status}}
@@ -738,27 +786,36 @@ Manage domains: {{.settings_url}}
 {{.store_name}}',
     '<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background-color:#F8FAFC;font-family:''Source Sans 3'',''Inter'',''Segoe UI'',Arial,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F8FAFC;">
-<tr><td style="padding:40px 20px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;">
-  <tr><td style="background-color:{{if .brand_primary_color}}{{.brand_primary_color}}{{else}}#0F172A{{end}};padding:24px 32px;border-radius:10px 10px 0 0;">
-    {{if .brand_logo_url}}<img src="{{.brand_logo_url}}" alt="{{.store_name}}" style="max-height:32px;">{{else}}<p style="margin:0;color:#FFFFFF;font-size:18px;font-weight:600;">{{.store_name}}</p>{{end}}
-  </td></tr>
-  <tr><td style="background-color:#FFFFFF;padding:32px;border:1px solid #E2E8F0;border-top:none;">
-    <h1 style="margin:0 0 16px;color:#059669;font-size:24px;font-weight:700;">Domain Verified</h1>
-    <p style="margin:0 0 24px;color:#334155;font-size:16px;line-height:1.6;">Your custom domain is now active.</p>
-    <div style="background-color:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:20px;margin:0 0 24px;">
-      <p style="margin:0 0 8px;color:#64748B;font-size:14px;">Domain</p>
-      <p style="margin:0 0 16px;color:#0F172A;font-size:16px;font-weight:600;">{{.domain_name}}</p>
-      <p style="margin:0 0 8px;color:#64748B;font-size:14px;">DNS / SSL</p>
-      <p style="margin:0;color:#059669;font-size:14px;font-weight:600;">{{.dns_status}} / {{.ssl_status}}</p>
-    </div>
-    <a href="{{.settings_url}}" style="display:inline-block;background-color:#0F172A;color:#FFFFFF;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">Manage Domains</a>
-  </td></tr>
-  <tr><td style="padding:24px 32px;border:1px solid #E2E8F0;border-top:none;border-radius:0 0 10px 10px;background-color:#FFFFFF;">
-    <p style="margin:0;color:#94A3B8;font-size:12px;text-align:center;">{{.store_name}} &mdash; Powered by Tesserix</p>
-  </td></tr>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,''Segoe UI'',Roboto,''Helvetica Neue'',Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;"><tr><td style="padding:48px 24px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:512px;margin:0 auto;">
+<tr><td>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;border:1px solid #e4e4e7;">
+    <tr><td style="height:3px;background:{{if .brand_primary_color}}{{.brand_primary_color}}{{else}}#18181b{{end}};border-radius:12px 12px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
+    <tr><td style="padding:32px 32px 0;text-align:center;">
+      {{if .brand_logo_url}}<img src="{{.brand_logo_url}}" alt="{{.store_name}}" height="28" style="height:28px;max-width:140px;">{{else}}<span style="font-size:15px;font-weight:600;color:#18181b;letter-spacing:-.2px;">{{.store_name}}</span>{{end}}
+    </td></tr>
+    <tr><td style="padding:28px 32px 36px;">
+      <h1 style="margin:0 0 24px;font-size:20px;font-weight:600;color:#18181b;">Domain verified</h1>
+      <p style="margin:0 0 20px;font-size:15px;line-height:1.65;color:#3f3f46;">Your custom domain is now active and serving traffic.</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td style="padding:16px 20px;background:#fafafa;border-radius:8px;">
+        <p style="margin:0 0 2px;font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;">Domain</p>
+        <p style="margin:0 0 14px;font-size:15px;font-weight:600;color:#18181b;">{{.domain_name}}</p>
+        <p style="margin:0 0 2px;font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;">DNS</p>
+        <p style="margin:0 0 14px;font-size:15px;color:#3f3f46;">{{.dns_status}}</p>
+        <p style="margin:0 0 2px;font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;">SSL</p>
+        <p style="margin:0;font-size:15px;color:#3f3f46;">{{.ssl_status}}</p>
+      </td></tr></table>
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="background:#18181b;border-radius:6px;">
+        <a href="{{.settings_url}}" style="display:inline-block;padding:11px 24px;font-size:14px;font-weight:500;color:#fff;text-decoration:none;">Manage domains</a>
+      </td></tr></table>
+    </td></tr>
+  </table>
+</td></tr>
+<tr><td style="padding:20px 0 0;text-align:center;">
+  <p style="margin:0;font-size:12px;color:#a1a1aa;">{{.store_name}}</p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">Mark8ly</a></p>
+</td></tr>
 </table>
 </td></tr></table>
 </body></html>',
@@ -777,8 +834,8 @@ INSERT INTO notification_templates (
     'Campaign Launched',
     'Sent to admin when a marketing campaign goes live',
     'EMAIL', 'campaign',
-    'Campaign Live: {{.campaign_name}}',
-    'Your campaign "{{.campaign_name}}" is now live!
+    'Campaign live: {{.campaign_name}}',
+    'Your campaign "{{.campaign_name}}" is now live.
 
 Runs: {{.start_date}} - {{.end_date}}
 
@@ -787,27 +844,34 @@ View: {{.campaign_url}}
 {{.store_name}}',
     '<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background-color:#F8FAFC;font-family:''Source Sans 3'',''Inter'',''Segoe UI'',Arial,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F8FAFC;">
-<tr><td style="padding:40px 20px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;">
-  <tr><td style="background-color:{{if .brand_primary_color}}{{.brand_primary_color}}{{else}}#0F172A{{end}};padding:24px 32px;border-radius:10px 10px 0 0;">
-    {{if .brand_logo_url}}<img src="{{.brand_logo_url}}" alt="{{.store_name}}" style="max-height:32px;">{{else}}<p style="margin:0;color:#FFFFFF;font-size:18px;font-weight:600;">{{.store_name}}</p>{{end}}
-  </td></tr>
-  <tr><td style="background-color:#FFFFFF;padding:32px;border:1px solid #E2E8F0;border-top:none;">
-    <h1 style="margin:0 0 16px;color:#0F172A;font-size:24px;font-weight:700;">Campaign Live!</h1>
-    <p style="margin:0 0 24px;color:#334155;font-size:16px;line-height:1.6;">Your campaign is now active and reaching customers.</p>
-    <div style="background-color:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:20px;margin:0 0 24px;">
-      <p style="margin:0 0 8px;color:#64748B;font-size:14px;">Campaign</p>
-      <p style="margin:0 0 16px;color:#0F172A;font-size:16px;font-weight:600;">{{.campaign_name}}</p>
-      <p style="margin:0 0 8px;color:#64748B;font-size:14px;">Duration</p>
-      <p style="margin:0;color:#0F172A;font-size:14px;">{{.start_date}} &mdash; {{.end_date}}</p>
-    </div>
-    <a href="{{.campaign_url}}" style="display:inline-block;background-color:#0F172A;color:#FFFFFF;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">View Campaign</a>
-  </td></tr>
-  <tr><td style="padding:24px 32px;border:1px solid #E2E8F0;border-top:none;border-radius:0 0 10px 10px;background-color:#FFFFFF;">
-    <p style="margin:0;color:#94A3B8;font-size:12px;text-align:center;">{{.store_name}} &mdash; Powered by Tesserix</p>
-  </td></tr>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,''Segoe UI'',Roboto,''Helvetica Neue'',Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;"><tr><td style="padding:48px 24px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:512px;margin:0 auto;">
+<tr><td>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;border:1px solid #e4e4e7;">
+    <tr><td style="height:3px;background:{{if .brand_primary_color}}{{.brand_primary_color}}{{else}}#18181b{{end}};border-radius:12px 12px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
+    <tr><td style="padding:32px 32px 0;text-align:center;">
+      {{if .brand_logo_url}}<img src="{{.brand_logo_url}}" alt="{{.store_name}}" height="28" style="height:28px;max-width:140px;">{{else}}<span style="font-size:15px;font-weight:600;color:#18181b;letter-spacing:-.2px;">{{.store_name}}</span>{{end}}
+    </td></tr>
+    <tr><td style="padding:28px 32px 36px;">
+      <h1 style="margin:0 0 24px;font-size:20px;font-weight:600;color:#18181b;">Campaign is live</h1>
+      <p style="margin:0 0 20px;font-size:15px;line-height:1.65;color:#3f3f46;">Your campaign is now active and reaching customers.</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td style="padding:16px 20px;background:#fafafa;border-radius:8px;">
+        <p style="margin:0 0 2px;font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;">Campaign</p>
+        <p style="margin:0 0 14px;font-size:15px;font-weight:600;color:#18181b;">{{.campaign_name}}</p>
+        <p style="margin:0 0 2px;font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;">Duration</p>
+        <p style="margin:0;font-size:15px;color:#3f3f46;">{{.start_date}} &ndash; {{.end_date}}</p>
+      </td></tr></table>
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="background:#18181b;border-radius:6px;">
+        <a href="{{.campaign_url}}" style="display:inline-block;padding:11px 24px;font-size:14px;font-weight:500;color:#fff;text-decoration:none;">View campaign</a>
+      </td></tr></table>
+    </td></tr>
+  </table>
+</td></tr>
+<tr><td style="padding:20px 0 0;text-align:center;">
+  <p style="margin:0;font-size:12px;color:#a1a1aa;">{{.store_name}}</p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">Mark8ly</a></p>
+</td></tr>
 </table>
 </td></tr></table>
 </body></html>',
@@ -826,10 +890,10 @@ INSERT INTO notification_templates (
     'Gift Card Received',
     'Sent to the recipient of a gift card',
     'EMAIL', 'gift_card',
-    'You''ve received a gift card from {{.sender_name}}!',
+    'You received a gift card from {{.sender_name}}',
     'Hi {{.recipient_name}},
 
-{{.sender_name}} has sent you a {{.gift_card_amount}} gift card!
+{{.sender_name}} sent you a {{.gift_card_amount}} gift card.
 
 Code: {{.gift_card_code}}
 Message: {{.gift_card_message}}
@@ -839,31 +903,35 @@ Redeem: {{.redeem_url}}
 {{.store_name}}',
     '<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background-color:#F8FAFC;font-family:''Source Sans 3'',''Inter'',''Segoe UI'',Arial,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F8FAFC;">
-<tr><td style="padding:40px 20px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;">
-  <tr><td style="background-color:{{if .brand_primary_color}}{{.brand_primary_color}}{{else}}#0F172A{{end}};padding:24px 32px;border-radius:10px 10px 0 0;">
-    {{if .brand_logo_url}}<img src="{{.brand_logo_url}}" alt="{{.store_name}}" style="max-height:32px;">{{else}}<p style="margin:0;color:#FFFFFF;font-size:18px;font-weight:600;">{{.store_name}}</p>{{end}}
-  </td></tr>
-  <tr><td style="background-color:#FFFFFF;padding:32px;border:1px solid #E2E8F0;border-top:none;">
-    <h1 style="margin:0 0 16px;color:#0F172A;font-size:24px;font-weight:700;">You''ve Got a Gift Card!</h1>
-    <p style="margin:0 0 16px;color:#334155;font-size:16px;line-height:1.6;">Hi {{.recipient_name}},</p>
-    <p style="margin:0 0 24px;color:#334155;font-size:16px;line-height:1.6;"><strong>{{.sender_name}}</strong> sent you a gift card.</p>
-    <div style="background-color:#F8FAFC;border:2px dashed #E2E8F0;border-radius:8px;padding:24px;margin:0 0 16px;text-align:center;">
-      <p style="margin:0 0 8px;color:#64748B;font-size:14px;">Gift Card Value</p>
-      <p style="margin:0 0 16px;color:#0F172A;font-size:28px;font-weight:700;">{{.gift_card_amount}}</p>
-      <p style="margin:0 0 8px;color:#64748B;font-size:14px;">Code</p>
-      <p style="margin:0;color:#0F172A;font-size:18px;font-weight:600;letter-spacing:2px;">{{.gift_card_code}}</p>
-    </div>
-    <p style="margin:0 0 24px;color:#64748B;font-size:14px;text-align:center;font-style:italic;">&ldquo;{{.gift_card_message}}&rdquo;</p>
-    <div style="text-align:center;">
-      <a href="{{.redeem_url}}" style="display:inline-block;background-color:#0F172A;color:#FFFFFF;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">Redeem Now</a>
-    </div>
-  </td></tr>
-  <tr><td style="padding:24px 32px;border:1px solid #E2E8F0;border-top:none;border-radius:0 0 10px 10px;background-color:#FFFFFF;">
-    <p style="margin:0;color:#94A3B8;font-size:12px;text-align:center;">{{.store_name}} &mdash; Powered by Tesserix</p>
-  </td></tr>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,''Segoe UI'',Roboto,''Helvetica Neue'',Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;"><tr><td style="padding:48px 24px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:512px;margin:0 auto;">
+<tr><td>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;border:1px solid #e4e4e7;">
+    <tr><td style="height:3px;background:{{if .brand_primary_color}}{{.brand_primary_color}}{{else}}#18181b{{end}};border-radius:12px 12px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
+    <tr><td style="padding:32px 32px 0;text-align:center;">
+      {{if .brand_logo_url}}<img src="{{.brand_logo_url}}" alt="{{.store_name}}" height="28" style="height:28px;max-width:140px;">{{else}}<span style="font-size:15px;font-weight:600;color:#18181b;letter-spacing:-.2px;">{{.store_name}}</span>{{end}}
+    </td></tr>
+    <tr><td style="padding:28px 32px 36px;">
+      <h1 style="margin:0 0 24px;font-size:20px;font-weight:600;color:#18181b;">You received a gift card</h1>
+      <p style="margin:0 0 24px;font-size:15px;line-height:1.65;color:#3f3f46;">Hi {{.recipient_name}}, <strong>{{.sender_name}}</strong> sent you a gift card.</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 8px;"><tr><td style="text-align:center;padding:24px;background:#fafafa;border:1px dashed #e4e4e7;border-radius:8px;">
+        <p style="margin:0 0 2px;font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;">Value</p>
+        <p style="margin:0 0 16px;font-size:28px;font-weight:700;color:#18181b;">{{.gift_card_amount}}</p>
+        <p style="margin:0 0 2px;font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;">Code</p>
+        <p style="margin:0;font-size:18px;font-weight:600;letter-spacing:2px;color:#18181b;">{{.gift_card_code}}</p>
+      </td></tr></table>
+      {{if .gift_card_message}}<p style="margin:16px 0 0;font-size:14px;color:#71717a;text-align:center;font-style:italic;">&ldquo;{{.gift_card_message}}&rdquo;</p>{{end}}
+      <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px auto 0;"><tr><td style="background:#18181b;border-radius:6px;">
+        <a href="{{.redeem_url}}" style="display:inline-block;padding:11px 24px;font-size:14px;font-weight:500;color:#fff;text-decoration:none;">Redeem now</a>
+      </td></tr></table>
+    </td></tr>
+  </table>
+</td></tr>
+<tr><td style="padding:20px 0 0;text-align:center;">
+  <p style="margin:0;font-size:12px;color:#a1a1aa;">{{.store_name}}</p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">Mark8ly</a></p>
+</td></tr>
 </table>
 </td></tr></table>
 </body></html>',
@@ -885,30 +953,36 @@ INSERT INTO notification_templates (
     'You''re invited to join {{.store_name}}',
     'Hi {{.staff_name}},
 
-{{.inviter_name}} has invited you to join {{.store_name}} as {{.role}}.
+{{.inviter_name}} invited you to join {{.store_name}} as {{.role}}.
 
-Accept: {{.invite_url}}',
+Accept: {{.invite_url}}
+
+This invitation expires in 7 days.',
     '<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background-color:#F8FAFC;font-family:''Source Sans 3'',''Inter'',''Segoe UI'',Arial,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F8FAFC;">
-<tr><td style="padding:40px 20px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;">
-  <tr><td style="background-color:{{if .brand_primary_color}}{{.brand_primary_color}}{{else}}#0F172A{{end}};padding:24px 32px;border-radius:10px 10px 0 0;">
-    {{if .brand_logo_url}}<img src="{{.brand_logo_url}}" alt="{{.store_name}}" style="max-height:32px;">{{else}}<p style="margin:0;color:#FFFFFF;font-size:18px;font-weight:600;">{{.store_name}}</p>{{end}}
-  </td></tr>
-  <tr><td style="background-color:#FFFFFF;padding:32px;border:1px solid #E2E8F0;border-top:none;">
-    <h1 style="margin:0 0 16px;color:#0F172A;font-size:24px;font-weight:700;">You''re Invited!</h1>
-    <p style="margin:0 0 16px;color:#334155;font-size:16px;line-height:1.6;">Hi {{.staff_name}},</p>
-    <p style="margin:0 0 24px;color:#334155;font-size:16px;line-height:1.6;"><strong>{{.inviter_name}}</strong> has invited you to join <strong>{{.store_name}}</strong> as <strong>{{.role}}</strong>.</p>
-    <div style="text-align:center;margin:0 0 24px;">
-      <a href="{{.invite_url}}" style="display:inline-block;background-color:#0F172A;color:#FFFFFF;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">Accept Invitation</a>
-    </div>
-    <p style="margin:0;color:#94A3B8;font-size:12px;">This invitation will expire in 7 days.</p>
-  </td></tr>
-  <tr><td style="padding:24px 32px;border:1px solid #E2E8F0;border-top:none;border-radius:0 0 10px 10px;background-color:#FFFFFF;">
-    <p style="margin:0;color:#94A3B8;font-size:12px;text-align:center;">{{.store_name}} &mdash; Powered by Tesserix</p>
-  </td></tr>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,''Segoe UI'',Roboto,''Helvetica Neue'',Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;"><tr><td style="padding:48px 24px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:512px;margin:0 auto;">
+<tr><td>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;border:1px solid #e4e4e7;">
+    <tr><td style="height:3px;background:{{if .brand_primary_color}}{{.brand_primary_color}}{{else}}#18181b{{end}};border-radius:12px 12px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
+    <tr><td style="padding:32px 32px 0;text-align:center;">
+      {{if .brand_logo_url}}<img src="{{.brand_logo_url}}" alt="{{.store_name}}" height="28" style="height:28px;max-width:140px;">{{else}}<span style="font-size:15px;font-weight:600;color:#18181b;letter-spacing:-.2px;">{{.store_name}}</span>{{end}}
+    </td></tr>
+    <tr><td style="padding:28px 32px 36px;">
+      <h1 style="margin:0 0 24px;font-size:20px;font-weight:600;color:#18181b;">You''re invited</h1>
+      <p style="margin:0 0 24px;font-size:15px;line-height:1.65;color:#3f3f46;">Hi {{.staff_name}}, <strong>{{.inviter_name}}</strong> invited you to join <strong>{{.store_name}}</strong> as <strong>{{.role}}</strong>.</p>
+      <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td style="background:#18181b;border-radius:6px;">
+        <a href="{{.invite_url}}" style="display:inline-block;padding:11px 24px;font-size:14px;font-weight:500;color:#fff;text-decoration:none;">Accept invitation</a>
+      </td></tr></table>
+      <p style="margin:0;font-size:13px;color:#a1a1aa;">This invitation expires in 7 days.</p>
+    </td></tr>
+  </table>
+</td></tr>
+<tr><td style="padding:20px 0 0;text-align:center;">
+  <p style="margin:0;font-size:12px;color:#a1a1aa;">{{.store_name}}</p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">Mark8ly</a></p>
+</td></tr>
 </table>
 </td></tr></table>
 </body></html>',
@@ -931,7 +1005,7 @@ INSERT INTO notification_templates (
     'System Health Alert',
     'Sent when a service health issue is detected',
     'EMAIL', 'system_health',
-    '[{{.alert_type}}] {{.service_name}} - {{.environment}}',
+    '[{{.alert_type}}] {{.service_name}} — {{.environment}}',
     'System Alert: {{.alert_type}}
 
 Service: {{.service_name}}
@@ -943,29 +1017,38 @@ Time: {{.timestamp}}
 Dashboard: {{.dashboard_url}}',
     '<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background-color:#F8FAFC;font-family:''Source Sans 3'',''Inter'',''Segoe UI'',Arial,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F8FAFC;">
-<tr><td style="padding:40px 20px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;">
-  <tr><td style="background-color:#0F172A;padding:24px 32px;border-radius:10px 10px 0 0;">
-    {{if .platform_logo_url}}<img src="{{.platform_logo_url}}" alt="Tesserix Platform" style="max-height:32px;">{{else}}<p style="margin:0;color:#FFFFFF;font-size:18px;font-weight:600;">Tesserix Platform</p>{{end}}
-  </td></tr>
-  <tr><td style="background-color:#FFFFFF;padding:32px;border:1px solid #E2E8F0;border-top:none;">
-    <h1 style="margin:0 0 16px;color:#DC2626;font-size:24px;font-weight:700;">System Health Alert</h1>
-    <div style="background-color:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:20px;margin:0 0 24px;">
-      <p style="margin:0 0 12px;color:#64748B;font-size:14px;">Service</p>
-      <p style="margin:0 0 16px;color:#0F172A;font-size:16px;font-weight:600;">{{.service_name}} ({{.environment}})</p>
-      <p style="margin:0 0 12px;color:#64748B;font-size:14px;">Alert Type</p>
-      <p style="margin:0 0 16px;color:#DC2626;font-size:16px;font-weight:600;">{{.alert_type}}</p>
-      <p style="margin:0 0 12px;color:#64748B;font-size:14px;">Message</p>
-      <p style="margin:0;color:#334155;font-size:14px;">{{.alert_message}}</p>
-    </div>
-    <p style="margin:0 0 24px;color:#94A3B8;font-size:12px;">{{.timestamp}}</p>
-    <a href="{{.dashboard_url}}" style="display:inline-block;background-color:#0F172A;color:#FFFFFF;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">View Dashboard</a>
-  </td></tr>
-  <tr><td style="padding:24px 32px;border:1px solid #E2E8F0;border-top:none;border-radius:0 0 10px 10px;background-color:#FFFFFF;">
-    <p style="margin:0;color:#94A3B8;font-size:12px;text-align:center;">Tesserix Platform Alerts</p>
-  </td></tr>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,''Segoe UI'',Roboto,''Helvetica Neue'',Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;"><tr><td style="padding:48px 24px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:512px;margin:0 auto;">
+<tr><td>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;border:1px solid #e4e4e7;">
+    <tr><td style="height:3px;background:#18181b;border-radius:12px 12px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
+    <tr><td style="padding:32px 32px 0;text-align:center;">
+      {{if .platform_logo_url}}<img src="{{.platform_logo_url}}" alt="Tesserix" height="28" style="height:28px;max-width:140px;">{{else}}<span style="font-size:15px;font-weight:600;color:#18181b;letter-spacing:-.2px;">Tesserix</span>{{end}}
+    </td></tr>
+    <tr><td style="padding:28px 32px 36px;">
+      <h1 style="margin:0 0 24px;font-size:20px;font-weight:600;color:#18181b;">System health alert</h1>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td style="padding:16px 20px;background:#fef2f2;border-radius:8px;">
+        <p style="margin:0 0 2px;font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;">Service</p>
+        <p style="margin:0 0 14px;font-size:15px;font-weight:600;color:#18181b;">{{.service_name}}</p>
+        <p style="margin:0 0 2px;font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;">Environment</p>
+        <p style="margin:0 0 14px;font-size:15px;color:#3f3f46;">{{.environment}}</p>
+        <p style="margin:0 0 2px;font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;">Alert</p>
+        <p style="margin:0 0 14px;font-size:15px;font-weight:600;color:#dc2626;">{{.alert_type}}</p>
+        <p style="margin:0 0 2px;font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;">Message</p>
+        <p style="margin:0;font-size:15px;color:#3f3f46;">{{.alert_message}}</p>
+      </td></tr></table>
+      <p style="margin:0 0 24px;font-size:13px;color:#a1a1aa;">{{.timestamp}}</p>
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="background:#18181b;border-radius:6px;">
+        <a href="{{.dashboard_url}}" style="display:inline-block;padding:11px 24px;font-size:14px;font-weight:500;color:#fff;text-decoration:none;">View dashboard</a>
+      </td></tr></table>
+    </td></tr>
+  </table>
+</td></tr>
+<tr><td style="padding:20px 0 0;text-align:center;">
+  <p style="margin:0;font-size:12px;color:#a1a1aa;">Tesserix</p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://tesserix.app" style="color:#a1a1aa;text-decoration:none;">Tesserix</a></p>
+</td></tr>
 </table>
 </td></tr></table>
 </body></html>',
@@ -994,30 +1077,35 @@ Time: {{.timestamp}}
 Details: {{.details}}',
     '<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background-color:#F8FAFC;font-family:''Source Sans 3'',''Inter'',''Segoe UI'',Arial,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F8FAFC;">
-<tr><td style="padding:40px 20px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;">
-  <tr><td style="background-color:#0F172A;padding:24px 32px;border-radius:10px 10px 0 0;">
-    {{if .platform_logo_url}}<img src="{{.platform_logo_url}}" alt="Tesserix Platform" style="max-height:32px;">{{else}}<p style="margin:0;color:#FFFFFF;font-size:18px;font-weight:600;">Tesserix Platform</p>{{end}}
-  </td></tr>
-  <tr><td style="background-color:#FFFFFF;padding:32px;border:1px solid #E2E8F0;border-top:none;">
-    <h1 style="margin:0 0 16px;color:#0F172A;font-size:24px;font-weight:700;">Audit Event</h1>
-    <div style="background-color:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:20px;margin:0 0 24px;">
-      <p style="margin:0 0 8px;color:#64748B;font-size:14px;">Actor</p>
-      <p style="margin:0 0 16px;color:#0F172A;font-size:16px;font-weight:600;">{{.actor_name}} ({{.actor_email}})</p>
-      <p style="margin:0 0 8px;color:#64748B;font-size:14px;">Action</p>
-      <p style="margin:0 0 16px;color:#0F172A;font-size:14px;font-weight:600;font-family:monospace;">{{.action}}</p>
-      <p style="margin:0 0 8px;color:#64748B;font-size:14px;">Resource</p>
-      <p style="margin:0 0 16px;color:#0F172A;font-size:14px;">{{.resource_type}} {{.resource_id}}</p>
-      <p style="margin:0 0 8px;color:#64748B;font-size:14px;">Details</p>
-      <p style="margin:0;color:#334155;font-size:14px;">{{.details}}</p>
-    </div>
-    <p style="margin:0;color:#94A3B8;font-size:12px;">{{.timestamp}}</p>
-  </td></tr>
-  <tr><td style="padding:24px 32px;border:1px solid #E2E8F0;border-top:none;border-radius:0 0 10px 10px;background-color:#FFFFFF;">
-    <p style="margin:0;color:#94A3B8;font-size:12px;text-align:center;">Tesserix Platform Alerts</p>
-  </td></tr>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,''Segoe UI'',Roboto,''Helvetica Neue'',Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;"><tr><td style="padding:48px 24px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:512px;margin:0 auto;">
+<tr><td>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;border:1px solid #e4e4e7;">
+    <tr><td style="height:3px;background:#18181b;border-radius:12px 12px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
+    <tr><td style="padding:32px 32px 0;text-align:center;">
+      {{if .platform_logo_url}}<img src="{{.platform_logo_url}}" alt="Tesserix" height="28" style="height:28px;max-width:140px;">{{else}}<span style="font-size:15px;font-weight:600;color:#18181b;letter-spacing:-.2px;">Tesserix</span>{{end}}
+    </td></tr>
+    <tr><td style="padding:28px 32px 36px;">
+      <h1 style="margin:0 0 24px;font-size:20px;font-weight:600;color:#18181b;">Audit event</h1>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td style="padding:16px 20px;background:#fafafa;border-radius:8px;">
+        <p style="margin:0 0 2px;font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;">Actor</p>
+        <p style="margin:0 0 14px;font-size:15px;font-weight:600;color:#18181b;">{{.actor_name}} ({{.actor_email}})</p>
+        <p style="margin:0 0 2px;font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;">Action</p>
+        <p style="margin:0 0 14px;font-size:13px;color:#18181b;font-family:''SF Mono'',SFMono-Regular,Menlo,monospace;">{{.action}}</p>
+        <p style="margin:0 0 2px;font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;">Resource</p>
+        <p style="margin:0 0 14px;font-size:15px;color:#3f3f46;">{{.resource_type}} {{.resource_id}}</p>
+        <p style="margin:0 0 2px;font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;">Details</p>
+        <p style="margin:0;font-size:15px;color:#3f3f46;">{{.details}}</p>
+      </td></tr></table>
+      <p style="margin:0;font-size:13px;color:#a1a1aa;">{{.timestamp}}</p>
+    </td></tr>
+  </table>
+</td></tr>
+<tr><td style="padding:20px 0 0;text-align:center;">
+  <p style="margin:0;font-size:12px;color:#a1a1aa;">Tesserix</p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://tesserix.app" style="color:#a1a1aa;text-decoration:none;">Tesserix</a></p>
+</td></tr>
 </table>
 </td></tr></table>
 </body></html>',
@@ -1036,7 +1124,7 @@ INSERT INTO notification_templates (
     'Security Alert',
     'Sent for suspicious login or security events',
     'EMAIL', 'security',
-    'Security Alert: {{.event_type}}',
+    'Security alert: {{.event_type}}',
     'Security Event Detected
 
 User: {{.user_name}} ({{.user_email}})
@@ -1048,30 +1136,37 @@ Time: {{.timestamp}}
 Take action: {{.action_url}}',
     '<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background-color:#F8FAFC;font-family:''Source Sans 3'',''Inter'',''Segoe UI'',Arial,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F8FAFC;">
-<tr><td style="padding:40px 20px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;">
-  <tr><td style="background-color:#0F172A;padding:24px 32px;border-radius:10px 10px 0 0;">
-    {{if .platform_logo_url}}<img src="{{.platform_logo_url}}" alt="Tesserix Platform" style="max-height:32px;">{{else}}<p style="margin:0;color:#FFFFFF;font-size:18px;font-weight:600;">Tesserix Platform</p>{{end}}
-  </td></tr>
-  <tr><td style="background-color:#FFFFFF;padding:32px;border:1px solid #E2E8F0;border-top:none;">
-    <h1 style="margin:0 0 16px;color:#DC2626;font-size:24px;font-weight:700;">Security Alert</h1>
-    <p style="margin:0 0 24px;color:#334155;font-size:16px;line-height:1.6;">A security event has been detected on the platform.</p>
-    <div style="background-color:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:20px;margin:0 0 24px;">
-      <p style="margin:0 0 8px;color:#64748B;font-size:14px;">Event</p>
-      <p style="margin:0 0 16px;color:#DC2626;font-size:16px;font-weight:600;">{{.event_type}}</p>
-      <p style="margin:0 0 8px;color:#64748B;font-size:14px;">User</p>
-      <p style="margin:0 0 16px;color:#0F172A;font-size:14px;">{{.user_name}} ({{.user_email}})</p>
-      <p style="margin:0 0 8px;color:#64748B;font-size:14px;">IP / Location</p>
-      <p style="margin:0;color:#0F172A;font-size:14px;">{{.ip_address}} &mdash; {{.location}}</p>
-    </div>
-    <p style="margin:0 0 24px;color:#94A3B8;font-size:12px;">{{.timestamp}}</p>
-    <a href="{{.action_url}}" style="display:inline-block;background-color:#DC2626;color:#FFFFFF;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">Review Event</a>
-  </td></tr>
-  <tr><td style="padding:24px 32px;border:1px solid #E2E8F0;border-top:none;border-radius:0 0 10px 10px;background-color:#FFFFFF;">
-    <p style="margin:0;color:#94A3B8;font-size:12px;text-align:center;">Tesserix Platform Alerts</p>
-  </td></tr>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,''Segoe UI'',Roboto,''Helvetica Neue'',Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;"><tr><td style="padding:48px 24px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:512px;margin:0 auto;">
+<tr><td>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;border:1px solid #e4e4e7;">
+    <tr><td style="height:3px;background:#dc2626;border-radius:12px 12px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
+    <tr><td style="padding:32px 32px 0;text-align:center;">
+      {{if .platform_logo_url}}<img src="{{.platform_logo_url}}" alt="Tesserix" height="28" style="height:28px;max-width:140px;">{{else}}<span style="font-size:15px;font-weight:600;color:#18181b;letter-spacing:-.2px;">Tesserix</span>{{end}}
+    </td></tr>
+    <tr><td style="padding:28px 32px 36px;">
+      <h1 style="margin:0 0 24px;font-size:20px;font-weight:600;color:#18181b;">Security alert</h1>
+      <p style="margin:0 0 20px;font-size:15px;line-height:1.65;color:#3f3f46;">A security event has been detected on the platform.</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td style="padding:16px 20px;background:#fef2f2;border-radius:8px;">
+        <p style="margin:0 0 2px;font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;">Event</p>
+        <p style="margin:0 0 14px;font-size:15px;font-weight:600;color:#dc2626;">{{.event_type}}</p>
+        <p style="margin:0 0 2px;font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;">User</p>
+        <p style="margin:0 0 14px;font-size:15px;color:#18181b;">{{.user_name}} ({{.user_email}})</p>
+        <p style="margin:0 0 2px;font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;">IP / Location</p>
+        <p style="margin:0;font-size:15px;color:#3f3f46;">{{.ip_address}} &mdash; {{.location}}</p>
+      </td></tr></table>
+      <p style="margin:0 0 24px;font-size:13px;color:#a1a1aa;">{{.timestamp}}</p>
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="background:#dc2626;border-radius:6px;">
+        <a href="{{.action_url}}" style="display:inline-block;padding:11px 24px;font-size:14px;font-weight:500;color:#fff;text-decoration:none;">Review event</a>
+      </td></tr></table>
+    </td></tr>
+  </table>
+</td></tr>
+<tr><td style="padding:20px 0 0;text-align:center;">
+  <p style="margin:0;font-size:12px;color:#a1a1aa;">Tesserix</p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://tesserix.app" style="color:#a1a1aa;text-decoration:none;">Tesserix</a></p>
+</td></tr>
 </table>
 </td></tr></table>
 </body></html>',
@@ -1090,7 +1185,7 @@ INSERT INTO notification_templates (
     'New Tenant Signup',
     'Sent to platform admins when a new tenant signs up',
     'EMAIL', 'platform_admin',
-    'New Tenant: {{.details}}',
+    'New tenant: {{.details}}',
     'New tenant signup on Tesserix.
 
 Type: {{.notification_type}}
@@ -1100,26 +1195,33 @@ Time: {{.timestamp}}
 Dashboard: {{.dashboard_url}}',
     '<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background-color:#F8FAFC;font-family:''Source Sans 3'',''Inter'',''Segoe UI'',Arial,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F8FAFC;">
-<tr><td style="padding:40px 20px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;">
-  <tr><td style="background-color:#0F172A;padding:24px 32px;border-radius:10px 10px 0 0;">
-    {{if .platform_logo_url}}<img src="{{.platform_logo_url}}" alt="Tesserix Platform" style="max-height:32px;">{{else}}<p style="margin:0;color:#FFFFFF;font-size:18px;font-weight:600;">Tesserix Platform</p>{{end}}
-  </td></tr>
-  <tr><td style="background-color:#FFFFFF;padding:32px;border:1px solid #E2E8F0;border-top:none;">
-    <h1 style="margin:0 0 16px;color:#0F172A;font-size:24px;font-weight:700;">New Tenant Signup</h1>
-    <p style="margin:0 0 24px;color:#334155;font-size:16px;line-height:1.6;">A new tenant has signed up on the platform.</p>
-    <div style="background-color:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:20px;margin:0 0 24px;">
-      <p style="margin:0 0 8px;color:#64748B;font-size:14px;">Details</p>
-      <p style="margin:0;color:#0F172A;font-size:16px;font-weight:600;">{{.details}}</p>
-    </div>
-    <p style="margin:0 0 24px;color:#94A3B8;font-size:12px;">{{.timestamp}}</p>
-    <a href="{{.dashboard_url}}" style="display:inline-block;background-color:#0F172A;color:#FFFFFF;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">View Dashboard</a>
-  </td></tr>
-  <tr><td style="padding:24px 32px;border:1px solid #E2E8F0;border-top:none;border-radius:0 0 10px 10px;background-color:#FFFFFF;">
-    <p style="margin:0;color:#94A3B8;font-size:12px;text-align:center;">Tesserix Platform Alerts</p>
-  </td></tr>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,''Segoe UI'',Roboto,''Helvetica Neue'',Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;"><tr><td style="padding:48px 24px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:512px;margin:0 auto;">
+<tr><td>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;border:1px solid #e4e4e7;">
+    <tr><td style="height:3px;background:#18181b;border-radius:12px 12px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
+    <tr><td style="padding:32px 32px 0;text-align:center;">
+      {{if .platform_logo_url}}<img src="{{.platform_logo_url}}" alt="Tesserix" height="28" style="height:28px;max-width:140px;">{{else}}<span style="font-size:15px;font-weight:600;color:#18181b;letter-spacing:-.2px;">Tesserix</span>{{end}}
+    </td></tr>
+    <tr><td style="padding:28px 32px 36px;">
+      <h1 style="margin:0 0 24px;font-size:20px;font-weight:600;color:#18181b;">New tenant signup</h1>
+      <p style="margin:0 0 20px;font-size:15px;line-height:1.65;color:#3f3f46;">A new tenant has signed up on the platform.</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td style="padding:16px 20px;background:#f0fdf4;border-radius:8px;">
+        <p style="margin:0 0 2px;font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;">Details</p>
+        <p style="margin:0;font-size:15px;font-weight:600;color:#18181b;">{{.details}}</p>
+      </td></tr></table>
+      <p style="margin:0 0 24px;font-size:13px;color:#a1a1aa;">{{.timestamp}}</p>
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="background:#18181b;border-radius:6px;">
+        <a href="{{.dashboard_url}}" style="display:inline-block;padding:11px 24px;font-size:14px;font-weight:500;color:#fff;text-decoration:none;">View dashboard</a>
+      </td></tr></table>
+    </td></tr>
+  </table>
+</td></tr>
+<tr><td style="padding:20px 0 0;text-align:center;">
+  <p style="margin:0;font-size:12px;color:#a1a1aa;">Tesserix</p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://tesserix.app" style="color:#a1a1aa;text-decoration:none;">Tesserix</a></p>
+</td></tr>
 </table>
 </td></tr></table>
 </body></html>',
