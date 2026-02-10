@@ -891,7 +891,8 @@ export async function authRoutes(fastify: FastifyInstance) {
 // Helper functions
 function determineClientType(request: FastifyRequest): 'internal' | 'customer' {
   const rawForwardedHost = request.headers['x-forwarded-host'] as string | undefined;
-  const forwardedHost = (rawForwardedHost || request.hostname || '').split(':')[0];
+  const fullForwardedHost = rawForwardedHost || request.hostname || '';
+  const forwardedHost = fullForwardedHost.split(':')[0];
 
   // Check X-Auth-Context header first (set by Next.js admin/storefront apps)
   // This handles custom domains where hostname pattern matching won't work
@@ -910,9 +911,9 @@ function determineClientType(request: FastifyRequest): 'internal' | 'customer' {
     matchMethod = 'admin-host';
   } else if (isHomeHost(forwardedHost)) {
     matchMethod = 'home-host';
-  } else if (isOnboardingHost(rawForwardedHost)) {
+  } else if (isOnboardingHost(fullForwardedHost)) {
     matchMethod = 'onboarding-host';
-  } else if (isCustomDomainAdminHost(rawForwardedHost)) {
+  } else if (isCustomDomainAdminHost(fullForwardedHost)) {
     matchMethod = 'custom-domain-admin';
   }
 
