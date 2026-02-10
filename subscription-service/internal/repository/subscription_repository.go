@@ -19,11 +19,14 @@ func NewSubscriptionRepository(db *gorm.DB) *SubscriptionRepository {
 
 // Plans
 
-func (r *SubscriptionRepository) ListPlans(ctx context.Context, activeOnly bool) ([]models.SubscriptionPlan, error) {
+func (r *SubscriptionRepository) ListPlans(ctx context.Context, activeOnly bool, currency string) ([]models.SubscriptionPlan, error) {
 	var plans []models.SubscriptionPlan
 	query := r.db.WithContext(ctx).Order("sort_order ASC")
 	if activeOnly {
 		query = query.Where("is_active = ?", true)
+	}
+	if currency != "" {
+		query = query.Where("currency = ?", currency)
 	}
 	err := query.Find(&plans).Error
 	return plans, err
@@ -106,6 +109,23 @@ func (r *SubscriptionRepository) ListInvoices(ctx context.Context, tenantID stri
 	return invoices, err
 }
 
+func (r *SubscriptionRepository) ListAllInvoices(ctx context.Context, status string, limit, offset int) ([]models.SubscriptionInvoice, int64, error) {
+	var invoices []models.SubscriptionInvoice
+	var total int64
+
+	query := r.db.WithContext(ctx).Model(&models.SubscriptionInvoice{})
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	err := query.Order("created_at DESC").Limit(limit).Offset(offset).Find(&invoices).Error
+	return invoices, total, err
+}
+
 func (r *SubscriptionRepository) UpsertInvoice(ctx context.Context, invoice *models.SubscriptionInvoice) error {
 	return r.db.WithContext(ctx).
 		Where("stripe_invoice_id = ?", invoice.StripeInvoiceID).
@@ -138,6 +158,80 @@ func (r *SubscriptionRepository) MarkEventProcessed(ctx context.Context, eventID
 }
 
 // Stats
+
+// GetDefaultTrialPlan finds the default trial plan for a region, falling back to 'global'
+func (r *SubscriptionRepository) GetDefaultTrialPlan(ctx context.Context, region string) (*models.SubscriptionPlan, error) {
+	var plan models.SubscriptionPlan
+	err := r.db.WithContext(ctx).
+		Where("is_default_trial = ? AND is_active = ? AND region = ?", true, true, region).
+		First(&plan).Error
+	if err == nil {
+		return &plan, nil
+	}
+	// Fallback to global default
+	err = r.db.WithContext(ctx).
+		Where("is_default_trial = ? AND is_active = ? AND region = ?", true, true, "global").
+		First(&plan).Error
+	if err != nil {
+		return nil, err
+	}
+	return &plan, nil
+}
+
+// FindExpiredTrials finds subscriptions with trialing status where trial has ended
+func (r *SubscriptionRepository) FindExpiredTrials(ctx context.Context) ([]models.TenantSubscription, error) {
+	var subs []models.TenantSubscription
+	err := r.db.WithContext(ctx).
+		Where("status = ? AND trial_end < NOW()", models.StatusTrialing).
+		Find(&subs).Error
+	return subs, err
+}
+
+// FindGraceExpired finds subscriptions where grace period has ended
+func (r *SubscriptionRepository) FindGraceExpired(ctx context.Context) ([]models.TenantSubscription, error) {
+	var subs []models.TenantSubscription
+	err := r.db.WithContext(ctx).
+		Where("status = ? AND grace_period_end < NOW()", models.StatusPastDue).
+		Find(&subs).Error
+	return subs, err
+}
+
+// GetExpiringTrials finds subscriptions with trial ending within N days
+func (r *SubscriptionRepository) GetExpiringTrials(ctx context.Context, withinDays int) ([]models.TenantSubscription, error) {
+	var subs []models.TenantSubscription
+	err := r.db.WithContext(ctx).Preload("Plan").
+		Where("status = ? AND trial_end > NOW() AND trial_end < NOW() + INTERVAL '1 day' * ?", models.StatusTrialing, withinDays).
+		Order("trial_end ASC").
+		Find(&subs).Error
+	return subs, err
+}
+
+// GetTrialConversionRate calculates the percentage of trials that converted to active
+func (r *SubscriptionRepository) GetTrialConversionRate(ctx context.Context) (float64, error) {
+	var result struct {
+		Active int64
+		Total  int64
+	}
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT
+			COUNT(CASE WHEN status = 'active' THEN 1 END) as active,
+			COUNT(CASE WHEN status IN ('active', 'expired', 'canceled', 'suspended') THEN 1 END) as total
+		FROM tenant_subscriptions
+		WHERE created_at < NOW() - INTERVAL '30 days'
+	`).Scan(&result).Error
+	if err != nil {
+		return 0, err
+	}
+	if result.Total == 0 {
+		return 0, nil
+	}
+	return float64(result.Active) / float64(result.Total) * 100, nil
+}
+
+// CountByStatus counts subscriptions by status
+func (r *SubscriptionRepository) CountByStatus(ctx context.Context, status models.SubscriptionStatus, count *int64) {
+	r.db.WithContext(ctx).Model(&models.TenantSubscription{}).Where("status = ?", status).Count(count)
+}
 
 func (r *SubscriptionRepository) GetStats(ctx context.Context) (*models.SubscriptionStats, error) {
 	stats := &models.SubscriptionStats{}

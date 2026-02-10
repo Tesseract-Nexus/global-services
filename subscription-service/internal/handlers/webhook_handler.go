@@ -5,21 +5,22 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stripe/stripe-go/v76"
 	"github.com/stripe/stripe-go/v76/webhook"
+	"subscription-service/internal/config"
 	"subscription-service/internal/models"
 	"subscription-service/internal/services"
 )
 
 type WebhookHandler struct {
 	service *services.WebhookService
+	cfg     *config.Config
 }
 
-func NewWebhookHandler(service *services.WebhookService) *WebhookHandler {
-	return &WebhookHandler{service: service}
+func NewWebhookHandler(service *services.WebhookService, cfg *config.Config) *WebhookHandler {
+	return &WebhookHandler{service: service, cfg: cfg}
 }
 
 func (h *WebhookHandler) HandleStripeWebhook(c *gin.Context) {
@@ -31,7 +32,7 @@ func (h *WebhookHandler) HandleStripeWebhook(c *gin.Context) {
 		return
 	}
 
-	webhookSecret := os.Getenv("STRIPE_WEBHOOK_SECRET")
+	webhookSecret := h.cfg.GetStripeWebhookSecret()
 	var event stripe.Event
 	if webhookSecret != "" {
 		event, err = webhook.ConstructEvent(body, c.GetHeader("Stripe-Signature"), webhookSecret)

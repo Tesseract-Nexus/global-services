@@ -21,8 +21,8 @@ func NewPlanService(repo *repository.SubscriptionRepository) *PlanService {
 	return &PlanService{repo: repo}
 }
 
-func (s *PlanService) ListPlans(ctx context.Context, activeOnly bool) ([]models.SubscriptionPlan, error) {
-	return s.repo.ListPlans(ctx, activeOnly)
+func (s *PlanService) ListPlans(ctx context.Context, activeOnly bool, currency string) ([]models.SubscriptionPlan, error) {
+	return s.repo.ListPlans(ctx, activeOnly, currency)
 }
 
 func (s *PlanService) GetPlan(ctx context.Context, id uuid.UUID) (*models.SubscriptionPlan, error) {
@@ -114,7 +114,7 @@ func (s *PlanService) DeletePlan(ctx context.Context, id uuid.UUID) error {
 
 // SyncToStripe creates/updates Stripe Products and Prices for all plans
 func (s *PlanService) SyncToStripe(ctx context.Context) error {
-	plans, err := s.repo.ListPlans(ctx, false)
+	plans, err := s.repo.ListPlans(ctx, false, "")
 	if err != nil {
 		return fmt.Errorf("failed to list plans: %w", err)
 	}

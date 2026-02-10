@@ -19,7 +19,8 @@ func NewPlanHandler(service *services.PlanService) *PlanHandler {
 
 func (h *PlanHandler) ListPlans(c *gin.Context) {
 	activeOnly := c.Query("active") == "true"
-	plans, err := h.service.ListPlans(c.Request.Context(), activeOnly)
+	currency := c.Query("currency")
+	plans, err := h.service.ListPlans(c.Request.Context(), activeOnly, currency)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to list plans", Message: err.Error()})
 		return

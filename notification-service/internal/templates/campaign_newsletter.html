@@ -1,24 +1,4 @@
-{{define "header"}}
-<!-- Header -->
-<tr>
-    <td style="text-align: center; padding-bottom: 24px;">
-        {{if .BrandLogoURL}}
-        <img src="{{.BrandLogoURL}}" alt="{{.BusinessName}}" style="max-width: 160px; max-height: 48px; display: inline-block;" />
-        {{else if .BusinessName}}
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
-            <tr>
-                <td style="width: 40px; height: 40px; background-color: {{if .BrandPrimaryColor}}{{.BrandPrimaryColor}}{{else}}#0F172A{{end}}; border-radius: 8px; text-align: center; vertical-align: middle;">
-                    <span style="font-size: 18px; font-weight: 700; color: {{if .BrandTextColor}}{{.BrandTextColor}}{{else}}#ffffff{{end}};">{{.BusinessInitial}}</span>
-                </td>
-                <td style="padding-left: 12px;">
-                    <p style="margin: 0; font-size: 18px; font-weight: 600; color: #0F172A; letter-spacing: -0.3px;">{{.BusinessName}}</p>
-                </td>
-            </tr>
-        </table>
-        {{end}}
-    </td>
-</tr>
-{{end}}
+{{define "header"}}{{end}}
 
 {{define "content"}}
 <!-- Newsletter Card -->

@@ -1,8 +1,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -14,6 +18,7 @@ import (
 	"subscription-service/internal/config"
 	"subscription-service/internal/handlers"
 	"subscription-service/internal/middleware"
+	natsconsumer "subscription-service/internal/nats"
 	"subscription-service/internal/repository"
 	"subscription-service/internal/services"
 )
@@ -41,16 +46,57 @@ func main() {
 	tenantClient := clients.NewTenantClient()
 
 	planService := services.NewPlanService(repo)
-	subscriptionService := services.NewSubscriptionService(repo, tenantClient)
-	webhookService := services.NewWebhookService(repo, tenantClient)
+	subscriptionService := services.NewSubscriptionService(repo, tenantClient, cfg)
+	webhookService := services.NewWebhookService(repo, tenantClient, cfg)
+	expirationService := services.NewExpirationService(repo, tenantClient)
+
+	stripeSettingsService, err := services.NewStripeSettingsService(cfg)
+	if err != nil {
+		log.Printf("WARNING: Failed to create Stripe settings service: %v", err)
+	}
 
 	planHandler := handlers.NewPlanHandler(planService)
 	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionService)
-	webhookHandler := handlers.NewWebhookHandler(webhookService)
+	webhookHandler := handlers.NewWebhookHandler(webhookService, cfg)
 	statsHandler := handlers.NewStatsHandler(subscriptionService)
 
+	var stripeSettingsHandler *handlers.StripeSettingsHandler
+	if stripeSettingsService != nil {
+		stripeSettingsHandler = handlers.NewStripeSettingsHandler(stripeSettingsService)
+	}
+
 	// Setup router
-	router := setupRouter(planHandler, subscriptionHandler, webhookHandler, statsHandler)
+	router := setupRouter(planHandler, subscriptionHandler, webhookHandler, statsHandler, stripeSettingsHandler)
+
+	// Start NATS consumer for tenant.created events
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	if cfg.NatsURL != "" {
+		consumer, err := natsconsumer.NewTenantEventConsumer(cfg.NatsURL, subscriptionService)
+		if err != nil {
+			log.Printf("WARNING: Failed to create NATS consumer: %v", err)
+		} else {
+			if err := consumer.Start(ctx); err != nil {
+				log.Printf("WARNING: Failed to start NATS consumer: %v", err)
+			} else {
+				log.Println("NATS tenant event consumer started")
+				defer consumer.Stop()
+			}
+		}
+	}
+
+	// Start background expiration processor
+	go expirationService.StartProcessor(ctx, 1*time.Hour)
+
+	// Graceful shutdown
+	go func() {
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+		<-sigCh
+		log.Println("Shutting down...")
+		cancel()
+	}()
 
 	log.Printf("Subscription Service starting on port %s (env: %s)", cfg.Port, cfg.Environment)
 	if err := router.Run(":" + cfg.Port); err != nil {
@@ -83,7 +129,7 @@ func connectDatabase(databaseURL string) (*gorm.DB, error) {
 	return db, nil
 }
 
-func setupRouter(planHandler *handlers.PlanHandler, subscriptionHandler *handlers.SubscriptionHandler, webhookHandler *handlers.WebhookHandler, statsHandler *handlers.StatsHandler) *gin.Engine {
+func setupRouter(planHandler *handlers.PlanHandler, subscriptionHandler *handlers.SubscriptionHandler, webhookHandler *handlers.WebhookHandler, statsHandler *handlers.StatsHandler, stripeSettingsHandler *handlers.StripeSettingsHandler) *gin.Engine {
 	router := gin.Default()
 
 	apiLimiter := middleware.NewRateLimiter(100, time.Minute)
@@ -120,16 +166,34 @@ func setupRouter(planHandler *handlers.PlanHandler, subscriptionHandler *handler
 		subs := v1.Group("/subscriptions")
 		{
 			subs.GET("/:tenantId", subscriptionHandler.GetSubscription)
+			subs.GET("/:tenantId/status", subscriptionHandler.GetSubscriptionStatus)
 			subs.POST("/checkout", subscriptionHandler.CreateCheckoutSession)
 			subs.POST("/portal", subscriptionHandler.CreatePortalSession)
 			subs.POST("/:tenantId/cancel", subscriptionHandler.CancelSubscription)
 			subs.POST("/:tenantId/reactivate", subscriptionHandler.ReactivateSubscription)
+			subs.POST("/:tenantId/setup-payment", subscriptionHandler.CreateSetupPayment)
 			subs.PUT("/:tenantId/plan", subscriptionHandler.ChangePlan)
 			subs.GET("/:tenantId/invoices", subscriptionHandler.GetInvoices)
 		}
 
 		// Stats
 		v1.GET("/stats/overview", statsHandler.GetOverview)
+
+		// Admin APIs (platform admin)
+		admin := v1.Group("/admin")
+		{
+			admin.GET("/stats/enhanced", statsHandler.GetEnhancedStats)
+			admin.GET("/stats/expiring-trials", statsHandler.GetExpiringTrials)
+			admin.GET("/invoices", statsHandler.GetAdminInvoices)
+			admin.POST("/subscriptions/:tenantId/extend-trial", subscriptionHandler.ExtendTrial)
+
+			if stripeSettingsHandler != nil {
+				admin.GET("/settings/stripe", stripeSettingsHandler.GetStripeSettings)
+				admin.PUT("/settings/stripe", stripeSettingsHandler.UpdateStripeKeys)
+				admin.POST("/settings/stripe/verify", stripeSettingsHandler.VerifyStripeKey)
+				admin.POST("/settings/stripe/reload", stripeSettingsHandler.ReloadStripeKeys)
+			}
+		}
 	}
 
 	// Webhooks (public, rate limited)

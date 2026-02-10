@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
+	"sync"
 	"time"
 
 	"github.com/Tesseract-Nexus/go-shared/secrets"
+	"github.com/stripe/stripe-go/v76"
 )
 
 type Config struct {
@@ -20,6 +23,14 @@ type Config struct {
 
 	TenantServiceURL string
 	NatsURL          string
+
+	DefaultTrialPlan string
+	GracePeriodDays  int
+
+	GCPProjectID        string
+	UseGCPSecretManager bool
+
+	mu sync.RWMutex
 }
 
 func buildDatabaseURL() string {
@@ -69,10 +80,14 @@ func Load() *Config {
 		Port:                getEnv("PORT", "8093"),
 		Environment:         getEnv("ENVIRONMENT", "devtest"),
 		DatabaseURL:         buildDatabaseURL(),
-		StripeSecretKey:     getEnv("STRIPE_SECRET_KEY", ""),
-		StripeWebhookSecret: getEnv("STRIPE_WEBHOOK_SECRET", ""),
+		StripeSecretKey:     secrets.GetSecretOrEnv("STRIPE_SECRET_KEY_SECRET_NAME", "STRIPE_SECRET_KEY", ""),
+		StripeWebhookSecret: secrets.GetSecretOrEnv("STRIPE_WEBHOOK_SECRET_SECRET_NAME", "STRIPE_WEBHOOK_SECRET", ""),
 		TenantServiceURL:    getEnv("TENANT_SERVICE_URL", "http://tenant-service.marketplace.svc.cluster.local:8080"),
 		NatsURL:             getEnv("NATS_URL", ""),
+		DefaultTrialPlan:    getEnv("DEFAULT_TRIAL_PLAN", "starter_inr"),
+		GracePeriodDays:     getEnvInt("GRACE_PERIOD_DAYS", 7),
+		GCPProjectID:        getEnv("GCP_PROJECT_ID", ""),
+		UseGCPSecretManager: os.Getenv("USE_GCP_SECRET_MANAGER") == "true",
 	}
 
 	if config.DatabaseURL == "" {
@@ -82,10 +97,53 @@ func Load() *Config {
 	return config
 }
 
+// GetStripeSecretKey returns the current Stripe secret key (thread-safe).
+func (c *Config) GetStripeSecretKey() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.StripeSecretKey
+}
+
+// GetStripeWebhookSecret returns the current Stripe webhook secret (thread-safe).
+func (c *Config) GetStripeWebhookSecret() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.StripeWebhookSecret
+}
+
+// ReloadStripeKeys re-reads Stripe keys from GCP Secret Manager (or env vars)
+// and updates the in-memory config and stripe.Key global.
+func (c *Config) ReloadStripeKeys() {
+	newSecretKey := secrets.GetSecretOrEnv("STRIPE_SECRET_KEY_SECRET_NAME", "STRIPE_SECRET_KEY", "")
+	newWebhookSecret := secrets.GetSecretOrEnv("STRIPE_WEBHOOK_SECRET_SECRET_NAME", "STRIPE_WEBHOOK_SECRET", "")
+
+	c.mu.Lock()
+	c.StripeSecretKey = newSecretKey
+	c.StripeWebhookSecret = newWebhookSecret
+	c.mu.Unlock()
+
+	if newSecretKey != "" {
+		stripe.Key = newSecretKey
+		log.Println("Stripe API key reloaded")
+	}
+}
+
 func getEnv(key, defaultValue string) string {
 	value := os.Getenv(key)
 	if value == "" {
 		return defaultValue
 	}
 	return value
+}
+
+func getEnvInt(key string, defaultValue int) int {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+	intVal, err := strconv.Atoi(value)
+	if err != nil {
+		return defaultValue
+	}
+	return intVal
 }

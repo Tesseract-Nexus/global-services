@@ -110,6 +110,62 @@ func (h *SubscriptionHandler) ChangePlan(c *gin.Context) {
 	c.JSON(http.StatusOK, sub)
 }
 
+func (h *SubscriptionHandler) GetSubscriptionStatus(c *gin.Context) {
+	tenantID := c.Param("tenantId")
+	if tenantID == "" {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Tenant ID required"})
+		return
+	}
+
+	status, err := h.service.GetSubscriptionStatus(c.Request.Context(), tenantID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, models.ErrorResponse{Error: "Subscription not found", Message: err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, status)
+}
+
+func (h *SubscriptionHandler) CreateSetupPayment(c *gin.Context) {
+	tenantID := c.Param("tenantId")
+	if tenantID == "" {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Tenant ID required"})
+		return
+	}
+
+	var req models.SetupPaymentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Invalid request", Message: err.Error()})
+		return
+	}
+
+	resp, err := h.service.CreateSetupCheckoutSession(c.Request.Context(), tenantID, req.SuccessURL, req.CancelURL)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to create setup session", Message: err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *SubscriptionHandler) ExtendTrial(c *gin.Context) {
+	tenantID := c.Param("tenantId")
+	if tenantID == "" {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Tenant ID required"})
+		return
+	}
+
+	var req models.ExtendTrialRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Invalid request", Message: err.Error()})
+		return
+	}
+
+	if err := h.service.ExtendTrial(c.Request.Context(), tenantID, req.AdditionalDays, req.Reason); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to extend trial", Message: err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Trial extended successfully"})
+}
+
 func (h *SubscriptionHandler) GetInvoices(c *gin.Context) {
 	tenantID := c.Param("tenantId")
 	if tenantID == "" {

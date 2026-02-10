@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stripe/stripe-go/v76"
 	"subscription-service/internal/clients"
+	"subscription-service/internal/config"
 	"subscription-service/internal/models"
 	"subscription-service/internal/repository"
 )
@@ -17,10 +18,11 @@ import (
 type WebhookService struct {
 	repo         *repository.SubscriptionRepository
 	tenantClient *clients.TenantClient
+	cfg          *config.Config
 }
 
-func NewWebhookService(repo *repository.SubscriptionRepository, tenantClient *clients.TenantClient) *WebhookService {
-	return &WebhookService{repo: repo, tenantClient: tenantClient}
+func NewWebhookService(repo *repository.SubscriptionRepository, tenantClient *clients.TenantClient, cfg *config.Config) *WebhookService {
+	return &WebhookService{repo: repo, tenantClient: tenantClient, cfg: cfg}
 }
 
 func (s *WebhookService) ProcessEvent(ctx context.Context, event stripe.Event) error {
@@ -50,7 +52,13 @@ func (s *WebhookService) ProcessEvent(ctx context.Context, event stripe.Event) e
 	var processingError string
 	switch event.Type {
 	case "checkout.session.completed":
-		processingError = s.handleCheckoutCompleted(ctx, event)
+		// Check if setup mode (payment method collection) vs subscription checkout
+		var sess stripe.CheckoutSession
+		if err := json.Unmarshal(event.Data.Raw, &sess); err == nil && string(sess.Mode) == "setup" {
+			processingError = s.handleSetupCompleted(ctx, event)
+		} else {
+			processingError = s.handleCheckoutCompleted(ctx, event)
+		}
 	case "customer.subscription.updated":
 		processingError = s.handleSubscriptionUpdated(ctx, event)
 	case "customer.subscription.deleted":
@@ -61,6 +69,8 @@ func (s *WebhookService) ProcessEvent(ctx context.Context, event stripe.Event) e
 		processingError = s.handleInvoicePaymentFailed(ctx, event)
 	case "invoice.created":
 		processingError = s.handleInvoiceCreated(ctx, event)
+	case "customer.subscription.trial_will_end":
+		processingError = s.handleTrialWillEnd(ctx, event)
 	default:
 		log.Printf("Unhandled event type: %s", event.Type)
 	}
@@ -267,11 +277,17 @@ func (s *WebhookService) handleInvoicePaymentFailed(ctx context.Context, event s
 		return ""
 	}
 
+	now := time.Now()
 	sub.Status = models.StatusPastDue
+	sub.PaymentFailedAt = &now
+	graceEnd := now.Add(time.Duration(s.cfg.GracePeriodDays) * 24 * time.Hour)
+	sub.GracePeriodEnd = &graceEnd
+
 	if err := s.repo.UpdateSubscription(ctx, sub); err != nil {
 		return fmt.Sprintf("failed to update subscription status: %v", err)
 	}
 
+	log.Printf("Payment failed for tenant %s, grace period until %s", sub.TenantID, graceEnd.Format(time.RFC3339))
 	return ""
 }
 
@@ -309,6 +325,60 @@ func (s *WebhookService) handleInvoiceCreated(ctx context.Context, event stripe.
 		return fmt.Sprintf("failed to cache invoice: %v", err)
 	}
 
+	return ""
+}
+
+func (s *WebhookService) handleTrialWillEnd(ctx context.Context, event stripe.Event) string {
+	var stripeSub stripe.Subscription
+	if err := json.Unmarshal(event.Data.Raw, &stripeSub); err != nil {
+		return fmt.Sprintf("failed to parse subscription: %v", err)
+	}
+
+	sub, err := s.repo.GetSubscriptionByStripeID(ctx, stripeSub.ID)
+	if err != nil {
+		return fmt.Sprintf("subscription not found for stripe_id %s: %v", stripeSub.ID, err)
+	}
+
+	log.Printf("Trial will end soon for tenant %s (subscription: %s)", sub.TenantID, stripeSub.ID)
+	// Future: trigger email notification via notification-service
+	return ""
+}
+
+func (s *WebhookService) handleSetupCompleted(ctx context.Context, event stripe.Event) string {
+	var sess stripe.CheckoutSession
+	if err := json.Unmarshal(event.Data.Raw, &sess); err != nil {
+		return fmt.Sprintf("failed to parse setup session: %v", err)
+	}
+
+	tenantID := sess.Metadata["tenant_id"]
+	if tenantID == "" {
+		return "missing tenant_id in setup session metadata"
+	}
+
+	sub, err := s.repo.GetSubscription(ctx, tenantID)
+	if err != nil {
+		return fmt.Sprintf("subscription not found for tenant %s: %v", tenantID, err)
+	}
+
+	// Clear grace period fields if they were set (payment method now on file)
+	if sub.GracePeriodEnd != nil {
+		sub.GracePeriodEnd = nil
+		sub.PaymentFailedAt = nil
+		if sub.Status == models.StatusPastDue {
+			sub.Status = models.StatusActive
+		}
+	}
+
+	// If expired trial, reactivate as active
+	if sub.Status == models.StatusExpired {
+		sub.Status = models.StatusActive
+	}
+
+	if err := s.repo.UpdateSubscription(ctx, sub); err != nil {
+		return fmt.Sprintf("failed to update subscription after setup: %v", err)
+	}
+
+	log.Printf("Payment method setup completed for tenant %s", tenantID)
 	return ""
 }
 

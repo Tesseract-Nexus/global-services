@@ -35,11 +35,13 @@ func (j *JSONB) Scan(value interface{}) error {
 type SubscriptionStatus string
 
 const (
-	StatusActive   SubscriptionStatus = "active"
-	StatusTrialing SubscriptionStatus = "trialing"
-	StatusPastDue  SubscriptionStatus = "past_due"
-	StatusCanceled SubscriptionStatus = "canceled"
-	StatusUnpaid   SubscriptionStatus = "unpaid"
+	StatusActive    SubscriptionStatus = "active"
+	StatusTrialing  SubscriptionStatus = "trialing"
+	StatusPastDue   SubscriptionStatus = "past_due"
+	StatusCanceled  SubscriptionStatus = "canceled"
+	StatusUnpaid    SubscriptionStatus = "unpaid"
+	StatusExpired   SubscriptionStatus = "expired"
+	StatusSuspended SubscriptionStatus = "suspended"
 )
 
 // InvoiceStatus enum
@@ -80,6 +82,8 @@ type SubscriptionPlan struct {
 	IsActive             bool      `gorm:"not null;default:true" json:"isActive"`
 	IsFree               bool      `gorm:"not null;default:false" json:"isFree"`
 	TrialDays            int       `gorm:"not null;default:0" json:"trialDays"`
+	Region               string    `gorm:"type:varchar(10);default:'global'" json:"region"`
+	IsDefaultTrial       bool      `gorm:"default:false" json:"isDefaultTrial"`
 	CreatedAt            time.Time `gorm:"default:CURRENT_TIMESTAMP" json:"createdAt"`
 	UpdatedAt            time.Time `gorm:"default:CURRENT_TIMESTAMP" json:"updatedAt"`
 }
@@ -104,6 +108,9 @@ type TenantSubscription struct {
 	CancelAtPeriodEnd    bool               `gorm:"not null;default:false" json:"cancelAtPeriodEnd"`
 	CanceledAt           *time.Time         `json:"canceledAt,omitempty"`
 	BillingEmail         string             `gorm:"type:varchar(255)" json:"billingEmail,omitempty"`
+	GracePeriodEnd       *time.Time         `json:"gracePeriodEnd,omitempty"`
+	PaymentFailedAt      *time.Time         `json:"paymentFailedAt,omitempty"`
+	SuspendedAt          *time.Time         `json:"suspendedAt,omitempty"`
 	CreatedAt            time.Time          `gorm:"default:CURRENT_TIMESTAMP" json:"createdAt"`
 	UpdatedAt            time.Time          `gorm:"default:CURRENT_TIMESTAMP" json:"updatedAt"`
 
