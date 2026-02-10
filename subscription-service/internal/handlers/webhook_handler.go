@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"io"
 	"log"
 	"net/http"
@@ -41,7 +42,7 @@ func (h *WebhookHandler) HandleStripeWebhook(c *gin.Context) {
 		}
 	} else {
 		log.Println("WARNING: STRIPE_WEBHOOK_SECRET not set, skipping signature verification")
-		if err := event.UnmarshalJSON(body); err != nil {
+		if err := json.Unmarshal(body, &event); err != nil {
 			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Invalid event payload"})
 			return
 		}
