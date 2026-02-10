@@ -160,9 +160,24 @@ type NotificationPreference struct {
 
 	// Push tokens
 	PushTokens        datatypes.JSON `json:"pushTokens" gorm:"type:jsonb"` // Array of FCM tokens
+	PushSubscriptions datatypes.JSON `json:"pushSubscriptions" gorm:"type:jsonb;default:'[]'"` // []PushSubscription
 
 	CreatedAt         time.Time `json:"createdAt"`
 	UpdatedAt         time.Time `json:"updatedAt"`
+}
+
+// PushSubscription represents a Web Push subscription (W3C standard)
+type PushSubscription struct {
+	Endpoint  string               `json:"endpoint"`
+	Keys      PushSubscriptionKeys `json:"keys"`
+	Platform  string               `json:"platform"`
+	CreatedAt time.Time            `json:"createdAt"`
+}
+
+// PushSubscriptionKeys holds the VAPID subscription keys
+type PushSubscriptionKeys struct {
+	P256dh string `json:"p256dh"`
+	Auth   string `json:"auth"`
 }
 
 // NotificationLog represents audit log for notifications

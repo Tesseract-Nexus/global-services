@@ -50,6 +50,7 @@ func main() {
 	emailProvider := initEmailProvider(cfg)
 	smsProvider := initSMSProvider(cfg)
 	pushProvider := initPushProvider(cfg)
+	webPushProvider := initWebPushProvider(cfg)
 
 	// Initialize repositories
 	notifRepo := repository.NewNotificationRepository(db)
@@ -123,6 +124,7 @@ func main() {
 	}
 	templateHandler := handlers.NewTemplateHandler(templateRepo)
 	prefHandler := handlers.NewPreferenceHandler(prefRepo)
+	deviceHandler := handlers.NewDeviceHandler(prefRepo)
 	var verifyHandler *handlers.VerifyHandler
 	if verifyService != nil {
 		verifyHandler = handlers.NewVerifyHandler(verifyService, cfg.Verify.DevtestEnabled, cfg.Verify.TestPhoneNumber)
@@ -143,6 +145,7 @@ func main() {
 			emailProvider,
 			smsProvider,
 			pushProvider,
+			webPushProvider,
 			cfg.App.AdminEmail,
 			cfg.App.SupportEmail,
 		)
@@ -152,7 +155,7 @@ func main() {
 	}
 
 	// Setup router
-	router := setupRouter(cfg, healthHandler, notifHandler, templateHandler, prefHandler, verifyHandler)
+	router := setupRouter(cfg, healthHandler, notifHandler, templateHandler, prefHandler, deviceHandler, verifyHandler)
 
 	// Start server with graceful shutdown
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
@@ -437,6 +440,25 @@ func initPushProvider(cfg *config.Config) services.Provider {
 	return nil
 }
 
+// initWebPushProvider initializes the Web Push (VAPID) provider
+func initWebPushProvider(cfg *config.Config) *services.WebPushProvider {
+	if cfg.Push.VAPIDPublicKey == "" || cfg.Push.VAPIDPrivateKey == "" {
+		log.Println("Warning: VAPID keys not configured - Web Push notifications disabled")
+		return nil
+	}
+	subject := cfg.Push.VAPIDSubject
+	if subject == "" {
+		subject = "mailto:push@tesserix.app"
+	}
+	provider, err := services.NewWebPushProvider(cfg.Push.VAPIDPublicKey, cfg.Push.VAPIDPrivateKey, subject)
+	if err != nil {
+		log.Printf("Warning: Failed to initialize Web Push provider: %v", err)
+		return nil
+	}
+	log.Printf("Web Push (VAPID) provider initialized (subject: %s)", subject)
+	return provider
+}
+
 // setupRouter configures the Gin router with middleware and routes
 func setupRouter(
 	cfg *config.Config,
@@ -444,6 +466,7 @@ func setupRouter(
 	notifHandler *handlers.NotificationHandler,
 	templateHandler *handlers.TemplateHandler,
 	prefHandler *handlers.PreferenceHandler,
+	deviceHandler *handlers.DeviceHandler,
 	verifyHandler *handlers.VerifyHandler,
 ) *gin.Engine {
 	// Set Gin mode
@@ -517,6 +540,13 @@ func setupRouter(
 			preferences.GET("/:userId", prefHandler.Get)
 			preferences.PUT("/:userId", prefHandler.Update)
 			preferences.POST("/:userId/push-token", prefHandler.RegisterPushToken)
+		}
+
+		// Device registration (push subscriptions)
+		devices := api.Group("/devices")
+		{
+			devices.POST("/register", deviceHandler.Register)
+			devices.POST("/unregister", deviceHandler.Unregister)
 		}
 
 		// OTP/Verification endpoints (only if Twilio Verify is configured)

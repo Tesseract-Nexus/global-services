@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -168,12 +169,19 @@ func (h *PreferenceHandler) RegisterPushToken(c *gin.Context) {
 	// Add token if not already present
 	var tokens []string
 	if pref.PushTokens != nil {
-		// Parse existing tokens
-		// For simplicity, just append
-		tokens = append(tokens, req.Token)
-	} else {
-		tokens = []string{req.Token}
+		if err := json.Unmarshal(pref.PushTokens, &tokens); err != nil {
+			tokens = []string{}
+		}
 	}
+
+	// Check for duplicate
+	for _, t := range tokens {
+		if t == req.Token {
+			c.JSON(http.StatusOK, gin.H{"success": true, "message": "Token already registered"})
+			return
+		}
+	}
+	tokens = append(tokens, req.Token)
 
 	// Ensure ID is set
 	if pref.ID == uuid.Nil {

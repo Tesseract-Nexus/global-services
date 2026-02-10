@@ -147,8 +147,11 @@ type SMSConfig struct {
 
 // PushConfig holds push notification settings
 type PushConfig struct {
-	FCMProjectID   string
-	FCMCredentials string
+	FCMProjectID    string
+	FCMCredentials  string
+	VAPIDPublicKey  string
+	VAPIDPrivateKey string
+	VAPIDSubject    string
 }
 
 // VerifyConfig holds Twilio Verify settings for OTP and account verification
@@ -253,8 +256,11 @@ func Load() (*Config, error) {
 			EnableFailover: getEnvBool("SMS_FAILOVER_ENABLED", true),
 		},
 		Push: PushConfig{
-			FCMProjectID:   getEnv("FCM_PROJECT_ID", ""),
-			FCMCredentials: getEnv("FCM_CREDENTIALS_JSON", ""),
+			FCMProjectID:    getEnv("FCM_PROJECT_ID", ""),
+			FCMCredentials:  getEnv("FCM_CREDENTIALS_JSON", ""),
+			VAPIDPublicKey:  getEnv("VAPID_PUBLIC_KEY", ""),
+			VAPIDPrivateKey: getEnv("VAPID_PRIVATE_KEY", ""),
+			VAPIDSubject:    getEnv("VAPID_SUBJECT", "mailto:push@tesserix.app"),
 		},
 		Verify: VerifyConfig{
 			TwilioVerifyServiceSID: getEnv("TWILIO_VERIFY_SERVICE_SID", ""),

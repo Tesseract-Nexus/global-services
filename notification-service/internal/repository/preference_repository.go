@@ -13,6 +13,8 @@ type PreferenceRepository interface {
 	GetByUserID(ctx context.Context, tenantID string, userID uuid.UUID) (*models.NotificationPreference, error)
 	Upsert(ctx context.Context, pref *models.NotificationPreference) error
 	UpdatePushTokens(ctx context.Context, tenantID string, userID uuid.UUID, tokens []string) error
+	GetPushEnabledByTenant(ctx context.Context, tenantID string) ([]*models.NotificationPreference, error)
+	UpdatePushSubscriptions(ctx context.Context, tenantID string, userID uuid.UUID, subs []byte) error
 }
 
 type preferenceRepository struct {
@@ -57,4 +59,22 @@ func (r *preferenceRepository) UpdatePushTokens(ctx context.Context, tenantID st
 		Model(&models.NotificationPreference{}).
 		Where("tenant_id = ? AND user_id = ?", tenantID, userID).
 		Update("push_tokens", tokens).Error
+}
+
+func (r *preferenceRepository) GetPushEnabledByTenant(ctx context.Context, tenantID string) ([]*models.NotificationPreference, error) {
+	var prefs []*models.NotificationPreference
+	err := r.db.WithContext(ctx).
+		Where("tenant_id = ? AND push_enabled = true AND (push_subscriptions IS NOT NULL AND push_subscriptions != '[]' OR push_tokens IS NOT NULL AND push_tokens != '[]')", tenantID).
+		Find(&prefs).Error
+	if err != nil {
+		return nil, err
+	}
+	return prefs, nil
+}
+
+func (r *preferenceRepository) UpdatePushSubscriptions(ctx context.Context, tenantID string, userID uuid.UUID, subs []byte) error {
+	return r.db.WithContext(ctx).
+		Model(&models.NotificationPreference{}).
+		Where("tenant_id = ? AND user_id = ?", tenantID, userID).
+		Update("push_subscriptions", subs).Error
 }

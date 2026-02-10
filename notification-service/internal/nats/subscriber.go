@@ -104,6 +104,7 @@ type Subscriber struct {
 	emailProvider services.Provider
 	smsProvider   services.Provider
 	pushProvider  services.Provider
+	webPushProvider *services.WebPushProvider
 	templateEng   *template.Engine
 	subs          []*nats.Subscription
 	// Configurable admin emails (from environment)
@@ -122,6 +123,7 @@ func NewSubscriber(
 	emailProvider services.Provider,
 	smsProvider services.Provider,
 	pushProvider services.Provider,
+	webPushProvider *services.WebPushProvider,
 	adminEmail string,
 	supportEmail string,
 ) *Subscriber {
@@ -141,18 +143,19 @@ func NewSubscriber(
 		}
 	}
 	return &Subscriber{
-		client:        client,
-		notifRepo:     notifRepo,
-		templateRepo:  templateRepo,
-		prefRepo:      prefRepo,
-		emailProvider: emailProvider,
-		smsProvider:   smsProvider,
-		pushProvider:  pushProvider,
-		templateEng:   template.NewEngine(),
-		subs:          make([]*nats.Subscription, 0),
-		adminEmail:    adminEmail,
-		supportEmail:  supportEmail,
-		tenantClient:  services.NewTenantClient(),
+		client:          client,
+		notifRepo:       notifRepo,
+		templateRepo:    templateRepo,
+		prefRepo:        prefRepo,
+		emailProvider:   emailProvider,
+		smsProvider:     smsProvider,
+		pushProvider:    pushProvider,
+		webPushProvider: webPushProvider,
+		templateEng:     template.NewEngine(),
+		subs:            make([]*nats.Subscription, 0),
+		adminEmail:      adminEmail,
+		supportEmail:    supportEmail,
+		tenantClient:    services.NewTenantClient(),
 	}
 }
 
@@ -215,6 +218,7 @@ func (s *Subscriber) Start(ctx context.Context) error {
 		{"GIFT_CARD_EVENTS", "gift_card.>", "Gift card lifecycle events"},
 		{"CAMPAIGN_EVENTS", "campaign.>", "Marketing campaign events"},
 		{"LOYALTY_EVENTS", "loyalty.>", "Loyalty program events"},
+		{"PRODUCT_EVENTS", "product.>", "Product lifecycle events"},
 	}
 
 	for _, stream := range streams {
@@ -510,6 +514,25 @@ func (s *Subscriber) Start(ctx context.Context) error {
 		log.Println("[NATS] Subscribed to loyalty.> events")
 	}
 
+	// Subscribe to product events (admin push for new/updated products)
+	productSub, err := js.QueueSubscribe(
+		"product.>",
+		"notification-service-workers",
+		s.handleProductEvent,
+		nats.BindStream("PRODUCT_EVENTS"),
+		nats.Durable("notification-service-products"),
+		nats.DeliverNew(),
+		nats.ManualAck(),
+		nats.AckWait(30*time.Second),
+		nats.MaxDeliver(3),
+	)
+	if err != nil {
+		log.Printf("[NATS] Warning: failed to subscribe to product events: %v", err)
+	} else {
+		s.subs = append(s.subs, productSub)
+		log.Println("[NATS] Subscribed to product.> events")
+	}
+
 	log.Printf("[NATS] Subscriber started with %d subscriptions", len(s.subs))
 	return nil
 }
@@ -624,6 +647,47 @@ func (s *Subscriber) handleOrderEvent(msg *nats.Msg) {
 		}
 	}
 
+	// Customer push notification
+	if s.shouldSendPush(prefs, category) && event.CustomerID != "" {
+		if customerUUID, err := uuid.Parse(event.CustomerID); err == nil {
+			var pushTitle, pushBody string
+			switch event.EventType {
+			case events.OrderCreated, events.OrderConfirmed:
+				pushTitle = "Order Confirmed"
+				pushBody = fmt.Sprintf("Your order #%s has been placed", event.OrderNumber)
+			case events.OrderShipped:
+				pushTitle = "Order Shipped"
+				pushBody = fmt.Sprintf("Your order #%s is on its way", event.OrderNumber)
+			case events.OrderDelivered:
+				pushTitle = "Order Delivered"
+				pushBody = fmt.Sprintf("Your order #%s has been delivered", event.OrderNumber)
+			case events.OrderCancelled:
+				pushTitle = "Order Cancelled"
+				pushBody = fmt.Sprintf("Your order #%s has been cancelled", event.OrderNumber)
+			}
+			if pushTitle != "" {
+				s.sendPushNotification(ctx, event.TenantID, customerUUID, pushTitle, pushBody, map[string]interface{}{
+					"type":      event.EventType,
+					"orderId":   event.OrderID,
+					"actionUrl": "/account/orders/" + event.OrderID,
+				})
+			}
+		}
+	}
+
+	// Admin push for new orders
+	if event.EventType == events.OrderCreated || event.EventType == events.OrderConfirmed {
+		s.sendAdminPush(ctx, event.TenantID,
+			"New Order",
+			fmt.Sprintf("New order #%s — %s %.2f", event.OrderNumber, event.Currency, event.TotalAmount),
+			map[string]interface{}{
+				"type":      event.EventType,
+				"orderId":   event.OrderID,
+				"actionUrl": "/orders/" + event.OrderID,
+			},
+		)
+	}
+
 	msg.Ack()
 	log.Printf("[NATS] Processed order event: %s for order %s", event.EventType, event.OrderNumber)
 }
@@ -694,6 +758,31 @@ func (s *Subscriber) handlePaymentEvent(msg *nats.Msg) {
 		if s.shouldSendSMS(prefs, category) && event.CustomerPhone != "" {
 			log.Printf("[SMS] Sending %s-sms to %s", templateName, event.CustomerPhone)
 			s.sendTemplatedSMS(ctx, event.TenantID, templateName+"-sms", event.CustomerPhone, variables)
+		}
+	}
+
+	// Customer push notification for payment events
+	if s.shouldSendPush(prefs, category) && event.CustomerID != "" {
+		if customerUUID, err := uuid.Parse(event.CustomerID); err == nil {
+			var pushTitle, pushBody string
+			switch event.EventType {
+			case events.PaymentFailed:
+				pushTitle = "Payment Failed"
+				pushBody = fmt.Sprintf("Payment for order #%s failed", event.OrderNumber)
+			case events.PaymentRefunded:
+				pushTitle = "Refund Processed"
+				pushBody = fmt.Sprintf("Your refund for order #%s has been processed", event.OrderNumber)
+			case events.PaymentCaptured:
+				pushTitle = "Payment Confirmed"
+				pushBody = fmt.Sprintf("Payment for order #%s confirmed", event.OrderNumber)
+			}
+			if pushTitle != "" {
+				s.sendPushNotification(ctx, event.TenantID, customerUUID, pushTitle, pushBody, map[string]interface{}{
+					"type":      event.EventType,
+					"orderId":   event.OrderID,
+					"actionUrl": "/account/orders/" + event.OrderID,
+				})
+			}
 		}
 	}
 
@@ -893,6 +982,17 @@ func (s *Subscriber) handleReviewEvent(msg *nats.Msg) {
 		log.Printf("[EMAIL] Sending review-submitted-admin to %s", s.adminEmail)
 		s.sendTemplatedEmail(ctx, event.TenantID, "review-submitted-admin", s.adminEmail, variables)
 
+		// Admin push for new reviews
+		s.sendAdminPush(ctx, event.TenantID,
+			"New Review",
+			fmt.Sprintf("New %d-star review for %s needs approval", event.Rating, event.ProductName),
+			map[string]interface{}{
+				"type":      event.EventType,
+				"reviewId":  event.ReviewID,
+				"actionUrl": "/reviews",
+			},
+		)
+
 	case events.ReviewApproved:
 		// Notify customer their review is published
 		if s.shouldSendEmail(prefs, category) && event.CustomerEmail != "" {
@@ -951,6 +1051,20 @@ func (s *Subscriber) handleInventoryEvent(msg *nats.Msg) {
 	case events.InventoryLowStock, events.InventoryOutOfStock:
 		log.Printf("[EMAIL] Sending low-stock-alert to %s", s.adminEmail)
 		s.sendTemplatedEmail(ctx, event.TenantID, "low-stock-alert", s.adminEmail, variables)
+
+		// Admin push for inventory alerts
+		var pushTitle, pushBody string
+		if event.EventType == events.InventoryOutOfStock {
+			pushTitle = "Out of Stock"
+			pushBody = fmt.Sprintf("%d product(s) are out of stock", event.TotalOutOfStock)
+		} else {
+			pushTitle = "Low Stock Alert"
+			pushBody = fmt.Sprintf("%d product(s) are running low on stock", event.TotalLowStock)
+		}
+		s.sendAdminPush(ctx, event.TenantID, pushTitle, pushBody, map[string]interface{}{
+			"type":      event.EventType,
+			"actionUrl": "/inventory",
+		})
 	}
 
 	msg.Ack()
@@ -999,6 +1113,17 @@ func (s *Subscriber) handleTicketEvent(msg *nats.Msg) {
 		// Notify support team
 		log.Printf("[EMAIL] Sending ticket-created-admin to %s", s.supportEmail)
 		s.sendTemplatedEmail(ctx, event.TenantID, "ticket-created-admin", s.supportEmail, variables)
+
+		// Admin push for new tickets
+		s.sendAdminPush(ctx, event.TenantID,
+			"New Support Ticket",
+			fmt.Sprintf("Ticket: %s", event.Subject),
+			map[string]interface{}{
+				"type":      event.EventType,
+				"ticketId":  event.TicketID,
+				"actionUrl": "/tickets/" + event.TicketID,
+			},
+		)
 
 	case events.TicketAssigned:
 		// Notify assigned agent
@@ -1309,6 +1434,17 @@ func (s *Subscriber) handleApprovalEvent(msg *nats.Msg) {
 			s.sendTemplatedEmail(ctx, event.TenantID, "approval-request", event.ApproverEmail, variables)
 		}
 
+		// Admin push for approval requests
+		s.sendAdminPush(ctx, event.TenantID,
+			"Approval Required",
+			fmt.Sprintf("%s by %s needs approval", formatActionTypeForDisplay(event.ActionType), event.RequesterName),
+			map[string]interface{}{
+				"type":       event.EventType,
+				"approvalId": event.ApprovalRequestID,
+				"actionUrl":  "/approvals/" + event.ApprovalRequestID,
+			},
+		)
+
 	case events.ApprovalEscalated:
 		// Send escalation notification to new approver
 		variables["approvalStatus"] = "ESCALATED"
@@ -1324,6 +1460,20 @@ func (s *Subscriber) handleApprovalEvent(msg *nats.Msg) {
 			log.Printf("[EMAIL] Sending approval-granted to requester %s", event.RequesterEmail)
 			s.sendTemplatedEmail(ctx, event.TenantID, "approval-granted", event.RequesterEmail, variables)
 		}
+		// Push to requester
+		if event.RequesterID != "" {
+			if requesterUUID, err := uuid.Parse(event.RequesterID); err == nil {
+				s.sendPushNotification(ctx, event.TenantID, requesterUUID,
+					"Request Approved",
+					fmt.Sprintf("Your %s request has been approved", formatActionTypeForDisplay(event.ActionType)),
+					map[string]interface{}{
+						"type":       event.EventType,
+						"approvalId": event.ApprovalRequestID,
+						"actionUrl":  "/approvals/" + event.ApprovalRequestID,
+					},
+				)
+			}
+		}
 
 	case events.ApprovalRejected:
 		// Notify requester that their request was rejected
@@ -1331,6 +1481,20 @@ func (s *Subscriber) handleApprovalEvent(msg *nats.Msg) {
 		if event.RequesterEmail != "" {
 			log.Printf("[EMAIL] Sending approval-rejected to requester %s", event.RequesterEmail)
 			s.sendTemplatedEmail(ctx, event.TenantID, "approval-rejected", event.RequesterEmail, variables)
+		}
+		// Push to requester
+		if event.RequesterID != "" {
+			if requesterUUID, err := uuid.Parse(event.RequesterID); err == nil {
+				s.sendPushNotification(ctx, event.TenantID, requesterUUID,
+					"Request Rejected",
+					fmt.Sprintf("Your %s request has been rejected", formatActionTypeForDisplay(event.ActionType)),
+					map[string]interface{}{
+						"type":       event.EventType,
+						"approvalId": event.ApprovalRequestID,
+						"actionUrl":  "/approvals/" + event.ApprovalRequestID,
+					},
+				)
+			}
 		}
 
 	case events.ApprovalCancelled:
@@ -1670,6 +1834,47 @@ func (s *Subscriber) shouldSendSMS(prefs *models.NotificationPreference, categor
 	}
 }
 
+// handleProductEvent processes product lifecycle events (admin push only)
+func (s *Subscriber) handleProductEvent(msg *nats.Msg) {
+	var event events.ProductEvent
+	if err := json.Unmarshal(msg.Data, &event); err != nil {
+		log.Printf("[NATS] Failed to unmarshal product event: %v", err)
+		msg.Ack()
+		return
+	}
+
+	log.Printf("[NATS] Processing product event: %s for product %s", event.EventType, event.ProductName)
+
+	ctx := context.Background()
+
+	switch event.EventType {
+	case events.ProductCreated:
+		s.sendAdminPush(ctx, event.TenantID,
+			"New Product",
+			fmt.Sprintf("Product \"%s\" has been created", event.ProductName),
+			map[string]interface{}{
+				"type":      event.EventType,
+				"productId": event.ProductID,
+				"actionUrl": "/catalog/products/" + event.ProductID,
+			},
+		)
+
+	case events.ProductPublished:
+		s.sendAdminPush(ctx, event.TenantID,
+			"Product Published",
+			fmt.Sprintf("Product \"%s\" is now live", event.ProductName),
+			map[string]interface{}{
+				"type":      event.EventType,
+				"productId": event.ProductID,
+				"actionUrl": "/catalog/products/" + event.ProductID,
+			},
+		)
+	}
+
+	msg.Ack()
+	log.Printf("[NATS] Processed product event: %s for product %s", event.EventType, event.ProductName)
+}
+
 // shouldSendPush checks if push should be sent based on preferences
 func (s *Subscriber) shouldSendPush(prefs *models.NotificationPreference, category string) bool {
 	// If no preferences, default to enabled
@@ -1932,52 +2137,80 @@ func (s *Subscriber) sendTemplatedSMS(ctx context.Context, tenantID, templateNam
 }
 
 func (s *Subscriber) sendPushNotification(ctx context.Context, tenantID string, userID uuid.UUID, title, body string, data map[string]interface{}) {
-	if s.pushProvider == nil {
-		log.Println("[PUSH] Provider not configured, skipping")
-		return
-	}
-
-	// Get user's push tokens from preferences
+	// Get user's push preferences
 	prefs, err := s.prefRepo.GetByUserID(ctx, tenantID, userID)
 	if err != nil || prefs == nil {
 		log.Printf("[PUSH] No preferences found for user %s", userID)
 		return
 	}
 
-	// Parse push tokens
-	var tokens []string
-	if prefs.PushTokens != nil {
-		if err := json.Unmarshal(prefs.PushTokens, &tokens); err != nil {
-			log.Printf("[PUSH] Failed to parse push tokens: %v", err)
-			return
+	// Web Push subscriptions (VAPID) — primary path
+	if s.webPushProvider != nil {
+		var subs []models.PushSubscription
+		if prefs.PushSubscriptions != nil {
+			if err := json.Unmarshal(prefs.PushSubscriptions, &subs); err != nil {
+				log.Printf("[PUSH] Failed to parse push subscriptions: %v", err)
+			}
+		}
+		for _, sub := range subs {
+			payload := services.WebPushPayload{
+				Title: title,
+				Body:  body,
+				Icon:  "/logo-icon.png",
+				Badge: "/logo-icon.png",
+				Data:  data,
+			}
+			if err := s.webPushProvider.SendToSubscription(ctx, &sub, payload); err != nil {
+				log.Printf("[WebPush] Failed to send to subscription: %v", err)
+			}
 		}
 	}
 
-	if len(tokens) == 0 {
-		log.Printf("[PUSH] No push tokens registered for user %s", userID)
+	// FCM tokens (mobile fallback) — only if FCM provider configured
+	if s.pushProvider != nil {
+		var tokens []string
+		if prefs.PushTokens != nil {
+			if err := json.Unmarshal(prefs.PushTokens, &tokens); err != nil {
+				log.Printf("[PUSH] Failed to parse push tokens: %v", err)
+			}
+		}
+
+		for _, token := range tokens {
+			message := &services.Message{
+				To:       token,
+				Subject:  title,
+				Body:     body,
+				Metadata: data,
+			}
+
+			result, err := s.pushProvider.Send(ctx, message)
+			if err != nil {
+				tokenPreview := token
+				if len(tokenPreview) > 20 {
+					tokenPreview = tokenPreview[:20] + "..."
+				}
+				log.Printf("[PUSH] Failed to send to token %s: %v", tokenPreview, err)
+				continue
+			}
+
+			if result.Success {
+				log.Printf("[PUSH] Successfully sent to user %s", userID)
+			} else {
+				log.Printf("[PUSH] Failed to send to user %s: %v", userID, result.Error)
+			}
+		}
+	}
+}
+
+// sendAdminPush sends a push notification to all push-enabled staff members in a tenant
+func (s *Subscriber) sendAdminPush(ctx context.Context, tenantID, title, body string, data map[string]interface{}) {
+	staffPrefs, err := s.prefRepo.GetPushEnabledByTenant(ctx, tenantID)
+	if err != nil {
+		log.Printf("[PUSH] Failed to get push-enabled staff for tenant %s: %v", tenantID, err)
 		return
 	}
-
-	// Send to each token
-	for _, token := range tokens {
-		message := &services.Message{
-			To:       token,
-			Subject:  title,
-			Body:     body,
-			Metadata: data,
-		}
-
-		result, err := s.pushProvider.Send(ctx, message)
-		if err != nil {
-			log.Printf("[PUSH] Failed to send to token %s: %v", token[:20]+"...", err)
-			continue
-		}
-
-		if result.Success {
-			log.Printf("[PUSH] Successfully sent to user %s", userID)
-		} else {
-			log.Printf("[PUSH] Failed to send to user %s: %v", userID, result.Error)
-		}
+	for _, pref := range staffPrefs {
+		s.sendPushNotification(ctx, tenantID, pref.UserID, title, body, data)
 	}
 }
 
