@@ -13,6 +13,7 @@ type TemplateRepository interface {
 	Create(ctx context.Context, template *models.NotificationTemplate) error
 	GetByID(ctx context.Context, id uuid.UUID) (*models.NotificationTemplate, error)
 	GetByName(ctx context.Context, tenantID, name string) (*models.NotificationTemplate, error)
+	GetBySlug(ctx context.Context, tenantID, slug string) (*models.NotificationTemplate, error)
 	List(ctx context.Context, tenantID string, filters TemplateFilters) ([]models.NotificationTemplate, int64, error)
 	ListAll(ctx context.Context, filters TemplateFilters) ([]models.NotificationTemplate, int64, error)
 	Update(ctx context.Context, template *models.NotificationTemplate) error
@@ -60,6 +61,21 @@ func (r *templateRepository) GetByName(ctx context.Context, tenantID, name strin
 	var template models.NotificationTemplate
 	err := r.db.WithContext(ctx).
 		Where("(tenant_id = ? OR tenant_id = 'default-tenant') AND name = ? AND is_active = true", tenantID, name).
+		Order(gorm.Expr("CASE WHEN tenant_id = ? THEN 0 ELSE 1 END", tenantID)). // Prefer tenant-specific templates
+		First(&template).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &template, nil
+}
+
+func (r *templateRepository) GetBySlug(ctx context.Context, tenantID, slug string) (*models.NotificationTemplate, error) {
+	var template models.NotificationTemplate
+	err := r.db.WithContext(ctx).
+		Where("(tenant_id = ? OR tenant_id = 'default-tenant') AND slug = ? AND is_active = true", tenantID, slug).
 		Order(gorm.Expr("CASE WHEN tenant_id = ? THEN 0 ELSE 1 END", tenantID)). // Prefer tenant-specific templates
 		First(&template).Error
 	if err != nil {

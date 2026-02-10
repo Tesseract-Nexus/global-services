@@ -112,6 +112,7 @@ type NotificationTemplate struct {
 	ID             uuid.UUID            `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
 	TenantID       string               `json:"tenantId" gorm:"type:varchar(255);not null;index"`
 	Name           string               `json:"name" gorm:"type:varchar(255);not null;uniqueIndex:idx_template_name_tenant"`
+	Slug           string               `json:"slug" gorm:"type:varchar(255);not null;uniqueIndex:idx_template_slug_tenant"`
 	Description    string               `json:"description" gorm:"type:text"`
 	Channel        NotificationChannel  `json:"channel" gorm:"type:varchar(20);not null"`
 	Category       string               `json:"category" gorm:"type:varchar(100);index"` // order, auth, marketing, etc.

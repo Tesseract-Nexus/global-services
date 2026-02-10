@@ -16,7 +16,6 @@ import (
 	"notification-service/internal/repository"
 	"notification-service/internal/services"
 	"notification-service/internal/template"
-	"notification-service/internal/templates"
 )
 
 // NotificationCategory maps event types to preference categories
@@ -1915,6 +1914,61 @@ func (s *Subscriber) getOrderTemplateName(eventType string) string {
 	}
 }
 
+// camelToSnake converts camelCase or PascalCase strings to snake_case.
+// Handles consecutive uppercase letters like "orderID" → "order_id", "trackingURL" → "tracking_url".
+func camelToSnake(s string) string {
+	var result []byte
+	for i, c := range s {
+		if c >= 'A' && c <= 'Z' {
+			if i > 0 {
+				prev := s[i-1]
+				// Insert underscore before uppercase if preceded by lowercase,
+				// or if preceded by uppercase and followed by lowercase (e.g. "URL" in "trackingURLPath")
+				if prev >= 'a' && prev <= 'z' {
+					result = append(result, '_')
+				} else if prev >= 'A' && prev <= 'Z' && i+1 < len(s) && s[i+1] >= 'a' && s[i+1] <= 'z' {
+					result = append(result, '_')
+				}
+			}
+			result = append(result, byte(c)+32) // toLower
+		} else {
+			result = append(result, byte(c))
+		}
+	}
+	return string(result)
+}
+
+// normalizeVariables converts camelCase variable keys to snake_case and adds semantic aliases
+// so that DB templates (which use snake_case like order_total, store_name) work with the
+// camelCase variables built by event handlers (totalAmount, businessName, etc.).
+func normalizeVariables(vars map[string]interface{}) map[string]interface{} {
+	result := make(map[string]interface{}, len(vars)*2)
+	// First pass: copy all original keys AND add snake_case versions
+	for k, v := range vars {
+		result[k] = v // keep original camelCase key for embedded fallback
+		snakeKey := camelToSnake(k)
+		if snakeKey != k {
+			result[snakeKey] = v
+		}
+	}
+	// Second pass: semantic aliases (code snake_case → DB template variable names)
+	aliases := map[string]string{
+		"total_amount":   "order_total",
+		"business_name":  "store_name",
+		"storefront_url": "store_url",
+		"amount":         "payment_amount",
+		"payment_id":     "transaction_id",
+	}
+	for src, tgt := range aliases {
+		if v, ok := result[src]; ok {
+			if _, exists := result[tgt]; !exists {
+				result[tgt] = v
+			}
+		}
+	}
+	return result
+}
+
 func (s *Subscriber) sendTemplatedEmail(ctx context.Context, tenantID, templateName, recipient string, variables map[string]interface{}) {
 	if s.emailProvider == nil {
 		log.Println("[EMAIL] Provider not configured, skipping")
@@ -1958,22 +2012,25 @@ func (s *Subscriber) sendTemplatedEmail(ctx context.Context, tenantID, templateN
 		}
 	}
 
+	// Normalize variable keys: camelCase → snake_case + semantic aliases
+	normalizedVars := normalizeVariables(variables)
+
 	var subject, body string
 	var tmplID *uuid.UUID
 
-	// Get template (try tenant-specific first, then system)
-	tmpl, err := s.templateRepo.GetByName(ctx, tenantID, templateName)
+	// Get template by slug (try tenant-specific first, then default-tenant)
+	tmpl, err := s.templateRepo.GetBySlug(ctx, tenantID, templateName)
 	if err != nil || tmpl == nil {
-		tmpl, err = s.templateRepo.GetByName(ctx, "system", templateName)
+		tmpl, err = s.templateRepo.GetBySlug(ctx, "system", templateName)
 	}
 
 	if tmpl != nil {
 		tmplID = &tmpl.ID
 
-		// Render subject
+		// Render subject using normalized variables for DB templates
 		subject = tmpl.Subject
 		if subject != "" {
-			rendered, err := s.templateEng.RenderText(subject, variables)
+			rendered, err := s.templateEng.RenderText(subject, normalizedVars)
 			if err != nil {
 				log.Printf("[EMAIL] Failed to render subject: %v", err)
 			} else {
@@ -1981,16 +2038,16 @@ func (s *Subscriber) sendTemplatedEmail(ctx context.Context, tenantID, templateN
 			}
 		}
 
-		// Render body
+		// Render body using normalized variables for DB templates
 		if tmpl.HTMLTemplate != "" {
-			rendered, err := s.templateEng.RenderHTML(tmpl.HTMLTemplate, variables)
+			rendered, err := s.templateEng.RenderHTML(tmpl.HTMLTemplate, normalizedVars)
 			if err != nil {
 				log.Printf("[EMAIL] Failed to render HTML template: %v", err)
 			} else {
 				body = rendered
 			}
 		} else if tmpl.BodyTemplate != "" {
-			rendered, err := s.templateEng.RenderText(tmpl.BodyTemplate, variables)
+			rendered, err := s.templateEng.RenderText(tmpl.BodyTemplate, normalizedVars)
 			if err != nil {
 				log.Printf("[EMAIL] Failed to render body template: %v", err)
 			} else {
@@ -1998,13 +2055,8 @@ func (s *Subscriber) sendTemplatedEmail(ctx context.Context, tenantID, templateN
 			}
 		}
 	} else {
-		// Fallback to embedded templates
-		log.Printf("[EMAIL] Using embedded template for: %s", templateName)
-		subject, body, err = s.renderEmbeddedTemplate(templateName, variables)
-		if err != nil {
-			log.Printf("[EMAIL] Embedded template error: %v", err)
-			return
-		}
+		log.Printf("[EMAIL] ERROR: No DB template for slug '%s' (tenant: %s)", templateName, tenantID)
+		return
 	}
 
 	// Create notification record for tracking
@@ -2212,637 +2264,6 @@ func (s *Subscriber) sendAdminPush(ctx context.Context, tenantID, title, body st
 	for _, pref := range staffPrefs {
 		s.sendPushNotification(ctx, tenantID, pref.UserID, title, body, data)
 	}
-}
-
-// renderEmbeddedTemplate renders using embedded Go templates as fallback
-func (s *Subscriber) renderEmbeddedTemplate(templateName string, variables map[string]interface{}) (string, string, error) {
-	renderer, err := templates.GetDefaultRenderer()
-	if err != nil {
-		return "", "", fmt.Errorf("failed to initialize template renderer: %w", err)
-	}
-
-	// Map template names to embedded template functions
-	// Template names from database use hyphens, embedded templates use underscores
-	embeddedName := s.mapTemplateNameToEmbedded(templateName)
-
-	// Build EmailData from variables
-	data := s.buildEmailData(variables)
-
-	switch embeddedName {
-	// Order templates
-	case "order_confirmation":
-		return renderer.RenderOrderConfirmation(data)
-	case "order_shipped":
-		return renderer.RenderOrderShipped(data)
-	case "order_delivered":
-		return renderer.RenderOrderDelivered(data)
-	case "order_cancelled":
-		return renderer.RenderOrderCancelled(data)
-	// Payment templates
-	case "payment_confirmation":
-		return renderer.RenderPaymentConfirmation(data)
-	case "payment_failed":
-		return renderer.RenderPaymentFailed(data)
-	case "payment_refunded":
-		return renderer.RenderPaymentRefunded(data)
-	// Customer templates
-	case "customer_welcome", "welcome_email":
-		return renderer.RenderCustomerWelcome(data)
-	// Inventory templates
-	case "low_stock_alert":
-		return renderer.RenderLowStockAlert(data)
-	// Review templates
-	case "review_submitted_customer":
-		return renderer.RenderReviewSubmittedCustomer(data)
-	case "review_submitted_admin":
-		return renderer.RenderReviewSubmittedAdmin(data)
-	case "review_approved":
-		return renderer.RenderReviewApproved(data)
-	case "review_rejected":
-		return renderer.RenderReviewRejected(data)
-	// Ticket templates
-	case "ticket_created":
-		return renderer.RenderTicketCreated(data)
-	case "ticket_created_admin":
-		return renderer.RenderTicketCreatedAdmin(data)
-	case "ticket_updated":
-		return renderer.RenderTicketUpdated(data)
-	case "ticket_resolved":
-		return renderer.RenderTicketResolved(data)
-	case "ticket_closed":
-		return renderer.RenderTicketClosed(data)
-	// Vendor templates
-	case "vendor_application":
-		return renderer.RenderVendorApplication(data)
-	case "vendor_welcome":
-		return renderer.RenderVendorWelcome(data)
-	case "vendor_approved":
-		return renderer.RenderVendorApproved(data)
-	case "vendor_rejected":
-		return renderer.RenderVendorRejected(data)
-	case "vendor_suspended":
-		return renderer.RenderVendorSuspended(data)
-	// Coupon templates
-	case "coupon_applied":
-		return renderer.RenderCouponApplied(data)
-	case "coupon_created":
-		return renderer.RenderCouponCreated(data)
-	case "coupon_expired":
-		return renderer.RenderCouponExpired(data)
-	// Auth templates
-	case "password_reset":
-		return renderer.RenderPasswordReset(data)
-	// Tenant onboarding templates
-	case "tenant_welcome_pack":
-		return renderer.RenderTenantWelcomePack(data)
-	case "verification_link":
-		return renderer.RenderVerificationLink(data)
-	// Approval workflow templates
-	case "approval_approver":
-		return renderer.RenderApprovalApprover(data)
-	case "approval_requester":
-		return renderer.RenderApprovalRequester(data)
-	// Domain lifecycle templates
-	case "domain_added":
-		return renderer.RenderDomainAdded(data)
-	case "domain_verified":
-		return renderer.RenderDomainVerified(data)
-	case "domain_ssl_ready":
-		return renderer.RenderDomainSSLReady(data)
-	case "domain_activated":
-		return renderer.RenderDomainActivated(data)
-	case "domain_failed":
-		return renderer.RenderDomainFailed(data)
-	case "domain_removed":
-		return renderer.RenderDomainRemoved(data)
-	case "domain_migrated":
-		return renderer.RenderDomainMigrated(data)
-	case "domain_ssl_expiring":
-		return renderer.RenderDomainSSLExpiring(data)
-	case "domain_health_failed":
-		return renderer.RenderDomainHealthFailed(data)
-	// Gift card templates
-	case "gift_card_recipient":
-		return renderer.RenderGiftCardRecipient(data)
-	// Campaign templates
-	case "campaign_admin":
-		return renderer.RenderCampaignAdmin(data)
-	case "campaign_broadcast":
-		return renderer.RenderCampaignBroadcast(data)
-	case "campaign_newsletter":
-		return renderer.RenderCampaignNewsletter(data)
-	default:
-		return "", "", fmt.Errorf("no embedded template found for: %s", templateName)
-	}
-}
-
-// mapTemplateNameToEmbedded converts database template names to embedded template names
-func (s *Subscriber) mapTemplateNameToEmbedded(templateName string) string {
-	// Map hyphenated database names to underscored embedded names
-	mapping := map[string]string{
-		// Order templates
-		"order-confirmation":        "order_confirmation",
-		"order-shipped":             "order_shipped",
-		"order-delivered":           "order_delivered",
-		"order-cancelled":           "order_cancelled",
-		// Payment templates
-		"payment-confirmation":      "payment_confirmation",
-		"payment-failed":            "payment_failed",
-		"payment-refunded":          "payment_refunded",
-		// Customer templates
-		"welcome-email":             "customer_welcome",
-		"customer-welcome":          "customer_welcome",
-		// Inventory templates
-		"low-stock-alert":           "low_stock_alert",
-		// Review templates
-		"review-submitted-customer": "review_submitted_customer",
-		"review-submitted-admin":    "review_submitted_admin",
-		"review-approved":           "review_approved",
-		"review-rejected":           "review_rejected",
-		// Ticket templates
-		"ticket-created":            "ticket_created",
-		"ticket-created-admin":      "ticket_created_admin",
-		"ticket-updated":            "ticket_updated",
-		"ticket-resolved":           "ticket_resolved",
-		"ticket-closed":             "ticket_closed",
-		// Vendor templates
-		"vendor-application":        "vendor_application",
-		"vendor-welcome":            "vendor_welcome",
-		"vendor-approved":           "vendor_approved",
-		"vendor-rejected":           "vendor_rejected",
-		"vendor-suspended":          "vendor_suspended",
-		// Coupon templates
-		"coupon-applied":            "coupon_applied",
-		"coupon-created":            "coupon_created",
-		"coupon-expired":            "coupon_expired",
-		// Auth templates
-		"password-reset":            "password_reset",
-		// Tenant onboarding templates
-		"tenant-welcome-pack":       "tenant_welcome_pack",
-		"verification-link":         "verification_link",
-		// Approval workflow templates
-		"approval-request":          "approval_approver",
-		"approval-escalated":        "approval_approver",
-		"approval-granted":          "approval_requester",
-		"approval-rejected":         "approval_requester",
-		"approval-cancelled":        "approval_requester",
-		"approval-expired":          "approval_requester",
-		// Domain lifecycle templates
-		"domain-added":        "domain_added",
-		"domain-verified":     "domain_verified",
-		"domain-ssl-ready":    "domain_ssl_ready",
-		"domain-activated":    "domain_activated",
-		"domain-failed":       "domain_failed",
-		"domain-removed":      "domain_removed",
-		"domain-migrated":     "domain_migrated",
-		"domain-ssl-expiring": "domain_ssl_expiring",
-		"domain-health-failed": "domain_health_failed",
-		// Gift card templates
-		"gift-card-recipient":  "gift_card_recipient",
-		"gift-card-purchaser":  "gift_card_recipient",
-		"gift-card-activated":  "gift_card_recipient",
-		// Campaign templates
-		"campaign-admin":      "campaign_admin",
-		"campaign-broadcast":  "campaign_broadcast",
-		"campaign-newsletter": "campaign_newsletter",
-	}
-
-	if mapped, ok := mapping[templateName]; ok {
-		return mapped
-	}
-	return templateName
-}
-
-// buildEmailData converts variables map to EmailData struct
-func (s *Subscriber) buildEmailData(variables map[string]interface{}) *templates.EmailData {
-	data := &templates.EmailData{}
-
-	// Helper to safely get string values
-	getString := func(key string) string {
-		if v, ok := variables[key]; ok {
-			if str, ok := v.(string); ok {
-				return str
-			}
-		}
-		return ""
-	}
-
-	// Helper to safely get float values as string
-	getFloat := func(key string) string {
-		if v, ok := variables[key]; ok {
-			switch val := v.(type) {
-			case float64:
-				return fmt.Sprintf("%.2f", val)
-			case float32:
-				return fmt.Sprintf("%.2f", val)
-			case int:
-				return fmt.Sprintf("%d.00", val)
-			case string:
-				return val
-			}
-		}
-		return ""
-	}
-
-	// Common fields
-	data.Email = getString("customerEmail")
-	data.BusinessName = getString("businessName")
-	data.SupportEmail = getString("supportEmail")
-	if data.SupportEmail == "" {
-		data.SupportEmail = "support@tesserix.app"
-	}
-
-	// Order fields
-	data.OrderNumber = getString("orderNumber")
-	data.OrderDate = getString("orderDate")
-	data.Currency = getString("currency")
-	if data.Currency == "" {
-		data.Currency = "$"
-	}
-	data.Subtotal = getFloat("subtotal")
-	data.Discount = getFloat("discount")
-	data.Shipping = getFloat("shipping")
-	data.Tax = getFloat("tax")
-	data.Total = getFloat("totalAmount")
-	data.TrackingURL = getString("trackingUrl")
-	data.OrderDetailsURL = getString("orderDetailsUrl")
-	data.PaymentMethod = getString("paymentMethod")
-
-	// Shipping fields
-	data.Carrier = getString("carrierName")
-	data.TrackingNumber = getString("trackingNumber")
-	data.EstimatedDelivery = getString("estimatedDelivery")
-	data.DeliveryDate = getString("deliveryDate")
-	data.DeliveryLocation = getString("deliveryLocation")
-
-	// Cancellation fields
-	data.CancelledDate = getString("cancelledDate")
-	data.CancellationReason = getString("cancellationReason")
-	data.RefundAmount = getFloat("refundAmount")
-	data.RefundDays = getString("refundDays")
-	data.ShopURL = getString("shopUrl")
-
-	// Payment fields
-	data.TransactionID = getString("paymentID")
-	data.Amount = getFloat("amount")
-	data.PaymentDate = getString("paymentDate")
-	data.FailureReason = getString("errorMessage")
-	data.RetryURL = getString("retryUrl")
-
-	// Customer fields
-	data.CustomerName = getString("customerName")
-	data.WelcomeOffer = getString("welcomeOffer")
-	data.PromoCode = getString("promoCode")
-	data.ReviewURL = getString("reviewUrl")
-
-	// Review fields
-	data.ReviewID = getString("reviewId")
-	data.ProductName = getString("productName")
-	data.ProductSKU = getString("productSku")
-	data.ReviewTitle = getString("reviewTitle")
-	data.ReviewContent = getString("reviewContent")
-	data.ReviewStatus = getString("reviewStatus")
-	data.RejectReason = getString("rejectReason")
-	data.ModeratedBy = getString("moderatedBy")
-	data.ReviewsURL = getString("reviewsUrl")
-	data.ProductURL = getString("productUrl")
-
-	// Handle rating as int
-	if rating, ok := variables["rating"]; ok {
-		switch v := rating.(type) {
-		case int:
-			data.Rating = v
-		case float64:
-			data.Rating = int(v)
-		}
-	}
-	if maxRating, ok := variables["maxRating"]; ok {
-		switch v := maxRating.(type) {
-		case int:
-			data.MaxRating = v
-		case float64:
-			data.MaxRating = int(v)
-		}
-	}
-	if data.MaxRating == 0 {
-		data.MaxRating = 5
-	}
-
-	// Handle isVerified as bool
-	if verified, ok := variables["isVerified"]; ok {
-		if v, ok := verified.(bool); ok {
-			data.IsVerified = v
-		}
-	}
-
-	// Parse order items if present
-	if items, ok := variables["items"]; ok {
-		if itemsList, ok := items.([]map[string]interface{}); ok {
-			for _, item := range itemsList {
-				orderItem := templates.OrderItem{}
-				if name, ok := item["name"].(string); ok {
-					orderItem.Name = name
-				}
-				if sku, ok := item["sku"].(string); ok {
-					orderItem.SKU = sku
-				}
-				if imageUrl, ok := item["imageUrl"].(string); ok {
-					orderItem.ImageURL = imageUrl
-				}
-				if qty, ok := item["quantity"].(int); ok {
-					orderItem.Quantity = qty
-				} else if qty, ok := item["quantity"].(float64); ok {
-					orderItem.Quantity = int(qty)
-				}
-				if price, ok := item["price"].(float64); ok {
-					orderItem.Price = fmt.Sprintf("%.2f", price)
-				} else if price, ok := item["price"].(string); ok {
-					orderItem.Price = price
-				}
-				if currency, ok := item["currency"].(string); ok {
-					orderItem.Currency = currency
-				} else {
-					orderItem.Currency = data.Currency
-				}
-				data.Items = append(data.Items, orderItem)
-			}
-		}
-	}
-
-	// Shipping Address - initialize with available data or use customer name as fallback
-	shippingName := getString("shippingName")
-	if shippingName == "" {
-		shippingName = data.CustomerName
-	}
-	shippingLine1 := getString("shippingLine1")
-	if shippingLine1 == "" {
-		shippingLine1 = getString("shippingAddress")
-	}
-
-	// Only create ShippingAddress if we have at least some data
-	if shippingName != "" || shippingLine1 != "" {
-		data.ShippingAddress = &templates.Address{
-			Name:       shippingName,
-			Line1:      shippingLine1,
-			Line2:      getString("shippingLine2"),
-			City:       getString("shippingCity"),
-			State:      getString("shippingState"),
-			PostalCode: getString("shippingPostalCode"),
-			Country:    getString("shippingCountry"),
-		}
-	} else {
-		// Create a minimal address to prevent nil pointer errors
-		data.ShippingAddress = &templates.Address{
-			Name:       data.CustomerName,
-			Line1:      "Address on file",
-			City:       "",
-			State:      "",
-			PostalCode: "",
-		}
-	}
-
-	// Ticket fields
-	data.TicketID = getString("ticketId")
-	data.TicketNumber = getString("ticketNumber")
-	data.TicketSubject = getString("subject")
-	data.TicketCategory = getString("category")
-	data.TicketPriority = getString("priority")
-	data.TicketStatus = getString("status")
-	data.Description = getString("description")
-	data.AssignedTo = getString("assignedTo")
-	data.AssignedToName = getString("assignedToName")
-	data.Resolution = getString("resolution")
-	data.TicketURL = getString("ticketUrl")
-
-	// Inventory fields
-	data.InventoryURL = getString("inventoryUrl")
-	if totalLow, ok := variables["totalLowStockItems"]; ok {
-		switch v := totalLow.(type) {
-		case int:
-			data.TotalLowStockItems = v
-		case float64:
-			data.TotalLowStockItems = int(v)
-		}
-	}
-	if totalOut, ok := variables["totalOutOfStockItems"]; ok {
-		switch v := totalOut.(type) {
-		case int:
-			data.TotalOutOfStockItems = v
-		case float64:
-			data.TotalOutOfStockItems = int(v)
-		}
-	}
-	if totalAffected, ok := variables["totalAffectedProducts"]; ok {
-		switch v := totalAffected.(type) {
-		case int:
-			data.TotalAffectedProducts = v
-		case float64:
-			data.TotalAffectedProducts = int(v)
-		}
-	}
-
-	// Parse product stock items if present
-	if products, ok := variables["products"]; ok {
-		if productsList, ok := products.([]map[string]interface{}); ok {
-			for _, product := range productsList {
-				stockItem := templates.ProductStock{}
-				if name, ok := product["name"].(string); ok {
-					stockItem.Name = name
-				}
-				if sku, ok := product["sku"].(string); ok {
-					stockItem.SKU = sku
-				}
-				if imageUrl, ok := product["imageUrl"].(string); ok {
-					stockItem.ImageURL = imageUrl
-				}
-				if stockLevel, ok := product["stockLevel"].(int); ok {
-					stockItem.StockLevel = stockLevel
-				} else if stockLevel, ok := product["stockLevel"].(float64); ok {
-					stockItem.StockLevel = int(stockLevel)
-				}
-				data.Products = append(data.Products, stockItem)
-			}
-		}
-	}
-
-	// Vendor fields
-	data.VendorID = getString("vendorId")
-	data.VendorName = getString("vendorName")
-	data.VendorEmail = getString("vendorEmail")
-	data.VendorBusinessName = getString("businessName")
-	data.VendorStatus = getString("status")
-	data.PreviousStatus = getString("previousStatus")
-	data.StatusReason = getString("statusReason")
-	data.ReviewedBy = getString("reviewedBy")
-	data.VendorURL = getString("vendorUrl")
-
-	// Coupon fields
-	data.CouponID = getString("couponId")
-	data.CouponCode = getString("couponCode")
-	data.DiscountType = getString("discountType")
-	data.DiscountValue = getFloat("discountValue")
-	data.DiscountAmount = getFloat("discountAmount")
-	data.OrderValue = getFloat("orderValue")
-	data.ValidFrom = getString("validFrom")
-	data.ValidUntil = getString("validUntil")
-	data.CouponStatus = getString("status")
-	data.CouponsURL = getString("couponsUrl")
-	if data.ShopURL == "" {
-		data.ShopURL = getString("shopUrl")
-	}
-
-	// Auth/Security fields
-	data.ResetCode = getString("resetToken")
-	data.ResetURL = getString("resetUrl")
-	data.VerificationLink = getString("verificationLink")
-	data.VerificationToken = getString("verificationToken")
-	data.VerificationExpiry = getString("verificationExpiry")
-
-	// Tenant onboarding fields
-	data.SessionID = getString("sessionId")
-	data.BusinessName = getString("businessName")
-	data.TenantSlug = getString("slug")
-	data.Product = getString("product")
-	data.AdminHost = getString("adminHost")
-	data.StorefrontHost = getString("storefrontHost")
-	data.BaseDomain = getString("baseDomain")
-	data.AdminURL = getString("adminUrl")
-	data.StorefrontURL = getString("storefrontUrl")
-
-	// Approval workflow fields
-	data.ApprovalID = getString("approvalId")
-	data.ApprovalStatus = getString("approvalStatus")
-	data.ApprovalPriority = getString("approvalPriority")
-	data.ActionType = getString("actionType")
-	data.ActionTypeDisplay = getString("actionTypeDisplay")
-	data.ResourceType = getString("resourceType")
-	data.ResourceID = getString("resourceId")
-	data.RequesterID = getString("requesterId")
-	data.RequesterName = getString("requesterName")
-	data.RequesterEmail = getString("requesterEmail")
-	data.ApproverID = getString("approverId")
-	data.ApproverName = getString("approverName")
-	data.ApproverEmail = getString("approverEmail")
-	data.ApproverRole = getString("approverRole")
-	data.ApprovalReason = getString("approvalReason")
-	data.ApprovalComment = getString("approvalComment")
-	data.ApprovalExpiresAt = getString("approvalExpiresAt")
-	data.ApprovalCreatedAt = getString("approvalCreatedAt")
-	data.ApprovalDecidedAt = getString("approvalDecidedAt")
-	data.ApprovalURL = getString("approvalUrl")
-	data.EscalatedFromID = getString("escalatedFromId")
-	data.EscalatedFromName = getString("escalatedFromName")
-	if escalationLevel, ok := variables["escalationLevel"]; ok {
-		switch v := escalationLevel.(type) {
-		case int:
-			data.EscalationLevel = v
-		case float64:
-			data.EscalationLevel = int(v)
-		}
-	}
-
-	// Login notification fields
-	data.LoginTime = getString("loginTime")
-	data.LoginLocation = getString("loginLocation")
-	data.IPAddress = getString("ipAddress")
-	data.DeviceInfo = getString("deviceInfo")
-	data.UserAgent = getString("userAgent")
-	data.LoginMethod = getString("loginMethod")
-	data.ResetPasswordURL = getString("resetPasswordURL")
-
-	// Domain lifecycle fields
-	data.DomainID = getString("domainId")
-	data.Domain = getString("domain")
-	data.DomainType = getString("domainType")
-	data.DomainStatus = getString("status")
-	data.DomainPreviousStatus = getString("previousStatus")
-	data.DNSRecordType = getString("dnsRecordType")
-	data.DNSRecordName = getString("dnsRecordName")
-	data.DNSRecordValue = getString("dnsRecordValue")
-	data.SSLStatus = getString("sslStatus")
-	data.SSLExpiresAt = getString("sslExpiresAt")
-	data.SSLProvider = getString("sslProvider")
-	data.RoutingTarget = getString("routingTarget")
-	data.RoutingPath = getString("routingPath")
-	data.MigratedFrom = getString("migratedFrom")
-	data.MigratedTo = getString("migratedTo")
-	data.MigrationReason = getString("migrationReason")
-	data.DomainFailureReason = getString("failureReason")
-	data.DomainFailureCode = getString("failureCode")
-	data.DomainSettingsURL = getString("domainSettingsUrl")
-	data.OwnerEmail = getString("ownerEmail")
-	data.OwnerName = getString("ownerName")
-
-	// Gift card fields
-	data.GiftCardCode = getString("giftCardCode")
-	data.GiftCardBalance = getFloat("initialBalance")
-	data.SenderName = getString("purchaserName")
-	data.RecipientName = getString("recipientName")
-	data.GiftMessage = getString("message")
-	data.GiftCardExpiry = getString("expiresAt")
-
-	// Campaign fields
-	data.CampaignID = getString("campaignId")
-	data.CampaignName = getString("campaignName")
-	data.CampaignType = getString("campaignType")
-	data.CampaignChannel = getString("campaignChannel")
-	data.CampaignStatus = getString("campaignStatus")
-	data.CampaignCTAText = getString("campaignCTAText")
-	data.CampaignCTAURL = getString("campaignCTAUrl")
-	data.CampaignURL = getString("campaignUrl")
-	data.UnsubscribeURL = getString("unsubscribeUrl")
-	data.CampaignRevenue = getFloat("campaignRevenue")
-	data.CampaignScheduledAt = getString("campaignScheduledAt")
-	data.CampaignActorName = getString("campaignActorName")
-	if totalRecipients, ok := variables["totalRecipients"]; ok {
-		switch v := totalRecipients.(type) {
-		case int:
-			data.TotalRecipients = v
-		case float64:
-			data.TotalRecipients = int(v)
-		}
-	}
-	if delivered, ok := variables["campaignDelivered"]; ok {
-		switch v := delivered.(type) {
-		case int:
-			data.CampaignDelivered = v
-		case float64:
-			data.CampaignDelivered = int(v)
-		}
-	}
-	if opened, ok := variables["campaignOpened"]; ok {
-		switch v := opened.(type) {
-		case int:
-			data.CampaignOpened = v
-		case float64:
-			data.CampaignOpened = int(v)
-		}
-	}
-	if clicked, ok := variables["campaignClicked"]; ok {
-		switch v := clicked.(type) {
-		case int:
-			data.CampaignClicked = v
-		case float64:
-			data.CampaignClicked = int(v)
-		}
-	}
-	if converted, ok := variables["campaignConverted"]; ok {
-		switch v := converted.(type) {
-		case int:
-			data.CampaignConverted = v
-		case float64:
-			data.CampaignConverted = int(v)
-		}
-	}
-
-	// Storefront branding fields - for tenant-branded customer emails
-	data.BrandPrimaryColor = getString("brandPrimaryColor")
-	data.BrandSecondaryColor = getString("brandSecondaryColor")
-	data.BrandAccentColor = getString("brandAccentColor")
-	data.BrandTextColor = getString("brandTextColor")
-	data.BrandLogoURL = getString("brandLogoUrl")
-
-	return data
 }
 
 // formatUserAgent parses user agent string and returns a human-readable device info

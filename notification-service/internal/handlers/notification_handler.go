@@ -16,7 +16,6 @@ import (
 	"notification-service/internal/repository"
 	"notification-service/internal/services"
 	"notification-service/internal/template"
-	"notification-service/internal/templates"
 )
 
 // NotificationHandler handles notification-related requests
@@ -217,17 +216,19 @@ func (h *NotificationHandler) Send(c *gin.Context) {
 	if req.TemplateName != "" || req.TemplateID != "" {
 		var tmpl *models.NotificationTemplate
 		var err error
-		var usedEmbeddedTemplate bool
 
-		// First try database template
+		// Look up database template by ID or slug
 		if req.TemplateID != "" {
 			templateID, _ := uuid.Parse(req.TemplateID)
 			tmpl, err = h.templateRepo.GetByID(c.Request.Context(), templateID)
 		} else {
-			tmpl, err = h.templateRepo.GetByName(c.Request.Context(), tenantID, req.TemplateName)
+			tmpl, err = h.templateRepo.GetBySlug(c.Request.Context(), tenantID, req.TemplateName)
+			if (err != nil || tmpl == nil) && req.TemplateName != "" {
+				// Fallback: try by name for backwards compatibility
+				tmpl, err = h.templateRepo.GetByName(c.Request.Context(), tenantID, req.TemplateName)
+			}
 		}
 
-		// If database template found, use it
 		if err == nil && tmpl != nil {
 			notification.TemplateID = &tmpl.ID
 			notification.TemplateName = tmpl.Name
@@ -249,35 +250,10 @@ func (h *NotificationHandler) Send(c *gin.Context) {
 				}
 			}
 		} else if req.TemplateName != "" {
-			// Fallback to embedded templates
-			// Normalize template name: convert dashes to underscores (e.g., "ticket-created" -> "ticket_created")
-			embeddedTemplateName := strings.ReplaceAll(req.TemplateName, "-", "_")
-
-			renderer, renderErr := templates.GetDefaultRenderer()
-			if renderErr != nil {
-				log.Printf("[NotificationHandler] Failed to get embedded template renderer: %v", renderErr)
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Template renderer not available"})
-				return
-			}
-
-			// Build EmailData from request variables
-			emailData := buildEmailDataFromVariables(req.Variables, notification.Subject, req.RecipientEmail)
-
-			// Try to render the embedded template
-			renderedHTML, renderErr := renderer.Render(embeddedTemplateName, emailData)
-			if renderErr != nil {
-				log.Printf("[NotificationHandler] Template '%s' not found in DB or embedded templates: %v", req.TemplateName, renderErr)
-				c.JSON(http.StatusNotFound, gin.H{"error": "Template not found"})
-				return
-			}
-
-			notification.TemplateName = embeddedTemplateName
-			notification.BodyHTML = renderedHTML
-			usedEmbeddedTemplate = true
-			log.Printf("[NotificationHandler] Using embedded template: %s", embeddedTemplateName)
+			log.Printf("[NotificationHandler] Template '%s' not found in DB", req.TemplateName)
+			c.JSON(http.StatusNotFound, gin.H{"error": "Template not found"})
+			return
 		}
-
-		_ = usedEmbeddedTemplate // silence unused variable warning
 	}
 
 	// Store variables and metadata
@@ -595,137 +571,6 @@ func parseIntWithDefault(s string, defaultVal int) int {
 	return val
 }
 
-// buildEmailDataFromVariables converts request variables map to EmailData struct for embedded templates
-func buildEmailDataFromVariables(variables map[string]interface{}, subject, recipientEmail string) *templates.EmailData {
-	data := &templates.EmailData{
-		Subject: subject,
-		Email:   recipientEmail,
-	}
-
-	if variables == nil {
-		return data
-	}
-
-	// Helper functions for type conversion
-	getString := func(key string) string {
-		if val, ok := variables[key]; ok {
-			if s, ok := val.(string); ok {
-				return s
-			}
-		}
-		return ""
-	}
-
-	getInt := func(key string) int {
-		if val, ok := variables[key]; ok {
-			switch v := val.(type) {
-			case int:
-				return v
-			case float64:
-				return int(v)
-			case int64:
-				return int(v)
-			}
-		}
-		return 0
-	}
-
-	// Common fields
-	data.BusinessName = getString("businessName")
-	data.SupportEmail = getString("supportEmail")
-	data.CustomerName = getString("customerName")
-
-	// Ticket fields
-	data.TicketID = getString("ticketId")
-	data.TicketNumber = getString("ticketNumber")
-	data.TicketSubject = getString("subject")
-	data.TicketCategory = getString("category")
-	data.TicketPriority = getString("priority")
-	data.TicketStatus = getString("status")
-	data.Description = getString("description")
-	data.Resolution = getString("resolution")
-	data.TicketURL = getString("ticketUrl")
-
-	// Order fields
-	data.OrderNumber = getString("orderNumber")
-	data.OrderDate = getString("orderDate")
-	data.Currency = getString("currency")
-	data.Subtotal = getString("subtotal")
-	data.Discount = getString("discount")
-	data.Shipping = getString("shipping")
-	data.Tax = getString("tax")
-	data.Total = getString("total")
-	data.PaymentMethod = getString("paymentMethod")
-	data.TrackingURL = getString("trackingUrl")
-	data.OrderDetailsURL = getString("orderDetailsUrl")
-
-	// Shipping fields
-	data.Carrier = getString("carrier")
-	data.TrackingNumber = getString("trackingNumber")
-	data.EstimatedDelivery = getString("estimatedDelivery")
-	data.DeliveryDate = getString("deliveryDate")
-
-	// Payment fields
-	data.TransactionID = getString("transactionId")
-	data.Amount = getString("amount")
-	data.PaymentDate = getString("paymentDate")
-	data.FailureReason = getString("failureReason")
-	data.RetryURL = getString("retryUrl")
-	data.RefundAmount = getString("refundAmount")
-
-	// Review fields
-	data.ReviewID = getString("reviewId")
-	data.ProductName = getString("productName")
-	data.ProductSKU = getString("productSku")
-	data.ReviewTitle = getString("reviewTitle")
-	data.ReviewContent = getString("reviewContent")
-	data.Rating = getInt("rating")
-	data.MaxRating = getInt("maxRating")
-	if data.MaxRating == 0 {
-		data.MaxRating = 5
-	}
-	data.ReviewDate = getString("reviewDate")
-	data.ReviewStatus = getString("reviewStatus")
-	data.RejectReason = getString("rejectReason")
-	data.ReviewsURL = getString("reviewsUrl")
-	data.ProductURL = getString("productUrl")
-
-	// Vendor fields
-	data.VendorID = getString("vendorId")
-	data.VendorName = getString("vendorName")
-	data.VendorEmail = getString("vendorEmail")
-	data.VendorBusinessName = getString("vendorBusinessName")
-	data.VendorStatus = getString("vendorStatus")
-	data.StatusReason = getString("statusReason")
-	data.VendorURL = getString("vendorUrl")
-
-	// Coupon fields
-	data.CouponID = getString("couponId")
-	data.CouponCode = getString("couponCode")
-	data.DiscountType = getString("discountType")
-	data.DiscountValue = getString("discountValue")
-	data.DiscountAmount = getString("discountAmount")
-	data.ValidFrom = getString("validFrom")
-	data.ValidUntil = getString("validUntil")
-
-	// Auth fields
-	data.ResetCode = getString("resetCode")
-	data.ResetURL = getString("resetUrl")
-
-	// Tenant fields
-	data.TenantSlug = getString("tenantSlug")
-	data.AdminURL = getString("adminUrl")
-	data.StorefrontURL = getString("storefrontUrl")
-
-	// Staff invitation fields
-	data.StaffName = getString("staffName")
-	data.StaffEmail = getString("staffEmail")
-	data.InviterName = getString("inviterName")
-	data.Role = getString("role")
-	data.ActivationLink = getString("activationLink")
-
-	return data
-}
 
 // getEmailAction determines the email action type based on template name or metadata
 func (h *NotificationHandler) getEmailAction(templateName string, metadata map[string]interface{}) middleware.EmailAction {
