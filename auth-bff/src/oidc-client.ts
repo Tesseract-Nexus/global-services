@@ -42,6 +42,8 @@ async function discoverIssuerWithCustomUserAgent(issuerUrl: string): Promise<Iss
   issuer[custom.http_options] = function httpOptionsHook(_url: URL, options: Record<string, unknown>) {
     const headers = (options.headers || {}) as Record<string, string>;
     headers['User-Agent'] = CUSTOM_USER_AGENT;
+    // Ensure Keycloak uses HTTPS scheme for issuer validation when called via internal HTTP URL
+    headers['X-Forwarded-Proto'] = 'https';
     return { ...options, headers };
   };
 
@@ -202,6 +204,7 @@ class OIDCClientManager {
         issuer[custom.http_options] = function httpOptionsHook(_url: URL, options: Record<string, unknown>) {
           const headers = (options.headers || {}) as Record<string, string>;
           headers['User-Agent'] = CUSTOM_USER_AGENT;
+          headers['X-Forwarded-Proto'] = 'https';
           return { ...options, headers };
         };
 
@@ -236,9 +239,11 @@ class OIDCClientManager {
 
     // Set custom http_options on the client instance for token exchange and other requests
     // This is required because WAF/CDN blocks the openid-client default User-Agent
+    // X-Forwarded-Proto ensures Keycloak uses HTTPS for issuer validation on internal HTTP calls
     client[custom.http_options] = function httpOptionsHook(_url: URL, options: Record<string, unknown>) {
       const headers = (options.headers || {}) as Record<string, string>;
       headers['User-Agent'] = CUSTOM_USER_AGENT;
+      headers['X-Forwarded-Proto'] = 'https';
       return { ...options, headers };
     };
 
