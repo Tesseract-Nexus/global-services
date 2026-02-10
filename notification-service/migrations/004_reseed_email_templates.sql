@@ -7,7 +7,7 @@
 --   - Logo/name inside card, centered
 --   - Clean typography, system font stack
 --   - Subtle info boxes (#fafafa, no border)
---   - Minimal footer (store name + "Powered by Mark8ly" for store emails, "Powered by Tesserix" for platform emails)
+--   - Minimal footer (store name + "Powered by mark8ly" for store emails, "Powered by Tesserix" for platform emails)
 --
 -- Template types:
 --   - 18 mark8ly templates (tenant_id = 'default-tenant') — use brand_primary_color, brand_logo_url
@@ -73,7 +73,7 @@ Total: {{.order_total}}
 </td></tr>
 <tr><td style="padding:20px 0 0;text-align:center;">
   <p style="margin:0;font-size:12px;color:#a1a1aa;">{{.store_name}}</p>
-  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">Mark8ly</a></p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">mark8ly</a></p>
 </td></tr>
 </table>
 </td></tr></table>
@@ -128,7 +128,7 @@ Track: {{.tracking_url}}
 </td></tr>
 <tr><td style="padding:20px 0 0;text-align:center;">
   <p style="margin:0;font-size:12px;color:#a1a1aa;">{{.store_name}}</p>
-  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">Mark8ly</a></p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">mark8ly</a></p>
 </td></tr>
 </table>
 </td></tr></table>
@@ -175,7 +175,7 @@ Your order #{{.order_id}} has been cancelled. If you didn''t request this, pleas
 </td></tr>
 <tr><td style="padding:20px 0 0;text-align:center;">
   <p style="margin:0;font-size:12px;color:#a1a1aa;">{{.store_name}}</p>
-  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">Mark8ly</a></p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">mark8ly</a></p>
 </td></tr>
 </table>
 </td></tr></table>
@@ -232,7 +232,7 @@ Method: {{.payment_method}}
 </td></tr>
 <tr><td style="padding:20px 0 0;text-align:center;">
   <p style="margin:0;font-size:12px;color:#a1a1aa;">{{.store_name}}</p>
-  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">Mark8ly</a></p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">mark8ly</a></p>
 </td></tr>
 </table>
 </td></tr></table>
@@ -279,7 +279,7 @@ Your payment of {{.payment_amount}} could not be processed. Please update your p
 </td></tr>
 <tr><td style="padding:20px 0 0;text-align:center;">
   <p style="margin:0;font-size:12px;color:#a1a1aa;">{{.store_name}}</p>
-  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">Mark8ly</a></p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">mark8ly</a></p>
 </td></tr>
 </table>
 </td></tr></table>
@@ -327,7 +327,7 @@ Start browsing: {{.store_url}}',
 </td></tr>
 <tr><td style="padding:20px 0 0;text-align:center;">
   <p style="margin:0;font-size:12px;color:#a1a1aa;">{{.store_name}}</p>
-  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">Mark8ly</a></p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">mark8ly</a></p>
 </td></tr>
 </table>
 </td></tr></table>
@@ -378,7 +378,7 @@ If you didn''t request this, ignore this email. This link expires in 1 hour.
 </td></tr>
 <tr><td style="padding:20px 0 0;text-align:center;">
   <p style="margin:0;font-size:12px;color:#a1a1aa;">{{.store_name}}</p>
-  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">Mark8ly</a></p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">mark8ly</a></p>
 </td></tr>
 </table>
 </td></tr></table>
@@ -425,7 +425,7 @@ This code expires in 10 minutes.
 </td></tr>
 <tr><td style="padding:20px 0 0;text-align:center;">
   <p style="margin:0;font-size:12px;color:#a1a1aa;">{{.store_name}}</p>
-  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">Mark8ly</a></p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">mark8ly</a></p>
 </td></tr>
 </table>
 </td></tr></table>
@@ -475,7 +475,7 @@ Leave a review: {{.review_url}}
 </td></tr>
 <tr><td style="padding:20px 0 0;text-align:center;">
   <p style="margin:0;font-size:12px;color:#a1a1aa;">{{.store_name}}</p>
-  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">Mark8ly</a></p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">mark8ly</a></p>
 </td></tr>
 </table>
 </td></tr></table>
@@ -531,7 +531,7 @@ Subject: {{.ticket_subject}}
 </td></tr>
 <tr><td style="padding:20px 0 0;text-align:center;">
   <p style="margin:0;font-size:12px;color:#a1a1aa;">{{.store_name}}</p>
-  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">Mark8ly</a></p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">mark8ly</a></p>
 </td></tr>
 </table>
 </td></tr></table>
@@ -585,7 +585,7 @@ Review: {{.action_url}}',
 </td></tr>
 <tr><td style="padding:20px 0 0;text-align:center;">
   <p style="margin:0;font-size:12px;color:#a1a1aa;">{{.store_name}}</p>
-  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">Mark8ly</a></p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">mark8ly</a></p>
 </td></tr>
 </table>
 </td></tr></table>
@@ -642,7 +642,7 @@ Shop now: {{.store_url}}
 </td></tr>
 <tr><td style="padding:20px 0 0;text-align:center;">
   <p style="margin:0;font-size:12px;color:#a1a1aa;">{{.store_name}}</p>
-  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">Mark8ly</a></p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">mark8ly</a></p>
 </td></tr>
 </table>
 </td></tr></table>
@@ -700,7 +700,7 @@ Manage inventory: {{.inventory_url}}
 </td></tr>
 <tr><td style="padding:20px 0 0;text-align:center;">
   <p style="margin:0;font-size:12px;color:#a1a1aa;">{{.store_name}}</p>
-  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">Mark8ly</a></p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">mark8ly</a></p>
 </td></tr>
 </table>
 </td></tr></table>
@@ -755,7 +755,7 @@ Review: {{.approval_url}}
 </td></tr>
 <tr><td style="padding:20px 0 0;text-align:center;">
   <p style="margin:0;font-size:12px;color:#a1a1aa;">{{.store_name}}</p>
-  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">Mark8ly</a></p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">mark8ly</a></p>
 </td></tr>
 </table>
 </td></tr></table>
@@ -814,7 +814,7 @@ Manage domains: {{.settings_url}}
 </td></tr>
 <tr><td style="padding:20px 0 0;text-align:center;">
   <p style="margin:0;font-size:12px;color:#a1a1aa;">{{.store_name}}</p>
-  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">Mark8ly</a></p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">mark8ly</a></p>
 </td></tr>
 </table>
 </td></tr></table>
@@ -870,7 +870,7 @@ View: {{.campaign_url}}
 </td></tr>
 <tr><td style="padding:20px 0 0;text-align:center;">
   <p style="margin:0;font-size:12px;color:#a1a1aa;">{{.store_name}}</p>
-  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">Mark8ly</a></p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">mark8ly</a></p>
 </td></tr>
 </table>
 </td></tr></table>
@@ -930,7 +930,7 @@ Redeem: {{.redeem_url}}
 </td></tr>
 <tr><td style="padding:20px 0 0;text-align:center;">
   <p style="margin:0;font-size:12px;color:#a1a1aa;">{{.store_name}}</p>
-  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">Mark8ly</a></p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">mark8ly</a></p>
 </td></tr>
 </table>
 </td></tr></table>
@@ -981,7 +981,7 @@ This invitation expires in 7 days.',
 </td></tr>
 <tr><td style="padding:20px 0 0;text-align:center;">
   <p style="margin:0;font-size:12px;color:#a1a1aa;">{{.store_name}}</p>
-  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">Mark8ly</a></p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">mark8ly</a></p>
 </td></tr>
 </table>
 </td></tr></table>
