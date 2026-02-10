@@ -185,12 +185,11 @@ export function isHomeHost(forwardedHost: string | undefined): boolean {
 
 /**
  * Determine if this host should use Logto for authentication.
- * Currently only tesserix-home hosts use Logto; all others use Keycloak.
- * Extend this as more apps migrate from Keycloak to Logto
- * (e.g., hospital management, or marketplace apps in the future).
+ * Currently disabled — all apps use Keycloak.
+ * Re-enable when Logto is ready for production use.
  */
-export function isLogtoHost(forwardedHost: string | undefined): boolean {
-  return isHomeHost(forwardedHost);
+export function isLogtoHost(_forwardedHost: string | undefined): boolean {
+  return false;
 }
 
 /**

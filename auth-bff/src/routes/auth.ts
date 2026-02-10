@@ -952,7 +952,7 @@ function determineClientType(request: FastifyRequest): 'internal' | 'customer' {
   // Fall back to hostname pattern matching for direct requests
   const forwardedHost = (request.headers['x-forwarded-host'] as string || request.hostname || '').split(':')[0];
   const baseDomain = config.baseDomain;
-  if (forwardedHost === `admin.${baseDomain}` || isAdminHost(forwardedHost)) {
+  if (forwardedHost === `admin.${baseDomain}` || isAdminHost(forwardedHost) || isHomeHost(forwardedHost)) {
     return 'internal';
   }
   return 'customer';
