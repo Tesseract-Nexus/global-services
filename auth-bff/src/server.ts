@@ -21,7 +21,6 @@ import { totpRoutes } from './routes/totp';
 import { passkeyRoutes } from './routes/passkeys';
 import { sessionStore } from './session-store';
 import { oidcClient } from './oidc-client';
-import { logtoClient } from './logto-client';
 
 const log = createLogger('server');
 
@@ -187,13 +186,9 @@ export async function startServer() {
   try {
     fastify = await buildApp();
 
-    // Initialize OIDC clients on startup to avoid rate limiting during request handling
-    log.info('Initializing OIDC clients...');
+    // Initialize OIDC client on startup to avoid rate limiting during request handling
+    log.info('Initializing OIDC client...');
     await oidcClient.initialize();
-
-    // Initialize Logto OIDC client (if configured)
-    log.info('Initializing Logto client...');
-    await logtoClient.initialize();
 
     await fastify.listen({
       port: config.server.port,

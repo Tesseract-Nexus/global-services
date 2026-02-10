@@ -21,11 +21,6 @@ const envSchema = z.object({
   KEYCLOAK_CUSTOMER_CLIENT_ID: z.string(),
   KEYCLOAK_CUSTOMER_CLIENT_SECRET: z.string(),
 
-  // Logto - for tesserix-home (platform admin) authentication
-  LOGTO_ENDPOINT: z.string().url().optional(),
-  LOGTO_HOME_CLIENT_ID: z.string().optional(),
-  LOGTO_HOME_CLIENT_SECRET: z.string().optional(),
-
   // Session
   SESSION_SECRET: z.string().min(32),
   SESSION_MAX_AGE: z.string().default('86400'), // 24 hours in seconds
@@ -113,13 +108,6 @@ export const config = {
       issuer: `${env.KEYCLOAK_CUSTOMER_URL}/realms/${env.KEYCLOAK_CUSTOMER_REALM}`,
     },
   },
-  logto: {
-    endpoint: env.LOGTO_ENDPOINT || '',
-    home: {
-      clientId: env.LOGTO_HOME_CLIENT_ID || '',
-      clientSecret: env.LOGTO_HOME_CLIENT_SECRET || '',
-    },
-  },
   session: {
     secret: env.SESSION_SECRET,
     maxAge: parseInt(env.SESSION_MAX_AGE, 10),
@@ -181,15 +169,6 @@ export function isHomeHost(forwardedHost: string | undefined): boolean {
     hostname === `company.${homeDomain}` ||
     (hostname === 'localhost' && port === '3002')
   );
-}
-
-/**
- * Determine if this host should use Logto for authentication.
- * Currently disabled — all apps use Keycloak.
- * Re-enable when Logto is ready for production use.
- */
-export function isLogtoHost(_forwardedHost: string | undefined): boolean {
-  return false;
 }
 
 /**
