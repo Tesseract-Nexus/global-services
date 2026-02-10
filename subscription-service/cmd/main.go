@@ -17,6 +17,7 @@ import (
 	"subscription-service/internal/clients"
 	"subscription-service/internal/config"
 	"subscription-service/internal/handlers"
+	"subscription-service/internal/models"
 	"subscription-service/internal/middleware"
 	natsconsumer "subscription-service/internal/nats"
 	"subscription-service/internal/repository"
@@ -40,8 +41,18 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
+	// Auto-migrate subscription tables
+	if err := db.AutoMigrate(
+		&models.SubscriptionPlan{},
+		&models.TenantSubscription{},
+		&models.SubscriptionInvoice{},
+		&models.SubscriptionEvent{},
+	); err != nil {
+		log.Fatalf("Failed to auto-migrate database: %v", err)
+	}
+	log.Println("Database schema migrated")
+
 	// Initialize layers
-	// Note: Schema creation and plan seeding is handled by db-schema-bootstrap CronJob
 	repo := repository.NewSubscriptionRepository(db)
 	tenantClient := clients.NewTenantClient()
 
