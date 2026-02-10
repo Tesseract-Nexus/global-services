@@ -26,7 +26,7 @@ func NewNotificationClient(baseURL string, apiKey string) *NotificationClient {
 	// Use notification-service URL (override verification-service URL)
 	notificationURL := os.Getenv("NOTIFICATION_SERVICE_URL")
 	if notificationURL == "" {
-		notificationURL = "http://notification-service.devtest.svc.cluster.local:8090"
+		notificationURL = "http://notification-service.marketplace.svc.cluster.local:8090"
 	}
 	return &NotificationClient{
 		baseURL: notificationURL,

@@ -33,12 +33,12 @@ func TestLoadConfig_Defaults(t *testing.T) {
 		t.Errorf("expected default DB name tesseract_hub, got %s", cfg.Database.Name)
 	}
 
-	if cfg.NATS.URL != "nats://nats.devtest.svc.cluster.local:4222" {
+	if cfg.NATS.URL != "nats://nats.nats.svc.cluster.local:4222" {
 		t.Errorf("expected default NATS URL, got %s", cfg.NATS.URL)
 	}
 
-	if cfg.Kubernetes.Namespace != "devtest" {
-		t.Errorf("expected default namespace devtest, got %s", cfg.Kubernetes.Namespace)
+	if cfg.Kubernetes.Namespace != "marketplace" {
+		t.Errorf("expected default namespace marketplace, got %s", cfg.Kubernetes.Namespace)
 	}
 
 	if cfg.Kubernetes.IstioNamespace != "istio-system" {

@@ -77,7 +77,7 @@ func Load() (*Config, error) {
 			APIKey:                 getEnv("EMAIL_API_KEY", ""), // Not required for notification-service
 			FromEmail:              getEnv("EMAIL_FROM", "no-reply@tesserix.app"),
 			FromName:               getEnv("EMAIL_FROM_NAME", "Tesseract Hub"),
-			NotificationServiceURL: getEnv("NOTIFICATION_SERVICE_URL", "http://notification-service.devtest.svc.cluster.local:8090"),
+			NotificationServiceURL: getEnv("NOTIFICATION_SERVICE_URL", "http://notification-service.marketplace.svc.cluster.local:8090"),
 		},
 		Security: SecurityConfig{
 			APIKey:           secrets.GetAPIKey(),

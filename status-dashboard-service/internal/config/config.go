@@ -43,7 +43,7 @@ func Load() *Config {
 
 // loadServicesConfig loads the services to monitor from environment
 func loadServicesConfig() []ServiceConfig {
-	namespace := getEnv("SERVICES_NAMESPACE", "devtest")
+	namespace := getEnv("SERVICES_NAMESPACE", "marketplace")
 
 	// Build service URL with correct port
 	svcURL := func(name string, port int) string {

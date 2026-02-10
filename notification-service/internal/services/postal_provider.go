@@ -228,7 +228,7 @@ func (p *PostalProvider) sendPlain(addr string, recipients []string, body string
 	defer client.Quit()
 
 	// Send EHLO
-	if err = client.Hello("notification-service.devtest.svc.cluster.local"); err != nil {
+	if err = client.Hello("notification-service.marketplace.svc.cluster.local"); err != nil {
 		return fmt.Errorf("EHLO failed: %w", err)
 	}
 

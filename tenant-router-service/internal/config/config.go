@@ -111,10 +111,10 @@ func LoadConfig() *Config {
 			DB:       getEnvInt("REDIS_DB", 0),
 		},
 		NATS: NATSConfig{
-			URL: getEnv("NATS_URL", "nats://nats.devtest.svc.cluster.local:4222"),
+			URL: getEnv("NATS_URL", "nats://nats.nats.svc.cluster.local:4222"),
 		},
 		Kubernetes: K8sConfig{
-			Namespace:        getEnv("K8S_NAMESPACE", "devtest"),
+			Namespace:        getEnv("K8S_NAMESPACE", "marketplace"),
 			IstioNamespace:   getEnv("ISTIO_NAMESPACE", "istio-system"),
 			GatewayName:      getEnv("GATEWAY_NAME", "main-gateway"),
 			AdminVSName:      getEnv("ADMIN_VS_NAME", "admin-vs"),

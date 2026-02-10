@@ -43,7 +43,7 @@ type notificationResponse struct {
 }
 
 // NewNotificationServiceProvider creates a new notification service provider
-// baseURL should be the notification-service internal URL (e.g., http://notification-service.devtest.svc.cluster.local:8090)
+// baseURL should be the notification-service internal URL (e.g., http://notification-service.marketplace.svc.cluster.local:8090)
 // apiKey is used for inter-service authentication
 func NewNotificationServiceProvider(baseURL, apiKey, fromEmail, fromName string) *NotificationServiceProvider {
 	return &NotificationServiceProvider{

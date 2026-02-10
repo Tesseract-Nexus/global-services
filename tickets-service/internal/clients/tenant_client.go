@@ -34,7 +34,7 @@ type TenantInfo struct {
 func NewTenantClient() *TenantClient {
 	baseURL := os.Getenv("TENANT_SERVICE_URL")
 	if baseURL == "" {
-		baseURL = "http://tenant-service.devtest.svc.cluster.local:8080"
+		baseURL = "http://tenant-service.marketplace.svc.cluster.local:8080"
 	}
 
 	baseDomain := os.Getenv("BASE_DOMAIN")

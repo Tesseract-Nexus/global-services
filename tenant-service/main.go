@@ -100,7 +100,7 @@ func main() {
 	membershipRepo := repository.NewMembershipRepository(db)
 
 	// Initialize tenant router client for recently deleted slug checking
-	tenantRouterServiceURL := getEnv("TENANT_ROUTER_SERVICE_URL", "http://tenant-router-service.devtest.svc.cluster.local:8080")
+	tenantRouterServiceURL := getEnv("TENANT_ROUTER_SERVICE_URL", "http://tenant-router-service.marketplace.svc.cluster.local:8089")
 	tenantRouterClient := clients.NewTenantRouterClient(tenantRouterServiceURL)
 	membershipRepo.SetTenantRouterClient(tenantRouterClient)
 	log.Printf("Initialized tenant-router-service client: %s", tenantRouterServiceURL)

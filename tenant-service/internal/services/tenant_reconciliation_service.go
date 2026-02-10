@@ -63,7 +63,7 @@ func NewTenantReconciliationService(db *gorm.DB, cfg TenantReconciliationConfig)
 	// Initialize vendor client
 	vendorServiceURL := os.Getenv("VENDOR_SERVICE_URL")
 	if vendorServiceURL == "" {
-		vendorServiceURL = "http://vendor-service.devtest.svc.cluster.local:8085"
+		vendorServiceURL = "http://vendor-service.marketplace.svc.cluster.local:8080"
 	}
 	vendorClient := clients.NewVendorClient(vendorServiceURL)
 

@@ -37,7 +37,7 @@ func EmailProviderFactory(providerName, apiKey, fromEmail, fromName string) (Ema
 		log.Printf("Warning: Provider '%s' is deprecated. Using notification-service instead.", providerName)
 	}
 
-	baseURL := getEnvOrDefault("NOTIFICATION_SERVICE_URL", "http://notification-service.devtest.svc.cluster.local:8090")
+	baseURL := getEnvOrDefault("NOTIFICATION_SERVICE_URL", "http://notification-service.marketplace.svc.cluster.local:8090")
 	return NewNotificationServiceProvider(baseURL, apiKey, fromEmail, fromName), nil
 }
 

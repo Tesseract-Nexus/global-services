@@ -130,7 +130,7 @@ func NewOnboardingService(
 	// Initialize staff client for bootstrapping owner RBAC roles
 	staffServiceURL := os.Getenv("STAFF_SERVICE_URL")
 	if staffServiceURL == "" {
-		staffServiceURL = "http://staff-service.devtest.svc.cluster.local:8082" // Default for k8s
+		staffServiceURL = "http://staff-service.marketplace.svc.cluster.local:8080" // Default for k8s
 	}
 	staffClient := clients.NewStaffClient(staffServiceURL)
 
