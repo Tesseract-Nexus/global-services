@@ -172,18 +172,56 @@ export function isHomeHost(forwardedHost: string | undefined): boolean {
 }
 
 /**
+ * Determine if the request originates from an onboarding host.
+ * Onboarding hosts: onboarding.tesserix.app, *-onboarding.tesserix.app, localhost:3001 (dev)
+ * Uses HOME_DOMAIN (always tesserix.app) since onboarding lives on the home domain.
+ */
+export function isOnboardingHost(forwardedHost: string | undefined): boolean {
+  if (!forwardedHost) return false;
+  const hostname = forwardedHost.split(':')[0].toLowerCase();
+  const port = forwardedHost.split(':')[1];
+  const homeDomain = config.homeDomain;
+  const escapedDomain = homeDomain.replace(/\./g, '\\.');
+  return (
+    hostname === `onboarding.${homeDomain}` ||
+    new RegExp(`^.+-onboarding\\.${escapedDomain}$`).test(hostname) ||
+    (hostname === 'localhost' && port === '3001')
+  );
+}
+
+/**
+ * Determine if the request originates from a custom domain admin host.
+ * Custom domain admin hosts: admin.{customdomain} (e.g., admin.yahvismartfarm.com)
+ * These are NOT on the platform base domain — they belong to tenant custom domains.
+ */
+export function isCustomDomainAdminHost(forwardedHost: string | undefined): boolean {
+  if (!forwardedHost) return false;
+  const hostname = forwardedHost.split(':')[0].toLowerCase();
+  // Must start with "admin." and NOT be on the platform base domain or home domain
+  if (!hostname.startsWith('admin.')) return false;
+  return (
+    !hostname.endsWith(`.${config.baseDomain}`) &&
+    hostname !== config.baseDomain &&
+    !hostname.endsWith(`.${config.homeDomain}`) &&
+    hostname !== config.homeDomain &&
+    hostname !== 'localhost'
+  );
+}
+
+/**
  * Returns the appropriate session cookie name based on the request host.
  * - Home (tesserix.app) uses `bff_home_session`
- * - Admin (*-admin.tesserix.app) uses `bff_session`
+ * - Admin (*-admin.tesserix.app, admin.customdomain.com) uses `bff_session`
+ * - Onboarding uses `bff_session`
  * - Storefront/custom domains use `bff_storefront_session`
  * - Unknown defaults to `bff_session` for backward compatibility.
  */
 export function getSessionCookieName(forwardedHost: string | undefined): string {
   if (!forwardedHost) return config.session.cookieName;
   if (isHomeHost(forwardedHost)) return config.session.homeCookieName;
-  return isAdminHost(forwardedHost)
-    ? config.session.cookieName
-    : config.session.storefrontCookieName;
+  if (isOnboardingHost(forwardedHost)) return config.session.cookieName;
+  if (isAdminHost(forwardedHost) || isCustomDomainAdminHost(forwardedHost)) return config.session.cookieName;
+  return config.session.storefrontCookieName;
 }
 
 export type Config = typeof config;

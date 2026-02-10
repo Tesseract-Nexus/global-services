@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
-import { config, getSessionCookieName, isAdminHost, isHomeHost } from '../config';
+import { config, getSessionCookieName, isAdminHost, isHomeHost, isOnboardingHost, isCustomDomainAdminHost } from '../config';
 import { oidcClient } from '../oidc-client';
 import { sessionStore, SessionData, WsTicketData, SessionTransferData } from '../session-store';
 import { tenantServiceClient, maskEmail, maskIP } from '../tenant-service-client';
@@ -251,7 +251,7 @@ export async function authRoutes(fastify: FastifyInstance) {
     });
 
     logger.info(
-      { clientType, state, kcIdpHint: query.kc_idp_hint, kcAction, tenantSlug },
+      { clientType, state, kcIdpHint: query.kc_idp_hint, kcAction, tenantSlug, redirectUri },
       'Initiating Keycloak auth flow'
     );
 
@@ -269,7 +269,8 @@ export async function authRoutes(fastify: FastifyInstance) {
 
     // Check for OAuth error
     if (query.error) {
-      logger.error({ error: query.error, description: query.error_description }, 'OAuth error');
+      const forwardedHost = request.headers['x-forwarded-host'] as string || request.hostname;
+      logger.error({ error: query.error, description: query.error_description, forwardedHost }, 'OAuth callback error from Keycloak');
       return reply.redirect(`/auth/error?error=${encodeURIComponent(query.error)}`);
     }
 
@@ -385,7 +386,10 @@ export async function authRoutes(fastify: FastifyInstance) {
       const forwardedHost = request.headers['x-forwarded-host'] as string || request.hostname;
       setSessionCookie(reply, session.id, forwardedHost);
 
-      logger.info({ userId: session.userId, sessionId: session.id, forwardedHost }, 'Authentication successful');
+      logger.info(
+        { userId: session.userId, sessionId: session.id, clientType: authState.clientType, forwardedHost, tenantSlug, idpHint: authState.idpHint },
+        'Authentication successful'
+      );
 
       // Publish login success event for notifications (non-blocking)
       // Only publish for customer logins (storefront) with tenant context
@@ -836,12 +840,20 @@ export async function authRoutes(fastify: FastifyInstance) {
       const transferCode = uuidv4();
       const fwdHost = request.headers['x-forwarded-host'] as string | undefined;
       const fwdAuthContext = request.headers['x-auth-context'] as string | undefined;
+      const resolvedClientType: 'internal' | 'customer' =
+        (fwdAuthContext === 'admin' || isAdminHost(fwdHost) || isCustomDomainAdminHost(fwdHost)) ? 'internal' : 'customer';
+
+      logger.debug(
+        { fwdHost, fwdAuthContext, resolvedClientType, tenantSlug: tenant_slug },
+        'import-tokens: resolved client type for transfer session'
+      );
+
       const transferData: SessionTransferData = {
         sessionId: uuidv4(), // Will be replaced when session is created on accept
         userId: user_id,
         tenantId: tenant_id,
         tenantSlug: tenant_slug,
-        clientType: (fwdAuthContext === 'admin' || isAdminHost(fwdHost)) ? 'internal' : 'customer',
+        clientType: resolvedClientType,
         accessToken: access_token,
         refreshToken: refresh_token,
         expiresAt,
@@ -878,19 +890,38 @@ export async function authRoutes(fastify: FastifyInstance) {
 
 // Helper functions
 function determineClientType(request: FastifyRequest): 'internal' | 'customer' {
+  const rawForwardedHost = request.headers['x-forwarded-host'] as string | undefined;
+  const forwardedHost = (rawForwardedHost || request.hostname || '').split(':')[0];
+
   // Check X-Auth-Context header first (set by Next.js admin/storefront apps)
   // This handles custom domains where hostname pattern matching won't work
   const authContext = request.headers['x-auth-context'] as string | undefined;
   if (authContext === 'admin') {
+    logger.debug({ forwardedHost, authContext, method: 'x-auth-context' }, 'Client type resolved to internal');
     return 'internal';
   }
 
   // Fall back to hostname pattern matching for direct requests
-  const forwardedHost = (request.headers['x-forwarded-host'] as string || request.hostname || '').split(':')[0];
   const baseDomain = config.baseDomain;
-  if (forwardedHost === `admin.${baseDomain}` || isAdminHost(forwardedHost) || isHomeHost(forwardedHost)) {
+  let matchMethod: string | undefined;
+  if (forwardedHost === `admin.${baseDomain}`) {
+    matchMethod = 'admin-base-domain';
+  } else if (isAdminHost(forwardedHost)) {
+    matchMethod = 'admin-host';
+  } else if (isHomeHost(forwardedHost)) {
+    matchMethod = 'home-host';
+  } else if (isOnboardingHost(rawForwardedHost)) {
+    matchMethod = 'onboarding-host';
+  } else if (isCustomDomainAdminHost(rawForwardedHost)) {
+    matchMethod = 'custom-domain-admin';
+  }
+
+  if (matchMethod) {
+    logger.debug({ forwardedHost, method: matchMethod }, 'Client type resolved to internal');
     return 'internal';
   }
+
+  logger.debug({ forwardedHost }, 'Client type resolved to customer (no admin/internal match)');
   return 'customer';
 }
 
