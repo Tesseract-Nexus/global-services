@@ -14,6 +14,7 @@ RUN go mod download
 COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -mod=mod \
     -ldflags="-w -s" \
     -a -installsuffix cgo -o subscription-service ./cmd
 
