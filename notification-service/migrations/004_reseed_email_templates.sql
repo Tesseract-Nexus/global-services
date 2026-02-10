@@ -1229,4 +1229,100 @@ Dashboard: {{.dashboard_url}}',
     true, true, 1
 ) ON CONFLICT DO NOTHING;
 
+-- ─── TENANT ONBOARDING ─────────────────────────────────────────────────────
+
+INSERT INTO notification_templates (
+    id, tenant_id, name, description, channel, category,
+    subject, body_template, html_template,
+    variables, is_active, is_system, version
+) VALUES (
+    gen_random_uuid(), 'platform',
+    'Tenant Welcome Pack',
+    'Sent to new store owners when their store is created',
+    'EMAIL', 'tenant_onboarding',
+    'Your store is ready — {{.business_name}}',
+    'Congratulations! Your store {{.business_name}} has been successfully created.
+
+Admin Panel: {{.admin_url}}
+Storefront: {{.storefront_url}}
+
+Email: {{.email}}
+
+Quick Start:
+1. Add your products
+2. Configure payments
+3. Set up shipping
+4. Customize your store
+
+Need help? Contact {{.support_email}}',
+    '<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,''Segoe UI'',Roboto,''Helvetica Neue'',Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;"><tr><td style="padding:48px 24px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:512px;margin:0 auto;">
+<tr><td>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;border:1px solid #e4e4e7;">
+    <tr><td style="height:3px;background:#18181b;border-radius:12px 12px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
+    <tr><td style="padding:32px 32px 0;text-align:center;">
+      {{if .platform_logo_url}}<img src="{{.platform_logo_url}}" alt="Tesserix" height="28" style="height:28px;max-width:140px;">{{else}}<span style="font-size:15px;font-weight:600;color:#18181b;letter-spacing:-.2px;">Tesserix</span>{{end}}
+    </td></tr>
+    <tr><td style="padding:28px 32px 0;">
+      <h1 style="margin:0 0 4px;font-size:20px;font-weight:600;color:#18181b;">Your store is ready</h1>
+      <p style="margin:0 0 24px;font-size:14px;color:#71717a;">{{.business_name}} is now live</p>
+      <p style="margin:0 0 24px;font-size:15px;line-height:1.65;color:#3f3f46;">Congratulations! Your store <strong>{{.business_name}}</strong> has been successfully created. Here''s everything you need to get started.</p>
+      <p style="margin:0 0 12px;font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;font-weight:600;">Your store URLs</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 8px;"><tr><td style="padding:14px 16px;background:#fafafa;border-radius:8px;">
+        <p style="margin:0 0 2px;font-size:12px;color:#a1a1aa;">Admin Panel</p>
+        <a href="{{.admin_url}}" style="font-size:14px;color:#18181b;font-weight:500;text-decoration:none;word-break:break-all;">{{.admin_url}}</a>
+      </td></tr></table>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td style="padding:14px 16px;background:#fafafa;border-radius:8px;">
+        <p style="margin:0 0 2px;font-size:12px;color:#a1a1aa;">Storefront</p>
+        <a href="{{.storefront_url}}" style="font-size:14px;color:#18181b;font-weight:500;text-decoration:none;word-break:break-all;">{{.storefront_url}}</a>
+      </td></tr></table>
+      <p style="margin:0 0 16px;font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;font-weight:600;">Quick start</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+        <tr>
+          <td style="width:28px;vertical-align:top;padding:0 0 14px;"><div style="width:24px;height:24px;background:#f4f4f5;border-radius:50%;text-align:center;line-height:24px;font-size:12px;font-weight:600;color:#52525b;">1</div></td>
+          <td style="vertical-align:top;padding:2px 0 14px 10px;"><p style="margin:0 0 2px;font-size:14px;font-weight:600;color:#18181b;">Add your products</p><p style="margin:0;font-size:13px;color:#71717a;line-height:1.5;">Upload inventory, set prices, and configure variants</p></td>
+        </tr>
+        <tr>
+          <td style="width:28px;vertical-align:top;padding:0 0 14px;"><div style="width:24px;height:24px;background:#f4f4f5;border-radius:50%;text-align:center;line-height:24px;font-size:12px;font-weight:600;color:#52525b;">2</div></td>
+          <td style="vertical-align:top;padding:2px 0 14px 10px;"><p style="margin:0 0 2px;font-size:14px;font-weight:600;color:#18181b;">Configure payments</p><p style="margin:0;font-size:13px;color:#71717a;line-height:1.5;">Connect Stripe, PayPal, or Razorpay to accept payments</p></td>
+        </tr>
+        <tr>
+          <td style="width:28px;vertical-align:top;padding:0 0 14px;"><div style="width:24px;height:24px;background:#f4f4f5;border-radius:50%;text-align:center;line-height:24px;font-size:12px;font-weight:600;color:#52525b;">3</div></td>
+          <td style="vertical-align:top;padding:2px 0 14px 10px;"><p style="margin:0 0 2px;font-size:14px;font-weight:600;color:#18181b;">Set up shipping</p><p style="margin:0;font-size:13px;color:#71717a;line-height:1.5;">Define shipping zones, rates, and delivery options</p></td>
+        </tr>
+        <tr>
+          <td style="width:28px;vertical-align:top;padding:0 0 0;"><div style="width:24px;height:24px;background:#f4f4f5;border-radius:50%;text-align:center;line-height:24px;font-size:12px;font-weight:600;color:#52525b;">4</div></td>
+          <td style="vertical-align:top;padding:2px 0 0 10px;"><p style="margin:0 0 2px;font-size:14px;font-weight:600;color:#18181b;">Customize your store</p><p style="margin:0;font-size:13px;color:#71717a;line-height:1.5;">Brand your storefront, add pages, and configure settings</p></td>
+        </tr>
+      </table>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td style="padding:16px 16px;background:#fafafa;border-radius:8px;">
+        <p style="margin:0 0 10px;font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;font-weight:600;">Account details</p>
+        <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+          <tr><td style="padding:2px 0;font-size:13px;color:#71717a;width:60px;">Email</td><td style="padding:2px 0 2px 8px;font-size:14px;color:#18181b;font-weight:500;">{{.email}}</td></tr>
+          <tr><td style="padding:2px 0;font-size:13px;color:#71717a;width:60px;">Store</td><td style="padding:2px 0 2px 8px;font-size:14px;color:#18181b;font-weight:500;">{{.business_name}}</td></tr>
+          {{if .tenant_slug}}<tr><td style="padding:2px 0;font-size:13px;color:#71717a;width:60px;">ID</td><td style="padding:2px 0 2px 8px;font-size:14px;color:#18181b;font-weight:500;font-family:''SF Mono'',SFMono-Regular,Menlo,monospace;">{{.tenant_slug}}</td></tr>{{end}}
+        </table>
+      </td></tr></table>
+      <table role="presentation" cellpadding="0" cellspacing="0" align="center"><tr><td style="background:#18181b;border-radius:6px;">
+        <a href="{{.admin_url}}" style="display:inline-block;padding:11px 24px;font-size:14px;font-weight:500;color:#fff;text-decoration:none;">Open Admin Panel &rarr;</a>
+      </td></tr></table>
+    </td></tr>
+    <tr><td style="height:36px;"></td></tr>
+  </table>
+</td></tr>
+<tr><td style="padding:20px 0 0;text-align:center;">
+  <p style="margin:0 0 8px;font-size:13px;color:#71717a;">Need help? <a href="mailto:{{.support_email}}" style="color:#18181b;text-decoration:none;font-weight:500;">Contact support</a></p>
+  <p style="margin:0;font-size:12px;color:#a1a1aa;">Tesserix</p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://tesserix.app" style="color:#a1a1aa;text-decoration:none;">Tesserix</a></p>
+</td></tr>
+</table>
+</td></tr></table>
+</body></html>',
+    '{"business_name":"","admin_url":"","storefront_url":"","email":"","tenant_slug":"","support_email":"","platform_logo_url":""}',
+    true, true, 1
+) ON CONFLICT DO NOTHING;
+
 COMMIT;
