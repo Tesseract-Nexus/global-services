@@ -14,6 +14,7 @@ type TemplateRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*models.NotificationTemplate, error)
 	GetByName(ctx context.Context, tenantID, name string) (*models.NotificationTemplate, error)
 	List(ctx context.Context, tenantID string, filters TemplateFilters) ([]models.NotificationTemplate, int64, error)
+	ListAll(ctx context.Context, filters TemplateFilters) ([]models.NotificationTemplate, int64, error)
 	Update(ctx context.Context, template *models.NotificationTemplate) error
 	Delete(ctx context.Context, id uuid.UUID) error
 	GetSystemTemplates(ctx context.Context) ([]models.NotificationTemplate, error)
@@ -94,6 +95,49 @@ func (r *templateRepository) List(ctx context.Context, tenantID string, filters 
 
 	// Count total
 	if err := query.Model(&models.NotificationTemplate{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Apply pagination
+	if filters.Limit <= 0 {
+		filters.Limit = 50
+	}
+	if filters.Limit > 100 {
+		filters.Limit = 100
+	}
+
+	err := query.Order("category, name").
+		Limit(filters.Limit).
+		Offset(filters.Offset).
+		Find(&templates).Error
+
+	return templates, total, err
+}
+
+func (r *templateRepository) ListAll(ctx context.Context, filters TemplateFilters) ([]models.NotificationTemplate, int64, error) {
+	var templates []models.NotificationTemplate
+	var total int64
+
+	query := r.db.WithContext(ctx).Model(&models.NotificationTemplate{})
+
+	if filters.Channel != "" {
+		query = query.Where("channel = ?", filters.Channel)
+	}
+	if filters.Category != "" {
+		query = query.Where("category = ?", filters.Category)
+	}
+	if filters.IsActive != nil {
+		query = query.Where("is_active = ?", *filters.IsActive)
+	}
+	if filters.IsSystem != nil {
+		query = query.Where("is_system = ?", *filters.IsSystem)
+	}
+	if filters.Search != "" {
+		query = query.Where("name ILIKE ? OR description ILIKE ?", "%"+filters.Search+"%", "%"+filters.Search+"%")
+	}
+
+	// Count total
+	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 

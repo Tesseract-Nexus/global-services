@@ -38,10 +38,12 @@ type CreateTemplateRequest struct {
 	Tags         []string               `json:"tags"`
 }
 
-// List returns templates for a tenant
+// List returns templates for a tenant (or all templates for platform owners)
 func (h *TemplateHandler) List(c *gin.Context) {
 	tenantID := c.GetString("tenant_id")
-	if tenantID == "" {
+	isPlatformOwner := c.GetBool("is_platform_owner")
+
+	if tenantID == "" && !isPlatformOwner {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing tenant_id"})
 		return
 	}
@@ -56,7 +58,16 @@ func (h *TemplateHandler) List(c *gin.Context) {
 		Offset:   parseIntWithDefault(c.Query("offset"), 0),
 	}
 
-	templates, total, err := h.templateRepo.List(c.Request.Context(), tenantID, filters)
+	var templates []models.NotificationTemplate
+	var total int64
+	var err error
+
+	if tenantID == "" {
+		// Platform owner — list all templates across tenants
+		templates, total, err = h.templateRepo.ListAll(c.Request.Context(), filters)
+	} else {
+		templates, total, err = h.templateRepo.List(c.Request.Context(), tenantID, filters)
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list templates"})
 		return
@@ -96,9 +107,16 @@ func (h *TemplateHandler) Get(c *gin.Context) {
 // Create creates a new template
 func (h *TemplateHandler) Create(c *gin.Context) {
 	tenantID := c.GetString("tenant_id")
-	if tenantID == "" {
+	isPlatformOwner := c.GetBool("is_platform_owner")
+
+	if tenantID == "" && !isPlatformOwner {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing tenant_id"})
 		return
+	}
+
+	// Platform owners creating templates get a special tenant ID
+	if tenantID == "" && isPlatformOwner {
+		tenantID = "platform"
 	}
 
 	var req CreateTemplateRequest
@@ -142,7 +160,9 @@ func (h *TemplateHandler) Create(c *gin.Context) {
 // Update updates a template
 func (h *TemplateHandler) Update(c *gin.Context) {
 	tenantID := c.GetString("tenant_id")
-	if tenantID == "" {
+	isPlatformOwner := c.GetBool("is_platform_owner")
+
+	if tenantID == "" && !isPlatformOwner {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing tenant_id"})
 		return
 	}
