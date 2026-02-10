@@ -154,10 +154,18 @@ const getSession = async (request: FastifyRequest): Promise<SessionData | null> 
   const forwardedHost = rawForwardedHost?.split(',')[0]?.trim() || (isInternalHost ? undefined : rawHostname);
   const cookieName = getSessionCookieName(forwardedHost);
   const sessionId = request.cookies[cookieName];
-  if (!sessionId) {
+
+  // Fallback: accept session ID via X-Session-ID header for internal service-to-service calls.
+  // In Istio mesh traffic, x-forwarded-host can be overwritten by the Envoy sidecar,
+  // causing getSessionCookieName to return the wrong cookie name. The X-Session-ID header
+  // bypasses this by passing the session value directly.
+  const effectiveSessionId = sessionId || (request.headers['x-session-id'] as string | undefined);
+
+  if (!effectiveSessionId) {
+    logger.debug({ forwardedHost, cookieName, hasCookie: !!sessionId, hasSessionHeader: !!request.headers['x-session-id'] }, 'No session found');
     return null;
   }
-  return sessionStore.getSession(sessionId);
+  return sessionStore.getSession(effectiveSessionId);
 };
 
 export async function authRoutes(fastify: FastifyInstance) {
