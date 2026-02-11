@@ -73,7 +73,7 @@ const loginQuerySchema = z.object({
 });
 
 const callbackQuerySchema = z.object({
-  code: z.string(),
+  code: z.string().optional(), // Optional: missing when Keycloak returns an error response
   state: z.string(),
   error: z.string().optional(),
   error_description: z.string().optional(),
@@ -278,11 +278,17 @@ export async function authRoutes(fastify: FastifyInstance) {
   }>('/auth/callback', async (request, reply) => {
     const query = callbackQuerySchema.parse(request.query);
 
-    // Check for OAuth error
+    // Check for OAuth error (Keycloak sends error without code param)
     if (query.error) {
       const forwardedHost = request.headers['x-forwarded-host'] as string || request.hostname;
       logger.error({ error: query.error, description: query.error_description, forwardedHost }, 'OAuth callback error from Keycloak');
       return reply.redirect(`/auth/error?error=${encodeURIComponent(query.error)}`);
+    }
+
+    // Ensure code is present (it's optional in schema to allow error responses through)
+    if (!query.code) {
+      logger.warn({ state: query.state }, 'Callback received without code or error');
+      return reply.redirect('/auth/error?error=callback_error');
     }
 
     // Retrieve auth flow state
