@@ -325,7 +325,29 @@ export async function authRoutes(fastify: FastifyInstance) {
             { email: userInfo.email, roles: keycloakRoles },
             'Home app login rejected — user does not have platform-admin role'
           );
-          return reply.redirect('/auth/error?error=access_denied&error_description=You+do+not+have+permission+to+access+the+platform+admin+portal');
+
+          // Revoke the tokens we just received (non-blocking)
+          if (tokens.refreshToken) {
+            oidcClient.revokeToken(authState.clientType, tokens.refreshToken, 'refresh_token')
+              .catch(err => logger.debug({ error: err }, 'Token revocation after rejection (non-critical)'));
+          }
+
+          // Redirect through Keycloak end_session to clear the SSO session,
+          // preventing the user from being stuck in an infinite login loop.
+          // Keycloak will clear the session, then redirect to our error page.
+          const errorPageUrl = new URL(authState.redirectUri);
+          const postLogoutUri = `${errorPageUrl.origin}/auth/error?error=access_denied&error_description=${encodeURIComponent('You do not have permission to access the platform admin portal')}`;
+          try {
+            const endSessionUrl = oidcClient.getEndSessionUrl(
+              authState.clientType,
+              tokens.idToken,
+              postLogoutUri,
+            );
+            return reply.redirect(endSessionUrl);
+          } catch {
+            // Fallback if end_session_endpoint is unavailable
+            return reply.redirect(postLogoutUri);
+          }
         }
         logger.info({ email: userInfo.email }, 'Home app login authorized — platform-admin role verified');
       }
