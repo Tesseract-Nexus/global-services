@@ -366,10 +366,15 @@ export async function authRoutes(fastify: FastifyInstance) {
       }
 
       // Enrich session with tenant role from tenant-service
-      // This is critical for SSO (Google) logins where Keycloak doesn't have tenant-specific roles
+      // This is critical for SSO (Google) logins where Keycloak doesn't have tenant-specific roles.
+      // IMPORTANT: Only enrich with admin/staff roles for internal (admin) context.
+      // Storefront (customer) sessions must NOT carry admin roles — the storefront's
+      // AuthSessionProvider rejects sessions with admin/staff roles to enforce
+      // realm isolation between admin (tesserix-internal) and storefront (customer).
       const email = userInfo.email as string | undefined;
       let userRole: string | undefined;
       let isStaff = false;
+      const isAdminContext = authState.clientType === 'internal';
 
       if (email) {
         try {
@@ -382,23 +387,28 @@ export async function authRoutes(fastify: FastifyInstance) {
               const matchedTenant = tenants.find(t => t.slug === tenantSlug);
               if (matchedTenant) {
                 tenantId = tenantId || matchedTenant.id;
-                userRole = matchedTenant.role;
-                // getUserTenants already filters through validateStaffAdminAccess,
-                // so any tenant returned means the user is authorized staff
-                isStaff = !!userRole;
+                // Only assign admin/staff roles for internal (admin) context
+                if (isAdminContext) {
+                  userRole = matchedTenant.role;
+                  // getUserTenants already filters through validateStaffAdminAccess,
+                  // so any tenant returned means the user is authorized staff
+                  isStaff = !!userRole;
+                }
                 logger.info(
-                  { email, tenantSlug, tenantId, role: userRole, isStaff },
-                  'Resolved tenant role from tenant-service for SSO user'
+                  { email, tenantSlug, tenantId, role: isAdminContext ? userRole : '(customer)', isStaff, clientType: authState.clientType },
+                  'Resolved tenant from tenant-service for SSO user'
                 );
               }
             } else if (tenants.length === 1) {
               // Auto-select single tenant
               tenantId = tenants[0].id;
               tenantSlug = tenants[0].slug;
-              userRole = tenants[0].role;
-              isStaff = !!userRole;
+              if (isAdminContext) {
+                userRole = tenants[0].role;
+                isStaff = !!userRole;
+              }
               logger.info(
-                { email, tenantSlug, tenantId, role: userRole },
+                { email, tenantSlug, tenantId, role: isAdminContext ? userRole : '(customer)', clientType: authState.clientType },
                 'Auto-selected single tenant for SSO user'
               );
             }
@@ -409,19 +419,21 @@ export async function authRoutes(fastify: FastifyInstance) {
       }
 
       // If staff logged in via Google IDP, upgrade auth_method from password → password_and_google
-      if (isStaff && tenantId && email && authState.idpHint === 'google') {
+      // Only applies to admin context — storefront logins don't track staff auth methods
+      if (isAdminContext && isStaff && tenantId && email && authState.idpHint === 'google') {
         tenantServiceClient.updateStaffAuthMethod(email, tenantId, 'password_and_google')
           .catch(err => logger.warn({ error: err }, 'Failed to update staff auth method (non-blocking)'));
       }
 
       // Merge tenant-specific role into userInfo for session
+      // Admin/staff roles are only included for internal (admin) sessions
       const enrichedUserInfo = {
         ...userInfo,
         ...(tenantId ? { tenant_id: tenantId } : {}),
         ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
-        ...(userRole ? { role: userRole } : {}),
-        ...(isStaff ? { is_staff: true } : {}),
-        ...(userRole ? { realm_access: { roles: [userRole, ...(((userInfo.realm_access as any)?.roles) || [])] } } : {}),
+        ...(isAdminContext && userRole ? { role: userRole } : {}),
+        ...(isAdminContext && isStaff ? { is_staff: true } : {}),
+        ...(isAdminContext && userRole ? { realm_access: { roles: [userRole, ...(((userInfo.realm_access as any)?.roles) || [])] } } : {}),
       };
 
       // Create session with tenant context
