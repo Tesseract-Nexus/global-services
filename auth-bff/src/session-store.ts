@@ -33,6 +33,8 @@ export interface AuthFlowState {
   tenantId?: string;
   tenantSlug?: string;
   idpHint?: string;
+  // App type for role-based access control at callback time
+  appType?: 'home' | 'admin' | 'onboarding' | 'storefront';
   createdAt: number;
 }
 

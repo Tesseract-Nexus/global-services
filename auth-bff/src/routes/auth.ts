@@ -212,6 +212,16 @@ export async function authRoutes(fastify: FastifyInstance) {
     // Determine redirect URI based on request
     const redirectUri = getCallbackUrl(request, clientType);
 
+    // Determine app type for role-based access control at callback time
+    const fwdHostForAppType = request.headers['x-forwarded-host'] as string || request.hostname || '';
+    const appType = isHomeHost(fwdHostForAppType)
+      ? 'home' as const
+      : isOnboardingHost(fwdHostForAppType)
+        ? 'onboarding' as const
+        : isAdminHost(fwdHostForAppType) || isCustomDomainAdminHost(fwdHostForAppType)
+          ? 'admin' as const
+          : 'storefront' as const;
+
     // Save auth flow state (including tenant context for session creation after callback)
     await sessionStore.saveAuthFlowState({
       state,
@@ -223,6 +233,7 @@ export async function authRoutes(fastify: FastifyInstance) {
       tenantId,
       tenantSlug,
       idpHint: query.kc_idp_hint,
+      appType,
       createdAt: Date.now(),
     });
 
@@ -296,6 +307,22 @@ export async function authRoutes(fastify: FastifyInstance) {
         authState.nonce
       );
       const userInfo = await oidcClient.getUserInfo(authState.clientType, tokens.accessToken);
+
+      // For home app, enforce platform-admin role requirement.
+      // The Keycloak realm_roles mapper puts roles in a top-level `roles` claim.
+      if (authState.appType === 'home') {
+        const keycloakRoles = (userInfo.roles as string[])
+          || (userInfo.realm_access as { roles?: string[] })?.roles
+          || [];
+        if (!keycloakRoles.includes('platform-admin')) {
+          logger.warn(
+            { email: userInfo.email, roles: keycloakRoles },
+            'Home app login rejected — user does not have platform-admin role'
+          );
+          return reply.redirect('/auth/error?error=access_denied&error_description=You+do+not+have+permission+to+access+the+platform+admin+portal');
+        }
+        logger.info({ email: userInfo.email }, 'Home app login authorized — platform-admin role verified');
+      }
 
       // Determine tenant context:
       // 1. Use auth state tenant context if provided (from storefront/admin login)
@@ -520,7 +547,12 @@ export async function authRoutes(fastify: FastifyInstance) {
       return reply.code(401).send({ authenticated: false, error: 'session_expired' });
     }
 
-    const roles = (session.userInfo?.realm_access as { roles?: string[] })?.roles || [];
+    // Read roles from both Keycloak locations:
+    // - `roles` (top-level): set by the realm_roles client mapper (claim.name = "roles")
+    // - `realm_access.roles`: standard Keycloak format from default scope mapper
+    const roles = (session.userInfo?.roles as string[])
+      || (session.userInfo?.realm_access as { roles?: string[] })?.roles
+      || [];
 
     return reply.send({
       authenticated: true,
