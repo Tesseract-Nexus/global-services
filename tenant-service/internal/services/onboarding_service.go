@@ -108,6 +108,7 @@ type KeycloakOnboardingConfig struct {
 	BaseDomain       string // Base domain for redirect URIs (e.g., "tesserix.app")
 	// Storefront client IDs for customer realm redirect URIs
 	StorefrontClientIDs []string // e.g., ["storefront-web", "web-storefront", "mobile-app"]
+	OnboardingDomain    string   // e.g., "dev-onboarding.tesserix.app"
 }
 
 // NewOnboardingService creates a new onboarding service
@@ -153,7 +154,7 @@ func NewOnboardingService(
 	// - Customer realm client: for Organizations and customer users
 	keycloakClient, keycloakCustomerClient, keycloakConfig := initKeycloakClients()
 
-	return &OnboardingService{
+	svc := &OnboardingService{
 		onboardingRepo:         onboardingRepo,
 		taskRepo:               taskRepo,
 		businessRepo:           repository.NewBusinessInformationRepository(db),
@@ -173,6 +174,25 @@ func NewOnboardingService(
 		keycloakConfig:         keycloakConfig,
 		db:                     db,
 	}
+
+	// Register onboarding app redirect URI at startup (idempotent)
+	// This ensures the onboarding app's own redirect URI is always registered in Keycloak
+	// before any Google SSO flow is triggered during onboarding
+	if keycloakClient != nil && keycloakConfig != nil && keycloakConfig.OnboardingDomain != "" && keycloakConfig.AdminClientID != "" {
+		onboardingRedirectURIs := []string{
+			fmt.Sprintf("https://%s/*", keycloakConfig.OnboardingDomain),
+		}
+		go func() {
+			ctx := context.Background()
+			if err := keycloakClient.AddClientRedirectURIs(ctx, keycloakConfig.AdminClientID, onboardingRedirectURIs); err != nil {
+				log.Printf("[OnboardingService] Warning: Failed to register onboarding redirect URIs: %v", err)
+			} else {
+				log.Printf("[OnboardingService] Registered onboarding redirect URIs: %v", onboardingRedirectURIs)
+			}
+		}()
+	}
+
+	return svc
 }
 
 // initKeycloakClients initializes both Keycloak admin clients for dual-realm architecture
@@ -291,6 +311,17 @@ func initKeycloakClients() (*auth.KeycloakAdminClient, *auth.KeycloakAdminClient
 		baseDomain = "tesserix.app"
 	}
 
+	// Onboarding domain for registering onboarding app redirect URI at startup
+	onboardingDomain := os.Getenv("ONBOARDING_DOMAIN")
+	if onboardingDomain == "" {
+		envPrefix := os.Getenv("ENV_PREFIX")
+		if envPrefix != "" {
+			onboardingDomain = fmt.Sprintf("%s-onboarding.%s", envPrefix, baseDomain)
+		} else {
+			onboardingDomain = fmt.Sprintf("onboarding.%s", baseDomain)
+		}
+	}
+
 	// Storefront client IDs for customer realm redirect URIs
 	storefrontClientIDsEnv := os.Getenv("KEYCLOAK_STOREFRONT_CLIENT_IDS")
 	var storefrontClientIDs []string
@@ -313,6 +344,7 @@ func initKeycloakClients() (*auth.KeycloakAdminClient, *auth.KeycloakAdminClient
 		AdminClientID:       adminPortalClientID,
 		BaseDomain:          baseDomain,
 		StorefrontClientIDs: storefrontClientIDs,
+		OnboardingDomain:    onboardingDomain,
 	}
 
 	return internalClient, customerClient, config
@@ -719,6 +751,10 @@ func (s *OnboardingService) ValidateAndReserveSlug(ctx context.Context, slug str
 		} else {
 			log.Printf("[OnboardingService] Stored reserved slug '%s' and storefront slug '%s' for session %s", result.Slug, session.BusinessInformation.StorefrontSlug, sessionID)
 		}
+
+		// Register Keycloak redirect URIs early (before Google SSO can be triggered at Step 5)
+		// This is idempotent — AddClientRedirectURIs deduplicates
+		go s.registerTenantRedirectURIs(ctx, result.Slug, session.BusinessInformation.StorefrontSlug)
 	}
 
 	return result, nil
@@ -997,6 +1033,46 @@ type KeycloakSetupResult struct {
 	AccessToken  string
 	RefreshToken string
 	ExpiresIn    int
+}
+
+// registerTenantRedirectURIs registers admin and storefront redirect URIs in Keycloak.
+// Safe to call multiple times — AddClientRedirectURIs is idempotent and deduplicates.
+func (s *OnboardingService) registerTenantRedirectURIs(ctx context.Context, adminSlug, storefrontSlug string) {
+	if adminSlug == "" {
+		return
+	}
+	if storefrontSlug == "" {
+		storefrontSlug = adminSlug
+	}
+
+	baseDomain := s.keycloakConfig.BaseDomain
+	if baseDomain == "" {
+		baseDomain = "tesserix.app"
+	}
+
+	// Register ADMIN redirect URIs in INTERNAL realm
+	if s.keycloakClient != nil && s.keycloakConfig != nil && s.keycloakConfig.AdminClientID != "" {
+		adminRedirectURIs := []string{
+			fmt.Sprintf("https://%s-admin.%s/*", adminSlug, baseDomain),
+		}
+		log.Printf("[OnboardingService] Registering ADMIN redirect URIs: %v", adminRedirectURIs)
+		if err := s.keycloakClient.AddClientRedirectURIs(ctx, s.keycloakConfig.AdminClientID, adminRedirectURIs); err != nil {
+			log.Printf("[OnboardingService] Warning: Failed to register admin redirect URIs: %v", err)
+		}
+	}
+
+	// Register STOREFRONT redirect URIs in CUSTOMER realm
+	if s.keycloakCustomerClient != nil && s.keycloakConfig != nil && len(s.keycloakConfig.StorefrontClientIDs) > 0 {
+		storefrontRedirectURIs := []string{
+			fmt.Sprintf("https://%s.%s/*", storefrontSlug, baseDomain),
+		}
+		log.Printf("[OnboardingService] Registering STOREFRONT redirect URIs: %v", storefrontRedirectURIs)
+		for _, clientID := range s.keycloakConfig.StorefrontClientIDs {
+			if err := s.keycloakCustomerClient.AddClientRedirectURIs(ctx, clientID, storefrontRedirectURIs); err != nil {
+				log.Printf("[OnboardingService] Warning: Failed to register storefront redirect URIs for client %s: %v", clientID, err)
+			}
+		}
+	}
 }
 
 // CompleteAccountSetup creates tenant and user account from onboarding session
@@ -1282,45 +1358,12 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 		log.Printf("[OnboardingService] Warning: Customer realm client not configured - Organization not created for tenant %s", tenantID)
 	}
 
-	// ============================================================================
-	// KEYCLOAK REDIRECT URIs: Register tenant-specific redirect URIs
-	// Dual-realm architecture:
-	// - Admin URIs (slug-admin.tesserix.app) → INTERNAL realm (tesserix-internal)
-	// - Storefront URIs (slug.tesserix.app) → CUSTOMER realm (tesserix-customer)
-	// ============================================================================
+	// Register redirect URIs (idempotent — may have been registered during slug validation)
+	s.registerTenantRedirectURIs(ctx, slug, session.BusinessInformation.StorefrontSlug)
+
 	baseDomain := s.keycloakConfig.BaseDomain
 	if baseDomain == "" {
 		baseDomain = "tesserix.app"
-	}
-
-	// Register ADMIN redirect URIs in INTERNAL realm
-	if s.keycloakClient != nil && s.keycloakConfig != nil && s.keycloakConfig.AdminClientID != "" {
-		adminRedirectURIs := []string{
-			fmt.Sprintf("https://%s-admin.%s/*", slug, baseDomain),
-		}
-
-		log.Printf("[OnboardingService] Registering ADMIN redirect URIs in INTERNAL realm for tenant %s: %v", tenantID, adminRedirectURIs)
-		if err := s.keycloakClient.AddClientRedirectURIs(ctx, s.keycloakConfig.AdminClientID, adminRedirectURIs); err != nil {
-			log.Printf("[OnboardingService] Warning: Failed to register admin redirect URIs for tenant %s: %v", tenantID, err)
-		} else {
-			log.Printf("[OnboardingService] Successfully registered admin redirect URIs for tenant %s", tenantID)
-		}
-	}
-
-	// Register STOREFRONT redirect URIs in CUSTOMER realm
-	if s.keycloakCustomerClient != nil && s.keycloakConfig != nil && len(s.keycloakConfig.StorefrontClientIDs) > 0 {
-		storefrontRedirectURIs := []string{
-			fmt.Sprintf("https://%s.%s/*", slug, baseDomain),
-		}
-
-		log.Printf("[OnboardingService] Registering STOREFRONT redirect URIs in CUSTOMER realm for tenant %s: %v", tenantID, storefrontRedirectURIs)
-		for _, clientID := range s.keycloakConfig.StorefrontClientIDs {
-			if err := s.keycloakCustomerClient.AddClientRedirectURIs(ctx, clientID, storefrontRedirectURIs); err != nil {
-				log.Printf("[OnboardingService] Warning: Failed to register storefront redirect URIs for client %s, tenant %s: %v", clientID, tenantID, err)
-			} else {
-				log.Printf("[OnboardingService] Registered storefront redirect URIs for client %s, tenant %s", clientID, tenantID)
-			}
-		}
 	}
 
 	// ============================================================================
