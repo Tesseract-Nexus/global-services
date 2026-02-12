@@ -385,6 +385,15 @@ type TenantBasicInfo struct {
 	UseCustomDomain bool   `json:"use_custom_domain,omitempty"`
 	DefaultTimezone string `json:"default_timezone,omitempty"`
 	DefaultCurrency string `json:"default_currency,omitempty"`
+
+	// Additional fields for detail views
+	Industry      string    `json:"industry,omitempty"`
+	PricingTier   string    `json:"pricing_tier,omitempty"`
+	BusinessModel string    `json:"business_model,omitempty"`
+	PrimaryColor  string    `json:"primary_color,omitempty"`
+	LogoURL       string    `json:"logo_url,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 // GetTenantByID retrieves basic tenant information by ID (for internal service calls)
@@ -409,6 +418,13 @@ func (s *TenantService) GetTenantByID(ctx context.Context, tenantID uuid.UUID) (
 		UseCustomDomain: tenant.UseCustomDomain,
 		DefaultTimezone: tenant.DefaultTimezone,
 		DefaultCurrency: tenant.DefaultCurrency,
+		Industry:        tenant.Industry,
+		PricingTier:     tenant.PricingTier,
+		BusinessModel:   tenant.BusinessModel,
+		PrimaryColor:    tenant.PrimaryColor,
+		LogoURL:         tenant.LogoURL,
+		CreatedAt:       tenant.CreatedAt,
+		UpdatedAt:       tenant.UpdatedAt,
 	}, nil
 }
 
