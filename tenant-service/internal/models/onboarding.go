@@ -103,6 +103,7 @@ type OnboardingSession struct {
 	ApplicationType    string     `json:"application_type" gorm:"not null;index" validate:"required"`
 	Status             string     `json:"status" gorm:"default:'started';index" validate:"oneof=started in_progress completed failed abandoned draft"`
 	CurrentStep        string     `json:"current_step" gorm:"index"`
+	CompletedSteps     JSONB      `json:"completed_steps" gorm:"type:jsonb;default:'[]'"` // Array of completed step indices for server-side validation
 	ProgressPercentage int        `json:"progress_percentage" gorm:"default:0"`
 	StartedAt          time.Time  `json:"started_at"`
 	CompletedAt        *time.Time `json:"completed_at"`

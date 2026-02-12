@@ -411,6 +411,14 @@ func (s *OnboardingService) SaveApplicationConfiguration(ctx context.Context, se
 		return nil, fmt.Errorf("cannot update configuration for session in %s status", session.Status)
 	}
 
+	// Step 2 (Store Setup) - requires step 1 (Business Address) to be completed
+	// Only validate for store_setup configurations, not other config types
+	if config.ApplicationType == "store_setup" {
+		if err := s.validateStepOrder(ctx, session, StepStoreSetup); err != nil {
+			return nil, fmt.Errorf("step validation failed: %w", err)
+		}
+	}
+
 	config.OnboardingSessionID = sessionID
 
 	// Check if configuration already exists for this type
@@ -425,6 +433,14 @@ func (s *OnboardingService) SaveApplicationConfiguration(ctx context.Context, se
 		if err := s.db.WithContext(ctx).Save(&existing).Error; err != nil {
 			return nil, fmt.Errorf("failed to update application configuration: %w", err)
 		}
+
+		// Mark step 2 as completed if this is store_setup
+		if config.ApplicationType == "store_setup" {
+			if err := s.markStepCompleted(ctx, sessionID, StepStoreSetup); err != nil {
+				log.Printf("Warning: failed to mark step %d as completed: %v", StepStoreSetup, err)
+			}
+		}
+
 		return &existing, nil
 	}
 
@@ -433,7 +449,102 @@ func (s *OnboardingService) SaveApplicationConfiguration(ctx context.Context, se
 		return nil, fmt.Errorf("failed to create application configuration: %w", err)
 	}
 
+	// Mark step 2 as completed if this is store_setup
+	if config.ApplicationType == "store_setup" {
+		if err := s.markStepCompleted(ctx, sessionID, StepStoreSetup); err != nil {
+			log.Printf("Warning: failed to mark step %d as completed: %v", StepStoreSetup, err)
+		}
+	}
+
 	return config, nil
+}
+
+// Step validation constants - these define the onboarding flow order
+const (
+	StepBusinessInfo  = 0 // Business Information (first sub-step of step 0)
+	StepContactInfo   = 0 // Contact Details (second sub-step of step 0) - note: same index as business
+	StepBusinessAddr  = 1 // Business Address
+	StepStoreSetup    = 2 // Store Configuration
+	StepDocuments     = 3 // Document Upload (optional)
+	StepLegal         = 4 // Legal Agreement
+)
+
+// validateStepOrder checks if previous steps are completed before allowing current step
+// This prevents users from skipping required onboarding steps
+func (s *OnboardingService) validateStepOrder(ctx context.Context, session *models.OnboardingSession, requiredStep int) error {
+	// Parse completed_steps from JSONB
+	var completedSteps []int
+	if session.CompletedSteps != nil && len(session.CompletedSteps) > 0 {
+		if err := json.Unmarshal(session.CompletedSteps, &completedSteps); err != nil {
+			log.Printf("Warning: failed to parse completed_steps: %v", err)
+			completedSteps = []int{}
+		}
+	}
+
+	// Check if all previous steps (0 to requiredStep-1) are completed
+	for i := 0; i < requiredStep; i++ {
+		stepCompleted := false
+		for _, completed := range completedSteps {
+			if completed == i {
+				stepCompleted = true
+				break
+			}
+		}
+		if !stepCompleted {
+			return fmt.Errorf("cannot proceed to step %d: step %d must be completed first", requiredStep, i)
+		}
+	}
+
+	return nil
+}
+
+// markStepCompleted adds a step to the completed_steps array if not already present
+func (s *OnboardingService) markStepCompleted(ctx context.Context, sessionID uuid.UUID, stepIndex int) error {
+	// Get current session to read completed_steps
+	session, err := s.onboardingRepo.GetSessionByID(ctx, sessionID, nil)
+	if err != nil {
+		return fmt.Errorf("failed to get session: %w", err)
+	}
+
+	// Parse existing completed_steps
+	var completedSteps []int
+	if session.CompletedSteps != nil && len(session.CompletedSteps) > 0 {
+		if err := json.Unmarshal(session.CompletedSteps, &completedSteps); err != nil {
+			log.Printf("Warning: failed to parse completed_steps: %v", err)
+			completedSteps = []int{}
+		}
+	}
+
+	// Check if step is already completed
+	alreadyCompleted := false
+	for _, completed := range completedSteps {
+		if completed == stepIndex {
+			alreadyCompleted = true
+			break
+		}
+	}
+
+	// Add step if not already completed
+	if !alreadyCompleted {
+		completedSteps = append(completedSteps, stepIndex)
+
+		// Serialize back to JSONB
+		completedStepsJSON, err := json.Marshal(completedSteps)
+		if err != nil {
+			return fmt.Errorf("failed to serialize completed_steps: %w", err)
+		}
+
+		// Update database
+		if err := s.db.WithContext(ctx).Model(&models.OnboardingSession{}).
+			Where("id = ?", sessionID).
+			Update("completed_steps", completedStepsJSON).Error; err != nil {
+			return fmt.Errorf("failed to update completed_steps: %w", err)
+		}
+
+		log.Printf("[OnboardingService] Marked step %d as completed for session %s", stepIndex, sessionID)
+	}
+
+	return nil
 }
 
 // UpdateBusinessInformation updates business information for a session
@@ -450,7 +561,9 @@ func (s *OnboardingService) UpdateBusinessInformation(ctx context.Context, sessi
 
 	// Validate business name uniqueness before saving
 	// This ensures no two tenants can have the same business name
-	if businessInfo.BusinessName != "" {
+	// SKIP in development/test environments if ALLOW_DUPLICATE_BUSINESS_NAMES=true
+	allowDuplicates := os.Getenv("ALLOW_DUPLICATE_BUSINESS_NAMES") == "true"
+	if businessInfo.BusinessName != "" && !allowDuplicates {
 		validationResult, err := s.ValidateBusinessNameWithSuggestions(ctx, businessInfo.BusinessName, &sessionID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to validate business name: %w", err)
@@ -465,6 +578,9 @@ func (s *OnboardingService) UpdateBusinessInformation(ctx context.Context, sessi
 		}
 	}
 
+	// Step 0 (Business Info) - no prerequisites, it's the first step
+	// No validation needed
+
 	// Save business information
 	savedBusinessInfo, err := s.businessRepo.CreateOrUpdate(ctx, sessionID, businessInfo)
 	if err != nil {
@@ -474,6 +590,11 @@ func (s *OnboardingService) UpdateBusinessInformation(ctx context.Context, sessi
 	// Mark the business_info task as completed
 	if err := s.completeTaskByID(ctx, sessionID, "business_info"); err != nil {
 		log.Printf("Warning: failed to complete business_info task: %v", err)
+	}
+
+	// Mark step 0 as completed (business info sub-step)
+	if err := s.markStepCompleted(ctx, sessionID, StepBusinessInfo); err != nil {
+		log.Printf("Warning: failed to mark step %d as completed: %v", StepBusinessInfo, err)
 	}
 
 	// Update session progress
@@ -496,6 +617,9 @@ func (s *OnboardingService) UpdateContactInformation(ctx context.Context, sessio
 		return nil, fmt.Errorf("cannot update contact information for session in %s status", session.Status)
 	}
 
+	// Step 0 (Contact Info) - still part of step 0, after business info sub-step
+	// No validation needed - both business and contact are sub-steps of step 0
+
 	// Save contact information
 	savedContact, err := s.contactRepo.CreateContact(ctx, sessionID, contact)
 	if err != nil {
@@ -505,6 +629,11 @@ func (s *OnboardingService) UpdateContactInformation(ctx context.Context, sessio
 	// Mark the contact_info task as completed
 	if err := s.completeTaskByID(ctx, sessionID, "contact_info"); err != nil {
 		log.Printf("Warning: failed to complete contact_info task: %v", err)
+	}
+
+	// Mark step 0 as completed (contact info sub-step also marks step 0 complete)
+	if err := s.markStepCompleted(ctx, sessionID, StepContactInfo); err != nil {
+		log.Printf("Warning: failed to mark step %d as completed: %v", StepContactInfo, err)
 	}
 
 	// Update session progress
@@ -527,6 +656,11 @@ func (s *OnboardingService) UpdateBusinessAddress(ctx context.Context, sessionID
 		return nil, fmt.Errorf("cannot update business address for session in %s status", session.Status)
 	}
 
+	// Step 1 (Business Address) - requires step 0 (Business + Contact) to be completed
+	if err := s.validateStepOrder(ctx, session, StepBusinessAddr); err != nil {
+		return nil, fmt.Errorf("step validation failed: %w", err)
+	}
+
 	// Create the address
 	address.OnboardingSessionID = sessionID
 	if address.ID == uuid.Nil {
@@ -541,6 +675,11 @@ func (s *OnboardingService) UpdateBusinessAddress(ctx context.Context, sessionID
 	// Mark the business_address task as completed
 	if err := s.completeTaskByID(ctx, sessionID, "business_address"); err != nil {
 		log.Printf("Warning: failed to complete business_address task: %v", err)
+	}
+
+	// Mark step 1 as completed
+	if err := s.markStepCompleted(ctx, sessionID, StepBusinessAddr); err != nil {
+		log.Printf("Warning: failed to mark step %d as completed: %v", StepBusinessAddr, err)
 	}
 
 	// Update session progress
@@ -1121,6 +1260,13 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 	// This allows users to set up their account after completing business info, contact, and address
 	if session.Status != "completed" && session.ProgressPercentage < 75 {
 		return nil, fmt.Errorf("onboarding session is not ready for account setup (progress: %d%%)", session.ProgressPercentage)
+	}
+
+	// SECURITY: Validate that all required onboarding steps are completed
+	// This prevents users from creating accounts by skipping mandatory steps
+	// Required steps: 0 (Business + Contact), 1 (Address), 2 (Store Setup)
+	if err := s.validateStepOrder(ctx, session, StepStoreSetup+1); err != nil {
+		return nil, fmt.Errorf("cannot complete account setup: %w", err)
 	}
 
 	// ============================================================================
