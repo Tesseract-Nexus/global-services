@@ -453,13 +453,49 @@ func (s *OffboardingService) deleteTenantCore(ctx context.Context, tenant *model
 		}
 	}
 
-	// Nullify tenant_id in onboarding_sessions (nullable FK)
+	// Clean up onboarding session child data BEFORE nullifying tenant_id
+	// (we need tenant_id to find the sessions). This prevents orphaned business names
+	// from blocking slug/name reuse after tenant deletion.
+	onboardingChildTables := []string{
+		"task_execution_logs",   // FK to onboarding_tasks
+		"onboarding_tasks",
+		"business_informations",
+		"contact_informations",
+		"business_addresses",
+		"verification_records",
+		"payment_informations",
+		"application_configurations",
+		"domain_reservations",
+		"onboarding_notifications",
+		"webhook_events",
+	}
+	for _, table := range onboardingChildTables {
+		var query string
+		if table == "task_execution_logs" {
+			// task_execution_logs links to onboarding_tasks, not directly to sessions
+			query = fmt.Sprintf(
+				"DELETE FROM %s WHERE onboarding_task_id IN (SELECT id FROM onboarding_tasks WHERE onboarding_session_id IN (SELECT id FROM onboarding_sessions WHERE tenant_id = $1))",
+				table)
+		} else {
+			query = fmt.Sprintf(
+				"DELETE FROM %s WHERE onboarding_session_id IN (SELECT id FROM onboarding_sessions WHERE tenant_id = $1)",
+				table)
+		}
+		result := s.db.WithContext(ctx).Exec(query, tenant.ID)
+		if result.Error != nil {
+			log.Printf("[OffboardingService] Warning: Failed to clean %s: %v", table, result.Error)
+		} else if result.RowsAffected > 0 {
+			log.Printf("[OffboardingService] Deleted %d rows from %s for tenant %s", result.RowsAffected, table, tenant.ID)
+		}
+	}
+
+	// Now nullify tenant_id and mark sessions as abandoned
 	result := s.db.WithContext(ctx).Exec(
-		"UPDATE onboarding_sessions SET tenant_id = NULL WHERE tenant_id = $1", tenant.ID)
+		"UPDATE onboarding_sessions SET tenant_id = NULL, status = 'abandoned' WHERE tenant_id = $1", tenant.ID)
 	if result.Error != nil {
-		log.Printf("[OffboardingService] Warning: Failed to nullify tenant_id in onboarding_sessions: %v", result.Error)
+		log.Printf("[OffboardingService] Warning: Failed to update onboarding_sessions: %v", result.Error)
 	} else if result.RowsAffected > 0 {
-		log.Printf("[OffboardingService] Nullified tenant_id in %d onboarding_sessions for tenant %s", result.RowsAffected, tenant.ID)
+		log.Printf("[OffboardingService] Updated %d onboarding_sessions for tenant %s", result.RowsAffected, tenant.ID)
 	}
 
 	// Release slug reservations so the slug can be reused by new tenants
