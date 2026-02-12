@@ -230,13 +230,19 @@ func (s *VerificationService) startEmailVerificationWithLinkAndBusinessName(ctx 
 	// Build verification link
 	verificationLink := s.buildVerificationLink(token)
 
-	// Get business name and custom domain from session
+	// Get business name, contact name, and custom domain from session
 	var dnsConfig *clients.CustomDomainDNSConfig
+	var contactName string
 	if s.onboardingRepo != nil {
-		session, err := s.onboardingRepo.GetSessionByID(ctx, sessionID, []string{"business_information", "application_configurations"})
+		session, err := s.onboardingRepo.GetSessionByID(ctx, sessionID, []string{"business_information", "contact_information", "application_configurations"})
 		if err == nil && session != nil {
 			if session.BusinessInformation != nil && businessName == "" {
 				businessName = session.BusinessInformation.BusinessName
+			}
+
+			// Extract contact name from contact information
+			if len(session.ContactInformation) > 0 && session.ContactInformation[0].FullName != "" {
+				contactName = session.ContactInformation[0].FullName
 			}
 
 			// Check if there's a custom domain in the store_setup configuration
@@ -252,7 +258,7 @@ func (s *VerificationService) startEmailVerificationWithLinkAndBusinessName(ctx 
 	log.Printf("[VerificationService] Sending verification email to %s for session %s", security.MaskEmail(email), sessionID)
 
 	// Use DNS-aware email sending if we have custom domain config
-	if err := s.notificationClient.SendVerificationLinkEmailWithDNS(ctx, email, verificationLink, businessName, dnsConfig); err != nil {
+	if err := s.notificationClient.SendVerificationLinkEmailWithDNS(ctx, email, verificationLink, businessName, contactName, dnsConfig); err != nil {
 		_ = s.redisClient.DeleteVerificationToken(ctx, token)
 		return nil, fmt.Errorf("failed to send verification email: %w", err)
 	}

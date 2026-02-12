@@ -105,18 +105,19 @@ type WelcomePackData struct {
 
 // SendVerificationLinkEmail sends a verification link email via notification-service template.
 func (c *NotificationClient) SendVerificationLinkEmail(ctx context.Context, email, verificationLink, businessName string) error {
-	return c.SendVerificationLinkEmailWithDNS(ctx, email, verificationLink, businessName, nil)
+	return c.SendVerificationLinkEmailWithDNS(ctx, email, verificationLink, businessName, "", nil)
 }
 
 // SendVerificationLinkEmailWithDNS sends a verification link email.
 // DNS config is used only to determine whether this is a custom domain onboarding;
 // actual DNS records are shown in the onboarding dashboard, not in the email.
-func (c *NotificationClient) SendVerificationLinkEmailWithDNS(ctx context.Context, email, verificationLink, businessName string, dnsConfig *CustomDomainDNSConfig) error {
+func (c *NotificationClient) SendVerificationLinkEmailWithDNS(ctx context.Context, email, verificationLink, businessName, contactName string, dnsConfig *CustomDomainDNSConfig) error {
 	vars := map[string]interface{}{
 		"verification_link":   verificationLink,
 		"verification_expiry": "1 hour",
 		"store_name":          businessName,
 		"business_name":       businessName,
+		"customer_name":       contactName,
 		"email":               email,
 	}
 	if dnsConfig != nil && dnsConfig.IsCustomDomain {
