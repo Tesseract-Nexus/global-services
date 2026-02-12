@@ -481,30 +481,44 @@ func (s *OffboardingService) deleteTenantCore(ctx context.Context, tenant *model
 
 	log.Printf("[OffboardingService] Archived tenant %s (ID: %s) to deleted_tenants", tenant.Slug, tenant.ID)
 
-	// Delete memberships
-	if err := tx.WithContext(ctx).
-		Where("tenant_id = ?", tenant.ID).
-		Delete(&models.UserTenantMembership{}).Error; err != nil {
-		tx.Rollback()
-		return nil, fmt.Errorf("failed to delete memberships: %w", err)
+	// Delete all dependent records before deleting the tenant.
+	// GORM auto-migrate creates FK constraints without ON DELETE CASCADE,
+	// so we must explicitly delete child records to avoid FK violations.
+	dependentTables := []string{
+		"passkey_credentials",
+		"tenant_auth_audit_logs",
+		"tenant_auth_policies",
+		"tenant_credentials",
+		"password_reset_tokens",
+		"deactivated_memberships",
+		"tenant_activity_logs",
+		"user_tenant_memberships",
 	}
 
-	log.Printf("[OffboardingService] Deleted %d memberships for tenant %s", len(tenant.Memberships), tenant.ID)
-
-	// Vendor/storefront deletion is handled by cleanupExternalDatabases (vendors_db)
-
-	// Release slug reservation
-	if err := tx.WithContext(ctx).
-		Model(&models.TenantSlugReservation{}).
-		Where("tenant_id = ?", tenant.ID).
-		Updates(map[string]interface{}{
-			"status":      models.SlugReservationReleased,
-			"released_at": time.Now(),
-		}).Error; err != nil {
-		log.Printf("[OffboardingService] Warning: Failed to release slug reservation: %v", err)
+	for _, table := range dependentTables {
+		result := tx.WithContext(ctx).Exec(fmt.Sprintf("DELETE FROM %s WHERE tenant_id = ?", table), tenant.ID)
+		if result.Error != nil {
+			log.Printf("[OffboardingService] Warning: Failed to delete from %s: %v", table, result.Error)
+		} else if result.RowsAffected > 0 {
+			log.Printf("[OffboardingService] Deleted %d rows from %s for tenant %s", result.RowsAffected, table, tenant.ID)
+		}
 	}
 
-	// Hard delete the tenant
+	// Nullify tenant_id in tables with nullable FK references (ON DELETE SET NULL may not work with GORM FKs)
+	nullableFKTables := []string{
+		"onboarding_sessions",
+		"tenant_slug_reservations",
+	}
+	for _, table := range nullableFKTables {
+		result := tx.WithContext(ctx).Exec(fmt.Sprintf("UPDATE %s SET tenant_id = NULL WHERE tenant_id = ?", table), tenant.ID)
+		if result.Error != nil {
+			log.Printf("[OffboardingService] Warning: Failed to nullify tenant_id in %s: %v", table, result.Error)
+		} else if result.RowsAffected > 0 {
+			log.Printf("[OffboardingService] Nullified tenant_id in %d rows of %s for tenant %s", result.RowsAffected, table, tenant.ID)
+		}
+	}
+
+	// Hard delete the tenant (all FK dependencies cleared above)
 	if err := tx.WithContext(ctx).
 		Unscoped().
 		Delete(&models.Tenant{}, "id = ?", tenant.ID).Error; err != nil {
