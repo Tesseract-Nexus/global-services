@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"net/http"
 	"os"
 	"regexp"
 	"strings"
