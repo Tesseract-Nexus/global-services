@@ -1,6 +1,6 @@
 # Postfix Sender Rewriting Fix for Postal -> Postfix -> AWS SES relay
 # This ConfigMap and deployment patch fix the sender address rewriting issue
-# where Postfix was using postal-relay.email.svc.cluster.local instead of tesserix.app
+# where Postfix was using postal-relay.email.svc.cluster.local instead of mark8ly.com
 
 ---
 apiVersion: v1
@@ -16,20 +16,20 @@ metadata:
     description: "Postfix sender address rewriting maps for AWS SES relay"
 data:
   generic: |
-    # Rewrite any internal addresses to tesserix.app domain
+    # Rewrite any internal addresses to mark8ly.com domain
     # This ensures AWS SES accepts emails from verified domain
-    /^(.*)@postal-relay\.email\.svc\.cluster\.local$/    ${1}@tesserix.app
-    /^(.*)@localhost$/    ${1}@tesserix.app
-    /^(.*)@localhost\.localdomain$/    ${1}@tesserix.app
+    /^(.*)@postal-relay\.email\.svc\.cluster\.local$/    ${1}@mark8ly.com
+    /^(.*)@localhost$/    ${1}@mark8ly.com
+    /^(.*)@localhost\.localdomain$/    ${1}@mark8ly.com
     # Catch-all for any unknown internal domains
-    /@.*\.svc\.cluster\.local$/    noreply@tesserix.app
+    /@.*\.svc\.cluster\.local$/    noreply@mark8ly.com
 
 ---
 # Note: The deployment patch should be applied via Helm values or kubectl patch
 #
 # Required environment variables for postfix-relay container:
 #   - name: POSTFIX_myorigin
-#     value: "tesserix.app"
+#     value: "mark8ly.com"
 #   - name: POSTFIX_smtp_generic_maps
 #     value: "regexp:/etc/postfix/generic"
 #

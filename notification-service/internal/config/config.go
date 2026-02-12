@@ -199,8 +199,8 @@ func Load() (*Config, error) {
 			Environment:       getEnv("ENVIRONMENT", "development"),
 			MaxRetryAttempts:  getEnvInt("MAX_RETRY_ATTEMPTS", 3),
 			WorkerConcurrency: getEnvInt("WORKER_CONCURRENCY", 10),
-			AdminEmail:        getEnv("ADMIN_EMAIL", "admin@tesserix.app"),
-			SupportEmail:      getEnv("SUPPORT_EMAIL", "support@tesserix.app"),
+			AdminEmail:        getEnv("ADMIN_EMAIL", "admin@mark8ly.com"),
+			SupportEmail:      getEnv("SUPPORT_EMAIL", "support@mark8ly.com"),
 		},
 		NATS: NATSConfig{
 			URL:           getEnv("NATS_URL", "nats://nats.nats.svc.cluster.local:4222"),
@@ -260,7 +260,7 @@ func Load() (*Config, error) {
 			FCMCredentials:  getEnv("FCM_CREDENTIALS_JSON", ""),
 			VAPIDPublicKey:  getEnv("VAPID_PUBLIC_KEY", ""),
 			VAPIDPrivateKey: getEnv("VAPID_PRIVATE_KEY", ""),
-			VAPIDSubject:    getEnv("VAPID_SUBJECT", "mailto:push@tesserix.app"),
+			VAPIDSubject:    getEnv("VAPID_SUBJECT", "mailto:push@mark8ly.com"),
 		},
 		Verify: VerifyConfig{
 			TwilioVerifyServiceSID: getEnv("TWILIO_VERIFY_SERVICE_SID", ""),

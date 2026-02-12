@@ -48,12 +48,12 @@ fix_postfix_sender() {
     # Check if the deployment has the required env vars
     CURRENT_MYORIGIN=$(kubectl get deployment postal-worker -n email -o jsonpath='{.spec.template.spec.containers[?(@.name=="postfix-relay")].env[?(@.name=="POSTFIX_myorigin")].value}' 2>/dev/null || echo "")
 
-    if [ "$CURRENT_MYORIGIN" != "tesserix.app" ]; then
+    if [ "$CURRENT_MYORIGIN" != "mark8ly.com" ]; then
         echo -e "${YELLOW}  Patching postal-worker deployment for sender fix...${NC}"
 
         # Add POSTFIX_myorigin
         kubectl patch deployment postal-worker -n email --type='json' -p='[
-          {"op": "add", "path": "/spec/template/spec/containers/1/env/-", "value": {"name": "POSTFIX_myorigin", "value": "tesserix.app"}},
+          {"op": "add", "path": "/spec/template/spec/containers/1/env/-", "value": {"name": "POSTFIX_myorigin", "value": "mark8ly.com"}},
           {"op": "add", "path": "/spec/template/spec/containers/1/env/-", "value": {"name": "POSTFIX_smtp_generic_maps", "value": "regexp:/etc/postfix/generic"}}
         ]' 2>/dev/null || true
 
@@ -85,7 +85,7 @@ if [ -z "$MAUTIC_URL" ]; then
     if [ "$IN_CLUSTER" = true ]; then
         export MAUTIC_URL="http://mautic.email.svc.cluster.local"
     else
-        export MAUTIC_URL="https://dev-mautic.tesserix.app"
+        export MAUTIC_URL="https://dev-mautic.mark8ly.com"
     fi
 fi
 echo -e "${GREEN}Mautic URL: $MAUTIC_URL${NC}"
@@ -109,7 +109,7 @@ if [ -z "$MAUTIC_PASSWORD" ]; then
 fi
 
 # Set email settings
-export FROM_EMAIL="${FROM_EMAIL:-noreply@mail.tesserix.app}"
+export FROM_EMAIL="${FROM_EMAIL:-noreply@mail.mark8ly.com}"
 export FROM_NAME="${FROM_NAME:-mark8ly}"
 
 # Optional: Test email

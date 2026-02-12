@@ -367,7 +367,7 @@ func getBenchmarkEmails(fromEmail, fromName string) []Email {
       </div>
 
       <center>
-        <a href="https://marketplace.tesserix.app" class="cta-button">Start Shopping</a>
+        <a href="https://marketplace.mark8ly.com" class="cta-button">Start Shopping</a>
       </center>
 
       <p>As a welcome gift, use code <strong>WELCOME10</strong> for 10% off your first order!</p>
@@ -392,7 +392,7 @@ What you can do:
 - Track your orders in real-time
 - Enjoy secure payments with multiple options
 
-Start shopping: https://marketplace.tesserix.app
+Start shopping: https://marketplace.mark8ly.com
 
 As a welcome gift, use code WELCOME10 for 10% off your first order!
 
@@ -445,7 +445,7 @@ Unsubscribe: {unsubscribe_url}`,
       </div>
 
       <center>
-        <a href="https://marketplace.tesserix.app/cart" class="cta-button">Complete My Order</a>
+        <a href="https://marketplace.mark8ly.com/cart" class="cta-button">Complete My Order</a>
       </center>
 
       <p>Need help? Our support team is here for you 24/7.</p>
@@ -502,7 +502,7 @@ Unsubscribe: {unsubscribe_url}`,
       </div>
 
       <center>
-        <a href="https://marketplace.tesserix.app/cart" class="cta-button">Use My Discount</a>
+        <a href="https://marketplace.mark8ly.com/cart" class="cta-button">Use My Discount</a>
       </center>
 
       <p style="color: #94a3b8; font-size: 14px;">*This offer expires in 24 hours</p>
@@ -562,14 +562,14 @@ Unsubscribe: {unsubscribe_url}`,
       </div>
 
       <center>
-        <a href="https://marketplace.tesserix.app/orders" class="cta-button">Track My Order</a>
+        <a href="https://marketplace.mark8ly.com/orders" class="cta-button">Track My Order</a>
       </center>
 
       <p>Thank you for shopping with us!</p>
       <p>The Tesserix Team</p>
     </div>
     <div class="footer">
-      <p>Need help? Contact us at support@tesserix.app</p>
+      <p>Need help? Contact us at support@mark8ly.com</p>
     </div>
   </div>
 </body>
@@ -613,7 +613,7 @@ Unsubscribe: {unsubscribe_url}`,
       <p>Your order has been delivered! We hope you love your purchase.</p>
       <p>Would you take a moment to share your experience?</p>
 
-      <a href="https://marketplace.tesserix.app/review" class="cta-button">Write a Review</a>
+      <a href="https://marketplace.mark8ly.com/review" class="cta-button">Write a Review</a>
 
       <div class="incentive">
         <strong>🎁 Get 50 Reward Points!</strong>
@@ -675,7 +675,7 @@ Unsubscribe: {unsubscribe_url}`,
       </div>
 
       <center>
-        <a href="https://marketplace.tesserix.app" class="cta-button">Shop Now</a>
+        <a href="https://marketplace.mark8ly.com" class="cta-button">Shop Now</a>
       </center>
 
       <p style="color: #94a3b8; font-size: 14px; text-align: center;">*Offer valid for 7 days. One-time use only.</p>
@@ -754,7 +754,7 @@ Unsubscribe: {unsubscribe_url}`,
       </div>
 
       <center>
-        <a href="https://marketplace.tesserix.app/vip" class="cta-button">Explore VIP Benefits</a>
+        <a href="https://marketplace.mark8ly.com/vip" class="cta-button">Explore VIP Benefits</a>
       </center>
 
       <p style="text-align: center; color: #94a3b8;">Thank you for being an amazing customer.</p>
@@ -812,7 +812,7 @@ Unsubscribe: {unsubscribe_url}`,
       <div class="section">
         <div class="section-title">🔥 Featured Products</div>
         <p>Check out our top picks this month - handpicked just for you.</p>
-        <center><a href="https://marketplace.tesserix.app/featured" class="cta-button">View All</a></center>
+        <center><a href="https://marketplace.mark8ly.com/featured" class="cta-button">View All</a></center>
       </div>
 
       <div class="section">
@@ -898,12 +898,12 @@ Unsubscribe: {unsubscribe_url}`,
       </ul>
 
       <center>
-        <a href="https://marketplace.tesserix.app/checkout/retry" class="cta-button">Try Again</a>
+        <a href="https://marketplace.mark8ly.com/checkout/retry" class="cta-button">Try Again</a>
       </center>
 
       <div class="help-section">
         <strong>Need Help?</strong>
-        <p style="margin: 10px 0 0 0;">Contact our support team at <a href="mailto:support@tesserix.app">support@tesserix.app</a> or call us at 1-800-TESSERACT.</p>
+        <p style="margin: 10px 0 0 0;">Contact our support team at <a href="mailto:support@mark8ly.com">support@mark8ly.com</a> or call us at 1-800-TESSERACT.</p>
       </div>
 
       <p>We're here to help!</p>
@@ -995,14 +995,14 @@ Unsubscribe: {unsubscribe_url}`,
       </div>
 
       <center>
-        <a href="https://marketplace.tesserix.app/track/{contactfield=order_id|order}" class="cta-button">Track My Package</a>
+        <a href="https://marketplace.mark8ly.com/track/{contactfield=order_id|order}" class="cta-button">Track My Package</a>
       </center>
 
       <p>Thank you for shopping with us!</p>
       <p>The Tesserix Team</p>
     </div>
     <div class="footer">
-      <p>Questions about your delivery? <a href="mailto:support@tesserix.app" style="color: #94a3b8;">Contact Support</a></p>
+      <p>Questions about your delivery? <a href="mailto:support@mark8ly.com" style="color: #94a3b8;">Contact Support</a></p>
     </div>
   </div>
 </body>
@@ -1015,7 +1015,7 @@ func main() {
 	// Get configuration from environment
 	mauticURL := os.Getenv("MAUTIC_URL")
 	if mauticURL == "" {
-		mauticURL = "https://dev-mautic.tesserix.app"
+		mauticURL = "https://dev-mautic.mark8ly.com"
 	}
 
 	username := os.Getenv("MAUTIC_USERNAME")
@@ -1030,7 +1030,7 @@ func main() {
 
 	fromEmail := os.Getenv("FROM_EMAIL")
 	if fromEmail == "" {
-		fromEmail = "noreply@tesserix.app"
+		fromEmail = "noreply@mark8ly.com"
 	}
 
 	fromName := os.Getenv("FROM_NAME")

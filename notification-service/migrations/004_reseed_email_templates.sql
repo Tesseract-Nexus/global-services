@@ -7,7 +7,7 @@
 --   - Logo/name inside card, centered
 --   - Clean typography, system font stack
 --   - Subtle info boxes (#fafafa, no border)
---   - Minimal footer (store name + "Powered by mark8ly" for store emails, "Powered by Tesserix" for platform emails)
+--   - Minimal footer (store name + "Powered by mark8ly" for store emails, "Powered by mark8ly" for platform emails)
 --
 -- Template types:
 --   - 18 mark8ly templates (tenant_id = 'default-tenant') — use brand_primary_color, brand_logo_url
@@ -1120,7 +1120,7 @@ Dashboard: {{.dashboard_url}}',
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;border:1px solid #e4e4e7;">
     <tr><td style="height:3px;background:#18181b;border-radius:12px 12px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
     <tr><td style="padding:32px 32px 0;text-align:center;">
-      {{if .platform_logo_url}}<img src="{{.platform_logo_url}}" alt="Tesserix" height="28" style="height:28px;max-width:140px;">{{else}}<span style="font-size:15px;font-weight:600;color:#18181b;letter-spacing:-.2px;">Tesserix</span>{{end}}
+      {{if .platform_logo_url}}<img src="{{.platform_logo_url}}" alt="mark8ly" height="28" style="height:28px;max-width:140px;">{{else}}<span style="font-size:15px;font-weight:600;color:#18181b;letter-spacing:-.2px;">mark8ly</span>{{end}}
     </td></tr>
     <tr><td style="padding:28px 32px 36px;">
       <h1 style="margin:0 0 24px;font-size:20px;font-weight:600;color:#18181b;">System health alert</h1>
@@ -1142,8 +1142,8 @@ Dashboard: {{.dashboard_url}}',
   </table>
 </td></tr>
 <tr><td style="padding:20px 0 0;text-align:center;">
-  <p style="margin:0;font-size:12px;color:#a1a1aa;">Tesserix</p>
-  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://tesserix.app" style="color:#a1a1aa;text-decoration:none;">Tesserix</a></p>
+  <p style="margin:0;font-size:12px;color:#a1a1aa;">mark8ly</p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">mark8ly</a></p>
 </td></tr>
 </table>
 </td></tr></table>
@@ -1180,7 +1180,7 @@ Details: {{.details}}',
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;border:1px solid #e4e4e7;">
     <tr><td style="height:3px;background:#18181b;border-radius:12px 12px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
     <tr><td style="padding:32px 32px 0;text-align:center;">
-      {{if .platform_logo_url}}<img src="{{.platform_logo_url}}" alt="Tesserix" height="28" style="height:28px;max-width:140px;">{{else}}<span style="font-size:15px;font-weight:600;color:#18181b;letter-spacing:-.2px;">Tesserix</span>{{end}}
+      {{if .platform_logo_url}}<img src="{{.platform_logo_url}}" alt="mark8ly" height="28" style="height:28px;max-width:140px;">{{else}}<span style="font-size:15px;font-weight:600;color:#18181b;letter-spacing:-.2px;">mark8ly</span>{{end}}
     </td></tr>
     <tr><td style="padding:28px 32px 36px;">
       <h1 style="margin:0 0 24px;font-size:20px;font-weight:600;color:#18181b;">Audit event</h1>
@@ -1199,8 +1199,8 @@ Details: {{.details}}',
   </table>
 </td></tr>
 <tr><td style="padding:20px 0 0;text-align:center;">
-  <p style="margin:0;font-size:12px;color:#a1a1aa;">Tesserix</p>
-  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://tesserix.app" style="color:#a1a1aa;text-decoration:none;">Tesserix</a></p>
+  <p style="margin:0;font-size:12px;color:#a1a1aa;">mark8ly</p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">mark8ly</a></p>
 </td></tr>
 </table>
 </td></tr></table>
@@ -1239,7 +1239,7 @@ Take action: {{.action_url}}',
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;border:1px solid #e4e4e7;">
     <tr><td style="height:3px;background:#dc2626;border-radius:12px 12px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
     <tr><td style="padding:32px 32px 0;text-align:center;">
-      {{if .platform_logo_url}}<img src="{{.platform_logo_url}}" alt="Tesserix" height="28" style="height:28px;max-width:140px;">{{else}}<span style="font-size:15px;font-weight:600;color:#18181b;letter-spacing:-.2px;">Tesserix</span>{{end}}
+      {{if .platform_logo_url}}<img src="{{.platform_logo_url}}" alt="mark8ly" height="28" style="height:28px;max-width:140px;">{{else}}<span style="font-size:15px;font-weight:600;color:#18181b;letter-spacing:-.2px;">mark8ly</span>{{end}}
     </td></tr>
     <tr><td style="padding:28px 32px 36px;">
       <h1 style="margin:0 0 24px;font-size:20px;font-weight:600;color:#18181b;">Security alert</h1>
@@ -1260,8 +1260,8 @@ Take action: {{.action_url}}',
   </table>
 </td></tr>
 <tr><td style="padding:20px 0 0;text-align:center;">
-  <p style="margin:0;font-size:12px;color:#a1a1aa;">Tesserix</p>
-  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://tesserix.app" style="color:#a1a1aa;text-decoration:none;">Tesserix</a></p>
+  <p style="margin:0;font-size:12px;color:#a1a1aa;">mark8ly</p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">mark8ly</a></p>
 </td></tr>
 </table>
 </td></tr></table>
@@ -1282,7 +1282,7 @@ INSERT INTO notification_templates (
     'Sent to platform admins when a new tenant signs up',
     'EMAIL', 'platform_admin',
     'New tenant: {{.details}}',
-    'New tenant signup on Tesserix.
+    'New tenant signup on mark8ly.
 
 Type: {{.notification_type}}
 Details: {{.details}}
@@ -1298,7 +1298,7 @@ Dashboard: {{.dashboard_url}}',
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;border:1px solid #e4e4e7;">
     <tr><td style="height:3px;background:#18181b;border-radius:12px 12px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
     <tr><td style="padding:32px 32px 0;text-align:center;">
-      {{if .platform_logo_url}}<img src="{{.platform_logo_url}}" alt="Tesserix" height="28" style="height:28px;max-width:140px;">{{else}}<span style="font-size:15px;font-weight:600;color:#18181b;letter-spacing:-.2px;">Tesserix</span>{{end}}
+      {{if .platform_logo_url}}<img src="{{.platform_logo_url}}" alt="mark8ly" height="28" style="height:28px;max-width:140px;">{{else}}<span style="font-size:15px;font-weight:600;color:#18181b;letter-spacing:-.2px;">mark8ly</span>{{end}}
     </td></tr>
     <tr><td style="padding:28px 32px 36px;">
       <h1 style="margin:0 0 24px;font-size:20px;font-weight:600;color:#18181b;">New tenant signup</h1>
@@ -1315,8 +1315,8 @@ Dashboard: {{.dashboard_url}}',
   </table>
 </td></tr>
 <tr><td style="padding:20px 0 0;text-align:center;">
-  <p style="margin:0;font-size:12px;color:#a1a1aa;">Tesserix</p>
-  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://tesserix.app" style="color:#a1a1aa;text-decoration:none;">Tesserix</a></p>
+  <p style="margin:0;font-size:12px;color:#a1a1aa;">mark8ly</p>
+  <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">mark8ly</a></p>
 </td></tr>
 </table>
 </td></tr></table>

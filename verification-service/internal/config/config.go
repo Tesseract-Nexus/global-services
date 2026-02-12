@@ -75,7 +75,7 @@ func Load() (*Config, error) {
 		Email: EmailConfig{
 			Provider:               getEnv("EMAIL_PROVIDER", "notification-service"),
 			APIKey:                 getEnv("EMAIL_API_KEY", ""), // Not required for notification-service
-			FromEmail:              getEnv("EMAIL_FROM", "no-reply@tesserix.app"),
+			FromEmail:              getEnv("EMAIL_FROM", "no-reply@mark8ly.com"),
 			FromName:               getEnv("EMAIL_FROM_NAME", "mark8ly"),
 			NotificationServiceURL: getEnv("NOTIFICATION_SERVICE_URL", "http://notification-service.marketplace.svc.cluster.local:8090"),
 		},

@@ -48,9 +48,9 @@ spec:
                   name: mautic-credentials
                   key: admin-password
             - name: FROM_EMAIL
-              value: "noreply@mail.tesserix.app"
+              value: "noreply@mail.mark8ly.com"
             - name: FROM_NAME
-              value: "Tesserix"
+              value: "mark8ly"
             # Uncomment to send test email during init
             # - name: TEST_EMAIL
             #   value: "test@example.com"
