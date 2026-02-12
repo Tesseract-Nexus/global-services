@@ -1341,6 +1341,7 @@ func (s *Subscriber) handleTenantEvent(msg *nats.Msg) {
 		"adminHost":      event.AdminHost,
 		"storefrontHost": event.StorefrontHost,
 		"baseDomain":     event.BaseDomain,
+		"customerName":   event.BusinessName, // templates use customer_name; use business name as fallback
 		// Build full URLs for the email
 		"adminUrl":      fmt.Sprintf("https://%s", event.AdminHost),
 		"storefrontUrl": fmt.Sprintf("https://%s", event.StorefrontHost),
