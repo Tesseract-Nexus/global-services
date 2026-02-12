@@ -213,10 +213,10 @@ func Load() (*Config, error) {
 			SecretAccessKey: secrets.GetSecretOrEnv("AWS_SECRET_ACCESS_KEY_SECRET_NAME", "AWS_SECRET_ACCESS_KEY", ""),
 		},
 		Email: EmailConfig{
-			// AWS SES (primary)
+			// AWS SES (primary email provider)
 			SESFrom:     getEnvWithFallback("AWS_SES_FROM", "POSTAL_FROM", ""), // Fallback to POSTAL_FROM if SES_FROM not set
 			SESFromName: getEnv("AWS_SES_FROM_NAME", "mark8ly"),
-			// Postal HTTP API (fallback)
+			// Postal HTTP API (fallback email provider)
 			PostalAPIURL:   getEnv("POSTAL_API_URL", ""),
 			PostalAPIKey:   secrets.GetSecretOrEnv("POSTAL_API_KEY_SECRET_NAME", "POSTAL_API_KEY", ""),
 			PostalFrom:     getEnv("POSTAL_FROM", ""),

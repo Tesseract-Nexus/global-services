@@ -251,40 +251,14 @@ func migrateDatabase(db *gorm.DB) error {
 }
 
 // initEmailProvider initializes the email provider with failover chain
-// Priority: Postal (primary) -> AWS SES (secondary) -> SendGrid (tertiary)
+// Priority: AWS SES (primary) -> Postal (fallback) -> SendGrid (tertiary)
 //
-// Postal is the primary self-hosted option with full template control.
-// AWS SES is the secondary managed fallback. SendGrid is used as final fallback.
+// AWS SES is the primary managed email provider (reliable, scalable).
+// Postal is the self-hosted fallback. SendGrid is used as final fallback.
 func initEmailProvider(cfg *config.Config) services.Provider {
 	var providers []services.Provider
 
-	// 1. Primary: Postal HTTP API (self-hosted, full template control)
-	if cfg.Email.PostalAPIURL != "" && cfg.Email.PostalAPIKey != "" {
-		postalHTTPConfig := &services.PostalHTTPConfig{
-			APIURL:   cfg.Email.PostalAPIURL,
-			APIKey:   cfg.Email.PostalAPIKey,
-			From:     cfg.Email.PostalFrom,
-			FromName: cfg.Email.PostalFromName,
-		}
-		postalHTTP := services.NewPostalHTTPProvider(postalHTTPConfig)
-		providers = append(providers, postalHTTP)
-		log.Printf("Email provider configured: Postal-HTTP (primary) - %s", cfg.Email.PostalAPIURL)
-	} else if cfg.Email.PostalHost != "" {
-		// Postal SMTP (if HTTP API not configured)
-		postalConfig := &services.ProviderConfig{
-			PostalHost:     cfg.Email.PostalHost,
-			PostalPort:     cfg.Email.PostalPort,
-			PostalUsername: cfg.Email.PostalUsername,
-			PostalPassword: cfg.Email.PostalPassword,
-			PostalFrom:     cfg.Email.PostalFrom,
-			PostalFromName: cfg.Email.PostalFromName,
-		}
-		postal := services.NewPostalProvider(postalConfig)
-		providers = append(providers, postal)
-		log.Printf("Email provider configured: Postal-SMTP (primary) - %s:%d", cfg.Email.PostalHost, cfg.Email.PostalPort)
-	}
-
-	// 2. Secondary: AWS SES (managed, reliable fallback)
+	// 1. Primary: AWS SES (managed, reliable, scalable)
 	if cfg.Email.SESFrom != "" && (cfg.AWS.AccessKeyID != "" || cfg.AWS.Region != "") {
 		sesConfig := &services.ProviderConfig{
 			AWSRegion:          cfg.AWS.Region,
@@ -298,8 +272,34 @@ func initEmailProvider(cfg *config.Config) services.Provider {
 			log.Printf("Warning: Failed to initialize AWS SES: %v", err)
 		} else {
 			providers = append(providers, sesProvider)
-			log.Printf("Email provider configured: AWS SES (secondary) - region: %s", cfg.AWS.Region)
+			log.Printf("Email provider configured: AWS SES (primary) - region: %s", cfg.AWS.Region)
 		}
+	}
+
+	// 2. Fallback: Postal HTTP API (self-hosted)
+	if cfg.Email.PostalAPIURL != "" && cfg.Email.PostalAPIKey != "" {
+		postalHTTPConfig := &services.PostalHTTPConfig{
+			APIURL:   cfg.Email.PostalAPIURL,
+			APIKey:   cfg.Email.PostalAPIKey,
+			From:     cfg.Email.PostalFrom,
+			FromName: cfg.Email.PostalFromName,
+		}
+		postalHTTP := services.NewPostalHTTPProvider(postalHTTPConfig)
+		providers = append(providers, postalHTTP)
+		log.Printf("Email provider configured: Postal-HTTP (fallback) - %s", cfg.Email.PostalAPIURL)
+	} else if cfg.Email.PostalHost != "" {
+		// Postal SMTP (if HTTP API not configured)
+		postalConfig := &services.ProviderConfig{
+			PostalHost:     cfg.Email.PostalHost,
+			PostalPort:     cfg.Email.PostalPort,
+			PostalUsername: cfg.Email.PostalUsername,
+			PostalPassword: cfg.Email.PostalPassword,
+			PostalFrom:     cfg.Email.PostalFrom,
+			PostalFromName: cfg.Email.PostalFromName,
+		}
+		postal := services.NewPostalProvider(postalConfig)
+		providers = append(providers, postal)
+		log.Printf("Email provider configured: Postal-SMTP (fallback) - %s:%d", cfg.Email.PostalHost, cfg.Email.PostalPort)
 	}
 
 	// 3. Tertiary: SendGrid API (final fallback)
