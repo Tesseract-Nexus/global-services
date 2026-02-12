@@ -19,6 +19,7 @@ import (
 	"tenant-service/internal/clients"
 	"tenant-service/internal/config"
 	"tenant-service/internal/handlers"
+	"tenant-service/internal/integrations"
 	"tenant-service/internal/middleware"
 	"tenant-service/internal/models"
 	natsClient "tenant-service/internal/nats"
@@ -185,8 +186,11 @@ func main() {
 		log.Printf("Warning: KEYCLOAK_ADMIN_CLIENT_SECRET not set - Keycloak cleanup during tenant deletion will be skipped")
 	}
 
+	// Initialize GrowthBook client for feature flag management
+	growthBookClient := integrations.NewGrowthBookClient()
+
 	// Initialize offboarding service (for tenant deletion)
-	offboardingSvc := services.NewOffboardingService(db, membershipSvc, nc, keycloakClient)
+	offboardingSvc := services.NewOffboardingService(db, membershipSvc, nc, keycloakClient, redisClient, growthBookClient)
 
 	// Initialize tenant auth service for multi-tenant credential isolation
 	// This enables the same email to have different passwords per tenant
@@ -576,6 +580,12 @@ func setupRouter(
 			// Tenant deletion (offboarding) - owner only
 			tenants.GET("/:id/deletion", tenantHandler.GetTenantDeletionInfo)
 			tenants.DELETE("/:id", tenantHandler.DeleteTenant)
+
+			// Platform admin deletion endpoints (requires platform_owner claim)
+			tenants.DELETE("/:id/admin-delete", tenantHandler.AdminDeleteTenant)
+			tenants.POST("/batch-delete", tenantHandler.BatchDeleteTenants)
+			tenants.POST("/delete-all", tenantHandler.DeleteAllTenants)
+			tenants.POST("/deletion-preview", tenantHandler.GetDeletionPreview)
 		}
 
 		// Invitation endpoints (requires auth)

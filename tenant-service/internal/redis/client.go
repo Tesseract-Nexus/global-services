@@ -403,6 +403,36 @@ func (c *Client) GetVerificationTokenBySession(ctx context.Context, sessionID, e
 	return token, nil
 }
 
+// DeleteByPattern deletes all keys matching a pattern using SCAN + DEL (non-blocking).
+// Returns the number of keys deleted.
+func (c *Client) DeleteByPattern(ctx context.Context, pattern string) (int64, error) {
+	var cursor uint64
+	var totalDeleted int64
+
+	for {
+		var batch []string
+		var err error
+		batch, cursor, err = c.rdb.Scan(ctx, cursor, pattern, 100).Result()
+		if err != nil {
+			return totalDeleted, fmt.Errorf("failed to scan keys with pattern %s: %w", pattern, err)
+		}
+
+		if len(batch) > 0 {
+			deleted, err := c.rdb.Del(ctx, batch...).Result()
+			if err != nil {
+				return totalDeleted, fmt.Errorf("failed to delete keys: %w", err)
+			}
+			totalDeleted += deleted
+		}
+
+		if cursor == 0 {
+			break
+		}
+	}
+
+	return totalDeleted, nil
+}
+
 // Platform settings constants (shared with tenant-router-service)
 const (
 	// PlatformSettingsPrefix is the prefix for platform-wide settings in Redis

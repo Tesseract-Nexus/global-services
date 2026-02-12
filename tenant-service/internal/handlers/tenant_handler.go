@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -450,4 +452,228 @@ func (h *TenantHandler) GetTenantGrowthBookSDKKey(c *gin.Context) {
 			"sdk_key": sdkKey,
 		},
 	})
+}
+
+// requirePlatformOwner checks that the request has platform_owner=true claim (set by Istio for tesserix-home users)
+func requirePlatformOwner(c *gin.Context) bool {
+	if sharedMiddleware.IsPlatformOwner(c) {
+		return true
+	}
+	// Fallback: check raw header (for server-to-server calls that set headers manually)
+	header := c.GetHeader("x-jwt-claim-platform-owner")
+	return strings.EqualFold(header, "true")
+}
+
+// AdminDeleteTenantRequest represents a platform admin delete request
+type AdminDeleteTenantRequest struct {
+	Reason string `json:"reason"`
+}
+
+// AdminDeleteTenant deletes a tenant as a platform admin (no owner check)
+// @Summary Admin delete tenant
+// @Description Platform admin endpoint to delete a tenant without owner verification
+// @Tags tenants
+// @Accept json
+// @Produce json
+// @Param id path string true "Tenant ID"
+// @Param request body AdminDeleteTenantRequest true "Delete reason"
+// @Success 200 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{}
+// @Failure 403 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/tenants/{id}/admin-delete [delete]
+func (h *TenantHandler) AdminDeleteTenant(c *gin.Context) {
+	if !requirePlatformOwner(c) {
+		ErrorResponse(c, http.StatusForbidden, "Platform owner access required", nil)
+		return
+	}
+
+	tenantIDStr := c.Param("id")
+	tenantID, err := uuid.Parse(tenantIDStr)
+	if err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid tenant ID format", err)
+		return
+	}
+
+	var req AdminDeleteTenantRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		// Reason is optional for admin delete
+		log.Printf("[TenantHandler] AdminDeleteTenant: no body or invalid body, proceeding with empty reason")
+	}
+
+	result, err := h.offboardingService.AdminDeleteTenant(c.Request.Context(), &services.AdminDeleteTenantRequest{
+		TenantID: tenantID,
+		Reason:   req.Reason,
+	})
+
+	if err != nil {
+		errMsg := err.Error()
+		if errMsg == "tenant not found" {
+			ErrorResponse(c, http.StatusNotFound, errMsg, nil)
+			return
+		}
+		ErrorResponse(c, http.StatusInternalServerError, "Failed to delete tenant", err)
+		return
+	}
+
+	SuccessResponse(c, http.StatusOK, result.Message, result)
+}
+
+// BatchDeleteTenantsRequest represents a batch delete request
+type BatchDeleteTenantsRequest struct {
+	TenantIDs []string `json:"tenant_ids" binding:"required,min=1"`
+	Reason    string   `json:"reason"`
+}
+
+// BatchDeleteTenants deletes multiple tenants as a platform admin
+// @Summary Batch delete tenants
+// @Description Delete multiple tenants in one operation. Requires platform owner access.
+// @Tags tenants
+// @Accept json
+// @Produce json
+// @Param request body BatchDeleteTenantsRequest true "Batch delete request"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 403 {object} map[string]interface{}
+// @Router /api/v1/tenants/batch-delete [post]
+func (h *TenantHandler) BatchDeleteTenants(c *gin.Context) {
+	if !requirePlatformOwner(c) {
+		ErrorResponse(c, http.StatusForbidden, "Platform owner access required", nil)
+		return
+	}
+
+	var req BatchDeleteTenantsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid request payload", err)
+		return
+	}
+
+	// Parse UUIDs
+	tenantIDs := make([]uuid.UUID, 0, len(req.TenantIDs))
+	for _, idStr := range req.TenantIDs {
+		id, err := uuid.Parse(idStr)
+		if err != nil {
+			ErrorResponse(c, http.StatusBadRequest, "Invalid tenant ID: "+idStr, err)
+			return
+		}
+		tenantIDs = append(tenantIDs, id)
+	}
+
+	result := h.offboardingService.BatchDeleteTenants(c.Request.Context(), tenantIDs, req.Reason)
+
+	SuccessResponse(c, http.StatusOK, "Batch delete completed", result)
+}
+
+// DeleteAllTenantsRequest represents a delete-all request
+type DeleteAllTenantsRequest struct {
+	ConfirmationText string `json:"confirmation_text" binding:"required"`
+	Reason           string `json:"reason"`
+}
+
+// DeleteAllTenants deletes all active tenants as a platform admin
+// @Summary Delete all tenants
+// @Description Delete all active tenants. Requires platform owner access and exact confirmation text.
+// @Tags tenants
+// @Accept json
+// @Produce json
+// @Param request body DeleteAllTenantsRequest true "Delete all request with confirmation"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 403 {object} map[string]interface{}
+// @Router /api/v1/tenants/delete-all [post]
+func (h *TenantHandler) DeleteAllTenants(c *gin.Context) {
+	if !requirePlatformOwner(c) {
+		ErrorResponse(c, http.StatusForbidden, "Platform owner access required", nil)
+		return
+	}
+
+	var req DeleteAllTenantsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid request payload", err)
+		return
+	}
+
+	if req.ConfirmationText != "DELETE ALL TENANTS" {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid confirmation text: must be 'DELETE ALL TENANTS'", nil)
+		return
+	}
+
+	result, total, err := h.offboardingService.DeleteAllTenants(c.Request.Context(), req.Reason)
+	if err != nil {
+		ErrorResponse(c, http.StatusInternalServerError, "Failed to delete tenants", err)
+		return
+	}
+
+	SuccessResponse(c, http.StatusOK, "Delete all completed", gin.H{
+		"total":     total,
+		"succeeded": len(result.Succeeded),
+		"failed":    result.Failed,
+	})
+}
+
+// DeletionPreviewRequest represents a preview request
+type DeletionPreviewRequest struct {
+	TenantIDs []string `json:"tenant_ids"`
+}
+
+// GetDeletionPreview returns counts of data that would be deleted (dry run)
+// @Summary Preview deletion
+// @Description Returns counts of data that would be deleted per database. No data is modified.
+// @Tags tenants
+// @Accept json
+// @Produce json
+// @Param request body DeletionPreviewRequest true "Preview request (empty tenant_ids for all)"
+// @Success 200 {object} map[string]interface{}
+// @Failure 403 {object} map[string]interface{}
+// @Router /api/v1/tenants/deletion-preview [post]
+func (h *TenantHandler) GetDeletionPreview(c *gin.Context) {
+	if !requirePlatformOwner(c) {
+		ErrorResponse(c, http.StatusForbidden, "Platform owner access required", nil)
+		return
+	}
+
+	var req DeletionPreviewRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		// Empty body means preview all tenants
+		req.TenantIDs = nil
+	}
+
+	var tenantIDs []uuid.UUID
+
+	if len(req.TenantIDs) > 0 {
+		for _, idStr := range req.TenantIDs {
+			id, err := uuid.Parse(idStr)
+			if err != nil {
+				ErrorResponse(c, http.StatusBadRequest, "Invalid tenant ID: "+idStr, err)
+				return
+			}
+			tenantIDs = append(tenantIDs, id)
+		}
+	} else {
+		// Preview all tenants
+		type tenantID struct {
+			ID uuid.UUID
+		}
+		var ids []tenantID
+		if err := h.offboardingService.DB().WithContext(c.Request.Context()).
+			Model(&struct{ ID uuid.UUID }{}).
+			Table("tenants").
+			Select("id").
+			Find(&ids).Error; err != nil {
+			ErrorResponse(c, http.StatusInternalServerError, "Failed to fetch tenants", err)
+			return
+		}
+		for _, t := range ids {
+			tenantIDs = append(tenantIDs, t.ID)
+		}
+	}
+
+	previews, err := h.offboardingService.GetDeletionPreview(c.Request.Context(), tenantIDs)
+	if err != nil {
+		ErrorResponse(c, http.StatusInternalServerError, "Failed to generate preview", err)
+		return
+	}
+
+	SuccessResponse(c, http.StatusOK, "Deletion preview generated", previews)
 }

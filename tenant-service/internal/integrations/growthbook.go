@@ -288,6 +288,20 @@ func (c *GrowthBookClient) seedDefaultFeatures(orgID string) error {
 	return nil
 }
 
+// DeleteOrganization deletes a GrowthBook organization and all its SDK connections and feature flags
+func (c *GrowthBookClient) DeleteOrganization(orgID string) error {
+	_, status, err := c.doRequest("DELETE", "/organization/"+orgID, nil, orgID)
+	if err != nil {
+		return fmt.Errorf("failed to delete GrowthBook organization %s: %w", orgID, err)
+	}
+
+	if status != 200 && status != 204 && status != 404 {
+		return fmt.Errorf("unexpected status %d when deleting GrowthBook organization %s", status, orgID)
+	}
+
+	return nil
+}
+
 // GetSDKKey retrieves the SDK key for an organization
 func (c *GrowthBookClient) GetSDKKey(orgID string) (string, error) {
 	body, status, err := c.doRequest("GET", "/sdk-connections", nil, orgID)
