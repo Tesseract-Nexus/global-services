@@ -1035,7 +1035,7 @@ func main() {
 
 	fromName := os.Getenv("FROM_NAME")
 	if fromName == "" {
-		fromName = "Tesserix"
+		fromName = "mark8ly"
 	}
 
 	testEmail := os.Getenv("TEST_EMAIL")

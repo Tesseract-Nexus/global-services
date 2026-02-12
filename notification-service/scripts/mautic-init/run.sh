@@ -110,7 +110,7 @@ fi
 
 # Set email settings
 export FROM_EMAIL="${FROM_EMAIL:-noreply@mail.tesserix.app}"
-export FROM_NAME="${FROM_NAME:-Tesserix}"
+export FROM_NAME="${FROM_NAME:-mark8ly}"
 
 # Optional: Test email
 if [ -n "$1" ]; then

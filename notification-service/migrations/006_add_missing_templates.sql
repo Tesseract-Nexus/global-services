@@ -150,7 +150,7 @@ If you need help, reply to this email and we''ll be happy to assist.',
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;border:1px solid #e4e4e7;">
     <tr><td style="height:3px;background:#18181b;border-radius:12px 12px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
     <tr><td style="padding:32px 32px 0;text-align:center;">
-      <span style="font-size:15px;font-weight:600;color:#18181b;letter-spacing:-.2px;">Tesseract Hub</span>
+      <span style="font-size:15px;font-weight:600;color:#18181b;letter-spacing:-.2px;">mark8ly</span>
     </td></tr>
     <tr><td style="padding:28px 32px 36px;">
       <h1 style="margin:0 0 20px;font-size:20px;font-weight:600;color:#18181b;">Continue setting up your store</h1>
@@ -163,7 +163,7 @@ If you need help, reply to this email and we''ll be happy to assist.',
   </table>
 </td></tr>
 <tr><td style="padding:20px 0 0;text-align:center;">
-  <p style="margin:0;font-size:12px;color:#a1a1aa;">Tesseract Hub</p>
+  <p style="margin:0;font-size:12px;color:#a1a1aa;">mark8ly</p>
   <p style="margin:6px 0 0;font-size:11px;color:#d4d4d8;">Powered by <a href="https://mark8ly.com" style="color:#a1a1aa;text-decoration:none;">mark8ly</a></p>
 </td></tr>
 </table>
