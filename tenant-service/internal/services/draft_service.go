@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"tenant-service/internal/clients"
 	"tenant-service/internal/config"
 	"tenant-service/internal/models"
 	"tenant-service/internal/redis"
@@ -16,19 +17,19 @@ import (
 
 // DraftService handles draft persistence for onboarding forms
 type DraftService struct {
-	db              *gorm.DB
-	redisClient     *redis.Client
-	config          config.DraftConfig
-	notificationSvc *NotificationService
+	db                 *gorm.DB
+	redisClient        *redis.Client
+	config             config.DraftConfig
+	notificationClient *clients.NotificationClient
 }
 
 // NewDraftService creates a new draft service
-func NewDraftService(db *gorm.DB, redisClient *redis.Client, cfg config.DraftConfig, notificationSvc *NotificationService) *DraftService {
+func NewDraftService(db *gorm.DB, redisClient *redis.Client, cfg config.DraftConfig, notificationClient *clients.NotificationClient) *DraftService {
 	return &DraftService{
-		db:              db,
-		redisClient:     redisClient,
-		config:          cfg,
-		notificationSvc: notificationSvc,
+		db:                 db,
+		redisClient:        redisClient,
+		config:             cfg,
+		notificationClient: notificationClient,
 	}
 }
 
@@ -361,7 +362,7 @@ func (s *DraftService) SendDraftReminder(ctx context.Context, session *models.On
 	}
 
 	// Send reminder email
-	if err := s.notificationSvc.SendDraftReminderEmail(ctx, email, firstName, session.ID.String()); err != nil {
+	if err := s.notificationClient.SendDraftReminderEmail(ctx, email, firstName, session.ID.String()); err != nil {
 		return fmt.Errorf("failed to send reminder email: %w", err)
 	}
 

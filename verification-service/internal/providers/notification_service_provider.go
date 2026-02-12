@@ -62,10 +62,18 @@ func (p *NotificationServiceProvider) GetName() string {
 	return "notification-service"
 }
 
-// SendVerificationEmail sends a verification email via notification-service
+// SendVerificationEmail sends a verification email via notification-service DB template.
 func (p *NotificationServiceProvider) SendVerificationEmail(recipient, code, purpose string) error {
-	subject, htmlBody := FormatVerificationEmail(code, purpose)
-	return p.SendEmail(recipient, subject, htmlBody)
+	templateSlug := "verification-code"
+	if purpose == "customer_email_verification" {
+		templateSlug = "customer-otp"
+	}
+	variables := map[string]interface{}{
+		"verification_code": code,
+		"email":             recipient,
+		"expiry_minutes":    "10",
+	}
+	return p.SendTemplatedEmail(recipient, templateSlug, variables)
 }
 
 // SendEmail sends a generic email via notification-service API

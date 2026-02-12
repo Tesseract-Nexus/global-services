@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"os"
 	"fmt"
 	"log"
 	"time"
@@ -374,75 +373,3 @@ func (s *VerificationService) sendCode(channel, recipient, code, purpose string)
 	}
 }
 
-// SendCustomEmail sends a custom email (welcome, account created, verification link, etc.)
-func (s *VerificationService) SendCustomEmail(ctx context.Context, req *models.SendEmailRequest) error {
-	var subject, htmlBody string
-
-	switch req.EmailType {
-	case "welcome":
-		firstName := req.FirstName
-		if firstName == "" {
-			firstName = "there" // fallback
-		}
-		subject, htmlBody = providers.FormatWelcomeEmail(firstName)
-
-	case "account_created":
-		firstName := req.FirstName
-		if firstName == "" {
-			firstName = "there" // fallback
-		}
-		businessName := req.BusinessName
-		if businessName == "" {
-			businessName = "Your Business"
-		}
-		subdomain := req.Subdomain
-		if subdomain == "" {
-			subdomain = "your-store"
-		}
-		subject, htmlBody = providers.FormatAccountCreatedEmail(firstName, businessName, subdomain)
-
-	case "email_verification_link":
-		verificationLink := req.VerificationLink
-		if verificationLink == "" {
-			return fmt.Errorf("verification_link is required for email_verification_link type")
-		}
-		businessName := req.BusinessName
-		if businessName == "" {
-			businessName = "Tesseract Hub"
-		}
-		subject, htmlBody = providers.FormatVerificationLinkEmail(verificationLink, businessName, req.Recipient)
-
-	case "welcome_pack":
-		firstName := req.FirstName
-		if firstName == "" {
-			firstName = "there"
-		}
-		businessName := req.BusinessName
-		if businessName == "" {
-			businessName = "Your Business"
-		}
-		adminURL := req.AdminURL
-		if adminURL == "" {
-			baseDomain := os.Getenv("BASE_DOMAIN")
-			if baseDomain == "" {
-				baseDomain = "tesserix.app"
-			}
-			adminURL = fmt.Sprintf("https://admin.%s", baseDomain)
-		}
-		storefrontURL := req.StorefrontURL
-		if storefrontURL == "" {
-			baseDomain := os.Getenv("BASE_DOMAIN")
-			if baseDomain == "" {
-				baseDomain = "tesserix.app"
-			}
-			storefrontURL = fmt.Sprintf("https://store.%s", baseDomain)
-		}
-		subject, htmlBody = providers.FormatWelcomePackEmail(firstName, businessName, req.TenantSlug, adminURL, storefrontURL, req.Recipient)
-
-	default:
-		return fmt.Errorf("unsupported email type: %s", req.EmailType)
-	}
-
-	// Send the email
-	return s.emailProvider.SendEmail(req.Recipient, subject, htmlBody)
-}

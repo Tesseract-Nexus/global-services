@@ -116,19 +116,3 @@ func (h *VerificationHandler) GetStatus(c *gin.Context) {
 	SuccessResponse(c, http.StatusOK, "Verification status retrieved successfully", response)
 }
 
-// SendEmail sends a custom email (welcome, account created, etc.)
-func (h *VerificationHandler) SendEmail(c *gin.Context) {
-	var req models.SendEmailRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		ErrorResponse(c, http.StatusBadRequest, "Invalid request payload", err)
-		return
-	}
-
-	err := h.verificationService.SendCustomEmail(c.Request.Context(), &req)
-	if err != nil {
-		ErrorResponse(c, http.StatusInternalServerError, "Failed to send email", err)
-		return
-	}
-
-	SuccessResponse(c, http.StatusOK, "Email sent successfully", nil)
-}

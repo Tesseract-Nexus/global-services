@@ -160,8 +160,6 @@ func setupRouter(cfg *config.Config, healthHandler *handlers.HealthHandler, veri
 		v1.POST("/verify/resend", verificationHandler.ResendCode)
 		v1.GET("/verify/status", verificationHandler.GetStatus)
 
-		// Email endpoints
-		v1.POST("/email/send", verificationHandler.SendEmail)
 	}
 
 	return router

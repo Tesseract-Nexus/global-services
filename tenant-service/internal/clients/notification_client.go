@@ -5,25 +5,22 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"html/template"
 	"io"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 )
 
-// NotificationClient handles communication with notification-service for sending emails
+// NotificationClient handles communication with notification-service for sending emails.
+// All email rendering is delegated to notification-service via DB templates.
 type NotificationClient struct {
 	baseURL    string
 	apiKey     string
 	httpClient *http.Client
 }
 
-// NewNotificationClient creates a new notification service client
-// This connects directly to notification-service for email delivery
+// NewNotificationClient creates a new notification service client.
 func NewNotificationClient(baseURL string, apiKey string) *NotificationClient {
-	// Use notification-service URL (override verification-service URL)
 	notificationURL := os.Getenv("NOTIFICATION_SERVICE_URL")
 	if notificationURL == "" {
 		notificationURL = "http://notification-service.marketplace.svc.cluster.local:8090"
@@ -37,396 +34,63 @@ func NewNotificationClient(baseURL string, apiKey string) *NotificationClient {
 	}
 }
 
-// NotificationSendRequest represents a request to notification-service /api/v1/notifications/send
-type NotificationSendRequest struct {
-	Channel        string `json:"channel"`
-	RecipientEmail string `json:"recipientEmail"`
-	Subject        string `json:"subject"`
-	Body           string `json:"body"`
-	BodyHTML       string `json:"bodyHtml"`
-	Priority       string `json:"priority,omitempty"`
+// notificationSendRequest represents a request to notification-service /api/v1/notifications/send.
+// Uses templateName + variables so notification-service renders HTML from DB templates.
+type notificationSendRequest struct {
+	Channel        string                 `json:"channel"`
+	TemplateName   string                 `json:"templateName,omitempty"`
+	RecipientEmail string                 `json:"recipientEmail"`
+	Variables      map[string]interface{} `json:"variables,omitempty"`
+	Priority       string                 `json:"priority,omitempty"`
+	// Legacy fields kept for backward compat — only used if TemplateName is empty
+	Subject  string `json:"subject,omitempty"`
+	Body     string `json:"body,omitempty"`
+	BodyHTML string `json:"bodyHtml,omitempty"`
 }
 
-// SendEmailResponse represents the response from sending an email
-type SendEmailResponse struct {
+type sendResponse struct {
 	Success bool   `json:"success"`
-	Message string `json:"message,omitempty"`
+	Error   string `json:"error,omitempty"`
 }
 
-// CustomDomainDNSConfig holds DNS configuration for custom domain verification emails
+// CustomDomainDNSConfig holds DNS configuration for custom domains.
+// Used by the GetDNSConfig API endpoint (UI-facing).
 type CustomDomainDNSConfig struct {
-	IsCustomDomain bool   // If true, show DNS instructions in the email
-	CustomDomain   string // The custom domain (e.g., "customdomain.com")
-
-	// Customer's subdomain hosts (what they configure DNS for)
-	AdminHost      string // Admin panel host (e.g., "admin.customdomain.com")
-	StorefrontHost string // Storefront host (e.g., "www.customdomain.com" or "customdomain.com")
-	APIHost        string // API host (e.g., "api.customdomain.com")
-
-	// Routing configuration
-	// UseARecords: true = A records to IP, false = CNAME records
-	// Custom domains must use A records due to Cloudflare cross-account CNAME restrictions
-	UseARecords        bool   // If true, show A records instead of CNAME for routing
-	RoutingIP          string // LoadBalancer IP for A records (e.g., "34.151.169.37")
-	RoutingCNAMETarget string // CNAME target for routing (fallback if IP not set)
-
-	// Tenant identification
-	TenantSlug string // The tenant slug (e.g., "awesome-store")
-	BaseDomain string // Platform base domain (e.g., "tesserix.app")
-
-	// CNAME Delegation for automatic SSL certificate management
-	// Customer adds: _acme-challenge.theirdomain.com CNAME theirdomain-com.acme.tesserix.app
-	// cert-manager follows the CNAME and creates TXT records in our Cloudflare zone
-	UseCNAMEDelegation bool   // If true, show CNAME delegation option in email
-	ACMEChallengeHost  string // The _acme-challenge subdomain (e.g., "_acme-challenge.customdomain.com")
-	ACMECNAMETarget    string // The CNAME target for ACME challenges (e.g., "customdomain-com.acme.tesserix.app")
+	IsCustomDomain     bool   `json:"isCustomDomain"`
+	CustomDomain       string `json:"customDomain"`
+	AdminHost          string `json:"adminHost"`
+	StorefrontHost     string `json:"storefrontHost"`
+	APIHost            string `json:"apiHost"`
+	UseARecords        bool   `json:"useARecords"`
+	RoutingIP          string `json:"routingIP"`
+	RoutingCNAMETarget string `json:"routingCNAMETarget"`
+	TenantSlug         string `json:"tenantSlug"`
+	BaseDomain         string `json:"baseDomain"`
+	UseCNAMEDelegation bool   `json:"useCNAMEDelegation"`
+	ACMEChallengeHost  string `json:"acmeChallengeHost"`
+	ACMECNAMETarget    string `json:"acmeCNAMETarget"`
 }
 
-// SendVerificationLinkEmail sends an email with a verification link via notification-service
-func (c *NotificationClient) SendVerificationLinkEmail(ctx context.Context, email, verificationLink, businessName string) error {
-	return c.SendVerificationLinkEmailWithDNS(ctx, email, verificationLink, businessName, nil)
+// GoodbyeEmailData contains data for the goodbye/deactivation email.
+type GoodbyeEmailData struct {
+	Email            string
+	FirstName        string
+	StoreName        string
+	DeactivatedAt    time.Time
+	ScheduledPurgeAt time.Time
+	ReactivationURL  string
 }
 
-// SendVerificationLinkEmailWithDNS sends a verification email with optional DNS configuration for custom domains
-func (c *NotificationClient) SendVerificationLinkEmailWithDNS(ctx context.Context, email, verificationLink, businessName string, dnsConfig *CustomDomainDNSConfig) error {
-	// Generate the beautiful HTML email with optional DNS instructions
-	htmlBody, err := renderVerificationEmailTemplate(verificationLink, businessName, email, dnsConfig)
-	if err != nil {
-		return fmt.Errorf("failed to render email template: %w", err)
-	}
-
-	subject := fmt.Sprintf("Verify your email for %s", businessName)
-	if dnsConfig != nil && dnsConfig.IsCustomDomain {
-		subject = fmt.Sprintf("Verify your email & configure DNS for %s", businessName)
-	}
-
-	req := &NotificationSendRequest{
-		Channel:        "EMAIL",
-		RecipientEmail: email,
-		Subject:        subject,
-		Body:           fmt.Sprintf("Click this link to verify your email: %s", verificationLink),
-		BodyHTML:       htmlBody,
-		Priority:       "high",
-	}
-
-	var response struct {
-		Success bool        `json:"success"`
-		Data    interface{} `json:"data,omitempty"`
-		Error   string      `json:"error,omitempty"`
-	}
-
-	if err := c.makeRequest(ctx, "POST", "/api/v1/notifications/send", req, &response); err != nil {
-		return fmt.Errorf("failed to call notification-service: %w", err)
-	}
-
-	if !response.Success && response.Error != "" {
-		return fmt.Errorf("notification-service error: %s", response.Error)
-	}
-
-	return nil
+// PasswordResetEmailData contains data for password reset emails.
+type PasswordResetEmailData struct {
+	Email     string
+	FirstName string
+	StoreName string
+	ResetLink string
+	ExpiresIn string // e.g., "1 hour"
 }
 
-// renderVerificationEmailTemplate generates the verification email HTML with optional DNS instructions
-func renderVerificationEmailTemplate(verificationLink, businessName, email string, dnsConfig *CustomDomainDNSConfig) (string, error) {
-	const emailTemplate = `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Verify Your Email</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: 'Source Sans 3', 'Inter', 'Segoe UI', 'Helvetica Neue', Arial, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; background-color: #F8FAFC;">
-    <table role="presentation" style="width: 100%; border-collapse: collapse;">
-        <tr>
-            <td align="center" style="padding: 40px 0;">
-                <table role="presentation" style="width: 600px; max-width: 100%; border-collapse: collapse; background-color: #ffffff; border-radius: 10px; border: 1px solid #E2E8F0; box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);">
-                    <!-- Header - Solid color, no gradient -->
-                    <tr>
-                        <td style="background-color: #0F172A; padding: 40px 40px 30px; border-radius: 10px 10px 0 0; text-align: center;">
-                            <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600;">
-                                Verify Your Email
-                            </h1>
-                            <p style="color: rgba(255, 255, 255, 0.9); margin: 12px 0 0; font-size: 16px;">
-                                One click away from launching {{.BusinessName}}
-                            </p>
-                        </td>
-                    </tr>
-
-                    <!-- Main content -->
-                    <tr>
-                        <td style="padding: 40px;">
-                            <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
-                                Hi there,
-                            </p>
-                            <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
-                                You're almost ready to launch <strong>{{.BusinessName}}</strong>. Just click the button below to verify your email address and complete your store setup.
-                            </p>
-
-                            <!-- CTA Button - Bulletproof table-cell button -->
-                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 16px auto 32px;">
-                                <tr>
-                                    <td style="background-color: #0F172A; border-radius: 10px;">
-                                        <a href="{{.VerificationLink}}" target="_blank" style="display: inline-block; padding: 18px 48px; font-size: 16px; font-weight: 600; color: #ffffff; text-decoration: none; border-radius: 10px;">
-                                            Verify Email Address
-                                        </a>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <!-- Alternative link -->
-                            <div style="background-color: #F8FAFC; border-radius: 8px; padding: 20px; margin-bottom: 24px; border: 1px solid #E2E8F0;">
-                                <p style="color: #64748B; font-size: 14px; margin: 0 0 8px;">
-                                    Or copy this link into your browser:
-                                </p>
-                                <p style="color: #0F172A; font-size: 14px; margin: 0; word-break: break-all;">
-                                    {{.VerificationLink}}
-                                </p>
-                            </div>
-
-                            {{if .IsCustomDomain}}
-                            <!-- Custom Domain Notice -->
-                            <div style="background-color: #FEF3C7; border-radius: 8px; padding: 24px; margin-bottom: 24px; border: 1px solid #FCD34D;">
-                                <h2 style="color: #92400E; font-size: 18px; font-weight: 700; margin: 0 0 16px;">
-                                    Custom Domain: {{.CustomDomain}}
-                                </h2>
-                                <p style="color: #78350F; font-size: 14px; line-height: 1.6; margin: 0 0 16px;">
-                                    Your custom domain requires DNS configuration. For security reasons, <strong>please view the complete DNS records in the onboarding dashboard</strong> after verifying your email.
-                                </p>
-
-                                <!-- Security Notice -->
-                                <div style="background-color: #ffffff; border-radius: 8px; padding: 16px; border: 1px solid #EF4444;">
-                                    <p style="color: #EF4444; font-size: 14px; font-weight: 700; margin: 0 0 8px;">
-                                        Security Notice
-                                    </p>
-                                    <p style="color: #991B1B; font-size: 14px; margin: 0; line-height: 1.6;">
-                                        DNS records containing IP addresses and routing information are <strong>only shown in the secure onboarding dashboard</strong> to prevent phishing attacks.
-                                        Never configure DNS records from an email without verifying the source.
-                                    </p>
-                                </div>
-
-                                <!-- Tips -->
-                                <div style="background-color: #DBEAFE; border-radius: 8px; padding: 16px; margin-top: 16px; border-left: 4px solid #3B82F6;">
-                                    <p style="color: #1E40AF; font-size: 14px; margin: 0; line-height: 1.7;">
-                                        <strong>Next Steps:</strong><br>
-                                        1. Click the verification link above to verify your email<br>
-                                        2. Complete DNS setup in the onboarding dashboard<br>
-                                        3. DNS changes usually take <strong>5-30 minutes</strong> to propagate<br>
-                                        4. We'll automatically provision your <strong>SSL certificate</strong>
-                                    </p>
-                                </div>
-                            </div>
-                            {{end}}
-
-                            <!-- Security notice -->
-                            <div style="border-left: 4px solid #F59E0B; background-color: #FEF3C7; padding: 16px; border-radius: 0 8px 8px 0;">
-                                <p style="color: #92400E; font-size: 14px; margin: 0;">
-                                    This link expires in <strong>{{.ExpiryTime}}</strong>. If you didn't request this, you can safely ignore this email.
-                                </p>
-                            </div>
-                        </td>
-                    </tr>
-
-                    <!-- Footer -->
-                    <tr>
-                        <td style="background-color: #F8FAFC; padding: 24px 40px; border-radius: 0 0 10px 10px; text-align: center;">
-                            <p style="color: #94A3B8; font-size: 14px; margin: 0 0 8px;">
-                                Sent to {{.Email}}
-                            </p>
-                            <p style="color: #94A3B8; font-size: 12px; margin: 0;">
-                                © 2026 Tesseract Hub. All rights reserved.
-                            </p>
-                        </td>
-                    </tr>
-                </table>
-            </td>
-        </tr>
-    </table>
-</body>
-</html>`
-
-	tmpl, err := template.New("verification").Parse(emailTemplate)
-	if err != nil {
-		return "", err
-	}
-
-	data := struct {
-		VerificationLink   string
-		BusinessName       string
-		Email              string
-		ExpiryTime         string // Human-readable expiry time (e.g., "1 hour")
-		IsCustomDomain     bool
-		CustomDomain       string
-		AdminHost          string
-		StorefrontHost     string
-		APIHost            string
-		TenantSlug         string
-		BaseDomain         string
-		// Routing configuration - A records vs CNAME
-		UseARecords        bool   // If true, show A records instead of CNAME
-		RoutingIP          string // LoadBalancer IP for A records
-		RoutingCNAMETarget string // CNAME target for routing (fallback)
-		// CNAME Delegation fields for automatic SSL
-		UseCNAMEDelegation bool
-		ACMEChallengeHost  string // e.g., "_acme-challenge.customdomain.com"
-		ACMECNAMETarget    string // e.g., "customdomain-com.acme.tesserix.app"
-	}{
-		VerificationLink: verificationLink,
-		BusinessName:     businessName,
-		Email:            email,
-		ExpiryTime:       "1 hour", // Matches VERIFICATION_TOKEN_EXPIRY_HOURS config
-	}
-
-	// Add DNS config if provided
-	if dnsConfig != nil && dnsConfig.IsCustomDomain {
-		data.IsCustomDomain = true
-		data.CustomDomain = dnsConfig.CustomDomain
-		data.AdminHost = dnsConfig.AdminHost
-		data.StorefrontHost = dnsConfig.StorefrontHost
-		data.APIHost = dnsConfig.APIHost
-		data.TenantSlug = dnsConfig.TenantSlug
-		data.BaseDomain = dnsConfig.BaseDomain
-		// Routing configuration
-		data.UseARecords = dnsConfig.UseARecords
-		data.RoutingIP = dnsConfig.RoutingIP
-		data.RoutingCNAMETarget = dnsConfig.RoutingCNAMETarget
-		// CNAME Delegation fields for automatic SSL
-		data.UseCNAMEDelegation = dnsConfig.UseCNAMEDelegation
-		data.ACMEChallengeHost = dnsConfig.ACMEChallengeHost
-		data.ACMECNAMETarget = dnsConfig.ACMECNAMETarget
-	}
-
-	var buf strings.Builder
-	if err := tmpl.Execute(&buf, data); err != nil {
-		return "", err
-	}
-
-	return buf.String(), nil
-}
-
-// SendVerificationSuccessEmail sends a confirmation email after successful verification
-func (c *NotificationClient) SendVerificationSuccessEmail(ctx context.Context, email, businessName string) error {
-	// For now, we don't send a success email - handled in welcome pack
-	return nil
-}
-
-// SendWelcomeEmail sends a welcome email to the user
-func (c *NotificationClient) SendWelcomeEmail(ctx context.Context, email, firstName string) error {
-	// Generate welcome email HTML
-	htmlBody := renderWelcomeEmailTemplate(firstName)
-
-	req := &NotificationSendRequest{
-		Channel:        "EMAIL",
-		RecipientEmail: email,
-		Subject:        "Welcome to Tesseract Hub!",
-		Body:           fmt.Sprintf("Welcome %s! Your account has been created.", firstName),
-		BodyHTML:       htmlBody,
-	}
-
-	var response struct {
-		Success bool   `json:"success"`
-		Error   string `json:"error,omitempty"`
-	}
-
-	return c.makeRequest(ctx, "POST", "/api/v1/notifications/send", req, &response)
-}
-
-// SendAccountCreatedEmail sends an account created email
-func (c *NotificationClient) SendAccountCreatedEmail(ctx context.Context, email, firstName, businessName, subdomain string) error {
-	// Handled by welcome pack email
-	return nil
-}
-
-// SendCustomerWelcomeEmail sends a welcome email to a new customer who registered on a storefront
-func (c *NotificationClient) SendCustomerWelcomeEmail(ctx context.Context, email, firstName, storeName string) error {
-	htmlBody := renderCustomerWelcomeEmailTemplate(firstName, storeName)
-
-	req := &NotificationSendRequest{
-		Channel:        "EMAIL",
-		RecipientEmail: email,
-		Subject:        fmt.Sprintf("Welcome to %s!", storeName),
-		Body:           fmt.Sprintf("Welcome %s! Your account at %s has been created.", firstName, storeName),
-		BodyHTML:       htmlBody,
-	}
-
-	var response struct {
-		Success bool   `json:"success"`
-		Error   string `json:"error,omitempty"`
-	}
-
-	return c.makeRequest(ctx, "POST", "/api/v1/notifications/send", req, &response)
-}
-
-// renderCustomerWelcomeEmailTemplate generates a welcome email for storefront customers
-func renderCustomerWelcomeEmailTemplate(firstName, storeName string) string {
-	return fmt.Sprintf(`<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Welcome to %s!</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: 'Source Sans 3', 'Inter', 'Segoe UI', 'Helvetica Neue', Arial, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; background-color: #F8FAFC;">
-    <table role="presentation" style="width: 100%%; border-collapse: collapse;">
-        <tr>
-            <td align="center" style="padding: 40px 0;">
-                <table role="presentation" style="width: 600px; max-width: 100%%; border-collapse: collapse; background-color: #ffffff; border-radius: 10px; border: 1px solid #E2E8F0; box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);">
-                    <!-- Header - Solid color -->
-                    <tr>
-                        <td style="background-color: #0F172A; padding: 40px 40px 30px; border-radius: 10px 10px 0 0; text-align: center;">
-                            <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600;">
-                                Welcome to %s!
-                            </h1>
-                        </td>
-                    </tr>
-
-                    <!-- Main content -->
-                    <tr>
-                        <td style="padding: 40px;">
-                            <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
-                                Hi %s,
-                            </p>
-                            <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
-                                Thank you for creating an account with <strong>%s</strong>. We're excited to have you as part of our community!
-                            </p>
-                            <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
-                                You can now:
-                            </p>
-                            <ul style="color: #334155; font-size: 16px; line-height: 1.8; margin: 0 0 24px; padding-left: 24px;">
-                                <li>Browse our products and collections</li>
-                                <li>Save items to your wishlist</li>
-                                <li>Track your orders</li>
-                                <li>Manage your account settings</li>
-                            </ul>
-
-                            <!-- Check email notice -->
-                            <div style="border-left: 4px solid #3B82F6; background-color: #DBEAFE; padding: 16px; border-radius: 0 8px 8px 0; margin-top: 24px;">
-                                <p style="color: #1E40AF; font-size: 14px; margin: 0;">
-                                    Please check your inbox for an email verification code to complete your account setup.
-                                </p>
-                            </div>
-                        </td>
-                    </tr>
-
-                    <!-- Footer -->
-                    <tr>
-                        <td style="background-color: #F8FAFC; padding: 24px 40px; border-radius: 0 0 10px 10px; text-align: center;">
-                            <p style="color: #94A3B8; font-size: 14px; margin: 0 0 8px;">
-                                This email was sent because you created an account at %s
-                            </p>
-                            <p style="color: #94A3B8; font-size: 12px; margin: 0;">
-                                © 2026 Powered by Tesseract Hub
-                            </p>
-                        </td>
-                    </tr>
-                </table>
-            </td>
-        </tr>
-    </table>
-</body>
-</html>`, storeName, storeName, firstName, storeName, storeName)
-}
-
-// WelcomePackData contains all data for sending a welcome pack email
+// WelcomePackData contains all data for sending a welcome pack email.
 type WelcomePackData struct {
 	Email         string
 	FirstName     string
@@ -437,132 +101,129 @@ type WelcomePackData struct {
 	DashboardURL  string
 }
 
-// SendWelcomePackEmail sends a comprehensive welcome pack email with tenant URLs and login info
+// ---------- Public Send methods ----------
+
+// SendVerificationLinkEmail sends a verification link email via notification-service template.
+func (c *NotificationClient) SendVerificationLinkEmail(ctx context.Context, email, verificationLink, businessName string) error {
+	return c.SendVerificationLinkEmailWithDNS(ctx, email, verificationLink, businessName, nil)
+}
+
+// SendVerificationLinkEmailWithDNS sends a verification link email.
+// DNS config is used only to determine whether this is a custom domain onboarding;
+// actual DNS records are shown in the onboarding dashboard, not in the email.
+func (c *NotificationClient) SendVerificationLinkEmailWithDNS(ctx context.Context, email, verificationLink, businessName string, dnsConfig *CustomDomainDNSConfig) error {
+	vars := map[string]interface{}{
+		"verification_link":   verificationLink,
+		"verification_expiry": "1 hour",
+		"store_name":          businessName,
+		"business_name":       businessName,
+		"email":               email,
+	}
+	if dnsConfig != nil && dnsConfig.IsCustomDomain {
+		vars["is_custom_domain"] = true
+		vars["custom_domain"] = dnsConfig.CustomDomain
+	}
+	return c.sendTemplated(ctx, email, "verification-link", vars, "high")
+}
+
+// SendVerificationSuccessEmail is a no-op — handled by the welcome pack.
+func (c *NotificationClient) SendVerificationSuccessEmail(ctx context.Context, email, businessName string) error {
+	return nil
+}
+
+// SendWelcomeEmail sends a generic welcome email.
+func (c *NotificationClient) SendWelcomeEmail(ctx context.Context, email, firstName string) error {
+	return c.sendTemplated(ctx, email, "welcome-email", map[string]interface{}{
+		"customer_name": firstName,
+		"first_name":    firstName,
+	}, "")
+}
+
+// SendAccountCreatedEmail is a no-op — handled by the welcome pack.
+func (c *NotificationClient) SendAccountCreatedEmail(ctx context.Context, email, firstName, businessName, subdomain string) error {
+	return nil
+}
+
+// SendCustomerWelcomeEmail sends a welcome email to a storefront customer.
+func (c *NotificationClient) SendCustomerWelcomeEmail(ctx context.Context, email, firstName, storeName, storefrontURL string) error {
+	return c.sendTemplated(ctx, email, "welcome-email", map[string]interface{}{
+		"customer_name": firstName,
+		"first_name":    firstName,
+		"store_name":    storeName,
+		"store_url":     storefrontURL,
+	}, "")
+}
+
+// SendWelcomePackEmail sends a comprehensive welcome pack email with tenant URLs.
 func (c *NotificationClient) SendWelcomePackEmail(ctx context.Context, data *WelcomePackData) error {
-	htmlBody, err := renderWelcomePackEmailTemplate(data)
-	if err != nil {
-		return fmt.Errorf("failed to render welcome pack template: %w", err)
-	}
+	return c.sendTemplated(ctx, data.Email, "tenant-welcome-pack", map[string]interface{}{
+		"business_name":  data.BusinessName,
+		"first_name":     data.FirstName,
+		"admin_url":      data.AdminURL,
+		"storefront_url": data.StorefrontURL,
+		"email":          data.Email,
+		"tenant_slug":    data.TenantSlug,
+	}, "high")
+}
 
-	req := &NotificationSendRequest{
+// SendGoodbyeEmail sends a goodbye email when a customer deactivates their account.
+func (c *NotificationClient) SendGoodbyeEmail(ctx context.Context, data *GoodbyeEmailData) error {
+	return c.sendTemplated(ctx, data.Email, "customer-goodbye", map[string]interface{}{
+		"first_name":       data.FirstName,
+		"store_name":       data.StoreName,
+		"purge_date":       data.ScheduledPurgeAt.Format("January 2, 2006"),
+		"reactivation_url": data.ReactivationURL,
+	}, "")
+}
+
+// SendPasswordResetEmail sends a password reset email with a secure link.
+func (c *NotificationClient) SendPasswordResetEmail(ctx context.Context, data *PasswordResetEmailData) error {
+	return c.sendTemplated(ctx, data.Email, "password-reset", map[string]interface{}{
+		"first_name": data.FirstName,
+		"store_name": data.StoreName,
+		"reset_url":  data.ResetLink,
+		"expires_in": data.ExpiresIn,
+	}, "high")
+}
+
+// SendDraftReminderEmail sends a reminder for incomplete onboarding drafts.
+func (c *NotificationClient) SendDraftReminderEmail(ctx context.Context, email, firstName, sessionID string) error {
+	onboardingBaseURL := os.Getenv("ONBOARDING_APP_URL")
+	if onboardingBaseURL == "" {
+		onboardingBaseURL = "http://localhost:3002"
+	}
+	continueURL := fmt.Sprintf("%s/onboarding?session=%s", onboardingBaseURL, sessionID)
+
+	return c.sendTemplated(ctx, email, "draft-reminder", map[string]interface{}{
+		"first_name":   firstName,
+		"continue_url": continueURL,
+		"session_id":   sessionID,
+	}, "")
+}
+
+// ---------- Internal helpers ----------
+
+// sendTemplated sends an email using a notification-service DB template.
+func (c *NotificationClient) sendTemplated(ctx context.Context, recipientEmail, templateName string, variables map[string]interface{}, priority string) error {
+	req := &notificationSendRequest{
 		Channel:        "EMAIL",
-		RecipientEmail: data.Email,
-		Subject:        fmt.Sprintf("🎉 Your store %s is ready!", data.BusinessName),
-		Body:           fmt.Sprintf("Welcome to %s! Your store is now live.", data.BusinessName),
-		BodyHTML:       htmlBody,
-		Priority:       "high",
+		RecipientEmail: recipientEmail,
+		TemplateName:   templateName,
+		Variables:      variables,
+		Priority:       priority,
 	}
 
-	var response struct {
-		Success bool   `json:"success"`
-		Error   string `json:"error,omitempty"`
+	var resp sendResponse
+	if err := c.makeRequest(ctx, "POST", "/api/v1/notifications/send", req, &resp); err != nil {
+		return fmt.Errorf("failed to call notification-service: %w", err)
 	}
-
-	return c.makeRequest(ctx, "POST", "/api/v1/notifications/send", req, &response)
+	if !resp.Success && resp.Error != "" {
+		return fmt.Errorf("notification-service error: %s", resp.Error)
+	}
+	return nil
 }
 
-// renderWelcomeEmailTemplate generates a simple welcome email
-func renderWelcomeEmailTemplate(firstName string) string {
-	return fmt.Sprintf(`<!DOCTYPE html>
-<html><body style="font-family: 'Source Sans 3', 'Inter', 'Segoe UI', Arial, sans-serif; background-color: #F8FAFC; padding: 40px;">
-<div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 10px; padding: 40px; border: 1px solid #E2E8F0; box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);">
-<h1 style="color: #0F172A; font-size: 24px; font-weight: 600;">Welcome, %s!</h1>
-<p style="color: #334155; font-size: 16px; line-height: 1.6;">Your account has been created successfully.</p>
-<p style="color: #334155; font-size: 16px; line-height: 1.6;">Get started by exploring your dashboard.</p>
-</div></body></html>`, firstName)
-}
-
-// renderWelcomePackEmailTemplate generates the welcome pack email HTML
-func renderWelcomePackEmailTemplate(data *WelcomePackData) (string, error) {
-	const emailTemplate = `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Your Store is Ready!</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: 'Source Sans 3', 'Inter', 'Segoe UI', 'Helvetica Neue', Arial, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; background-color: #F8FAFC;">
-    <table role="presentation" style="width: 100%; border-collapse: collapse;">
-        <tr>
-            <td align="center" style="padding: 40px 0;">
-                <table role="presentation" style="width: 600px; max-width: 100%; border-collapse: collapse; background-color: #ffffff; border-radius: 10px; border: 1px solid #E2E8F0; box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);">
-                    <!-- Header - Success green for celebration -->
-                    <tr>
-                        <td style="background-color: #10B981; padding: 40px; border-radius: 10px 10px 0 0; text-align: center;">
-                            <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600;">Congratulations!</h1>
-                            <p style="color: rgba(255,255,255,0.9); margin: 12px 0 0; font-size: 16px;">
-                                {{.BusinessName}} is now live!
-                            </p>
-                        </td>
-                    </tr>
-
-                    <!-- Content -->
-                    <tr>
-                        <td style="padding: 40px;">
-                            <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
-                                Hi {{.FirstName}},
-                            </p>
-                            <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 32px;">
-                                Your store has been set up successfully. Here are your important links:
-                            </p>
-
-                            <!-- Links -->
-                            <div style="background-color: #F8FAFC; border-radius: 8px; padding: 24px; margin-bottom: 24px; border: 1px solid #E2E8F0;">
-                                <h3 style="color: #0F172A; margin: 0 0 16px; font-size: 16px; font-weight: 600;">Your Store URLs</h3>
-
-                                <p style="margin: 0 0 12px;">
-                                    <strong style="color: #64748B;">Admin Panel:</strong><br>
-                                    <a href="{{.AdminURL}}" style="color: #0F172A; text-decoration: none; font-weight: 500;">{{.AdminURL}}</a>
-                                </p>
-
-                                <p style="margin: 0;">
-                                    <strong style="color: #64748B;">Storefront:</strong><br>
-                                    <a href="{{.StorefrontURL}}" style="color: #0F172A; text-decoration: none; font-weight: 500;">{{.StorefrontURL}}</a>
-                                </p>
-                            </div>
-
-                            <!-- CTA - Bulletproof table-cell button -->
-                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto;">
-                                <tr>
-                                    <td style="background-color: #0F172A; border-radius: 10px;">
-                                        <a href="{{.AdminURL}}" target="_blank" style="display: inline-block; padding: 14px 32px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none; border-radius: 10px;">
-                                            Open Admin Panel &#8594;
-                                        </a>
-                                    </td>
-                                </tr>
-                            </table>
-                        </td>
-                    </tr>
-
-                    <!-- Footer -->
-                    <tr>
-                        <td style="background-color: #F8FAFC; padding: 24px 40px; border-radius: 0 0 10px 10px; text-align: center;">
-                            <p style="color: #94A3B8; font-size: 12px; margin: 0;">
-                                © 2026 Tesseract Hub. All rights reserved.
-                            </p>
-                        </td>
-                    </tr>
-                </table>
-            </td>
-        </tr>
-    </table>
-</body>
-</html>`
-
-	tmpl, err := template.New("welcomepack").Parse(emailTemplate)
-	if err != nil {
-		return "", err
-	}
-
-	var buf strings.Builder
-	if err := tmpl.Execute(&buf, data); err != nil {
-		return "", err
-	}
-
-	return buf.String(), nil
-}
-
-// makeRequest makes an HTTP request to notification-service
+// makeRequest makes an HTTP request to notification-service.
 func (c *NotificationClient) makeRequest(ctx context.Context, method, path string, body interface{}, result interface{}) error {
 	var reqBody io.Reader
 	if body != nil {
@@ -580,9 +241,7 @@ func (c *NotificationClient) makeRequest(ctx context.Context, method, path strin
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	// notification-service requires tenant_id - use "onboarding" for system emails
 	req.Header.Set("X-Tenant-ID", "onboarding")
-	// Add API key if provided
 	if c.apiKey != "" {
 		req.Header.Set("X-API-Key", c.apiKey)
 	}
@@ -593,7 +252,6 @@ func (c *NotificationClient) makeRequest(ctx context.Context, method, path strin
 	}
 	defer resp.Body.Close()
 
-	// Check for non-2xx status codes
 	if resp.StatusCode >= 400 {
 		bodyBytes, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("notification-service returned status %d: %s", resp.StatusCode, string(bodyBytes))
@@ -604,235 +262,4 @@ func (c *NotificationClient) makeRequest(ctx context.Context, method, path strin
 	}
 
 	return nil
-}
-
-// GoodbyeEmailData contains data for the goodbye/deactivation email
-type GoodbyeEmailData struct {
-	Email            string
-	FirstName        string
-	StoreName        string
-	DeactivatedAt    time.Time
-	ScheduledPurgeAt time.Time
-	ReactivationURL  string
-}
-
-// SendGoodbyeEmail sends a goodbye email when a customer deactivates their account
-func (c *NotificationClient) SendGoodbyeEmail(ctx context.Context, data *GoodbyeEmailData) error {
-	htmlBody := renderGoodbyeEmailTemplate(data)
-
-	req := &NotificationSendRequest{
-		Channel:        "EMAIL",
-		RecipientEmail: data.Email,
-		Subject:        fmt.Sprintf("We're sorry to see you go from %s", data.StoreName),
-		Body:           fmt.Sprintf("Your account at %s has been deactivated. You have 90 days to reactivate.", data.StoreName),
-		BodyHTML:       htmlBody,
-	}
-
-	var response struct {
-		Success bool   `json:"success"`
-		Error   string `json:"error,omitempty"`
-	}
-
-	return c.makeRequest(ctx, "POST", "/api/v1/notifications/send", req, &response)
-}
-
-// PasswordResetEmailData contains data for password reset emails
-type PasswordResetEmailData struct {
-	Email        string
-	FirstName    string
-	StoreName    string
-	ResetLink    string
-	ExpiresIn    string // e.g., "1 hour"
-}
-
-// SendPasswordResetEmail sends a password reset email with a secure link
-func (c *NotificationClient) SendPasswordResetEmail(ctx context.Context, data *PasswordResetEmailData) error {
-	htmlBody := renderPasswordResetEmailTemplate(data)
-
-	req := &NotificationSendRequest{
-		Channel:        "EMAIL",
-		RecipientEmail: data.Email,
-		Subject:        fmt.Sprintf("Reset your password for %s", data.StoreName),
-		Body:           fmt.Sprintf("Click this link to reset your password: %s. This link expires in %s.", data.ResetLink, data.ExpiresIn),
-		BodyHTML:       htmlBody,
-		Priority:       "high",
-	}
-
-	var response struct {
-		Success bool   `json:"success"`
-		Error   string `json:"error,omitempty"`
-	}
-
-	return c.makeRequest(ctx, "POST", "/api/v1/notifications/send", req, &response)
-}
-
-// renderPasswordResetEmailTemplate generates a password reset email
-func renderPasswordResetEmailTemplate(data *PasswordResetEmailData) string {
-	return fmt.Sprintf(`<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reset Your Password</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: 'Source Sans 3', 'Inter', 'Segoe UI', 'Helvetica Neue', Arial, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; background-color: #F8FAFC;">
-    <table role="presentation" style="width: 100%%; border-collapse: collapse;">
-        <tr>
-            <td align="center" style="padding: 40px 0;">
-                <table role="presentation" style="width: 600px; max-width: 100%%; border-collapse: collapse; background-color: #ffffff; border-radius: 10px; border: 1px solid #E2E8F0; box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);">
-                    <!-- Header - Solid color -->
-                    <tr>
-                        <td style="background-color: #0F172A; padding: 40px 40px 30px; border-radius: 10px 10px 0 0; text-align: center;">
-                            <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600;">
-                                Reset Your Password
-                            </h1>
-                        </td>
-                    </tr>
-
-                    <!-- Main content -->
-                    <tr>
-                        <td style="padding: 40px;">
-                            <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
-                                Hi %s,
-                            </p>
-                            <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
-                                We received a request to reset your password for your <strong>%s</strong> account. Click the button below to create a new password.
-                            </p>
-
-                            <!-- CTA Button - Bulletproof table-cell button -->
-                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 16px auto 32px;">
-                                <tr>
-                                    <td style="background-color: #0F172A; border-radius: 10px;">
-                                        <a href="%s" target="_blank" style="display: inline-block; padding: 18px 48px; font-size: 16px; font-weight: 600; color: #ffffff; text-decoration: none; border-radius: 10px;">
-                                            Reset Password
-                                        </a>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <!-- Alternative link -->
-                            <div style="background-color: #F8FAFC; border-radius: 8px; padding: 20px; margin-bottom: 24px; border: 1px solid #E2E8F0;">
-                                <p style="color: #64748B; font-size: 14px; margin: 0 0 8px;">
-                                    Or copy this link into your browser:
-                                </p>
-                                <p style="color: #0F172A; font-size: 14px; margin: 0; word-break: break-all;">
-                                    %s
-                                </p>
-                            </div>
-
-                            <!-- Security notice -->
-                            <div style="border-left: 4px solid #F59E0B; background-color: #FEF3C7; padding: 16px; border-radius: 0 8px 8px 0;">
-                                <p style="color: #92400E; font-size: 14px; margin: 0;">
-                                    This link expires in <strong>%s</strong>. If you didn't request this password reset, you can safely ignore this email.
-                                </p>
-                            </div>
-                        </td>
-                    </tr>
-
-                    <!-- Footer -->
-                    <tr>
-                        <td style="background-color: #F8FAFC; padding: 24px 40px; border-radius: 0 0 10px 10px; text-align: center;">
-                            <p style="color: #94A3B8; font-size: 14px; margin: 0 0 8px;">
-                                This email was sent to %s
-                            </p>
-                            <p style="color: #94A3B8; font-size: 12px; margin: 0;">
-                                © 2026 Powered by Tesseract Hub
-                            </p>
-                        </td>
-                    </tr>
-                </table>
-            </td>
-        </tr>
-    </table>
-</body>
-</html>`, data.FirstName, data.StoreName, data.ResetLink, data.ResetLink, data.ExpiresIn, data.Email)
-}
-
-// renderGoodbyeEmailTemplate generates a goodbye email for deactivated accounts
-func renderGoodbyeEmailTemplate(data *GoodbyeEmailData) string {
-	purgeDate := data.ScheduledPurgeAt.Format("January 2, 2006")
-
-	return fmt.Sprintf(`<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>We're sorry to see you go</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: 'Source Sans 3', 'Inter', 'Segoe UI', 'Helvetica Neue', Arial, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; background-color: #F8FAFC;">
-    <table role="presentation" style="width: 100%%; border-collapse: collapse;">
-        <tr>
-            <td align="center" style="padding: 40px 0;">
-                <table role="presentation" style="width: 600px; max-width: 100%%; border-collapse: collapse; background-color: #ffffff; border-radius: 10px; border: 1px solid #E2E8F0; box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);">
-                    <!-- Header - Neutral slate color -->
-                    <tr>
-                        <td style="background-color: #64748B; padding: 40px 40px 30px; border-radius: 10px 10px 0 0; text-align: center;">
-                            <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600;">
-                                We're sorry to see you go
-                            </h1>
-                        </td>
-                    </tr>
-
-                    <!-- Main content -->
-                    <tr>
-                        <td style="padding: 40px;">
-                            <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
-                                Hi %s,
-                            </p>
-                            <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
-                                Your account at <strong>%s</strong> has been deactivated as requested.
-                            </p>
-
-                            <!-- Info box -->
-                            <div style="background-color: #FEF3C7; border-left: 4px solid #F59E0B; padding: 20px; border-radius: 0 8px 8px 0; margin-bottom: 24px;">
-                                <h3 style="color: #92400E; margin: 0 0 12px; font-size: 16px; font-weight: 600;">What happens next?</h3>
-                                <ul style="color: #92400E; font-size: 14px; margin: 0; padding-left: 20px; line-height: 1.8;">
-                                    <li>Your data will be safely retained for <strong>90 days</strong></li>
-                                    <li>You can reactivate your account anytime before <strong>%s</strong></li>
-                                    <li>After 90 days, your data will be permanently deleted</li>
-                                </ul>
-                            </div>
-
-                            <!-- Changed your mind section -->
-                            <div style="background-color: #D1FAE5; border-left: 4px solid #10B981; padding: 20px; border-radius: 0 8px 8px 0; margin-bottom: 24px;">
-                                <h3 style="color: #166534; margin: 0 0 12px; font-size: 16px; font-weight: 600;">Changed your mind?</h3>
-                                <p style="color: #166534; font-size: 14px; margin: 0;">
-                                    Simply log back in to reactivate your account. All your data will be restored instantly.
-                                </p>
-                            </div>
-
-                            <!-- CTA Button - Bulletproof table-cell button -->
-                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 16px auto;">
-                                <tr>
-                                    <td style="background-color: #10B981; border-radius: 10px;">
-                                        <a href="%s" target="_blank" style="display: inline-block; padding: 14px 32px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none; border-radius: 10px;">
-                                            Reactivate My Account
-                                        </a>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <p style="color: #64748B; font-size: 14px; line-height: 1.6; margin: 24px 0 0; text-align: center;">
-                                We'd love to have you back! If you have any feedback on how we can improve, please let us know.
-                            </p>
-                        </td>
-                    </tr>
-
-                    <!-- Footer -->
-                    <tr>
-                        <td style="background-color: #F8FAFC; padding: 24px 40px; border-radius: 0 0 10px 10px; text-align: center;">
-                            <p style="color: #94A3B8; font-size: 14px; margin: 0 0 8px;">
-                                This email was sent because you deactivated your account at %s
-                            </p>
-                            <p style="color: #94A3B8; font-size: 12px; margin: 0;">
-                                © 2026 Powered by Tesseract Hub
-                            </p>
-                        </td>
-                    </tr>
-                </table>
-            </td>
-        </tr>
-    </table>
-</body>
-</html>`, data.FirstName, data.StoreName, purgeDate, data.ReactivationURL, data.StoreName)
 }

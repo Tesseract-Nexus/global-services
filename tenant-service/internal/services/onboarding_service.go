@@ -83,7 +83,6 @@ type OnboardingService struct {
 	credentialRepo       *repository.CredentialRepository
 	verificationSvc      *VerificationService
 	paymentSvc           *PaymentService
-	notificationSvc      *NotificationService
 	membershipSvc        *MembershipService
 	vendorClient         *clients.VendorClient
 	staffClient          *clients.StaffClient
@@ -162,7 +161,6 @@ func NewOnboardingService(
 		credentialRepo:         repository.NewCredentialRepository(db),
 		verificationSvc:        verificationSvc,
 		paymentSvc:             paymentSvc,
-		notificationSvc:        NewNotificationService(),
 		membershipSvc:          membershipSvc,
 		vendorClient:           vendorClient,
 		staffClient:            staffClient,
@@ -2190,37 +2188,8 @@ func (s *OnboardingService) CompleteAccountSetup(ctx context.Context, sessionID 
 		log.Printf("[OnboardingService] WARNING: Custom domain requested but custom-domain-service client not initialized")
 	}
 
-	// ============================================================================
-	// WELCOME EMAIL: Send AFTER all infrastructure is provisioned
-	// ============================================================================
-	// This is the FINAL step - only send email when everything is ready:
-	// - Tenant created and activated
-	// - Vendor and storefront created
-	// - Owner RBAC bootstrapped
-	// - VirtualServices created (via NATS + HTTP fallback)
-	// - Custom domain configured (if applicable)
-	//
-	// We send synchronously (not in goroutine) to ensure email delivery is confirmed
-	// before returning to the user. The sendWelcomePackEmail function also performs
-	// health checks on the URLs to ensure they are accessible before sending.
-	//
-	// IMPORTANT: Use the correct URLs based on whether custom domain is configured:
-	// - If custom domain: use admin.customdomain.com, customdomain.com
-	// - If default domain: use slug-admin.tesserix.app, slug.tesserix.app
-	welcomeAdminURL := fmt.Sprintf("https://%s", adminHost)
-	welcomeStorefrontURL := fmt.Sprintf("https://%s", storefrontHost)
-
-	log.Printf("[OnboardingService] All infrastructure provisioned for %s, sending welcome email...", slug)
-	log.Printf("[OnboardingService] Email URLs: admin=%s, storefront=%s, customDomain=%v", welcomeAdminURL, welcomeStorefrontURL, isCustomDomainUsed)
-	s.sendWelcomePackEmail(context.Background(), &WelcomePackEmailRequest{
-		Email:          primaryContact.Email,
-		FirstName:      primaryContact.FirstName,
-		BusinessName:   session.BusinessInformation.BusinessName,
-		TenantSlug:     slug,
-		AdminURL:       welcomeAdminURL,
-		StorefrontURL:  welcomeStorefrontURL,
-		IsCustomDomain: isCustomDomainUsed,
-	})
+	// Welcome email is sent via NATS tenant.created event → notification-service
+	// (no direct call needed here — handled by the event published above)
 
 	return response, nil
 }
@@ -2251,109 +2220,7 @@ func generateSubdomain(businessName string) string {
 	return generateSlug(businessName)
 }
 
-// WelcomePackEmailRequest contains data for sending welcome pack email
-type WelcomePackEmailRequest struct {
-	Email          string
-	FirstName      string
-	BusinessName   string
-	TenantSlug     string
-	AdminURL       string
-	StorefrontURL  string // Custom domain storefront URL if applicable
-	IsCustomDomain bool   // Whether custom domain is used
-}
 
-// sendWelcomePackEmail sends a comprehensive welcome pack email with all tenant URLs
-// It performs health checks on URLs before sending to ensure they are accessible
-func (s *OnboardingService) sendWelcomePackEmail(ctx context.Context, req *WelcomePackEmailRequest) {
-	// Use provided URLs directly (they are already correct - custom or default)
-	adminURL := req.AdminURL
-	storefrontURL := req.StorefrontURL
-	dashboardURL := adminURL + "/dashboard"
-
-	// Perform health checks on URLs before sending email
-	// This ensures the user receives working links
-	maxRetries := 10
-	retryInterval := 3 * time.Second
-
-	log.Printf("[OnboardingService] Waiting for URLs to become healthy before sending welcome email...")
-	log.Printf("[OnboardingService] Admin URL: %s, Storefront URL: %s", adminURL, storefrontURL)
-
-	urlsHealthy := false
-	for attempt := 1; attempt <= maxRetries; attempt++ {
-		adminHealthy := s.checkURLHealth(adminURL)
-		storefrontHealthy := s.checkURLHealth(storefrontURL)
-
-		if adminHealthy && storefrontHealthy {
-			log.Printf("[OnboardingService] URLs are healthy after %d attempts, proceeding with welcome email", attempt)
-			urlsHealthy = true
-			break
-		}
-
-		log.Printf("[OnboardingService] URL health check attempt %d/%d: admin=%v, storefront=%v",
-			attempt, maxRetries, adminHealthy, storefrontHealthy)
-
-		if attempt < maxRetries {
-			time.Sleep(retryInterval)
-		}
-	}
-
-	if !urlsHealthy {
-		log.Printf("[OnboardingService] WARNING: URLs did not become healthy after %d attempts, sending email anyway", maxRetries)
-		log.Printf("[OnboardingService] User may experience temporary issues accessing their store")
-	}
-
-	data := &WelcomePackEmailData{
-		Email:         req.Email,
-		FirstName:     req.FirstName,
-		BusinessName:  req.BusinessName,
-		TenantSlug:    req.TenantSlug,
-		AdminURL:      adminURL,
-		StorefrontURL: storefrontURL,
-		DashboardURL:  dashboardURL,
-	}
-
-	if err := s.notificationSvc.SendWelcomePackEmail(ctx, data); err != nil {
-		// Log error but don't fail the operation
-		log.Printf("[OnboardingService] Failed to send welcome pack email: %v", err)
-	} else {
-		log.Printf("[OnboardingService] Successfully sent welcome pack email to %s", security.MaskEmail(req.Email))
-	}
-}
-
-// checkURLHealth performs a GET request to verify URL returns 200 status
-func (s *OnboardingService) checkURLHealth(url string) bool {
-	client := &http.Client{
-		Timeout: 5 * time.Second,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			// Follow redirects (e.g., HTTP -> HTTPS)
-			return nil
-		},
-	}
-
-	resp, err := client.Get(url)
-	if err != nil {
-		log.Printf("[OnboardingService] Health check failed for %s: %v", url, err)
-		return false
-	}
-	defer resp.Body.Close()
-
-	// Accept 200, 301, 302 as healthy (redirects are OK for SPAs)
-	healthy := resp.StatusCode >= 200 && resp.StatusCode < 400
-	if !healthy {
-		log.Printf("[OnboardingService] Health check returned %d for %s", resp.StatusCode, url)
-	}
-	return healthy
-}
-
-// sendAccountCreatedEmail sends account created email to new user (legacy)
-func (s *OnboardingService) sendAccountCreatedEmail(ctx context.Context, email, firstName, businessName, subdomain string) {
-	if err := s.notificationSvc.SendAccountCreatedEmail(ctx, email, firstName, businessName, subdomain); err != nil {
-		// Log error but don't fail the operation
-		fmt.Printf("Failed to send account created email: %v\n", err)
-	} else {
-		fmt.Printf("Successfully sent account created email to %s\n", security.MaskEmail(email))
-	}
-}
 
 // registerUserInAuthService registers a user in the identity provider (Keycloak)
 // Supports multi-tenant: same user can have multiple tenants

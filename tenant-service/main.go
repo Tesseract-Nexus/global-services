@@ -136,7 +136,6 @@ func main() {
 	verificationSvc.SetCustomDomainClient(customDomainClient)
 	log.Println("Verification service: Dynamic gateway IP lookup enabled via custom-domain-service")
 	templateSvc := services.NewTemplateService(templateRepo)
-	notificationSvc := services.NewNotificationService()
 	membershipSvc := services.NewMembershipService(membershipRepo)
 	onboardingSvc := services.NewOnboardingService(
 		onboardingRepo,
@@ -151,7 +150,7 @@ func main() {
 	// Initialize draft service (with optional Redis)
 	var draftSvc *services.DraftService
 	if redisClient != nil {
-		draftSvc = services.NewDraftService(db, redisClient, cfg.Draft, notificationSvc)
+		draftSvc = services.NewDraftService(db, redisClient, cfg.Draft, notificationClient)
 		log.Println("Draft service initialized with Redis caching")
 	}
 

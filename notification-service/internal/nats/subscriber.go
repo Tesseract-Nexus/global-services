@@ -1958,6 +1958,7 @@ func normalizeVariables(vars map[string]interface{}) map[string]interface{} {
 		"storefront_url": "store_url",
 		"amount":         "payment_amount",
 		"payment_id":     "transaction_id",
+		"slug":           "tenant_slug",
 	}
 	for src, tgt := range aliases {
 		if v, ok := result[src]; ok {
