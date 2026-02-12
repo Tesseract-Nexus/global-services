@@ -428,7 +428,47 @@ func (s *OffboardingService) deleteTenantCore(ctx context.Context, tenant *model
 		}
 	}
 
-	// Start transaction for the main (tesseract_hub) database
+	// === Pre-transaction cleanup ===
+	// Delete dependent records OUTSIDE the transaction. PostgreSQL aborts the entire
+	// transaction on any SQL error (even caught ones like "relation does not exist"),
+	// so each cleanup runs independently — failures don't affect other tables.
+	dependentTables := []string{
+		"passkey_credentials",
+		"tenant_auth_audit_logs",
+		"tenant_auth_policies",
+		"tenant_credentials",
+		"password_reset_tokens",
+		"deactivated_memberships",
+		"tenant_activity_logs",
+		"user_tenant_memberships",
+	}
+
+	for _, table := range dependentTables {
+		result := s.db.WithContext(ctx).Exec(
+			fmt.Sprintf("DELETE FROM %s WHERE tenant_id = $1", table), tenant.ID)
+		if result.Error != nil {
+			log.Printf("[OffboardingService] Warning: Failed to delete from %s: %v", table, result.Error)
+		} else if result.RowsAffected > 0 {
+			log.Printf("[OffboardingService] Deleted %d rows from %s for tenant %s", result.RowsAffected, table, tenant.ID)
+		}
+	}
+
+	// Nullify tenant_id in tables with nullable FK references
+	nullableFKTables := []string{
+		"onboarding_sessions",
+		"tenant_slug_reservations",
+	}
+	for _, table := range nullableFKTables {
+		result := s.db.WithContext(ctx).Exec(
+			fmt.Sprintf("UPDATE %s SET tenant_id = NULL WHERE tenant_id = $1", table), tenant.ID)
+		if result.Error != nil {
+			log.Printf("[OffboardingService] Warning: Failed to nullify tenant_id in %s: %v", table, result.Error)
+		} else if result.RowsAffected > 0 {
+			log.Printf("[OffboardingService] Nullified tenant_id in %d rows of %s for tenant %s", result.RowsAffected, table, tenant.ID)
+		}
+	}
+
+	// === Transaction: archive + delete tenant ===
 	tx := s.db.Begin()
 	if tx.Error != nil {
 		return nil, fmt.Errorf("failed to start transaction: %w", tx.Error)
@@ -453,10 +493,7 @@ func (s *OffboardingService) deleteTenantCore(ctx context.Context, tenant *model
 		return nil, fmt.Errorf("failed to serialize memberships data: %w", err)
 	}
 
-	// Vendor/storefront data lives in external databases (vendors_db), not tesseract_hub.
-	// Query outside the transaction to avoid poisoning it if the tables don't exist locally.
-	var vendors []map[string]interface{}
-	vendorsJSON, _ := json.Marshal(vendors)
+	vendorsJSON, _ := json.Marshal([]map[string]interface{}{})
 	storefrontsJSON, _ := json.Marshal([]map[string]interface{}{})
 
 	// Create archived tenant record
@@ -481,44 +518,7 @@ func (s *OffboardingService) deleteTenantCore(ctx context.Context, tenant *model
 
 	log.Printf("[OffboardingService] Archived tenant %s (ID: %s) to deleted_tenants", tenant.Slug, tenant.ID)
 
-	// Delete all dependent records before deleting the tenant.
-	// GORM auto-migrate creates FK constraints without ON DELETE CASCADE,
-	// so we must explicitly delete child records to avoid FK violations.
-	dependentTables := []string{
-		"passkey_credentials",
-		"tenant_auth_audit_logs",
-		"tenant_auth_policies",
-		"tenant_credentials",
-		"password_reset_tokens",
-		"deactivated_memberships",
-		"tenant_activity_logs",
-		"user_tenant_memberships",
-	}
-
-	for _, table := range dependentTables {
-		result := tx.WithContext(ctx).Exec(fmt.Sprintf("DELETE FROM %s WHERE tenant_id = ?", table), tenant.ID)
-		if result.Error != nil {
-			log.Printf("[OffboardingService] Warning: Failed to delete from %s: %v", table, result.Error)
-		} else if result.RowsAffected > 0 {
-			log.Printf("[OffboardingService] Deleted %d rows from %s for tenant %s", result.RowsAffected, table, tenant.ID)
-		}
-	}
-
-	// Nullify tenant_id in tables with nullable FK references (ON DELETE SET NULL may not work with GORM FKs)
-	nullableFKTables := []string{
-		"onboarding_sessions",
-		"tenant_slug_reservations",
-	}
-	for _, table := range nullableFKTables {
-		result := tx.WithContext(ctx).Exec(fmt.Sprintf("UPDATE %s SET tenant_id = NULL WHERE tenant_id = ?", table), tenant.ID)
-		if result.Error != nil {
-			log.Printf("[OffboardingService] Warning: Failed to nullify tenant_id in %s: %v", table, result.Error)
-		} else if result.RowsAffected > 0 {
-			log.Printf("[OffboardingService] Nullified tenant_id in %d rows of %s for tenant %s", result.RowsAffected, table, tenant.ID)
-		}
-	}
-
-	// Hard delete the tenant (all FK dependencies cleared above)
+	// Hard delete the tenant (FK dependencies already cleared above)
 	if err := tx.WithContext(ctx).
 		Unscoped().
 		Delete(&models.Tenant{}, "id = ?", tenant.ID).Error; err != nil {
@@ -528,7 +528,7 @@ func (s *OffboardingService) deleteTenantCore(ctx context.Context, tenant *model
 
 	log.Printf("[OffboardingService] Deleted tenant %s (ID: %s)", tenant.Slug, tenant.ID)
 
-	// Commit main transaction
+	// Commit transaction
 	if err := tx.Commit().Error; err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
