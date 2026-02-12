@@ -434,12 +434,12 @@ func (s *OffboardingService) deleteTenantCore(ctx context.Context, tenant *model
 	// so each cleanup runs independently — failures don't affect other tables.
 	dependentTables := []string{
 		"passkey_credentials",
-		"tenant_auth_audit_logs",
+		"tenant_auth_audit_log",
 		"tenant_auth_policies",
 		"tenant_credentials",
 		"password_reset_tokens",
 		"deactivated_memberships",
-		"tenant_activity_logs",
+		"tenant_activity_log",
 		"user_tenant_memberships",
 	}
 
@@ -453,19 +453,23 @@ func (s *OffboardingService) deleteTenantCore(ctx context.Context, tenant *model
 		}
 	}
 
-	// Nullify tenant_id in tables with nullable FK references
-	nullableFKTables := []string{
-		"onboarding_sessions",
-		"tenant_slug_reservations",
+	// Nullify tenant_id in onboarding_sessions (nullable FK)
+	result := s.db.WithContext(ctx).Exec(
+		"UPDATE onboarding_sessions SET tenant_id = NULL WHERE tenant_id = $1", tenant.ID)
+	if result.Error != nil {
+		log.Printf("[OffboardingService] Warning: Failed to nullify tenant_id in onboarding_sessions: %v", result.Error)
+	} else if result.RowsAffected > 0 {
+		log.Printf("[OffboardingService] Nullified tenant_id in %d onboarding_sessions for tenant %s", result.RowsAffected, tenant.ID)
 	}
-	for _, table := range nullableFKTables {
-		result := s.db.WithContext(ctx).Exec(
-			fmt.Sprintf("UPDATE %s SET tenant_id = NULL WHERE tenant_id = $1", table), tenant.ID)
-		if result.Error != nil {
-			log.Printf("[OffboardingService] Warning: Failed to nullify tenant_id in %s: %v", table, result.Error)
-		} else if result.RowsAffected > 0 {
-			log.Printf("[OffboardingService] Nullified tenant_id in %d rows of %s for tenant %s", result.RowsAffected, table, tenant.ID)
-		}
+
+	// Release slug reservations so the slug can be reused by new tenants
+	result = s.db.WithContext(ctx).Exec(
+		"UPDATE tenant_slug_reservations SET status = $1, released_at = $2, tenant_id = NULL WHERE tenant_id = $3",
+		models.SlugReservationReleased, time.Now(), tenant.ID)
+	if result.Error != nil {
+		log.Printf("[OffboardingService] Warning: Failed to release slug reservations: %v", result.Error)
+	} else if result.RowsAffected > 0 {
+		log.Printf("[OffboardingService] Released %d slug reservations for tenant %s", result.RowsAffected, tenant.ID)
 	}
 
 	// === Transaction: archive + delete tenant ===
