@@ -453,37 +453,11 @@ func (s *OffboardingService) deleteTenantCore(ctx context.Context, tenant *model
 		return nil, fmt.Errorf("failed to serialize memberships data: %w", err)
 	}
 
-	// Fetch and archive vendors
+	// Vendor/storefront data lives in external databases (vendors_db), not tesseract_hub.
+	// Query outside the transaction to avoid poisoning it if the tables don't exist locally.
 	var vendors []map[string]interface{}
-	if err := tx.WithContext(ctx).
-		Table("vendors").
-		Where("tenant_id = ?", tenant.ID.String()).
-		Find(&vendors).Error; err != nil {
-		log.Printf("[OffboardingService] Warning: Failed to fetch vendors: %v", err)
-		vendors = []map[string]interface{}{}
-	}
 	vendorsJSON, _ := json.Marshal(vendors)
-	log.Printf("[OffboardingService] Found %d vendors to archive for tenant %s", len(vendors), tenant.ID)
-
-	// Fetch and archive storefronts
-	var storefronts []map[string]interface{}
-	vendorIDs := make([]string, 0)
-	for _, v := range vendors {
-		if id, ok := v["id"].(string); ok {
-			vendorIDs = append(vendorIDs, id)
-		}
-	}
-	if len(vendorIDs) > 0 {
-		if err := tx.WithContext(ctx).
-			Table("storefronts").
-			Where("vendor_id IN ?", vendorIDs).
-			Find(&storefronts).Error; err != nil {
-			log.Printf("[OffboardingService] Warning: Failed to fetch storefronts: %v", err)
-			storefronts = []map[string]interface{}{}
-		}
-	}
-	storefrontsJSON, _ := json.Marshal(storefronts)
-	log.Printf("[OffboardingService] Found %d storefronts to archive for tenant %s", len(storefronts), tenant.ID)
+	storefrontsJSON, _ := json.Marshal([]map[string]interface{}{})
 
 	// Create archived tenant record
 	deletedTenant := &models.DeletedTenant{
@@ -517,25 +491,7 @@ func (s *OffboardingService) deleteTenantCore(ctx context.Context, tenant *model
 
 	log.Printf("[OffboardingService] Deleted %d memberships for tenant %s", len(tenant.Memberships), tenant.ID)
 
-	// Delete storefronts (before vendors — FK constraint)
-	if len(vendorIDs) > 0 {
-		result := tx.WithContext(ctx).
-			Exec("DELETE FROM storefronts WHERE vendor_id IN ?", vendorIDs)
-		if result.Error != nil {
-			log.Printf("[OffboardingService] Warning: Failed to delete storefronts: %v", result.Error)
-		} else {
-			log.Printf("[OffboardingService] Deleted %d storefronts for tenant %s", result.RowsAffected, tenant.ID)
-		}
-	}
-
-	// Delete vendors
-	result := tx.WithContext(ctx).
-		Exec("DELETE FROM vendors WHERE tenant_id = ?", tenant.ID.String())
-	if result.Error != nil {
-		log.Printf("[OffboardingService] Warning: Failed to delete vendors: %v", result.Error)
-	} else {
-		log.Printf("[OffboardingService] Deleted %d vendors for tenant %s", result.RowsAffected, tenant.ID)
-	}
+	// Vendor/storefront deletion is handled by cleanupExternalDatabases (vendors_db)
 
 	// Release slug reservation
 	if err := tx.WithContext(ctx).
