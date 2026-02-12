@@ -241,8 +241,15 @@ func (s *VerificationService) startEmailVerificationWithLinkAndBusinessName(ctx 
 			}
 
 			// Extract contact name from contact information
-			if len(session.ContactInformation) > 0 && session.ContactInformation[0].FullName != "" {
-				contactName = session.ContactInformation[0].FullName
+			if len(session.ContactInformation) > 0 {
+				firstName := session.ContactInformation[0].FirstName
+				lastName := session.ContactInformation[0].LastName
+				if firstName != "" {
+					contactName = firstName
+					if lastName != "" {
+						contactName = firstName + " " + lastName
+					}
+				}
 			}
 
 			// Check if there's a custom domain in the store_setup configuration
