@@ -123,6 +123,8 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=feature-flags-service-v2
           cache-to: type=gha,mode=max,scope=feature-flags-service-v2
+          build-args: |
+            GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
 
       # --- Copy image to Artifact Registry (only when GCP auth + main branch) ---
       - name: Generate AR tags

@@ -6,6 +6,12 @@ FROM golang:1.25-alpine AS builder
 
 RUN apk add --no-cache git ca-certificates tzdata
 
+ARG GITHUB_TOKEN
+RUN if [ -n "$GITHUB_TOKEN" ]; then \
+      git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"; \
+    fi
+ENV GOPRIVATE=github.com/Tesseract-Nexus/*
+
 WORKDIR /build
 
 COPY go.mod go.sum ./

@@ -11,6 +11,13 @@ FROM golang:1.25-alpine AS builder
 # Install build dependencies
 RUN apk add --no-cache git ca-certificates tzdata
 
+# Configure private Go module access
+ARG GITHUB_TOKEN
+RUN if [ -n "$GITHUB_TOKEN" ]; then \
+      git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"; \
+    fi
+ENV GOPRIVATE=github.com/Tesseract-Nexus/*
+
 # Create non-root user for runtime
 RUN addgroup -g 1000 -S appgroup && adduser -D -u 1000 -S appuser -G appgroup
 
