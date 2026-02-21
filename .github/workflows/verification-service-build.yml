@@ -111,7 +111,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-            GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+            GITHUB_TOKEN=${{ secrets.GO_PRIVATE_TOKEN }}
 
       # --- Copy image to Artifact Registry (only when GCP auth + main branch) ---
       - name: Generate AR tags
