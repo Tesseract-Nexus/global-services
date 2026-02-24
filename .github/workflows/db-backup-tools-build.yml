@@ -30,7 +30,7 @@ env:
 jobs:
   build:
     name: Build and Push db-backup-tools
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
 
     steps:
       - name: Checkout code

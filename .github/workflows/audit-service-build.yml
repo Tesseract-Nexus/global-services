@@ -23,7 +23,7 @@ env:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
     defaults:
       run:
         working-directory: audit-service
@@ -57,7 +57,7 @@ jobs:
           fail_ci_if_error: false
 
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
     needs: [test]
     permissions:
       contents: read

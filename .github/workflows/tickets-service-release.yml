@@ -26,7 +26,7 @@ env:
 jobs:
   test:
     name: Test tickets-service
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
 
     steps:
       - name: Checkout code
@@ -60,7 +60,7 @@ jobs:
 
   release:
     name: Release tickets-service
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
     needs: test
 
     steps:
