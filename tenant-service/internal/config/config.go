@@ -1,6 +1,7 @@
 package config
 
 import (
+	"net/url"
 	"os"
 	"strconv"
 
@@ -164,12 +165,7 @@ func New() *Config {
 			CustomDomainServiceURL:  getEnvWithDefault("CUSTOM_DOMAIN_SERVICE_URL", "http://custom-domain-service.marketplace.svc.cluster.local:8093"),
 			TenantRouterServiceURL:  getEnvWithDefault("TENANT_ROUTER_SERVICE_URL", "http://tenant-router-service.marketplace.svc.cluster.local:8089"),
 		},
-		Redis: RedisConfig{
-			Host:     getEnvWithDefault("REDIS_HOST", "localhost"),
-			Port:     getEnvWithDefault("REDIS_PORT", "6379"),
-			Password: getEnvWithDefault("REDIS_PASSWORD", ""),
-			DB:       getEnvAsIntWithDefault("REDIS_DB", 0),
-		},
+		Redis: parseRedisConfig(),
 		Draft: DraftConfig{
 			ExpiryHours:      getEnvAsIntWithDefault("DRAFT_EXPIRY_HOURS", 168), // 7 days
 			ReminderInterval: getEnvAsIntWithDefault("DRAFT_REMINDER_INTERVAL_HOURS", 24),
@@ -218,4 +214,35 @@ func getEnvAsBoolWithDefault(key string, defaultValue bool) bool {
 		}
 	}
 	return defaultValue
+}
+
+// parseRedisConfig builds RedisConfig from REDIS_HOST/REDIS_PORT env vars,
+// falling back to parsing REDIS_URL (redis://host:port) when REDIS_HOST is not set.
+// Password is loaded via GCP Secret Manager when available.
+func parseRedisConfig() RedisConfig {
+	host := os.Getenv("REDIS_HOST")
+	port := getEnvWithDefault("REDIS_PORT", "6379")
+
+	// Fall back to parsing REDIS_URL if REDIS_HOST is not explicitly set
+	if host == "" {
+		if redisURL := os.Getenv("REDIS_URL"); redisURL != "" {
+			if parsed, err := url.Parse(redisURL); err == nil {
+				host = parsed.Hostname()
+				if p := parsed.Port(); p != "" {
+					port = p
+				}
+			}
+		}
+	}
+
+	if host == "" {
+		host = "localhost"
+	}
+
+	return RedisConfig{
+		Host:     host,
+		Port:     port,
+		Password: secrets.GetRedisPassword(),
+		DB:       getEnvAsIntWithDefault("REDIS_DB", 0),
+	}
 }
