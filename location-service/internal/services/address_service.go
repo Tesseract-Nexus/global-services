@@ -2762,8 +2762,114 @@ func (p *PhotonProvider) ReverseGeocode(ctx context.Context, lat, lng float64) (
 	}, nil
 }
 
-// GetPlaceDetails implements AddressProvider - Photon doesn't have place details, use geocode
+// GetPlaceDetails implements AddressProvider - uses Nominatim lookup for photon place IDs
 func (p *PhotonProvider) GetPlaceDetails(ctx context.Context, placeID string) (*models.GeocodingResult, error) {
+	// Photon place IDs are OSM IDs in format "photon:W:923350139"
+	// Use Nominatim /lookup API to resolve them accurately
+	if strings.HasPrefix(placeID, "photon:") {
+		parts := strings.Split(placeID, ":")
+		if len(parts) == 3 {
+			osmType := parts[1]
+			osmID := parts[2]
+
+			params := url.Values{}
+			params.Set("osm_ids", fmt.Sprintf("%s%s", strings.ToUpper(osmType[:1]), osmID))
+			params.Set("format", "jsonv2")
+			params.Set("addressdetails", "1")
+
+			reqURL := fmt.Sprintf("https://nominatim.openstreetmap.org/lookup?%s", params.Encode())
+
+			req, err := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create request: %w", err)
+			}
+			req.Header.Set("User-Agent", "TesseractHub/1.0 (https://tesserix.app)")
+
+			resp, err := p.httpClient.Do(req)
+			if err != nil {
+				return nil, fmt.Errorf("failed to call Nominatim API: %w", err)
+			}
+			defer resp.Body.Close()
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read response: %w", err)
+			}
+
+			var results []struct {
+				PlaceID     int64  `json:"place_id"`
+				OsmType     string `json:"osm_type"`
+				OsmID       int64  `json:"osm_id"`
+				Lat         string `json:"lat"`
+				Lon         string `json:"lon"`
+				DisplayName string `json:"display_name"`
+				Address     struct {
+					HouseNumber string `json:"house_number"`
+					Road        string `json:"road"`
+					City        string `json:"city"`
+					Town        string `json:"town"`
+					Village     string `json:"village"`
+					State       string `json:"state"`
+					Postcode    string `json:"postcode"`
+					Country     string `json:"country"`
+					CountryCode string `json:"country_code"`
+				} `json:"address"`
+			}
+
+			if err := json.Unmarshal(body, &results); err != nil {
+				return nil, fmt.Errorf("failed to parse response: %w", err)
+			}
+
+			if len(results) > 0 {
+				r := results[0]
+				lat := 0.0
+				lng := 0.0
+				fmt.Sscanf(r.Lat, "%f", &lat)
+				fmt.Sscanf(r.Lon, "%f", &lng)
+
+				city := r.Address.City
+				if city == "" {
+					city = r.Address.Town
+				}
+				if city == "" {
+					city = r.Address.Village
+				}
+
+				components := []models.AddressComponent{}
+				if r.Address.HouseNumber != "" {
+					components = append(components, models.AddressComponent{Type: "street_number", LongName: r.Address.HouseNumber, ShortName: r.Address.HouseNumber})
+				}
+				if r.Address.Road != "" {
+					components = append(components, models.AddressComponent{Type: "route", LongName: r.Address.Road, ShortName: r.Address.Road})
+				}
+				if city != "" {
+					components = append(components, models.AddressComponent{Type: "locality", LongName: city, ShortName: city})
+				}
+				if r.Address.State != "" {
+					components = append(components, models.AddressComponent{Type: "administrative_area_level_1", LongName: r.Address.State, ShortName: r.Address.State})
+				}
+				if r.Address.Country != "" {
+					components = append(components, models.AddressComponent{Type: "country", LongName: r.Address.Country, ShortName: strings.ToUpper(r.Address.CountryCode)})
+				}
+				if r.Address.Postcode != "" {
+					components = append(components, models.AddressComponent{Type: "postal_code", LongName: r.Address.Postcode, ShortName: r.Address.Postcode})
+				}
+
+				return &models.GeocodingResult{
+					FormattedAddress: r.DisplayName,
+					PlaceID:          placeID,
+					Location: models.GeoLocation{
+						Latitude:  lat,
+						Longitude: lng,
+					},
+					Components: components,
+					Types:      []string{"street_address"},
+				}, nil
+			}
+		}
+	}
+
+	// Fallback: treat placeID as an address and geocode it
 	return p.Geocode(ctx, placeID)
 }
 
