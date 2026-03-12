@@ -201,10 +201,15 @@ class OIDCClientManager {
         });
 
         // Re-apply custom http_options on the new issuer
+        // CRITICAL: X-Forwarded-Host must be set so Keycloak derives the correct
+        // issuer URL in tokens (KC_HOSTNAME is empty — issuer is derived from Host header).
+        // Without this, tokens issued via internal URL have a mismatched iss claim.
+        const externalHost = new URL(externalUrl).host;
         issuer[custom.http_options] = function httpOptionsHook(_url: URL, options: Record<string, unknown>) {
           const headers = (options.headers || {}) as Record<string, string>;
           headers['User-Agent'] = CUSTOM_USER_AGENT;
           headers['X-Forwarded-Proto'] = 'https';
+          headers['X-Forwarded-Host'] = externalHost;
           return { ...options, headers };
         };
 

@@ -497,6 +497,43 @@ export async function authRoutes(fastify: FastifyInstance) {
   });
 
   // ============================================================================
+  // GET /auth/error
+  // Redirects auth errors back to the calling app's login page with error params.
+  // The BFF itself is hosted on identity.fe3dr.com — errors should redirect
+  // to the frontend app (fe3dr.com, vendors.fe3dr.com) that initiated the flow.
+  // ============================================================================
+  fastify.get<{
+    Querystring: { error?: string; error_description?: string };
+  }>('/auth/error', async (request, reply) => {
+    const error = (request.query as any).error || 'unknown_error';
+    const errorDescription = (request.query as any).error_description || '';
+
+    // Determine the best frontend to redirect to based on the Referer or Origin
+    const referer = request.headers.referer || request.headers.origin || '';
+    const forwardedHost = request.headers['x-forwarded-host'] as string || request.hostname || '';
+
+    // Build the error redirect URL — default to the base domain login page
+    let loginUrl = `https://${config.baseDomain}/login`;
+
+    // If we can determine the source app, redirect there
+    if (referer.includes('vendors.')) {
+      loginUrl = `https://vendors.${config.baseDomain}/login`;
+    } else if (referer.includes('admin.')) {
+      loginUrl = `https://admin.${config.baseDomain}/login`;
+    } else if (referer.includes('delivery.')) {
+      loginUrl = `https://delivery.${config.baseDomain}/login`;
+    }
+
+    const params = new URLSearchParams({ error });
+    if (errorDescription) {
+      params.set('error_description', errorDescription);
+    }
+
+    logger.warn({ error, errorDescription, referer, loginUrl }, 'Redirecting auth error to frontend');
+    return reply.redirect(`${loginUrl}?${params.toString()}`);
+  });
+
+  // ============================================================================
   // POST /auth/logout
   // Logs out the user - clears session locally without redirecting to IDP
   // ============================================================================
