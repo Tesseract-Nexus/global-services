@@ -999,7 +999,7 @@ function determineClientType(request: FastifyRequest): 'internal' | 'customer' {
 }
 
 function getCallbackUrl(request: FastifyRequest, _clientType: 'internal' | 'customer'): string {
-  const protocol = request.headers['x-forwarded-proto'] || 'https';
+  const protocol = process.env.FORCE_PROTOCOL || request.headers['x-forwarded-proto'] || 'https';
   const host = request.headers['x-forwarded-host'] || request.hostname;
   // tesserix-home proxies auth routes through /api/auth/*, so the callback
   // URL needs the /api prefix for the Next.js catch-all route to handle it
