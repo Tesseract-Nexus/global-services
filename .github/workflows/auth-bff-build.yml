@@ -99,27 +99,16 @@ jobs:
       - name: Restart Knative service
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && steps.auth_wif.outcome == 'success'
         run: |
-          SHA_SHORT=$(echo "${{ github.sha }}" | cut -c1-7)
-          NEW_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${SHA_SHORT}"
-          # Get current container spec to preserve env vars and other settings
-          CURRENT_CONTAINER=$(kubectl get ksvc homechef-auth-bff -n homechef -o jsonpath='{.spec.template.spec.containers[0]}')
-          # Update only the image in the container spec
-          UPDATED_CONTAINER=$(echo "$CURRENT_CONTAINER" | python3 -c "
-          import json, sys
-          c = json.load(sys.stdin)
-          c['image'] = '${NEW_IMAGE}'.lower()
-          print(json.dumps(c))
-          ")
           kubectl patch ksvc homechef-auth-bff -n homechef \
             --type merge \
-            -p "{\"spec\":{\"template\":{\"spec\":{\"containers\":[${UPDATED_CONTAINER}]}}}}"
+            -p "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"client.knative.dev/updateTimestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}}}}}"
 
       # --- Security scanning ---
       - name: Run Trivy vulnerability scanner
         if: github.event_name != 'pull_request'
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ fromJSON(steps.meta.outputs.json).tags[0] }}
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           format: sarif
           output: trivy-results.sarif
           severity: CRITICAL,HIGH
