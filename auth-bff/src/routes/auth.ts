@@ -266,6 +266,19 @@ export async function authRoutes(fastify: FastifyInstance) {
       'Initiating Keycloak auth flow'
     );
 
+    // Set a cookie with returnTo so /auth/error can redirect to the correct app
+    // even if the auth flow state expires in Redis (e.g., slow social login flows)
+    const forwardedHostForCookie = request.headers['x-forwarded-host'] as string || request.hostname;
+    const cookieDomain = getCookieDomain(forwardedHostForCookie);
+    reply.setCookie('auth_return_to', query.returnTo || `https://${forwardedHostForCookie}/`, {
+      httpOnly: true,
+      secure: config.server.nodeEnv === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 1800, // 30 minutes — generous for slow IDP flows
+      ...(cookieDomain ? { domain: cookieDomain } : {}),
+    });
+
     return reply.redirect(authUrl);
   });
 
@@ -465,6 +478,9 @@ export async function authRoutes(fastify: FastifyInstance) {
       const forwardedHost = request.headers['x-forwarded-host'] as string || request.hostname;
       setSessionCookie(reply, session.id, forwardedHost);
 
+      // Clear the auth_return_to cookie (no longer needed after successful auth)
+      reply.clearCookie('auth_return_to', { path: '/' });
+
       logger.info(
         { userId: session.userId, sessionId: session.id, clientType: authState.clientType, forwardedHost, tenantSlug, idpHint: authState.idpHint },
         'Authentication successful'
@@ -520,17 +536,19 @@ export async function authRoutes(fastify: FastifyInstance) {
   }>('/auth/error', async (request, reply) => {
     const error = (request.query as any).error || 'unknown_error';
     const errorDescription = (request.query as any).error_description || '';
-    const returnTo = (request.query as any).returnTo || '';
+    // Use returnTo from query param (set by callback handler) or cookie (set at login start)
+    const returnTo = (request.query as any).returnTo || (request.cookies as Record<string, string>)?.auth_return_to || '';
 
-    // Determine the correct frontend from returnTo (set during auth flow initiation)
-    // returnTo contains the URL the user came from (e.g., https://vendors.fe3dr.com/dashboard)
+    // Determine the correct frontend from returnTo
     let loginUrl = `https://${config.baseDomain}/login`;
 
     if (returnTo) {
       try {
         const returnToUrl = returnTo.startsWith('/') ? new URL(returnTo, `https://${config.baseDomain}`) : new URL(returnTo);
-        // Use the origin from returnTo to redirect back to the correct app
-        loginUrl = `${returnToUrl.origin}/login`;
+        // Validate the origin is on our domain before using it
+        if (returnToUrl.hostname === config.baseDomain || returnToUrl.hostname.endsWith('.' + config.baseDomain)) {
+          loginUrl = `${returnToUrl.origin}/login`;
+        }
       } catch {
         // If returnTo is not a valid URL, fall back to matching substrings
         if (returnTo.includes('vendors.')) {
@@ -542,6 +560,9 @@ export async function authRoutes(fastify: FastifyInstance) {
         }
       }
     }
+
+    // Clear the auth_return_to cookie
+    reply.clearCookie('auth_return_to', { path: '/' });
 
     const params = new URLSearchParams({ error });
     if (errorDescription) {
