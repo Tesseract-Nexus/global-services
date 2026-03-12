@@ -510,7 +510,6 @@ export async function authRoutes(fastify: FastifyInstance) {
 
     // Determine the best frontend to redirect to based on the Referer or Origin
     const referer = request.headers.referer || request.headers.origin || '';
-    const forwardedHost = request.headers['x-forwarded-host'] as string || request.hostname || '';
 
     // Build the error redirect URL — default to the base domain login page
     let loginUrl = `https://${config.baseDomain}/login`;
