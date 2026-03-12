@@ -27,10 +27,9 @@ permissions:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}/auth-bff
-  AR_REGISTRY: asia-south1-docker.pkg.dev/tesseracthub-480811/global
   GCP_PROJECT_ID: tesseracthub-480811
-  GCP_REGION: asia-south1
-  CLOUD_RUN_SERVICE: global-auth-bff
+  GKE_CLUSTER: tesseract-prod-in-gke
+  GKE_REGION: asia-south1
 
 jobs:
   build:
@@ -52,7 +51,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # --- GCP Authentication (best-effort: WIF → SA Key → skip) ---
+      # --- GCP Authentication (WIF for GKE deploy) ---
       - name: Authenticate to Google Cloud (WIF)
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         id: auth_wif
@@ -61,35 +60,6 @@ jobs:
           workload_identity_provider: projects/849928263410/locations/global/workloadIdentityPools/github-pool/providers/github-provider
           service_account: github-actions@tesseracthub-480811.iam.gserviceaccount.com
           project_id: ${{ env.GCP_PROJECT_ID }}
-        continue-on-error: true
-
-      - name: Authenticate to Google Cloud (SA Key Fallback)
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && steps.auth_wif.outcome == 'failure'
-        id: auth_sa
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_PROD_SA_KEY }}
-        continue-on-error: true
-
-      - name: Check GCP auth status
-        id: gcp_auth
-        run: |
-          if [[ "${{ steps.auth_wif.outcome }}" == "success" || "${{ steps.auth_sa.outcome }}" == "success" ]]; then
-            echo "authenticated=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "authenticated=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::GCP authentication unavailable — skipping Artifact Registry push and Cloud Run deploy"
-          fi
-
-      - name: Set up Cloud SDK
-        if: steps.gcp_auth.outputs.authenticated == 'true'
-        uses: google-github-actions/setup-gcloud@v2
-        with:
-          project_id: ${{ env.GCP_PROJECT_ID }}
-
-      - name: Configure Docker for Artifact Registry
-        if: steps.gcp_auth.outputs.authenticated == 'true'
-        run: gcloud auth configure-docker asia-south1-docker.pkg.dev --quiet
 
       - name: Extract metadata (tags, labels)
         id: meta
@@ -117,92 +87,32 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # --- Copy image to Artifact Registry (only when GCP auth + main branch) ---
-      - name: Generate AR tags
-        if: steps.gcp_auth.outputs.authenticated == 'true'
-        id: ar_tags
+      # --- Deploy to GKE (Knative) ---
+      - name: Get GKE credentials
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && steps.auth_wif.outcome == 'success'
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: ${{ env.GKE_CLUSTER }}
+          location: ${{ env.GKE_REGION }}
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Restart Knative service
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && steps.auth_wif.outcome == 'success'
         run: |
           SHA_SHORT=$(echo "${{ github.sha }}" | cut -c1-7)
-          GHCR_IMAGE=$(echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" | tr '[:upper:]' '[:lower:]')
-          echo "sha_tag=main-${SHA_SHORT}" >> "$GITHUB_OUTPUT"
-          echo "ghcr_image=${GHCR_IMAGE}" >> "$GITHUB_OUTPUT"
-
-      - name: Push image to Artifact Registry
-        if: steps.gcp_auth.outputs.authenticated == 'true'
-        id: ar_push
-        run: |
-          docker pull ${{ steps.ar_tags.outputs.ghcr_image }}
-          docker tag ${{ steps.ar_tags.outputs.ghcr_image }} \
-            ${{ env.AR_REGISTRY }}/${{ env.CLOUD_RUN_SERVICE }}:${{ steps.ar_tags.outputs.sha_tag }}
-          docker tag ${{ steps.ar_tags.outputs.ghcr_image }} \
-            ${{ env.AR_REGISTRY }}/${{ env.CLOUD_RUN_SERVICE }}:latest
-          docker push ${{ env.AR_REGISTRY }}/${{ env.CLOUD_RUN_SERVICE }}:${{ steps.ar_tags.outputs.sha_tag }}
-          docker push ${{ env.AR_REGISTRY }}/${{ env.CLOUD_RUN_SERVICE }}:latest
-        continue-on-error: true
-
-      # --- Deploy to Cloud Run (Security Hardened) ---
-      # SECURITY: --ingress internal-and-cloud-load-balancing blocks direct *.run.app access from internet
-      # SECURITY: --no-allow-unauthenticated removes allUsers IAM invoker binding
-      # Traffic MUST flow through: Cloudflare → GKE Istio → Cloud Run (internal)
-      - name: Deploy to Cloud Run
-        if: steps.ar_push.outcome == 'success'
-        id: cloud_run_deploy
-        run: |
-          gcloud run deploy ${{ env.CLOUD_RUN_SERVICE }} \
-            --image ${{ env.AR_REGISTRY }}/${{ env.CLOUD_RUN_SERVICE }}:${{ steps.ar_tags.outputs.sha_tag }} \
-            --region ${{ env.GCP_REGION }} \
-            --project ${{ env.GCP_PROJECT_ID }} \
-            --ingress internal-and-cloud-load-balancing \
-            --no-allow-unauthenticated
-        continue-on-error: true
-
-      - name: Remove any leftover public IAM bindings
-        if: steps.cloud_run_deploy.outcome == 'success'
-        run: |
-          # Remove allUsers invoker binding if it exists (from previous --allow-unauthenticated deploys)
-          gcloud run services remove-iam-policy-binding ${{ env.CLOUD_RUN_SERVICE }} \
-            --region ${{ env.GCP_REGION }} \
-            --project ${{ env.GCP_PROJECT_ID }} \
-            --member="allUsers" \
-            --role="roles/run.invoker" 2>/dev/null || true
-          # Remove allAuthenticatedUsers if present
-          gcloud run services remove-iam-policy-binding ${{ env.CLOUD_RUN_SERVICE }} \
-            --region ${{ env.GCP_REGION }} \
-            --project ${{ env.GCP_PROJECT_ID }} \
-            --member="allAuthenticatedUsers" \
-            --role="roles/run.invoker" 2>/dev/null || true
-        continue-on-error: true
-
-      - name: Verify Cloud Run security posture
-        if: steps.cloud_run_deploy.outcome == 'success'
-        run: |
-          echo "## Cloud Run Security Verification - ${{ env.CLOUD_RUN_SERVICE }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          INGRESS=$(gcloud run services describe ${{ env.CLOUD_RUN_SERVICE }} \
-            --region ${{ env.GCP_REGION }} \
-            --project ${{ env.GCP_PROJECT_ID }} \
-            --format='value(metadata.annotations."run.googleapis.com/ingress")' 2>/dev/null || echo "unknown")
-          echo "| Security Control | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|-----------------|--------|" >> $GITHUB_STEP_SUMMARY
-          if [[ "$INGRESS" == "internal-and-cloud-load-balancing" ]]; then
-            echo "| Ingress restriction | Secured (internal + GCLB only) |" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "| Ingress restriction | WARNING: ${INGRESS} |" >> $GITHUB_STEP_SUMMARY
-            echo "::error::Cloud Run ingress is not properly restricted: ${INGRESS}"
-          fi
-          IAM_CHECK=$(gcloud run services get-iam-policy ${{ env.CLOUD_RUN_SERVICE }} \
-            --region ${{ env.GCP_REGION }} \
-            --project ${{ env.GCP_PROJECT_ID }} \
-            --format=json 2>/dev/null || echo "{}")
-          if echo "$IAM_CHECK" | grep -q "allUsers\|allAuthenticatedUsers"; then
-            echo "| IAM policy | WARNING: Public invoker binding exists |" >> $GITHUB_STEP_SUMMARY
-            echo "::error::Cloud Run service still has public IAM bindings - manual cleanup required"
-          else
-            echo "| IAM policy | Secured (no public invokers) |" >> $GITHUB_STEP_SUMMARY
-          fi
-          echo "| Direct *.run.app access | Blocked |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-        continue-on-error: true
+          NEW_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${SHA_SHORT}"
+          # Get current container spec to preserve env vars and other settings
+          CURRENT_CONTAINER=$(kubectl get ksvc homechef-auth-bff -n homechef -o jsonpath='{.spec.template.spec.containers[0]}')
+          # Update only the image in the container spec
+          UPDATED_CONTAINER=$(echo "$CURRENT_CONTAINER" | python3 -c "
+          import json, sys
+          c = json.load(sys.stdin)
+          c['image'] = '${NEW_IMAGE}'.lower()
+          print(json.dumps(c))
+          ")
+          kubectl patch ksvc homechef-auth-bff -n homechef \
+            --type merge \
+            -p "{\"spec\":{\"template\":{\"spec\":{\"containers\":[${UPDATED_CONTAINER}]}}}}"
 
       # --- Security scanning ---
       - name: Run Trivy vulnerability scanner
@@ -235,12 +145,10 @@ jobs:
 
           if [[ "${{ github.event_name }}" != "pull_request" ]]; then
             echo "Docker Image: Pushed to ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" >> $GITHUB_STEP_SUMMARY
-            if [[ "${{ steps.ar_push.outcome }}" == "success" ]]; then
-              echo "✅ **Artifact Registry:** Pushed to ${{ env.AR_REGISTRY }}/${{ env.CLOUD_RUN_SERVICE }}" >> $GITHUB_STEP_SUMMARY
-            elif [[ "${{ steps.gcp_auth.outputs.authenticated }}" == "true" ]]; then
-              echo "⚠️ **Artifact Registry:** Push failed (repo may not exist yet)" >> $GITHUB_STEP_SUMMARY
+            if [[ "${{ steps.auth_wif.outcome }}" == "success" ]]; then
+              echo "✅ **GKE Knative:** Service restarted" >> $GITHUB_STEP_SUMMARY
             else
-              echo "⏭️ **GCP:** Skipped (auth not configured)" >> $GITHUB_STEP_SUMMARY
+              echo "⏭️ **GKE:** Skipped (auth not configured)" >> $GITHUB_STEP_SUMMARY
             fi
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "**Tags:**" >> $GITHUB_STEP_SUMMARY
