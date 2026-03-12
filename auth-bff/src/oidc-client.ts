@@ -242,13 +242,19 @@ class OIDCClientManager {
     // Set clock tolerance for token validation
     (client as unknown as Record<symbol, number>)[Symbol.for('openid-client.clock_tolerance')] = 10;
 
-    // Set custom http_options on the client instance for token exchange and other requests
+    // Set custom http_options on the client instance for token exchange, userinfo, and other requests
     // This is required because WAF/CDN blocks the openid-client default User-Agent
     // X-Forwarded-Proto ensures Keycloak uses HTTPS for issuer validation on internal HTTP calls
+    // X-Forwarded-Host is CRITICAL when using internal URLs: Keycloak derives the issuer from Host
+    // header, so without this, userinfo token validation fails with issuer mismatch
+    const clientExternalHost = keycloakConfig.internalUrl ? new URL(keycloakConfig.url).host : undefined;
     client[custom.http_options] = function httpOptionsHook(_url: URL, options: Record<string, unknown>) {
       const headers = (options.headers || {}) as Record<string, string>;
       headers['User-Agent'] = CUSTOM_USER_AGENT;
       headers['X-Forwarded-Proto'] = 'https';
+      if (clientExternalHost) {
+        headers['X-Forwarded-Host'] = clientExternalHost;
+      }
       return { ...options, headers };
     };
 
