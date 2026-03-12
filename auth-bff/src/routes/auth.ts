@@ -187,14 +187,19 @@ export async function authRoutes(fastify: FastifyInstance) {
 
     // Extract tenant slug from hostname if not provided
     // e.g., demo-store-admin.mark8ly.com → demo-store
+    // Platform subdomains (vendors, identity, admin, www, etc.) are NOT tenant slugs.
     if (!tenantSlug) {
       const forwardedHost = (request.headers['x-forwarded-host'] as string || request.hostname || '').split(':')[0];
       const escapedDomain = config.baseDomain.replace(/\./g, '\\.');
+      const platformSubdomains = new Set([
+        'www', 'api', 'identity', 'internal-identity', 'vendors', 'admin',
+        'delivery', 'analytics', 'docs', 'status', 'mail', 'cdn',
+      ]);
       const adminMatch = forwardedHost.match(new RegExp(`^(.+)-admin\\.${escapedDomain}$`));
       const storefrontMatch = forwardedHost.match(new RegExp(`^(.+)\\.${escapedDomain}$`));
-      if (adminMatch) {
+      if (adminMatch && !platformSubdomains.has(adminMatch[1])) {
         tenantSlug = adminMatch[1];
-      } else if (storefrontMatch && !storefrontMatch[1].includes('devtest')) {
+      } else if (storefrontMatch && !platformSubdomains.has(storefrontMatch[1]) && !storefrontMatch[1].includes('devtest')) {
         tenantSlug = storefrontMatch[1];
       }
     }
