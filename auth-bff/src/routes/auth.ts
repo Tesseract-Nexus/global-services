@@ -278,24 +278,35 @@ export async function authRoutes(fastify: FastifyInstance) {
   }>('/auth/callback', async (request, reply) => {
     const query = callbackQuerySchema.parse(request.query);
 
+    // Helper to build /auth/error redirect with returnTo preserved
+    const errorRedirect = (error: string, returnTo?: string, errorDescription?: string) => {
+      const params = new URLSearchParams({ error });
+      if (returnTo) params.set('returnTo', returnTo);
+      if (errorDescription) params.set('error_description', errorDescription);
+      return reply.redirect(`/auth/error?${params.toString()}`);
+    };
+
+    // Try to retrieve auth flow state early (needed for returnTo in error redirects)
+    const authStateLookup = query.state ? await sessionStore.getAuthFlowState(query.state) : null;
+
     // Check for OAuth error (Keycloak sends error without code param)
     if (query.error) {
       const forwardedHost = request.headers['x-forwarded-host'] as string || request.hostname;
       logger.error({ error: query.error, description: query.error_description, forwardedHost }, 'OAuth callback error from Keycloak');
-      return reply.redirect(`/auth/error?error=${encodeURIComponent(query.error)}`);
+      return errorRedirect(query.error, authStateLookup?.returnTo, query.error_description);
     }
 
     // Ensure code is present (it's optional in schema to allow error responses through)
     if (!query.code) {
       logger.warn({ state: query.state }, 'Callback received without code or error');
-      return reply.redirect('/auth/error?error=callback_error');
+      return errorRedirect('callback_error', authStateLookup?.returnTo);
     }
 
     // Retrieve auth flow state
-    const authState = await sessionStore.getAuthFlowState(query.state);
+    const authState = authStateLookup;
     if (!authState) {
       logger.warn({ state: query.state }, 'Invalid or expired auth state');
-      return reply.redirect('/auth/error?error=invalid_state');
+      return errorRedirect('invalid_state');
     }
 
     try {
@@ -336,7 +347,8 @@ export async function authRoutes(fastify: FastifyInstance) {
           // preventing the user from being stuck in an infinite login loop.
           // Keycloak will clear the session, then redirect to our error page.
           const errorPageUrl = new URL(authState.redirectUri);
-          const postLogoutUri = `${errorPageUrl.origin}/auth/error?error=access_denied&error_description=${encodeURIComponent('You do not have permission to access the platform admin portal')}`;
+          const returnToParam = authState.returnTo ? `&returnTo=${encodeURIComponent(authState.returnTo)}` : '';
+          const postLogoutUri = `${errorPageUrl.origin}/auth/error?error=access_denied&error_description=${encodeURIComponent('You do not have permission to access the platform admin portal')}${returnToParam}`;
           try {
             const endSessionUrl = oidcClient.getEndSessionUrl(
               authState.clientType,
@@ -492,7 +504,7 @@ export async function authRoutes(fastify: FastifyInstance) {
         redirectUri: authState.redirectUri,
         clientType: authState.clientType,
       }, 'Token exchange failed');
-      return reply.redirect('/auth/error?error=token_exchange_failed');
+      return errorRedirect('token_exchange_failed', authState.returnTo);
     }
   });
 
@@ -501,26 +513,34 @@ export async function authRoutes(fastify: FastifyInstance) {
   // Redirects auth errors back to the calling app's login page with error params.
   // The BFF itself is hosted on identity.fe3dr.com — errors should redirect
   // to the frontend app (fe3dr.com, vendors.fe3dr.com) that initiated the flow.
+  // Uses returnTo from the auth flow state to determine the correct app.
   // ============================================================================
   fastify.get<{
-    Querystring: { error?: string; error_description?: string };
+    Querystring: { error?: string; error_description?: string; returnTo?: string };
   }>('/auth/error', async (request, reply) => {
     const error = (request.query as any).error || 'unknown_error';
     const errorDescription = (request.query as any).error_description || '';
+    const returnTo = (request.query as any).returnTo || '';
 
-    // Determine the best frontend to redirect to based on the Referer or Origin
-    const referer = request.headers.referer || request.headers.origin || '';
-
-    // Build the error redirect URL — default to the base domain login page
+    // Determine the correct frontend from returnTo (set during auth flow initiation)
+    // returnTo contains the URL the user came from (e.g., https://vendors.fe3dr.com/dashboard)
     let loginUrl = `https://${config.baseDomain}/login`;
 
-    // If we can determine the source app, redirect there
-    if (referer.includes('vendors.')) {
-      loginUrl = `https://vendors.${config.baseDomain}/login`;
-    } else if (referer.includes('admin.')) {
-      loginUrl = `https://admin.${config.baseDomain}/login`;
-    } else if (referer.includes('delivery.')) {
-      loginUrl = `https://delivery.${config.baseDomain}/login`;
+    if (returnTo) {
+      try {
+        const returnToUrl = returnTo.startsWith('/') ? new URL(returnTo, `https://${config.baseDomain}`) : new URL(returnTo);
+        // Use the origin from returnTo to redirect back to the correct app
+        loginUrl = `${returnToUrl.origin}/login`;
+      } catch {
+        // If returnTo is not a valid URL, fall back to matching substrings
+        if (returnTo.includes('vendors.')) {
+          loginUrl = `https://vendors.${config.baseDomain}/login`;
+        } else if (returnTo.includes('admin.')) {
+          loginUrl = `https://admin.${config.baseDomain}/login`;
+        } else if (returnTo.includes('delivery.')) {
+          loginUrl = `https://delivery.${config.baseDomain}/login`;
+        }
+      }
     }
 
     const params = new URLSearchParams({ error });
@@ -528,7 +548,7 @@ export async function authRoutes(fastify: FastifyInstance) {
       params.set('error_description', errorDescription);
     }
 
-    logger.warn({ error, errorDescription, referer, loginUrl }, 'Redirecting auth error to frontend');
+    logger.warn({ error, errorDescription, returnTo, loginUrl }, 'Redirecting auth error to frontend');
     return reply.redirect(`${loginUrl}?${params.toString()}`);
   });
 
