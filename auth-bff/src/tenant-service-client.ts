@@ -346,7 +346,7 @@ class TenantServiceClient {
 
   constructor() {
     this.baseUrl = config.tenantServiceUrl;
-    this.timeout = 10000; // 10 second timeout
+    this.timeout = 3000; // 3 second timeout — keep short to avoid blocking auth callbacks
   }
 
   /**

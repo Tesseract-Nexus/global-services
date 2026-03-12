@@ -401,7 +401,9 @@ export async function authRoutes(fastify: FastifyInstance) {
       let isStaff = false;
       const isAdminContext = authState.clientType === 'internal';
 
-      if (email) {
+      // Only look up tenants for admin/internal context — customer storefront users
+      // don't need tenant role enrichment, and the tenant-service may not be deployed
+      if (email && isAdminContext) {
         try {
           const tenantsResult = await tenantServiceClient.getUserTenants(email);
           if (tenantsResult.success && tenantsResult.data?.tenants) {
