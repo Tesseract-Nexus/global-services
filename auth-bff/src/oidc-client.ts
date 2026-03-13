@@ -178,10 +178,14 @@ class OIDCClientManager {
 
     let issuer = this.issuers.get(type);
     if (!issuer) {
-      // Always discover via the external URL so browser-facing endpoints
-      // (authorization_endpoint, end_session_endpoint) use the public domain.
-      // The sidecar readiness wait in server.ts ensures Envoy is ready before this runs.
-      issuer = await discoverIssuerWithCustomUserAgent(keycloakConfig.issuer);
+      // For customer-facing clients: discover via external URL (identity.fe3dr.com)
+      // so browser-facing endpoints use the public domain.
+      // For internal clients (admin): discover via internal URL since there's
+      // no external domain for internal-identity.
+      const discoveryUrl = (type === 'internal' && keycloakConfig.internalUrl)
+        ? `${keycloakConfig.internalUrl}/realms/${keycloakConfig.realm}`
+        : keycloakConfig.issuer;
+      issuer = await discoverIssuerWithCustomUserAgent(discoveryUrl);
 
       // Override server-to-server endpoints with internal URL to bypass Cloudflare
       // Browser-facing endpoints (authorization_endpoint) stay external
