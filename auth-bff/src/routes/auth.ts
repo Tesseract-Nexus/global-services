@@ -5,6 +5,7 @@ import { oidcClient } from '../oidc-client';
 import { sessionStore, SessionData, WsTicketData, SessionTransferData } from '../session-store';
 import { tenantServiceClient, maskEmail, maskIP } from '../tenant-service-client';
 import { natsClient } from '../nats-client';
+import { setSessionCookie as setSessionCookieWithRememberMe } from '../cookie-helpers';
 import { v4 as uuidv4 } from 'uuid';
 import { createLogger } from '../logger';
 
@@ -117,16 +118,7 @@ const getCookieDomain = (forwardedHost: string | undefined): string | undefined 
 };
 
 const setSessionCookie = (reply: FastifyReply, sessionId: string, forwardedHost?: string) => {
-  const domain = getCookieDomain(forwardedHost);
-  const cookieName = getSessionCookieName(forwardedHost);
-  reply.setCookie(cookieName, sessionId, {
-    httpOnly: true,
-    secure: config.server.nodeEnv === 'production',
-    sameSite: 'lax',
-    path: '/',
-    maxAge: config.session.maxAge,
-    ...(domain ? { domain } : {}),
-  });
+  setSessionCookieWithRememberMe(reply, sessionId, forwardedHost, false);
 };
 
 const clearSessionCookie = (reply: FastifyReply, forwardedHost?: string) => {
@@ -648,27 +640,49 @@ export async function authRoutes(fastify: FastifyInstance) {
 
   // ============================================================================
   // GET /auth/session
-  // Returns current session info (user info, not tokens)
+  // Returns current session info (user info, not tokens).
+  // Auto-refreshes access tokens transparently so frontends never see expiry.
   // ============================================================================
   fastify.get('/auth/session', async (request, reply) => {
-    const session = await getSession(request);
+    let session = await getSession(request);
 
     if (!session) {
       return reply.code(401).send({ authenticated: false });
     }
 
-    // Check if session is expired
-    // Note: We use a long session expiry (24 hours) for direct login sessions
-    // to avoid issues with token refresh when using different Keycloak endpoints.
-    // The session cookie handles the actual session lifetime.
+    // Auto-refresh tokens if expired or about to expire (60s buffer)
     const now = Math.floor(Date.now() / 1000);
-    if (session.expiresAt < now) {
-      // Session has expired - clear it
-      logger.info({ sessionId: session.id }, 'Session expired');
-      await sessionStore.deleteSession(session.id);
-      const forwardedHost = request.headers['x-forwarded-host'] as string || request.hostname;
-      clearSessionCookie(reply, forwardedHost);
-      return reply.code(401).send({ authenticated: false, error: 'session_expired' });
+    const bufferTime = 60;
+    if (session.expiresAt - bufferTime <= now) {
+      if (!session.refreshToken) {
+        logger.info({ sessionId: session.id }, 'Session expired, no refresh token');
+        await sessionStore.deleteSession(session.id);
+        const forwardedHost = request.headers['x-forwarded-host'] as string || request.hostname;
+        clearSessionCookie(reply, forwardedHost);
+        return reply.code(401).send({ authenticated: false, error: 'session_expired' });
+      }
+
+      try {
+        const newTokens = await oidcClient.refreshTokens(session.clientType, session.refreshToken);
+        const updatedSession = await sessionStore.updateSession(session.id, {
+          accessToken: newTokens.accessToken,
+          idToken: newTokens.idToken,
+          refreshToken: newTokens.refreshToken || session.refreshToken,
+          expiresAt: newTokens.expiresAt,
+        });
+
+        if (updatedSession) {
+          session = updatedSession;
+        }
+
+        logger.debug({ sessionId: session.id }, 'Session tokens refreshed during /auth/session');
+      } catch (error) {
+        logger.error({ error, sessionId: session.id }, 'Token refresh failed in /auth/session');
+        await sessionStore.deleteSession(session.id);
+        const forwardedHost = request.headers['x-forwarded-host'] as string || request.hostname;
+        clearSessionCookie(reply, forwardedHost);
+        return reply.code(401).send({ authenticated: false, error: 'session_expired' });
+      }
     }
 
     // Read roles from both Keycloak locations:

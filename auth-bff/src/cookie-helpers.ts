@@ -46,7 +46,8 @@ export const setSessionCookie = (
   forwardedHost: string | undefined,
   rememberMe: boolean = false
 ) => {
-  const maxAge = rememberMe ? config.session.maxAge * 7 : config.session.maxAge; // 7 days if remember me
+  const REMEMBER_ME_MAX_AGE = 30 * 86400; // 30 days
+  const maxAge = rememberMe ? REMEMBER_ME_MAX_AGE : config.session.maxAge;
   const domain = getCookieDomain(forwardedHost);
   const cookieName = getSessionCookieName(forwardedHost);
 
