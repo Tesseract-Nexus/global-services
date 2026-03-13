@@ -318,6 +318,18 @@ export async function apiProxyRoutes(fastify: FastifyInstance) {
     // x-jwt-claim-sub is the standard Istio header for JWT subject claim
     headers['x-jwt-claim-sub'] = validSession.userId;
 
+    // Forward user info from session so backend can auto-provision users
+    if (validSession.userInfo) {
+      const email = validSession.userInfo.email as string | undefined;
+      const name = validSession.userInfo.name as string | undefined;
+      const givenName = validSession.userInfo.given_name as string | undefined;
+      const familyName = validSession.userInfo.family_name as string | undefined;
+      if (email) headers['x-jwt-claim-email'] = email;
+      if (name) headers['x-jwt-claim-name'] = name;
+      if (givenName) headers['x-jwt-claim-given-name'] = givenName;
+      if (familyName) headers['x-jwt-claim-family-name'] = familyName;
+    }
+
     try {
       // Determine the request body based on content type
       const isMultipart = (request.headers['content-type'] || '').includes('multipart/form-data');
