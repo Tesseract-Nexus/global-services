@@ -74,6 +74,14 @@ async function getSessionFromCookie(
   return sessionStore.getSession(sessionId);
 }
 
+/**
+ * Check if the session has a tenant context.
+ * Non-tenant apps (e.g., HomeChef) use Redis-backed TOTP storage directly.
+ */
+function hasTenantContext(session: { tenantId?: string }): boolean {
+  return !!session.tenantId;
+}
+
 // ============================================================================
 // Routes
 // ============================================================================
@@ -93,20 +101,21 @@ export async function totpRoutes(fastify: FastifyInstance) {
       });
     }
 
-    if (!session.tenantId) {
-      return reply.code(400).send({
-        success: false,
-        error: 'NO_TENANT_CONTEXT',
-        message: 'No tenant context found.',
+    if (hasTenantContext(session)) {
+      const totpInfo = await tenantServiceClient.getTotpSecret(session.userId, session.tenantId!);
+      return reply.send({
+        success: true,
+        totp_enabled: totpInfo.totp_enabled,
+        backup_codes_remaining: totpInfo.backup_codes_remaining || 0,
       });
     }
 
-    const totpInfo = await tenantServiceClient.getTotpSecret(session.userId, session.tenantId);
-
+    // Non-tenant context: read from Redis
+    const totpData = await sessionStore.getTotpUserData(session.userId);
     return reply.send({
       success: true,
-      totp_enabled: totpInfo.totp_enabled,
-      backup_codes_remaining: totpInfo.backup_codes_remaining || 0,
+      totp_enabled: totpData?.enabled || false,
+      backup_codes_remaining: totpData ? totpData.backupCodeHashes.length : 0,
     });
   });
 
@@ -213,19 +222,29 @@ export async function totpRoutes(fastify: FastifyInstance) {
       });
     }
 
-    // Persist to tenant-service
-    const saveResult = await tenantServiceClient.saveTotpSecret(
-      session.userId,
-      session.tenantId!,
-      setupData.encryptedSecret,
-      setupData.backupCodeHashes
-    );
+    if (hasTenantContext(session)) {
+      // Persist to tenant-service
+      const saveResult = await tenantServiceClient.saveTotpSecret(
+        session.userId,
+        session.tenantId!,
+        setupData.encryptedSecret,
+        setupData.backupCodeHashes
+      );
 
-    if (!saveResult.success) {
-      return reply.code(500).send({
-        success: false,
-        error: 'SAVE_FAILED',
-        message: 'Failed to save TOTP configuration. Please try again.',
+      if (!saveResult.success) {
+        return reply.code(500).send({
+          success: false,
+          error: 'SAVE_FAILED',
+          message: 'Failed to save TOTP configuration. Please try again.',
+        });
+      }
+    } else {
+      // Non-tenant context: persist to Redis
+      await sessionStore.saveTotpUserData(session.userId, {
+        encryptedSecret: setupData.encryptedSecret,
+        backupCodeHashes: setupData.backupCodeHashes,
+        enabled: true,
+        createdAt: Date.now(),
       });
     }
 
@@ -366,26 +385,32 @@ export async function totpRoutes(fastify: FastifyInstance) {
 
     const { code } = validation.data;
 
-    if (!session.tenantId) {
-      return reply.code(400).send({
-        success: false,
-        error: 'NO_TENANT_CONTEXT',
-        message: 'No tenant context found.',
-      });
-    }
+    let totpSecret: string | undefined;
 
-    // Get current TOTP secret to verify the code
-    const totpInfo = await tenantServiceClient.getTotpSecret(session.userId, session.tenantId);
-    if (!totpInfo.totp_enabled || !totpInfo.totp_secret_encrypted) {
-      return reply.code(400).send({
-        success: false,
-        error: 'TOTP_NOT_ENABLED',
-        message: 'TOTP is not currently enabled.',
-      });
+    if (hasTenantContext(session)) {
+      const totpInfo = await tenantServiceClient.getTotpSecret(session.userId, session.tenantId!);
+      if (!totpInfo.totp_enabled || !totpInfo.totp_secret_encrypted) {
+        return reply.code(400).send({
+          success: false,
+          error: 'TOTP_NOT_ENABLED',
+          message: 'TOTP is not currently enabled.',
+        });
+      }
+      totpSecret = totpInfo.totp_secret_encrypted;
+    } else {
+      const totpData = await sessionStore.getTotpUserData(session.userId);
+      if (!totpData?.enabled) {
+        return reply.code(400).send({
+          success: false,
+          error: 'TOTP_NOT_ENABLED',
+          message: 'TOTP is not currently enabled.',
+        });
+      }
+      totpSecret = totpData.encryptedSecret;
     }
 
     // Verify TOTP code before disabling
-    const secret = decryptTotpSecret(totpInfo.totp_secret_encrypted);
+    const secret = decryptTotpSecret(totpSecret);
     if (!verifyTotpCode(secret, code)) {
       return reply.code(400).send({
         success: false,
@@ -394,14 +419,17 @@ export async function totpRoutes(fastify: FastifyInstance) {
       });
     }
 
-    // Disable TOTP in tenant-service
-    const disableResult = await tenantServiceClient.disableTotp(session.userId, session.tenantId);
-    if (!disableResult.success) {
-      return reply.code(500).send({
-        success: false,
-        error: 'DISABLE_FAILED',
-        message: 'Failed to disable authenticator app. Please try again.',
-      });
+    if (hasTenantContext(session)) {
+      const disableResult = await tenantServiceClient.disableTotp(session.userId, session.tenantId!);
+      if (!disableResult.success) {
+        return reply.code(500).send({
+          success: false,
+          error: 'DISABLE_FAILED',
+          message: 'Failed to disable authenticator app. Please try again.',
+        });
+      }
+    } else {
+      await sessionStore.deleteTotpUserData(session.userId);
     }
 
     logger.info({ userId: session.userId }, 'TOTP disabled');
@@ -439,26 +467,32 @@ export async function totpRoutes(fastify: FastifyInstance) {
 
     const { code } = validation.data;
 
-    if (!session.tenantId) {
-      return reply.code(400).send({
-        success: false,
-        error: 'NO_TENANT_CONTEXT',
-        message: 'No tenant context found.',
-      });
-    }
+    let totpSecret: string | undefined;
 
-    // Get current TOTP secret to verify the code
-    const totpInfo = await tenantServiceClient.getTotpSecret(session.userId, session.tenantId);
-    if (!totpInfo.totp_enabled || !totpInfo.totp_secret_encrypted) {
-      return reply.code(400).send({
-        success: false,
-        error: 'TOTP_NOT_ENABLED',
-        message: 'TOTP is not currently enabled.',
-      });
+    if (hasTenantContext(session)) {
+      const totpInfo = await tenantServiceClient.getTotpSecret(session.userId, session.tenantId!);
+      if (!totpInfo.totp_enabled || !totpInfo.totp_secret_encrypted) {
+        return reply.code(400).send({
+          success: false,
+          error: 'TOTP_NOT_ENABLED',
+          message: 'TOTP is not currently enabled.',
+        });
+      }
+      totpSecret = totpInfo.totp_secret_encrypted;
+    } else {
+      const totpData = await sessionStore.getTotpUserData(session.userId);
+      if (!totpData?.enabled) {
+        return reply.code(400).send({
+          success: false,
+          error: 'TOTP_NOT_ENABLED',
+          message: 'TOTP is not currently enabled.',
+        });
+      }
+      totpSecret = totpData.encryptedSecret;
     }
 
     // Verify TOTP code
-    const secret = decryptTotpSecret(totpInfo.totp_secret_encrypted);
+    const secret = decryptTotpSecret(totpSecret);
     if (!verifyTotpCode(secret, code)) {
       return reply.code(400).send({
         success: false,
@@ -470,19 +504,29 @@ export async function totpRoutes(fastify: FastifyInstance) {
     // Generate new backup codes
     const { codes, hashes } = generateBackupCodes(10);
 
-    // Update in tenant-service
-    const updateResult = await tenantServiceClient.updateBackupCodes(
-      session.userId,
-      session.tenantId,
-      hashes
-    );
+    if (hasTenantContext(session)) {
+      const updateResult = await tenantServiceClient.updateBackupCodes(
+        session.userId,
+        session.tenantId!,
+        hashes
+      );
 
-    if (!updateResult.success) {
-      return reply.code(500).send({
-        success: false,
-        error: 'UPDATE_FAILED',
-        message: 'Failed to regenerate backup codes. Please try again.',
-      });
+      if (!updateResult.success) {
+        return reply.code(500).send({
+          success: false,
+          error: 'UPDATE_FAILED',
+          message: 'Failed to regenerate backup codes. Please try again.',
+        });
+      }
+    } else {
+      // Non-tenant context: update backup codes in Redis
+      const totpData = await sessionStore.getTotpUserData(session.userId);
+      if (totpData) {
+        await sessionStore.saveTotpUserData(session.userId, {
+          ...totpData,
+          backupCodeHashes: hashes,
+        });
+      }
     }
 
     logger.info({ userId: session.userId }, 'Backup codes regenerated');

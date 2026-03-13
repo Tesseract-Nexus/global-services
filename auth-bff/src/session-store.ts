@@ -94,6 +94,14 @@ export interface TotpSetupSessionData {
   createdAt: number;
 }
 
+// Persistent TOTP data stored in Redis (for non-tenant contexts like HomeChef)
+export interface TotpUserData {
+  encryptedSecret: string;
+  backupCodeHashes: string[];
+  enabled: boolean;
+  createdAt: number;
+}
+
 // Passkey (WebAuthn) challenge for registration/authentication
 export interface PasskeyChallengeData {
   type: 'registration' | 'authentication';
@@ -123,6 +131,7 @@ class SessionStore {
   private readonly MFA_SESSION_PREFIX = 'bff:mfa_session:';
   private readonly DEVICE_TRUST_PREFIX = 'bff:device_trust:';
   private readonly TOTP_SETUP_PREFIX = 'bff:totp_setup:';
+  private readonly TOTP_USER_PREFIX = 'bff:totp_user:';
   private readonly PASSKEY_CHALLENGE_PREFIX = 'bff:passkey_challenge:';
   private readonly SESSION_TTL = config.session.maxAge;
   private readonly AUTH_FLOW_TTL = 600; // 10 minutes for auth flow state
@@ -423,6 +432,23 @@ class SessionStore {
 
   async deleteTotpSetupSession(sessionId: string): Promise<boolean> {
     const result = await this.redis.del(this.TOTP_SETUP_PREFIX + sessionId);
+    return result > 0;
+  }
+
+  // Persistent TOTP User Data (Redis-backed, for non-tenant contexts)
+  async saveTotpUserData(userId: string, data: TotpUserData): Promise<void> {
+    await this.redis.set(this.TOTP_USER_PREFIX + userId, JSON.stringify(data));
+    logger.debug({ userId }, 'TOTP user data saved');
+  }
+
+  async getTotpUserData(userId: string): Promise<TotpUserData | null> {
+    const data = await this.redis.get(this.TOTP_USER_PREFIX + userId);
+    if (!data) return null;
+    return JSON.parse(data) as TotpUserData;
+  }
+
+  async deleteTotpUserData(userId: string): Promise<boolean> {
+    const result = await this.redis.del(this.TOTP_USER_PREFIX + userId);
     return result > 0;
   }
 
