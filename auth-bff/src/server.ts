@@ -21,6 +21,7 @@ import { totpRoutes } from './routes/totp';
 import { passkeyRoutes } from './routes/passkeys';
 import { sessionStore } from './session-store';
 import { oidcClient } from './oidc-client';
+import { natsClient } from './nats-client';
 
 const log = createLogger('server');
 
@@ -180,15 +181,51 @@ async function buildApp() {
   return fastify;
 }
 
+/**
+ * Wait for the Istio sidecar proxy to be ready before making outbound requests.
+ * Without this, OIDC discovery and NATS connections fail because the Envoy proxy
+ * hasn't started accepting traffic yet.
+ */
+async function waitForSidecar(maxWaitMs = 15000): Promise<void> {
+  const start = Date.now();
+  const probeUrl = 'http://localhost:15021/healthz/ready';
+
+  while (Date.now() - start < maxWaitMs) {
+    try {
+      const res = await fetch(probeUrl, { signal: AbortSignal.timeout(1000) });
+      if (res.ok) {
+        log.info({ elapsed: Date.now() - start }, 'Istio sidecar is ready');
+        return;
+      }
+    } catch {
+      // Sidecar not ready yet
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+
+  log.warn({ maxWaitMs }, 'Istio sidecar readiness wait timed out — proceeding anyway');
+}
+
 export async function startServer() {
   let fastify: Awaited<ReturnType<typeof buildApp>> | null = null;
 
   try {
     fastify = await buildApp();
 
+    // Wait for Istio sidecar before any outbound calls (OIDC discovery, NATS, Redis)
+    if (config.server.nodeEnv === 'production') {
+      await waitForSidecar();
+    }
+
     // Initialize OIDC client on startup to avoid rate limiting during request handling
     log.info('Initializing OIDC client...');
     await oidcClient.initialize();
+
+    // Reconnect NATS now that sidecar is ready (initial module-level connect likely failed)
+    log.info('Connecting to NATS...');
+    natsClient.connect().catch((err) => {
+      log.warn({ err }, 'NATS connection failed — will retry in background');
+    });
 
     await fastify.listen({
       port: config.server.port,
@@ -216,6 +253,9 @@ export async function startServer() {
 
         await sessionStore.close();
         log.info('Session store closed');
+
+        await natsClient.close();
+        log.info('NATS connection closed');
 
         process.exit(0);
       } catch (error) {

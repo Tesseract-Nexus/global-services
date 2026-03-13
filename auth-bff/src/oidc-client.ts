@@ -143,8 +143,8 @@ class OIDCClientManager {
 
   private async initializeClientWithRetry(
     type: 'internal' | 'customer',
-    maxRetries = 3,
-    baseDelayMs = 1000
+    maxRetries = 5,
+    baseDelayMs = 2000
   ): Promise<Client> {
     let lastError: Error | undefined;
 

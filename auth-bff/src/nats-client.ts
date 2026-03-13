@@ -156,10 +156,5 @@ class NatsClient {
   }
 }
 
-// Singleton instance
+// Singleton instance — connection is deferred to server.ts after sidecar is ready
 export const natsClient = new NatsClient();
-
-// Initialize connection on module load (non-blocking)
-natsClient.connect().catch((err) => {
-  logger.error({ error: err }, 'Initial NATS connection failed');
-});
