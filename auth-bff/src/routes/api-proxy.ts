@@ -321,14 +321,14 @@ export async function apiProxyRoutes(fastify: FastifyInstance) {
     try {
       // Determine the request body based on content type
       const isMultipart = (request.headers['content-type'] || '').includes('multipart/form-data');
-      let requestBody: string | Buffer | undefined;
+      let requestBody: BodyInit | undefined;
 
       if (['GET', 'HEAD'].includes(request.method)) {
         requestBody = undefined;
       } else if (isMultipart && Buffer.isBuffer(request.body)) {
-        // For multipart/form-data, pass the raw buffer directly
+        // For multipart/form-data, pass the raw buffer as Uint8Array for fetch() compatibility
         // The Content-Type header with boundary is already forwarded
-        requestBody = request.body;
+        requestBody = new Uint8Array(request.body);
       } else {
         requestBody = JSON.stringify(request.body);
       }
