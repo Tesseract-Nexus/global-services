@@ -31,6 +31,7 @@ async function buildApp() {
     trustProxy: config.server.trustProxy,
     requestIdHeader: 'x-request-id',
     requestIdLogLabel: 'requestId',
+    bodyLimit: 10 * 1024 * 1024, // 10MB to support file uploads (5MB files + overhead)
   });
 
   // Security headers

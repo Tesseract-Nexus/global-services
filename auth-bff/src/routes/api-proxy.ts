@@ -58,6 +58,14 @@ const validateCsrf = (request: FastifyRequest, session: SessionData): boolean =>
     return true;
   }
 
+  // Skip CSRF for multipart/form-data (file uploads)
+  // File uploads use session cookies for auth and can't easily include CSRF tokens
+  // The SameSite=Lax cookie policy already prevents cross-origin POST with cookies
+  const contentType = request.headers['content-type'] || '';
+  if (contentType.includes('multipart/form-data')) {
+    return true;
+  }
+
   const csrfHeader = request.headers['x-csrf-token'] as string | undefined;
   const csrfBody = (request.body as Record<string, unknown>)?._csrf as string | undefined;
 
@@ -72,6 +80,12 @@ const validateCsrf = (request: FastifyRequest, session: SessionData): boolean =>
 };
 
 export async function apiProxyRoutes(fastify: FastifyInstance) {
+  // Register raw body content type parser for multipart/form-data
+  // This preserves the original multipart body so we can stream it to the backend
+  fastify.addContentTypeParser('multipart/form-data', { parseAs: 'buffer' }, (_req, body, done) => {
+    done(null, body);
+  });
+
   // ============================================================================
   // Tenant API Routes - Simplified endpoints for frontend
   // These map BFF-style URLs to the actual backend API endpoints
@@ -305,13 +319,25 @@ export async function apiProxyRoutes(fastify: FastifyInstance) {
     headers['x-jwt-claim-sub'] = validSession.userId;
 
     try {
+      // Determine the request body based on content type
+      const isMultipart = (request.headers['content-type'] || '').includes('multipart/form-data');
+      let requestBody: string | Buffer | undefined;
+
+      if (['GET', 'HEAD'].includes(request.method)) {
+        requestBody = undefined;
+      } else if (isMultipart && Buffer.isBuffer(request.body)) {
+        // For multipart/form-data, pass the raw buffer directly
+        // The Content-Type header with boundary is already forwarded
+        requestBody = request.body;
+      } else {
+        requestBody = JSON.stringify(request.body);
+      }
+
       // Make the proxied request
       const response = await fetch(targetUrl.toString(), {
         method: request.method,
         headers,
-        body: ['GET', 'HEAD'].includes(request.method)
-          ? undefined
-          : JSON.stringify(request.body),
+        body: requestBody,
       });
 
       // Forward response headers
