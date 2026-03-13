@@ -178,12 +178,10 @@ class OIDCClientManager {
 
     let issuer = this.issuers.get(type);
     if (!issuer) {
-      // Use internal URL for discovery if available (avoids external round-trip through Cloudflare
-      // which can fail during pod startup when Envoy routes aren't fully propagated)
-      const discoveryIssuer = keycloakConfig.internalUrl
-        ? `${keycloakConfig.internalUrl}/realms/${keycloakConfig.realm}`
-        : keycloakConfig.issuer;
-      issuer = await discoverIssuerWithCustomUserAgent(discoveryIssuer);
+      // Always discover via the external URL so browser-facing endpoints
+      // (authorization_endpoint, end_session_endpoint) use the public domain.
+      // The sidecar readiness wait in server.ts ensures Envoy is ready before this runs.
+      issuer = await discoverIssuerWithCustomUserAgent(keycloakConfig.issuer);
 
       // Override server-to-server endpoints with internal URL to bypass Cloudflare
       // Browser-facing endpoints (authorization_endpoint) stay external

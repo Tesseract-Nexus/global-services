@@ -182,20 +182,22 @@ async function buildApp() {
 }
 
 /**
- * Wait for the Istio sidecar proxy to be ready before making outbound requests.
- * Without this, OIDC discovery and NATS connections fail because the Envoy proxy
- * hasn't started accepting traffic yet.
+ * Wait for the Istio sidecar proxy to be ready AND verify outbound connectivity
+ * before making OIDC/NATS calls. The sidecar health check passes before Envoy's
+ * outbound route tables are fully configured, so we also verify we can reach an
+ * external endpoint.
  */
-async function waitForSidecar(maxWaitMs = 15000): Promise<void> {
+async function waitForSidecar(maxWaitMs = 30000): Promise<void> {
   const start = Date.now();
   const probeUrl = 'http://localhost:15021/healthz/ready';
 
+  // Phase 1: Wait for sidecar health endpoint
   while (Date.now() - start < maxWaitMs) {
     try {
       const res = await fetch(probeUrl, { signal: AbortSignal.timeout(1000) });
       if (res.ok) {
-        log.info({ elapsed: Date.now() - start }, 'Istio sidecar is ready');
-        return;
+        log.warn({ elapsed: Date.now() - start }, 'Istio sidecar health check passed');
+        break;
       }
     } catch {
       // Sidecar not ready yet
@@ -203,7 +205,28 @@ async function waitForSidecar(maxWaitMs = 15000): Promise<void> {
     await new Promise((r) => setTimeout(r, 500));
   }
 
-  log.warn({ maxWaitMs }, 'Istio sidecar readiness wait timed out — proceeding anyway');
+  // Phase 2: Verify outbound connectivity by reaching Keycloak discovery endpoint
+  // Sidecar health != outbound routes ready. We poll until an actual external request succeeds.
+  const keycloakUrl = config.keycloak.customer.internalUrl || config.keycloak.customer.url;
+  const testUrl = `${keycloakUrl}/realms/${config.keycloak.customer.realm}/.well-known/openid-configuration`;
+
+  while (Date.now() - start < maxWaitMs) {
+    try {
+      const res = await fetch(testUrl, {
+        signal: AbortSignal.timeout(3000),
+        headers: { 'User-Agent': 'auth-bff/startup-probe' },
+      });
+      if (res.ok) {
+        log.warn({ elapsed: Date.now() - start }, 'Outbound connectivity verified — Keycloak reachable');
+        return;
+      }
+    } catch {
+      // Route not ready yet
+    }
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+
+  log.error({ maxWaitMs }, 'Outbound connectivity wait timed out — OIDC init may fail');
 }
 
 export async function startServer() {
