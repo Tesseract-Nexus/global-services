@@ -228,28 +228,38 @@ export async function apiProxyRoutes(fastify: FastifyInstance) {
   // ============================================================================
   // API Proxy - Forwards authenticated requests to the API Gateway
   // All /api/* routes (except /api/auth/*) are proxied
+  //
+  // Auth model: prefer the Keycloak BFF cookie session, but fall back to the
+  // X-Auth-Token header (API-issued JWT from POST /api/v1/auth/login) so
+  // email/password-logged-in users — who have no cookie session — can still
+  // reach the proxied API. Without this fallback, every /bff/api/* call from
+  // such users 401s, which in HomeChef cascaded into AuthProvider bouncing
+  // completed chefs back to /onboarding on every page load.
   // ============================================================================
   fastify.all('/api/*', async (request, reply) => {
     const session = await getSession(request);
+    const bearerToken = (request.headers['x-auth-token'] as string | undefined)?.trim();
 
-    if (!session) {
+    if (!session && !bearerToken) {
       return reply.code(401).send({
         error: 'unauthorized',
         message: 'Authentication required',
       });
     }
 
-    // Validate CSRF
-    if (!validateCsrf(request, session)) {
+    // CSRF is only meaningful for cookie-auth'd requests — token auth is
+    // already immune to CSRF because the attacker can't read cross-origin
+    // localStorage to forge X-Auth-Token.
+    if (session && !validateCsrf(request, session)) {
       return reply.code(403).send({
         error: 'csrf_invalid',
         message: 'CSRF validation failed',
       });
     }
 
-    // Refresh tokens if needed
-    const validSession = await refreshSessionIfNeeded(session);
-    if (!validSession) {
+    // Refresh tokens if needed (cookie-session path only)
+    const validSession = session ? await refreshSessionIfNeeded(session) : null;
+    if (session && !validSession) {
       return reply.code(401).send({
         error: 'session_expired',
         message: 'Session has expired, please login again',
@@ -259,12 +269,18 @@ export async function apiProxyRoutes(fastify: FastifyInstance) {
     // Build the proxied URL
     const targetUrl = new URL(request.url, config.apiGatewayUrl);
 
-    // Prepare headers
+    // Prepare headers. For bearer-token auth, forward X-Auth-Token unchanged
+    // so the upstream API's middleware validates it; for cookie-session auth,
+    // use the refreshed access token as an Authorization: Bearer header.
     const headers: Record<string, string> = {
-      Authorization: `Bearer ${validSession.accessToken}`,
       'Content-Type': request.headers['content-type'] || 'application/json',
       Accept: request.headers['accept'] || 'application/json',
     };
+    if (validSession) {
+      headers['Authorization'] = `Bearer ${validSession.accessToken}`;
+    } else if (bearerToken) {
+      headers['X-Auth-Token'] = bearerToken;
+    }
 
     // SECURITY: Detect and log header spoofing attempts
     // Client-supplied tenant headers are NEVER trusted
@@ -275,12 +291,12 @@ export async function apiProxyRoutes(fastify: FastifyInstance) {
     if (clientTenantId || clientTenantSlug || clientUserId) {
       logger.warn(
         {
-          sessionId: validSession.id,
-          userId: validSession.userId,
+          sessionId: validSession?.id,
+          userId: validSession?.userId,
           clientTenantId,
           clientTenantSlug,
           clientUserId,
-          sessionTenantId: validSession.tenantId,
+          sessionTenantId: validSession?.tenantId,
           ip: request.ip,
           userAgent: request.headers['user-agent'],
         },
@@ -303,31 +319,29 @@ export async function apiProxyRoutes(fastify: FastifyInstance) {
       }
     }
 
-    // SECURITY: Always use session values for tenant/user context
-    // These values are from the validated Keycloak session, never from client headers
-    // Use Istio-style x-jwt-claim-* headers so backend services can process them
-    // consistently whether requests come from ingress or internal BFF
-    if (validSession.tenantId) {
-      headers['x-jwt-claim-tenant-id'] = validSession.tenantId;
-    }
-    if (validSession.tenantSlug) {
-      headers['x-jwt-claim-tenant-slug'] = validSession.tenantSlug;
-    }
+    // For cookie-session auth only: inject Istio-style x-jwt-claim-* headers
+    // so the upstream API can read tenant/user context without reparsing the
+    // JWT. Bearer-token callers already carry their identity inside the JWT
+    // the upstream middleware verifies, so no claim-copying is needed.
+    if (validSession) {
+      if (validSession.tenantId) {
+        headers['x-jwt-claim-tenant-id'] = validSession.tenantId;
+      }
+      if (validSession.tenantSlug) {
+        headers['x-jwt-claim-tenant-slug'] = validSession.tenantSlug;
+      }
+      headers['x-jwt-claim-sub'] = validSession.userId;
 
-    // Add user ID from session (validated from Keycloak token)
-    // x-jwt-claim-sub is the standard Istio header for JWT subject claim
-    headers['x-jwt-claim-sub'] = validSession.userId;
-
-    // Forward user info from session so backend can auto-provision users
-    if (validSession.userInfo) {
-      const email = validSession.userInfo.email as string | undefined;
-      const name = validSession.userInfo.name as string | undefined;
-      const givenName = validSession.userInfo.given_name as string | undefined;
-      const familyName = validSession.userInfo.family_name as string | undefined;
-      if (email) headers['x-jwt-claim-email'] = email;
-      if (name) headers['x-jwt-claim-name'] = name;
-      if (givenName) headers['x-jwt-claim-given-name'] = givenName;
-      if (familyName) headers['x-jwt-claim-family-name'] = familyName;
+      if (validSession.userInfo) {
+        const email = validSession.userInfo.email as string | undefined;
+        const name = validSession.userInfo.name as string | undefined;
+        const givenName = validSession.userInfo.given_name as string | undefined;
+        const familyName = validSession.userInfo.family_name as string | undefined;
+        if (email) headers['x-jwt-claim-email'] = email;
+        if (name) headers['x-jwt-claim-name'] = name;
+        if (givenName) headers['x-jwt-claim-given-name'] = givenName;
+        if (familyName) headers['x-jwt-claim-family-name'] = familyName;
+      }
     }
 
     try {
